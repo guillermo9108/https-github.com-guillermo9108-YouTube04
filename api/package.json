@@ -1,0 +1,13 @@
+{
+  "name": "streampay-api-deps",
+  "version": "1.0.0",
+  "description": "Dependencies for Streamer and YouTube Bridge",
+  "main": "streamer.js",
+  "dependencies": {
+    "express": "^4.17.1",
+    "mysql2": "^2.3.3",
+    "cors": "^2.8.5",
+    "yt-search": "^2.10.3",
+    "@distube/ytdl-core": "^4.13.5"
+  }
+}

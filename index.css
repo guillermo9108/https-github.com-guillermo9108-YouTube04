@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Seguridad anti-desbordamiento global - Optimizada para permitir sticky */
+html, body {
+  max-width: 100%;
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  -webkit-overflow-scrolling: touch;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a; 
+}
+::-webkit-scrollbar-thumb {
+  background: #334155; 
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569; 
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+.pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}

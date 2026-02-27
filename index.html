@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>StreamPay</title>
+    
+    <!-- PWA Theme & Color -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.json" />
+    
+    <!-- iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StreamPay">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=S+P&background=4f46e5&color=fff&size=192&rounded=true&length=2">
+    
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    
+    <!-- Early PWA Capture -->
+    <script>
+      window.deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPrompt = e;
+        console.log('StreamPay: PWA Install Event Captured');
+      });
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "url": "https://esm.sh/url@^0.11.4",
+    "path": "https://esm.sh/path@^0.12.7",
+    "jsmediatags": "https://esm.sh/jsmediatags@^3.9.7",
+    "jszip": "https://esm.sh/jszip@3.10.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white overscroll-none">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

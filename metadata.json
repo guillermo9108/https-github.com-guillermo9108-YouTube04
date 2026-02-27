@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Apk StreamPay OFICIAL 0.0.16.4",
+  "description": "StreamPay - Plataforma de streaming de video y marketplace con capacidades PWA y gestión administrativa avanzada.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontend Dependencies
+      run: npm install
+
+    - name: Build Frontend
+      run: npm run build
+
+    - name: Prepare Backend Node Deps
+      run: |
+        cd api
+        # Crear un package.json si no existe para gestionar yt-search y ytdl
+        echo '{"type":"commonjs"}' > package.json
+        npm install yt-search @distube/ytdl-core
+        cd ..
+
+    - name: Prepare Release Structure
+      run: |
+        mkdir -p dist/api
+        
+        # Copiar archivos PHP
+        cp api/index_code.txt dist/api/index.php 2>/dev/null || :
+        cp api/install_code.txt dist/api/install.php 2>/dev/null || :
+        cp api/video_worker.txt dist/api/video_worker.php 2>/dev/null || :
+        cp api/transcode_worker.txt dist/api/transcode_worker.php 2>/dev/null || :
+        
+        # Copiar módulos de funciones
+        for file in api/functions_*.txt; do
+            if [ -f "$file" ]; then
+                filename=$(basename "$file" .txt)
+                cp "$file" "dist/api/$filename.php"
+            fi
+        done
+
+        # Copiar scripts de Node y package.json (sin node_modules)
+        cp api/streamer.js dist/api/streamer.js 2>/dev/null || :
+        cp api/yt_bridge.js dist/api/yt_bridge.js 2>/dev/null || :
+        cp api/package.json dist/api/package.json 2>/dev/null || :
+        
+        # Crear estructura de carpetas para subidas
+        mkdir -p dist/api/uploads/videos
+        mkdir -p dist/api/uploads/thumbnails
+        mkdir -p dist/api/uploads/avatars
+        mkdir -p dist/api/uploads/market
+
+    - name: Zip Build
+      run: |
+        cd dist
+        zip -r ../streampay-release.zip .
+        cd ..
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: streampay-build
+        path: streampay-release.zip
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: streampay-release.zip
+        tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+        name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Build {0}', github.run_number) }}
+        prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
