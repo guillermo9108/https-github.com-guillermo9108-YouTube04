@@ -12,12 +12,15 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
+require_once 'functions_utils.php';
 require_once 'functions_schema.php';
 
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
 function respond($success, $data = null, $error = null) {
+    // Limpiar cualquier salida previa (warnings, notices)
+    while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json');
     echo json_encode(['success' => $success, 'data' => $data, 'error' => $error]);
     exit;
@@ -30,8 +33,13 @@ if ($action === 'check') {
 
 if ($action === 'verify_db') {
     try {
-        $dsn = "mysql:host={$input['host']};port={$input['port']};charset=utf8mb4";
-        new PDO($dsn, $input['user'], $input['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $host = isset($input['host']) ? $input['host'] : '';
+        $port = isset($input['port']) ? $input['port'] : '3306';
+        $user = isset($input['user']) ? $input['user'] : '';
+        $pass = isset($input['password']) ? $input['password'] : '';
+        
+        $dsn = "mysql:host=$host;port=$port;charset=utf8mb4";
+        new PDO($dsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         respond(true, "Conexión exitosa");
     } catch (Exception $e) {
         respond(false, null, $e->getMessage());
