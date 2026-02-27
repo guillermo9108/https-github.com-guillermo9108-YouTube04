@@ -10,7 +10,7 @@ function auth_login($pdo, $input) {
     
     if ($user && password_verify($p, $user['password_hash'])) {
         $sid = bin2hex(random_bytes(32));
-        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $user['id']]);
         unset($user['password_hash']);
@@ -36,7 +36,7 @@ function auth_heartbeat($pdo, $input) {
     $stmt = $pdo->prepare("SELECT id, currentSessionId, role, balance, vipExpiry, is_verified_seller FROM users WHERE id = ?");
     $stmt->execute([$uid]); $user = $stmt->fetch();
     if ($user && $user['currentSessionId'] === $sid) {
-        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
         $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
         respond(true, $user);
     }
