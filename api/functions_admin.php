@@ -182,14 +182,19 @@ function admin_cleanup_files($pdo) {
 
 function admin_get_local_stats($pdo) {
     $stmt = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN transcode_status='DONE' THEN 1 ELSE 0 END) as transcoded, SUM(CASE WHEN transcode_status='WAITING' THEN 1 ELSE 0 END) as in_queue FROM videos WHERE isLocal = 1");
-    respond(true, $stmt->fetch());
+    $stats = $stmt->fetch();
+    $active = $pdo->query("SELECT id, title, transcode_progress as progress FROM videos WHERE transcode_status = 'PROCESSING'")->fetchAll();
+    $stats['active_processes'] = $active;
+    respond(true, $stats);
 }
 
 function admin_get_logs() {
     $logFile = 'transcode_log.txt';
-    if (!file_exists($logFile)) respond(true, "No hay logs disponibles.");
-    $lines = array_slice(explode("\n", file_get_contents($logFile)), -100);
-    respond(true, implode("\n", $lines));
+    if (!file_exists($logFile)) respond(true, []);
+    $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!$lines) $lines = [];
+    $lines = array_slice($lines, -100);
+    respond(true, $lines);
 }
 
 function admin_clear_logs() {
@@ -246,26 +251,45 @@ function admin_delete_transcode_profile($pdo, $ext) {
 }
 
 function admin_transcode_scan_filters($pdo, $input) {
-    $exts = $input['extensions']; // Array de extensiones a buscar, ej: ['avi', 'mkv']
-    if (empty($exts)) respond(false, null, "Debe seleccionar al menos una extensión.");
+    $onlyNonMp4 = $input['onlyNonMp4'] ?? false;
+    $onlyIncompatible = $input['onlyIncompatible'] ?? false;
+    $mode = $input['mode'] ?? 'PREVIEW';
     
-    $placeholders = implode(',', array_fill(0, count($exts), '?'));
-    $sql = "UPDATE videos SET transcode_status = 'WAITING' WHERE transcode_status = 'NONE' AND (";
-    $clauses = [];
-    foreach ($exts as $e) $clauses[] = "videoUrl LIKE ?";
-    $sql .= implode(' OR ', $clauses) . ")";
+    $where = ["isLocal = 1", "transcode_status = 'NONE'"];
+    if ($onlyNonMp4) {
+        $where[] = "videoUrl NOT LIKE '%.mp4'";
+    }
     
-    $params = [];
-    foreach ($exts as $e) $params[] = "%.$e";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    respond(true, "Videos añadidos a la cola: " . $stmt->rowCount());
+    $whereSql = implode(" AND ", $where);
+    if ($mode === 'PREVIEW') {
+        $count = $pdo->query("SELECT COUNT(*) FROM videos WHERE $whereSql")->fetchColumn();
+        respond(true, ['count' => (int)$count]);
+    } else {
+        $pdo->exec("UPDATE videos SET transcode_status = 'WAITING' WHERE $whereSql");
+        respond(true, "Videos añadidos a la cola.");
+    }
 }
 
 function admin_transcode_batch($pdo) {
     $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING' WHERE transcode_status = 'NONE' AND isLocal = 1")->execute();
     respond(true, "Toda la biblioteca local añadida a la cola.");
+}
+
+function admin_process_next_transcode($pdo) {
+    // Busca el siguiente video en la cola
+    $stmt = $pdo->query("SELECT id, videoUrl FROM videos WHERE transcode_status = 'WAITING' ORDER BY createdAt ASC LIMIT 1");
+    $video = $stmt->fetch();
+    
+    if (!$video) {
+        respond(true, null, "No hay videos pendientes en la cola.");
+    }
+    
+    // Marcamos como procesando para evitar colisiones
+    $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING' WHERE id = ?")->execute([$video['id']]);
+    
+    // En un entorno real, aquí se dispararía el comando ffmpeg.
+    // En esta arquitectura, el frontend o un cron worker se encarga de la ejecución pesada.
+    respond(true, $video);
 }
 
 function admin_stop_transcoder($pdo) {
@@ -411,7 +435,7 @@ function admin_get_seller_verification_requests($pdo) {
 }
 
 function admin_handle_seller_verification($pdo, $input) {
-    $id = $input['id'];
+    $id = $input['reqId'] ?? $input['id'];
     $status = $input['status'];
     $pdo->beginTransaction();
     try {

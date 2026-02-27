@@ -2,7 +2,7 @@ import {
     User, Video, Transaction, VipPlan, Comment, UserInteraction, 
     Notification as AppNotification, VideoResult, ContentRequest, 
     MarketplaceItem, MarketplaceReview, BalanceRequest, VipRequest, 
-    SmartCleanerResult, FtpFile, SystemSettings 
+    SmartCleanerResult, FtpFile, SystemSettings, SellerVerificationRequest 
 } from '../types';
 
 interface VideoPagedResponse {
@@ -338,6 +338,118 @@ class DBService {
     public async fixLibraryMetadata(): Promise<any> { return this.request<any>(`action=fix_library_metadata`, { method: 'POST' }); }
     public async adminCleanupSystemFiles(): Promise<any> { return this.request<any>(`action=admin_cleanup_files`, { method: 'POST' }); }
     public async adminRepairDb(): Promise<any> { return this.request<any>(`action=admin_repair_db`, { method: 'POST' }); }
+    public async getSellerVerificationRequests(): Promise<SellerVerificationRequest[]> {
+        return this.request<SellerVerificationRequest[]>('action=get_seller_verification_requests');
+    }
+
+    public async handleSellerVerification(reqId: string, status: 'APPROVED' | 'REJECTED'): Promise<void> {
+        return this.request<void>('action=admin_handle_seller_verification', {
+            method: 'POST',
+            body: JSON.stringify({ reqId, status })
+        });
+    }
+
+    public async submitSellerVerification(data: { fullName: string, idNumber: string, address: string, mobile: string, userId: string }): Promise<void> {
+        return this.request<void>('action=submit_seller_verification', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    public async adminGetLogs(): Promise<string[]> {
+        return this.request<string[]>('action=admin_get_logs');
+    }
+
+    public async adminClearLogs(): Promise<void> {
+        return this.request<void>('action=admin_clear_logs', { method: 'POST' });
+    }
+
+    public async adminGetTranscodeProfiles(): Promise<any[]> {
+        return this.request<any[]>('action=admin_get_transcode_profiles');
+    }
+
+    public async adminSaveTranscodeProfile(profile: { extension: string, command_args: string, description: string }): Promise<void> {
+        return this.request<void>('action=admin_save_transcode_profile', {
+            method: 'POST',
+            body: JSON.stringify(profile)
+        });
+    }
+
+    public async adminDeleteTranscodeProfile(extension: string): Promise<void> {
+        return this.request<void>(`action=admin_delete_transcode_profile&extension=${extension}`, { method: 'POST' });
+    }
+
+    public async adminTranscodeScanFilters(filters: { onlyNonMp4: boolean, onlyIncompatible: boolean, mode: 'PREVIEW' | 'EXECUTE' }): Promise<any> {
+        return this.request<any>('action=admin_transcode_scan_filters', {
+            method: 'POST',
+            body: JSON.stringify(filters)
+        });
+    }
+
+    public async adminRetryFailedTranscodes(): Promise<void> {
+        return this.request<void>('action=admin_retry_failed_transcodes', { method: 'POST' });
+    }
+
+    public async adminClearTranscodeQueue(): Promise<void> {
+        return this.request<void>('action=admin_clear_transcode_queue', { method: 'POST' });
+    }
+
+    public async adminRemoveFromQueue(videoId: string): Promise<void> {
+        return this.request<void>(`action=admin_remove_from_queue&videoId=${videoId}`, { method: 'POST' });
+    }
+
+    public async adminSkipTranscode(videoId: string): Promise<void> {
+        return this.request<void>(`action=admin_skip_transcode&videoId=${videoId}`, { method: 'POST' });
+    }
+
+    public async adminGetLocalStats(): Promise<any> {
+        return this.request<any>('action=admin_get_local_stats');
+    }
+
+    public async getRealStats(): Promise<any> {
+        return this.request<any>('action=get_real_stats');
+    }
+
+    public async adminProcessNextTranscode(): Promise<void> {
+        return this.request<void>('action=admin_process_next_transcode', { method: 'POST' });
+    }
+
+    public async adminStopTranscoder(): Promise<void> {
+        return this.request<void>('action=admin_stop_transcoder', { method: 'POST' });
+    }
+
+    public async adminSmartCleanerPreview(filters: any): Promise<SmartCleanerResult> {
+        return this.request<SmartCleanerResult>('action=admin_smart_cleaner_preview', {
+            method: 'POST',
+            body: JSON.stringify(filters)
+        });
+    }
+
+    public async adminSmartCleanerExecute(filters: any): Promise<any> {
+        return this.request<any>('action=admin_smart_cleaner_execute', {
+            method: 'POST',
+            body: JSON.stringify(filters)
+        });
+    }
+
+    public async adminExtremeJanitor(filters: any): Promise<any> {
+        return this.request<any>('action=admin_extreme_janitor', {
+            method: 'POST',
+            body: JSON.stringify(filters)
+        });
+    }
+
+    public async adminFileCleanupPreview(type: string): Promise<any> {
+        return this.request<any>(`action=admin_file_cleanup_preview&type=${type}`);
+    }
+
+    public async adminOrganizePaquete(data: any): Promise<any> {
+        return this.request<any>('action=admin_organize_paquete', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
     public invalidateCache(key?: string) {
         if (!key || key.includes('get_videos')) {
         }

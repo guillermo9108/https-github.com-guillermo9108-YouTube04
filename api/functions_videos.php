@@ -175,7 +175,11 @@ function video_scan_local($pdo, $input) {
             }
         }
     }
-    respond(true, "Escaneo completado. $count nuevos archivos encontrados.");
+    respond(true, [
+        'totalFound' => $it->count() ?? $count, // Aproximación si no es contable
+        'newToImport' => $count,
+        'errors' => []
+    ]);
 }
 
 function video_delete($pdo, $input) {
@@ -227,4 +231,109 @@ function video_organize_single($pdo, $id, $sets) {
         }
     }
     return false;
+}
+
+function video_get_by_creator($pdo, $userId) {
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? ORDER BY createdAt DESC");
+    $stmt->execute([$userId]);
+    $res = $stmt->fetchAll();
+    foreach ($res as &$v) $v['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
+    respond(true, $res);
+}
+
+function video_get_unprocessed($pdo) {
+    $limit = intval($_GET['limit'] ?? 50);
+    $mode = $_GET['mode'] ?? 'normal';
+    
+    $sql = "SELECT * FROM videos WHERE (thumbnailUrl IS NULL OR thumbnailUrl = '' OR duration = 0)";
+    if ($mode === 'transcode') {
+        $sql = "SELECT * FROM videos WHERE transcode_status = 'WAITING'";
+    }
+    
+    $sql .= " ORDER BY createdAt DESC LIMIT $limit";
+    respond(true, $pdo->query($sql)->fetchAll());
+}
+
+function video_update_metadata($pdo, $post, $files) {
+    $id = $post['id'];
+    $duration = intval($post['duration'] ?? 0);
+    $success = ($post['success'] ?? '1') === '1';
+    
+    $fields = ["duration = ?", "processing_attempts = processing_attempts + 1"];
+    $params = [$duration];
+    
+    if (isset($files['thumbnail'])) {
+        $tDir = 'uploads/thumbnails/';
+        if (!is_dir($tDir)) mkdir($tDir, 0777, true);
+        $tPath = $tDir . $id . '.jpg';
+        move_uploaded_file($files['thumbnail']['tmp_name'], $tPath);
+        $fields[] = "thumbnailUrl = ?";
+        $params[] = 'api/' . $tPath;
+    }
+    
+    if (!$success) {
+        $fields[] = "transcode_status = 'FAILED'";
+    } else if ($duration > 0) {
+        $fields[] = "transcode_status = 'DONE'";
+    }
+    
+    $params[] = $id;
+    $pdo->prepare("UPDATE videos SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+    respond(true);
+}
+
+function video_get_scan_folders($pdo) {
+    $stmt = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+    $root = rtrim($stmt->fetchColumn() ?: '', '/');
+    if (!$root || !is_dir($root)) respond(true, []);
+    
+    $folders = [];
+    $items = scandir($root);
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') continue;
+        if (is_dir($root . '/' . $item)) {
+            $folders[] = [
+                'name' => $item,
+                'path' => $root . '/' . $item,
+                'relativePath' => $item
+            ];
+        }
+    }
+    respond(true, $folders);
+}
+
+function video_get_admin_stats($pdo) {
+    $stats = [
+        'pending' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PENDING'")->fetchColumn(),
+        'locked' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE transcode_status = 'PROCESSING'")->fetchColumn(),
+        'available' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE (thumbnailUrl IS NULL OR thumbnailUrl = '' OR duration = 0) AND transcode_status != 'PROCESSING'")->fetchColumn(),
+        'processing' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE transcode_status = 'WAITING'")->fetchColumn(),
+        'broken' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE duration = 0 AND transcode_status = 'DONE'")->fetchColumn(),
+        'failed' => (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE transcode_status = 'FAILED'")->fetchColumn(),
+        'total' => (int)$pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn()
+    ];
+    respond(true, $stats);
+}
+
+function video_process_batch($pdo) {
+    // Esta función suele ser llamada para iniciar el procesamiento de videos pendientes
+    // En este entorno, simplemente devolvemos éxito y dejamos que el worker haga su trabajo
+    respond(true, "Procesamiento de lote iniciado.");
+}
+
+function video_reorganize_all($pdo) {
+    $stmtS = $pdo->query("SELECT * FROM system_settings WHERE id = 1");
+    $sets = $stmtS->fetch();
+    $stmt = $pdo->query("SELECT id FROM videos WHERE isLocal = 1");
+    $count = 0;
+    while ($v = $stmt->fetch()) {
+        if (video_organize_single($pdo, $v['id'], $sets)) $count++;
+    }
+    respond(true, "Se reorganizaron $count videos.");
+}
+
+function video_fix_metadata($pdo) {
+    // Intenta corregir metadatos básicos como categorías vacías
+    $pdo->exec("UPDATE videos SET category = 'GENERAL' WHERE category IS NULL OR category = '' OR category = 'PENDING'");
+    respond(true, "Metadatos de la biblioteca corregidos.");
 }
