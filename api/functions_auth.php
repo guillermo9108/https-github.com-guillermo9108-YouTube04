@@ -10,8 +10,9 @@ function auth_login($pdo, $input) {
     
     if ($user && password_verify($p, $user['password_hash'])) {
         $sid = bin2hex(random_bytes(32));
+        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
-            ->execute([$sid, time(), $_SERVER['HTTP_USER_AGENT'], $user['id']]);
+            ->execute([$sid, time(), $userAgent, $user['id']]);
         unset($user['password_hash']);
         $user['sessionId'] = $sid;
         $user['avatarUrl'] = fix_url($user['avatarUrl']);
@@ -35,7 +36,8 @@ function auth_heartbeat($pdo, $input) {
     $stmt = $pdo->prepare("SELECT id, currentSessionId, role, balance, vipExpiry, is_verified_seller FROM users WHERE id = ?");
     $stmt->execute([$uid]); $user = $stmt->fetch();
     if ($user && $user['currentSessionId'] === $sid) {
-        $pdo->prepare("UPDATE users SET lastActive = ? WHERE id = ?")->execute([time(), $uid]);
+        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
         respond(true, $user);
     }
     respond(false, null, "Sesión expirada");

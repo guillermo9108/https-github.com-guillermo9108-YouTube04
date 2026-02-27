@@ -11,8 +11,8 @@ function video_get_all($pdo) {
     $folder = $_GET['folder'] ?? '';
     $query = $_GET['q'] ?? '';
     $category = $_GET['category'] ?? 'TODOS';
-    $mediaFilter = $_GET['mediaFilter'] ?? 'ALL';
-    $sort = $_GET['sort'] ?? '';
+    $mediaFilter = $_GET['mediaFilter'] ?? $_GET['media_type'] ?? 'ALL';
+    $sort = $_GET['sort'] ?? $_GET['sort_order'] ?? '';
 
     $where = ["transcode_status != 'PROCESSING'"];
     $params = [];
@@ -32,11 +32,17 @@ function video_get_all($pdo) {
     }
     if ($mediaFilter === 'VIDEO') $where[] = "is_audio = 0";
     if ($mediaFilter === 'AUDIO') $where[] = "is_audio = 1";
+    if ($mediaFilter === 'SHORTS') {
+        $where[] = "is_audio = 0 AND duration < 60";
+    }
 
     $orderBy = "createdAt DESC";
     if ($sort === 'ALPHA') $orderBy = "title ASC";
-    if ($sort === 'LATEST') $orderBy = "createdAt DESC";
+    if ($sort === 'LATEST' || $sort === 'recent') $orderBy = "createdAt DESC";
     if ($sort === 'RANDOM') $orderBy = "RAND()";
+    if ($sort === 'views' || $sort === 'POPULAR') $orderBy = "views DESC";
+    if ($sort === 'price_asc') $orderBy = "price ASC";
+    if ($sort === 'price_desc') $orderBy = "price DESC";
 
     $whereSql = implode(" AND ", $where);
     

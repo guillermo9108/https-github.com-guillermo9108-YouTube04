@@ -168,6 +168,7 @@ try {
         case 'checkout_cart': market_checkout($pdo, $input); break;
         case 'admin_delete_listing': market_admin_delete_listing($pdo, $input); break;
         case 'get_reviews': market_get_reviews($pdo, $_GET['itemId'] ?? ''); break;
+        case 'get_my_sales': market_get_my_sales($pdo, $_GET['userId'] ?? ''); break;
         case 'add_review': market_add_review($pdo, $input); break;
         case 'get_system_settings': admin_get_settings($pdo); break;
         case 'update_system_settings': admin_update_settings($pdo, $input); break;
@@ -204,6 +205,7 @@ try {
         case 'admin_smart_cleaner_execute': admin_smart_cleaner_execute($pdo, $input); break;
         case 'admin_extreme_janitor': admin_extreme_janitor($pdo, $input); break;
         case 'admin_file_cleanup_preview': admin_file_cleanup_preview($pdo, $_GET['type'] ?? ''); break;
+        case 'client_log': admin_client_log($input); break;
         case 'admin_organize_paquete': admin_organize_paquete($pdo, $input); break;
         case 'list_ftp_files': if(function_exists('listFtpFiles')) listFtpFiles($pdo, $_GET['path'] ?? '/'); else respond(false, null, "Módulo FTP no disponible"); break;
         case 'import_ftp_file': if(function_exists('importFtpFile')) importFtpFile($pdo, $input); else respond(false, null, "Módulo FTP no disponible"); break;

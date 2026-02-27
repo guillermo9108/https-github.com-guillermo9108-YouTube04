@@ -32,18 +32,6 @@ function interact_submit_seller_verification($pdo, $input) {
     respond(true);
 }
 
-function admin_get_seller_verification_requests($pdo) {
-    respond(true, $pdo->query("SELECT sv.*, u.username FROM seller_verifications sv JOIN users u ON sv.userId = u.id WHERE sv.status = 'PENDING' ORDER BY sv.createdAt DESC")->fetchAll());
-}
-
-function admin_handle_seller_verification($pdo, $input) {
-    $reqId = $input['reqId']; $status = $input['status']; $pdo->beginTransaction();
-    $stmt = $pdo->prepare("SELECT userId FROM seller_verifications WHERE id = ?"); $stmt->execute([$reqId]); $uid = $stmt->fetchColumn();
-    if ($status === 'APPROVED') $pdo->prepare("UPDATE users SET is_verified_seller = 1 WHERE id = ?")->execute([$uid]);
-    $pdo->prepare("UPDATE seller_verifications SET status = ? WHERE id = ?")->execute([$status, $reqId]);
-    $pdo->commit(); respond(true);
-}
-
 function interact_has_purchased($pdo, $userId, $videoId) {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE buyerId = ? AND videoId = ? AND type = 'PURCHASE'"); $stmt->execute([$userId, $videoId]);
     respond(true, ['hasPurchased' => $stmt->fetchColumn() > 0]);

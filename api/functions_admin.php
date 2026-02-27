@@ -390,3 +390,37 @@ function admin_organize_paquete($pdo, $input) {
     }
     respond(true, "Se organizaron $count archivos.");
 }
+
+function admin_client_log($input) {
+    $msg = $input['message'] ?? '';
+    $level = $input['level'] ?? 'ERROR';
+    $log = "[" . date('Y-m-d H:i:s') . "] [$level] $msg\n";
+    file_put_contents('client_errors.log', $log, FILE_APPEND);
+    respond(true);
+}
+
+function admin_get_seller_verification_requests($pdo) {
+    $stmt = $pdo->query("SELECT sv.*, u.username FROM seller_verifications sv JOIN users u ON sv.userId = u.id WHERE sv.status = 'PENDING' ORDER BY sv.createdAt DESC");
+    respond(true, $stmt->fetchAll());
+}
+
+function admin_handle_seller_verification($pdo, $input) {
+    $id = $input['id'];
+    $status = $input['status'];
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT userId FROM seller_verifications WHERE id = ?");
+        $stmt->execute([$id]);
+        $uid = $stmt->fetchColumn();
+        
+        $pdo->prepare("UPDATE seller_verifications SET status = ? WHERE id = ?")->execute([$status, $id]);
+        if ($status === 'APPROVED') {
+            $pdo->prepare("UPDATE users SET is_verified_seller = 1 WHERE id = ?")->execute([$uid]);
+        }
+        $pdo->commit();
+        respond(true);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        respond(false, null, $e->getMessage());
+    }
+}
