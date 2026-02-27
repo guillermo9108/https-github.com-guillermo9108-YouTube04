@@ -87,4 +87,3 @@ if ($action === 'install') {
 }
 
 respond(false, null, "Acción no válida");
-?>

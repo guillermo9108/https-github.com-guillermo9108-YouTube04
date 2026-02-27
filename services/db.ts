@@ -129,7 +129,15 @@ class DBService {
     }
 
     public async verifyDbConnection(config: any): Promise<boolean> {
-        return fetch('api/install.php?action=verify_db', { method: 'POST', body: JSON.stringify(config) }).then(r => r.json()).then(res => res.success);
+        const res = await fetch('api/install.php?action=verify_db', { 
+            method: 'POST', 
+            body: JSON.stringify(config) 
+        }).then(r => r.json());
+        
+        if (!res.success) {
+            throw new Error(res.error || 'Connection failed');
+        }
+        return true;
     }
 
     public async initializeSystem(dbConfig: any, adminConfig: any): Promise<void> {
