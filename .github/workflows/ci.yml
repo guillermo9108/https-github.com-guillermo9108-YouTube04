@@ -33,29 +33,17 @@ jobs:
     - name: Prepare Backend Node Deps
       run: |
         cd api
-        # Crear un package.json si no existe para gestionar yt-search y ytdl
-        echo '{"type":"commonjs"}' > package.json
-        npm install yt-search @distube/ytdl-core
+        # Usar el package.json existente e instalar dependencias
+        npm install
         cd ..
 
     - name: Prepare Release Structure
       run: |
         mkdir -p dist/api
         
-        # Copiar archivos PHP
-        cp api/index_code.txt dist/api/index.php 2>/dev/null || :
-        cp api/install_code.txt dist/api/install.php 2>/dev/null || :
-        cp api/video_worker.txt dist/api/video_worker.php 2>/dev/null || :
-        cp api/transcode_worker.txt dist/api/transcode_worker.php 2>/dev/null || :
+        # Copiar todos los archivos PHP (ya no se usan archivos .txt intermedios)
+        cp api/*.php dist/api/ 2>/dev/null || :
         
-        # Copiar módulos de funciones
-        for file in api/functions_*.txt; do
-            if [ -f "$file" ]; then
-                filename=$(basename "$file" .txt)
-                cp "$file" "dist/api/$filename.php"
-            fi
-        done
-
         # Copiar scripts de Node y package.json (sin node_modules)
         cp api/streamer.js dist/api/streamer.js 2>/dev/null || :
         cp api/yt_bridge.js dist/api/yt_bridge.js 2>/dev/null || :

@@ -330,6 +330,30 @@ function admin_smart_cleaner_execute($pdo, $input) {
     respond(true, "Se eliminaron " . count($ids) . " registros de la base de datos.");
 }
 
+function admin_extreme_janitor($pdo, $input) {
+    $cat = $input['category'] ?? 'ALL';
+    $minDays = intval($input['minDays'] ?? 30);
+    $maxViews = intval($input['maxViews'] ?? 5);
+    $limit = intval($input['maxDeleteLimit'] ?? 100);
+    
+    $threshold = time() - ($minDays * 86400);
+    
+    $sql = "DELETE FROM videos WHERE views <= ? AND createdAt < ?";
+    $params = [$maxViews, $threshold];
+    
+    if ($cat !== 'ALL') {
+        $sql .= " AND category = ?";
+        $params[] = $cat;
+    }
+    
+    $sql .= " LIMIT $limit";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    
+    respond(true, "Janitor completado. Registros eliminados: " . $stmt->rowCount());
+}
+
 function admin_file_cleanup_preview($pdo, $type) {
     $results = [];
     if ($type === 'THUMBS') {

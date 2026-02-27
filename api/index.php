@@ -72,6 +72,7 @@ require_once 'functions_interactions.php';
 require_once 'functions_market.php';
 require_once 'functions_admin.php';
 require_once 'functions_portability.php';
+require_once 'functions_analytics.php';
 
 if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';
 if (file_exists('functions_payment.php')) require_once 'functions_payment.php';
@@ -81,6 +82,8 @@ $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
 try {
     switch ($action) {
+        case 'get_detailed_stats': analytics_get_detailed_stats($pdo); break;
+        case 'get_revenue_chart': analytics_get_revenue_chart($pdo); break;
         case 'submit_seller_verification': interact_submit_seller_verification($pdo, $input); break;
         case 'get_seller_verification_requests': admin_get_seller_verification_requests($pdo); break;
         case 'admin_handle_seller_verification': admin_handle_seller_verification($pdo, $input); break;
@@ -199,6 +202,7 @@ try {
         case 'admin_skip_transcode': admin_skip_transcode($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_smart_cleaner_preview': admin_smart_cleaner_preview($pdo, $input); break;
         case 'admin_smart_cleaner_execute': admin_smart_cleaner_execute($pdo, $input); break;
+        case 'admin_extreme_janitor': admin_extreme_janitor($pdo, $input); break;
         case 'admin_file_cleanup_preview': admin_file_cleanup_preview($pdo, $_GET['type'] ?? ''); break;
         case 'admin_organize_paquete': admin_organize_paquete($pdo, $input); break;
         case 'list_ftp_files': if(function_exists('listFtpFiles')) listFtpFiles($pdo, $_GET['path'] ?? '/'); else respond(false, null, "Módulo FTP no disponible"); break;

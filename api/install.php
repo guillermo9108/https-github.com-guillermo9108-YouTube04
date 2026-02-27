@@ -23,13 +23,28 @@ function respond($success, $data = null, $error = null) {
     exit;
 }
 
+if ($action === 'check') {
+    $installed = file_exists('db_config.json');
+    respond(true, ['installed' => $installed]);
+}
+
+if ($action === 'verify_db') {
+    try {
+        $dsn = "mysql:host={$input['host']};port={$input['port']};charset=utf8mb4";
+        new PDO($dsn, $input['user'], $input['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        respond(true, "Conexión exitosa");
+    } catch (Exception $e) {
+        respond(false, null, $e->getMessage());
+    }
+}
+
 if ($action === 'install') {
     $config = [
-        'host' => $input['host'],
-        'port' => $input['port'],
-        'user' => $input['user'],
-        'password' => $input['password'],
-        'name' => $input['name']
+        'host' => $input['dbConfig']['host'],
+        'port' => $input['dbConfig']['port'],
+        'user' => $input['dbConfig']['user'],
+        'password' => $input['dbConfig']['password'],
+        'name' => $input['dbConfig']['name']
     ];
 
     try {
@@ -47,9 +62,9 @@ if ($action === 'install') {
 
         // Crear Admin Inicial
         $adminId = 'admin_' . uniqid();
-        $pass = password_hash($input['adminPass'], PASSWORD_DEFAULT);
+        $pass = password_hash($input['adminUser']['password'], PASSWORD_DEFAULT);
         $stmt = $pdo->prepare("INSERT IGNORE INTO users (id, username, password_hash, role, balance) VALUES (?, ?, ?, 'ADMIN', 1000)");
-        $stmt->execute([$adminId, $input['adminUser'], $pass, 1000]);
+        $stmt->execute([$adminId, $input['adminUser']['username'], $pass]);
 
         // Configuración inicial del sistema
         $pdo->exec("INSERT IGNORE INTO system_settings (id, ffmpegPath) VALUES (1, 'ffmpeg')");
