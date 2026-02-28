@@ -10,7 +10,8 @@ function auth_login($pdo, $input) {
     
     if ($user && password_verify($p, $user['password_hash'])) {
         $sid = bin2hex(random_bytes(32));
-        $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        $userAgent = $input['deviceId'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $userAgent = substr($userAgent, 0, 255);
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $user['id']]);
         unset($user['password_hash']);
@@ -24,9 +25,11 @@ function auth_login($pdo, $input) {
 function auth_register($pdo, $input) {
     $u = $input['username']; $p = password_hash($input['password'], PASSWORD_DEFAULT);
     $id = 'u_' . uniqid();
+    $userAgent = $input['deviceId'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $userAgent = substr($userAgent, 0, 255);
     try {
-        $pdo->prepare("INSERT INTO users (id, username, password_hash, role, balance) VALUES (?, ?, ?, 'USER', 0)")
-            ->execute([$id, $u, $p]);
+        $pdo->prepare("INSERT INTO users (id, username, password_hash, role, balance, lastActive, lastDeviceId) VALUES (?, ?, ?, 'USER', 0, ?, ?)")
+            ->execute([$id, $u, $p, time(), $userAgent]);
         respond(true, ['id' => $id, 'username' => $u]);
     } catch (Exception $e) { respond(false, null, "El usuario ya existe"); }
 }
@@ -36,7 +39,8 @@ function auth_heartbeat($pdo, $input) {
     $stmt = $pdo->prepare("SELECT id, currentSessionId, role, balance, vipExpiry, is_verified_seller FROM users WHERE id = ?");
     $stmt->execute([$uid]); $user = $stmt->fetch();
     if ($user && $user['currentSessionId'] === $sid) {
-        $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        $userAgent = $input['deviceId'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $userAgent = substr($userAgent, 0, 255);
         $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
         respond(true, $user);
     }
