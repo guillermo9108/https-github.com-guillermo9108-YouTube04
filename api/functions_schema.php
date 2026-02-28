@@ -1,3 +1,4 @@
+
 <?php
 // DEFINICIÓN DEL ESQUEMA MAESTRO V1.6 (Identity Verification)
 function getAppSchema() {
@@ -13,7 +14,7 @@ function getAppSchema() {
                 'watchLater' => 'JSON',
                 'currentSessionId' => 'VARCHAR(64) DEFAULT NULL',
                 'lastActive' => 'BIGINT DEFAULT 0',
-                'lastDeviceId' => 'TEXT',
+                'lastDeviceId' => 'VARCHAR(100) DEFAULT NULL',
                 'avatarUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'defaultPrices' => 'JSON DEFAULT NULL',
                 'shippingDetails' => 'JSON DEFAULT NULL',
@@ -285,7 +286,8 @@ function syncTable($pdo, $tableName, $def) {
                 }
             }
         }
-    } catch (Throwable $e) { 
+    } catch (Exception $e) { 
         write_log("Sync Error en $tableName: " . $e->getMessage(), 'ERROR');
     }
 }
+?>
