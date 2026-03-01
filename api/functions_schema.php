@@ -1,4 +1,3 @@
-
 <?php
 // DEFINICIÓN DEL ESQUEMA MAESTRO V1.6 (Identity Verification)
 function getAppSchema() {
@@ -14,7 +13,7 @@ function getAppSchema() {
                 'watchLater' => 'JSON',
                 'currentSessionId' => 'VARCHAR(64) DEFAULT NULL',
                 'lastActive' => 'BIGINT DEFAULT 0',
-                'lastDeviceId' => 'VARCHAR(100) DEFAULT NULL',
+                'lastDeviceId' => 'VARCHAR(255) DEFAULT NULL',
                 'avatarUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'defaultPrices' => 'JSON DEFAULT NULL',
                 'shippingDetails' => 'JSON DEFAULT NULL',

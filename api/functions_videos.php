@@ -431,7 +431,7 @@ function video_upload($pdo, $post, $files) {
 function video_update_metadata($pdo, $post, $files) {
     $id = $post['id']; 
     $success = ($post['success'] ?? '1') === '1';
-    if (!$success) { 
+    if (!$success) {
         $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0 WHERE id = ?")->execute([$id]); 
         respond(true); 
     }
@@ -525,7 +525,7 @@ function video_smart_organize($pdo) {
     $stmt = $pdo->query("SELECT id FROM videos WHERE category = 'PROCESSING'");
     $processed = 0;
     while ($id = $stmt->fetchColumn()) { 
-        video_organize_single($pdo, $id, $settings); 
+        video_organize_single($pdo, $id, $settings);
         $processed++; 
     }
     respond(true, ['processed' => $processed]);

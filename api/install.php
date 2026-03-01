@@ -1,107 +1,82 @@
 <?php
 ob_start();
-ini_set('display_errors', 0);
+/**
+ * StreamPay - Installer V1.2.0
+ */
+ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { ob_clean(); http_response_code(200); exit(); }
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
 require_once 'functions_schema.php';
 
-register_shutdown_function(function() {
-    $error = error_get_last();
-    if ($error && ($error['type'] === E_ERROR || $error['type'] === E_PARSE || $error['type'] === E_CORE_ERROR)) {
-        ob_clean();
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Critical Install Error: ' . $error['message']]);
-        exit;
-    }
-});
-
 $action = $_GET['action'] ?? '';
-$input = json_decode(file_get_contents('php://input'), true);
-$configFile = 'db_config.json';
+$input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
 function respond($success, $data = null, $error = null) {
-    ob_clean();
     header('Content-Type: application/json');
     echo json_encode(['success' => $success, 'data' => $data, 'error' => $error]);
-    exit();
+    exit;
 }
 
-if ($action === 'ping') respond(true, ['message' => 'pong']);
-
 if ($action === 'check') {
-    if (file_exists($configFile)) {
-        $config = json_decode(file_get_contents($configFile), true);
-        try {
-            $pdo = new PDO("mysql:host={$config['host']};port={$config['port']}", $config['user'], $config['password']);
-            $pdo->exec("USE `{$config['name']}`");
-            if ($pdo->query("SHOW TABLES LIKE 'users'")->rowCount() > 0) respond(true, ['installed' => true]);
-        } catch (Exception $e) {}
-    }
-    respond(true, ['installed' => false]);
+    $installed = file_exists('db_config.json');
+    respond(true, ['installed' => $installed]);
 }
 
 if ($action === 'verify_db') {
-    $host = $input['host'] ?? 'localhost';
     try {
-        $pdo = new PDO("mysql:host=$host;port={$input['port']};charset=utf8mb4", $input['username'], $input['password']);
-        respond(true, ['message' => 'Connection successful']);
-    } catch (PDOException $e) { respond(false, null, 'Connection failed: ' . $e->getMessage()); }
+        $dsn = "mysql:host={$input['host']};port={$input['port']};charset=utf8mb4";
+        new PDO($dsn, $input['user'], $input['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        respond(true, "Conexión exitosa");
+    } catch (Exception $e) {
+        respond(false, null, $e->getMessage());
+    }
 }
 
 if ($action === 'install') {
-    $dbConfig = $input['dbConfig'];
-    $adminUser = $input['adminUser'];
+    $config = [
+        'host' => $input['dbConfig']['host'],
+        'port' => $input['dbConfig']['port'],
+        'user' => $input['dbConfig']['user'],
+        'password' => $input['dbConfig']['password'],
+        'name' => $input['dbConfig']['name']
+    ];
 
     try {
-        $pdo = new PDO("mysql:host={$dbConfig['host']};port={$dbConfig['port']};charset=utf8mb4", $dbConfig['username'], $dbConfig['password']);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $dsn = "mysql:host={$config['host']};port={$config['port']};charset=utf8mb4";
+        $pdo = new PDO($dsn, $config['user'], $config['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        
+        $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$config['name']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $pdo->exec("USE `{$config['name']}`");
 
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbConfig['database']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("USE `{$dbConfig['database']}`");
-
+        // Sincronizar todas las tablas
         $schema = getAppSchema();
         foreach ($schema as $tableName => $def) {
             syncTable($pdo, $tableName, $def);
         }
+
+        // Crear Admin Inicial
+        $adminId = 'admin_' . uniqid();
+        $pass = password_hash($input['adminUser']['password'], PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT IGNORE INTO users (id, username, password_hash, role, balance) VALUES (?, ?, ?, 'ADMIN', 1000)");
+        $stmt->execute([$adminId, $input['adminUser']['username'], $pass]);
+
+        // Configuración inicial del sistema
+        $pdo->exec("INSERT IGNORE INTO system_settings (id, ffmpegPath) VALUES (1, 'ffmpeg')");
+
+        // Guardar config
+        file_put_contents('db_config.json', json_encode($config, JSON_PRETTY_PRINT));
         
-        $pdo->exec("INSERT IGNORE INTO system_settings (id) VALUES (1)");
-
-        $adminId = 'u_' . uniqid();
-        $hash = password_hash($adminUser['password'], PASSWORD_DEFAULT);
-        
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
-        $stmt->execute([$adminUser['username']]);
-        if ($stmt->fetchColumn() == 0) {
-            $stmt = $pdo->prepare("INSERT INTO users (id, username, password_hash, role, balance, autoPurchaseLimit, watchLater) VALUES (?, ?, ?, 'ADMIN', 999999.00, 100.00, '[]')");
-            $stmt->execute([$adminId, $adminUser['username'], $hash]);
-        }
-        
-        $pdo->prepare("UPDATE users SET role = 'ADMIN' WHERE username = ?")->execute([$adminUser['username']]);
-
-        $configData = [
-            'host' => $dbConfig['host'],
-            'port' => $dbConfig['port'],
-            'user' => $dbConfig['username'],
-            'password' => $dbConfig['password'],
-            'name' => $dbConfig['database']
-        ];
-        file_put_contents($configFile, json_encode($configData));
-
-        if (!file_exists('uploads/videos')) mkdir('uploads/videos', 0777, true);
-        if (!file_exists('uploads/thumbnails')) mkdir('uploads/thumbnails', 0777, true);
-        if (!file_exists('uploads/avatars')) mkdir('uploads/avatars', 0777, true);
-        if (!file_exists('uploads/market')) mkdir('uploads/market', 0777, true);
-
-        respond(true, ['message' => 'Installation successful']);
-
-    } catch (PDOException $e) {
-        respond(false, null, 'Installation error: ' . $e->getMessage());
+        respond(true, "Instalación completada con éxito");
+    } catch (Exception $e) {
+        respond(false, null, "Error: " . $e->getMessage());
     }
 }
+
+respond(false, null, "Acción no válida");
 ?>

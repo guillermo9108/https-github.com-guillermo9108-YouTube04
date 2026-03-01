@@ -16,9 +16,9 @@ export default function Setup() {
   const [dbConfig, setDbConfig] = useState({
     host: '127.0.0.1', // Default to IP to force TCP/IP and avoid socket errors
     port: '3306',
-    user: 'root',
+    username: 'root',
     password: '',
-    name: 'streampay_db'
+    database: 'streampay_db'
   });
 
   const [adminConfig, setAdminConfig] = useState({
@@ -32,7 +32,6 @@ export default function Setup() {
   // --- Step 1: DB Config ---
   const handleDbConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Formulario enviado:', dbConfig);
     setLoading(true);
     setError('');
 
@@ -79,7 +78,7 @@ export default function Setup() {
     const logs = [
       'Connecting to MariaDB @ ' + dbConfig.host + '...',
       'Connection established successfully.',
-      'Checking database ' + dbConfig.name + '...',
+      'Checking database ' + dbConfig.database + '...',
       'Database created.',
       'Creating table: users...',
       'Creating table: videos...',
@@ -168,13 +167,13 @@ export default function Setup() {
 
               <div className="space-y-1">
                  <label className="text-xs font-bold text-slate-500 uppercase">Database Name</label>
-                 <input required type="text" value={dbConfig.name} onChange={e => setDbConfig({...dbConfig, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="streampay" />
+                 <input required type="text" value={dbConfig.database} onChange={e => setDbConfig({...dbConfig, database: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="streampay" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                    <label className="text-xs font-bold text-slate-500 uppercase">Username</label>
-                   <input required type="text" value={dbConfig.user} onChange={e => setDbConfig({...dbConfig, user: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="root" />
+                   <input required type="text" value={dbConfig.username} onChange={e => setDbConfig({...dbConfig, username: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="root" />
                 </div>
                 <div className="space-y-1">
                    <label className="text-xs font-bold text-slate-500 uppercase">Password</label>

@@ -89,17 +89,28 @@ export default function Watch() {
         const mediaFilter = localStorage.getItem('sp_media_filter') || 'ALL';
         
         try {
-            const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any);
-            const filteredResults = res.videos;
+            let filteredResults: Video[] = [];
+            let hasMore = false;
+
+            if (navigationContext.f) {
+                // Si estamos en una carpeta, usar getFolderVideos para mantener el sortOrder
+                const res = await db.getFolderVideos(id || '');
+                filteredResults = res.videos;
+                hasMore = false; // getFolderVideos devuelve todo
+            } else {
+                const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any);
+                filteredResults = res.videos;
+                hasMore = res.hasMore;
+            }
             
-            if (p === navigationContext.p) {
+            if (p === navigationContext.p || navigationContext.f) {
                 setRelatedVideos(filteredResults.filter(v => v.id !== id));
                 setSeriesQueue(filteredResults);
             } else {
                 setRelatedVideos(prev => [...prev, ...filteredResults.filter(v => v.id !== id)]);
                 setSeriesQueue(prev => [...prev, ...filteredResults]);
             }
-            setHasMoreRelated(res.hasMore);
+            setHasMoreRelated(hasMore);
             setRelatedPage(p);
         } catch (e) {} finally { setLoadingMoreRelated(false); }
     };
