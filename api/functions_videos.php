@@ -463,6 +463,47 @@ function video_organize_single($pdo, $id, $settings) {
     interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$meta['title']}", "/watch/{$id}", $v['thumbnailUrl']);
 }
 
+function smartParseFilename($path, $currentCategory, $categories) {
+    $title = pathinfo($path, PATHINFO_FILENAME);
+    $dir = dirname($path);
+    $parts = explode('/', str_replace('\\', '/', $dir));
+    
+    $category = $currentCategory;
+    $parent_category = null;
+    $collection = null;
+
+    if (count($parts) > 0) {
+        $category = array_pop($parts);
+    }
+    if (count($parts) > 0) {
+        $parent_category = array_pop($parts);
+    }
+
+    return [
+        'title' => $title,
+        'category' => $category,
+        'parent_category' => $parent_category,
+        'collection' => $collection
+    ];
+}
+
+function getPriceForCategory($category, $settings, $parent_category = null) {
+    $cats = json_decode($settings['categories'] ?? '[]', true);
+    foreach ($cats as $c) {
+        if (strcasecmp($c['name'], $category) === 0 && isset($c['price'])) {
+            return floatval($c['price']);
+        }
+    }
+    if ($parent_category) {
+        foreach ($cats as $c) {
+            if (strcasecmp($c['name'], $parent_category) === 0 && isset($c['price'])) {
+                return floatval($c['price']);
+            }
+        }
+    }
+    return 0;
+}
+
 function video_scan_local($pdo, $input) {
     $scanPath = rtrim($input['path'], '/\\'); 
     if (!is_dir($scanPath)) respond(false, null, "Ruta inválida");
@@ -477,12 +518,21 @@ function video_scan_local($pdo, $input) {
     }
 
     $found = 0; $new = 0; $errors = [];
+    $newCategories = [];
 
     foreach ($it as $file) {
         if ($file->isDir() || !in_array(strtolower($file->getExtension()), $exts)) continue;
         $found++; 
         $path = str_replace('\\', '/', $file->getRealPath());
         $id = 'loc_' . md5($path);
+        
+        // Extract category from path
+        $dir = dirname($path);
+        $parts = explode('/', $dir);
+        $categoryName = array_pop($parts);
+        if ($categoryName && !in_array($categoryName, $newCategories)) {
+            $newCategories[] = $categoryName;
+        }
 
         try {
             $stmt = $pdo->prepare("SELECT id FROM videos WHERE videoUrl = ? OR id = ?");
@@ -499,6 +549,27 @@ function video_scan_local($pdo, $input) {
             write_log("Scanner Error on file $path: " . $e->getMessage(), 'ERROR');
         }
     }
+    
+    // Auto-create categories
+    if (!empty($newCategories)) {
+        $stmtS = $pdo->query("SELECT categories FROM system_settings WHERE id = 1");
+        $cats = json_decode($stmtS->fetchColumn() ?: '[]', true);
+        $existingNames = array_map(function($c) { return strtolower($c['name']); }, $cats);
+        
+        $updated = false;
+        foreach ($newCategories as $catName) {
+            if (!in_array(strtolower($catName), $existingNames)) {
+                $cats[] = ['name' => $catName, 'price' => 0, 'sortOrder' => 'LATEST'];
+                $existingNames[] = strtolower($catName);
+                $updated = true;
+            }
+        }
+        
+        if ($updated) {
+            $pdo->prepare("UPDATE system_settings SET categories = ? WHERE id = 1")->execute([json_encode($cats)]);
+        }
+    }
+
     respond(true, ['totalFound' => $found, 'newToImport' => $new, 'errors' => $errors]);
 }
 
@@ -522,7 +593,7 @@ function video_process_batch($pdo) {
 
 function video_smart_organize($pdo) {
     $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
-    $stmt = $pdo->query("SELECT id FROM videos WHERE category = 'PROCESSING'");
+    $stmt = $pdo->query("SELECT id FROM videos WHERE category IN ('PENDING', 'PROCESSING')");
     $processed = 0;
     while ($id = $stmt->fetchColumn()) { 
         video_organize_single($pdo, $id, $settings);
