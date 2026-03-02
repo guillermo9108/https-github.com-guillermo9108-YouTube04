@@ -14,6 +14,16 @@ function admin_get_settings($pdo) {
         $res['ftpSettings'] = json_decode($res['ftpSettings'] ?: '[]', true);
         $res['vipPlans'] = json_decode($res['vipPlans'] ?: '[]', true);
         $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
+    } else {
+        $res = [
+            'categories' => [],
+            'categoryPrices' => [],
+            'customCategories' => [],
+            'libraryPaths' => [],
+            'ftpSettings' => [],
+            'vipPlans' => [],
+            'paymentMethods' => []
+        ];
     }
     respond(true, $res);
 }
@@ -202,9 +212,9 @@ function admin_get_local_stats($pdo) {
 
 function admin_get_logs() {
     $logFile = 'transcode_log.txt';
-    if (!file_exists($logFile)) respond(true, "No hay logs disponibles.");
+    if (!file_exists($logFile)) respond(true, []);
     $lines = array_slice(explode("\n", file_get_contents($logFile)), -100);
-    respond(true, implode("\n", $lines));
+    respond(true, $lines);
 }
 
 function admin_clear_logs() {

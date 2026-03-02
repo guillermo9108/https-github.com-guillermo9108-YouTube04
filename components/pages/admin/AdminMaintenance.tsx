@@ -51,9 +51,9 @@ export default function AdminMaintenance() {
                 db.getAdminLibraryStats(),
                 db.getSystemSettings()
             ]);
-            setLogs(logsRes || []);
+            setLogs(Array.isArray(logsRes) ? logsRes : []);
             setStats(adminStats);
-            if (settings.categories) setCategories(settings.categories);
+            if (settings && Array.isArray(settings.categories)) setCategories(settings.categories);
         } catch (e) {} finally {
             setLoadingLogs(false);
         }
