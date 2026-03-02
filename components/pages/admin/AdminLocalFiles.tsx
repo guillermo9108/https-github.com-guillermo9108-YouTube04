@@ -290,13 +290,30 @@ export default function AdminLocalFiles() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Categoría</label>
+                                <select value={purgeConfig.category} onChange={e => setPurgeConfig({...purgeConfig, category: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-black text-sm outline-none cursor-pointer">
+                                    <option value="ALL">TODAS</option>
+                                    {settings?.categories?.map((c: any) => (
+                                        <option key={c.name} value={c.name}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="space-y-1">
                                 <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Vistas Máximas</label>
                                 <input type="number" value={purgeConfig.maxViews} onChange={e => setPurgeConfig({...purgeConfig, maxViews: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-black text-sm outline-none" />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Límite de Purga (GB)</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Likes Máximos</label>
+                                <input type="number" value={purgeConfig.minLikes} onChange={e => setPurgeConfig({...purgeConfig, minLikes: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-black text-sm outline-none" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Dislikes Mínimos</label>
+                                <input type="number" value={purgeConfig.maxDislikes} onChange={e => setPurgeConfig({...purgeConfig, maxDislikes: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-black text-sm outline-none" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Límite (GB)</label>
                                 <input type="number" value={purgeConfig.maxGbLimit} onChange={e => setPurgeConfig({...purgeConfig, maxGbLimit: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-red-400 font-black text-sm outline-none" />
                             </div>
                             <div className="space-y-1">

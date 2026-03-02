@@ -75,16 +75,52 @@ function interact_purchase_vip_instant($pdo, $input) {
 
 function interact_rate($pdo, $input) {
     $uid = $input['userId']; $vid = $input['videoId']; $type = $input['type'];
-    $pdo->prepare("REPLACE INTO interactions (userId, videoId, liked) VALUES (?, ?, ?)")->execute([$uid, $vid, $type === 'like' ? 1 : 0]);
+    
+    $stmt = $pdo->prepare("SELECT liked, disliked FROM interactions WHERE userId = ? AND videoId = ?");
+    $stmt->execute([$uid, $vid]);
+    $current = $stmt->fetch();
+    
+    $newLiked = ($type === 'like') ? 1 : 0;
+    $newDisliked = ($type === 'dislike') ? 1 : 0;
+    
+    if ($current) {
+        if (($type === 'like' && $current['liked'] == 1) || ($type === 'dislike' && $current['disliked'] == 1)) {
+            $pdo->prepare("UPDATE interactions SET liked = 0, disliked = 0 WHERE userId = ? AND videoId = ?")->execute([$uid, $vid]);
+            $resLiked = false;
+            $resDisliked = false;
+        } else {
+            $pdo->prepare("UPDATE interactions SET liked = ?, disliked = ? WHERE userId = ? AND videoId = ?")->execute([$newLiked, $newDisliked, $uid, $vid]);
+            $resLiked = ($newLiked === 1);
+            $resDisliked = ($newDisliked === 1);
+        }
+    } else {
+        $pdo->prepare("INSERT INTO interactions (userId, videoId, liked, disliked) VALUES (?, ?, ?, ?)")->execute([$uid, $vid, $newLiked, $newDisliked]);
+        $resLiked = ($newLiked === 1);
+        $resDisliked = ($newDisliked === 1);
+    }
+    
     $likes = $pdo->query("SELECT COUNT(*) FROM interactions WHERE videoId = '$vid' AND liked = 1")->fetchColumn();
-    $pdo->prepare("UPDATE videos SET likes = ? WHERE id = ?")->execute([$likes, $vid]);
-    respond(true, ['newLikeCount' => $likes]);
+    $dislikes = $pdo->query("SELECT COUNT(*) FROM interactions WHERE videoId = '$vid' AND disliked = 1")->fetchColumn();
+    $pdo->prepare("UPDATE videos SET likes = ?, dislikes = ? WHERE id = ?")->execute([$likes, $dislikes, $vid]);
+    
+    respond(true, [
+        'newLikeCount' => $likes, 
+        'newDislikeCount' => $dislikes,
+        'liked' => $resLiked,
+        'disliked' => $resDisliked
+    ]);
 }
 
 function interact_get($pdo, $userId, $videoId) {
     $stmt = $pdo->prepare("SELECT * FROM interactions WHERE userId = ? AND videoId = ?");
     $stmt->execute([$userId, $videoId]); $res = $stmt->fetch();
-    respond(true, $res ?: ['liked' => false, 'disliked' => false, 'isWatched' => false]);
+    if ($res) {
+        $liked = $res['liked'] !== null && (int)$res['liked'] === 1;
+        $disliked = $res['disliked'] !== null && (int)$res['disliked'] === 1;
+        respond(true, ['liked' => $liked, 'disliked' => $disliked, 'isWatched' => (bool)$res['isWatched']]);
+    } else {
+        respond(true, ['liked' => false, 'disliked' => false, 'isWatched' => false]);
+    }
 }
 
 function interact_get_activity($pdo, $userId) {

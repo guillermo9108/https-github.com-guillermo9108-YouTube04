@@ -319,36 +319,93 @@ function admin_skip_transcode($pdo, $vid) {
 
 // --- SMART CLEANER & ORPHAN SYNC ---
 
+function formatBytes($bytes, $precision = 2) { 
+    $units = array('B', 'KB', 'MB', 'GB', 'TB'); 
+    $bytes = max($bytes, 0); 
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024)); 
+    $pow = min($pow, count($units) - 1); 
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow]; 
+}
+
 function admin_smart_cleaner_preview($pdo, $input) {
-    $type = $input['type'] ?? 'ORPHANS';
-    $results = [];
+    $cat = $input['category'] ?? 'ALL';
+    $minDays = intval($input['minDays'] ?? 30);
+    $maxViews = intval($input['maxViews'] ?? 2);
+    $minLikes = intval($input['minLikes'] ?? 0);
+    $maxDislikes = intval($input['maxDislikes'] ?? 10);
+    $maxGbLimit = floatval($input['maxGbLimit'] ?? 50);
     
-    if ($type === 'ORPHANS') {
-        // 1. Buscar videos en DB que NO existen físicamente
-        $stmt = $pdo->query("SELECT id, title, videoUrl, thumbnailUrl FROM videos WHERE isLocal = 1");
-        while ($v = $stmt->fetch()) {
-            $path = resolve_video_path($v['videoUrl']);
-            if (!$path || !file_exists($path)) {
-                $results[] = ['id' => $v['id'], 'title' => $v['title'], 'path' => $v['videoUrl'], 'reason' => 'Archivo no encontrado'];
-            }
-        }
-    } else if ($type === 'DUPLICATES') {
-        // 2. Buscar videos con el mismo nombre y tamaño (o ruta similar)
-        $stmt = $pdo->query("SELECT id, title, videoUrl, COUNT(*) as qty FROM videos GROUP BY title, duration HAVING qty > 1");
-        $results = $stmt->fetchAll();
+    $threshold = time() - ($minDays * 86400);
+    
+    $sql = "SELECT id, title, views, videoUrl FROM videos WHERE isLocal = 1 AND views <= ? AND likes <= ? AND dislikes >= ? AND createdAt < ?";
+    $params = [$maxViews, $minLikes, $maxDislikes, $threshold];
+    
+    if ($cat !== 'ALL') {
+        $sql .= " AND category = ?";
+        $params[] = $cat;
     }
     
-    respond(true, $results);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $preview = [];
+    $totalBytes = 0;
+    $maxBytes = $maxGbLimit * 1024 * 1024 * 1024;
+    
+    foreach ($videos as $v) {
+        if ($totalBytes >= $maxBytes) break;
+        
+        $path = resolve_video_path($v['videoUrl']);
+        $size = 0;
+        if ($path && file_exists($path)) {
+            $size = filesize($path);
+        }
+        
+        $totalBytes += $size;
+        $preview[] = [
+            'id' => $v['id'],
+            'title' => $v['title'],
+            'views' => $v['views'],
+            'size_fmt' => formatBytes($size)
+        ];
+    }
+    
+    respond(true, [
+        'preview' => $preview,
+        'stats' => [
+            'spaceReclaimed' => formatBytes($totalBytes)
+        ]
+    ]);
 }
 
 function admin_smart_cleaner_execute($pdo, $input) {
-    $ids = $input['ids'] ?? [];
+    $ids = $input['videoIds'] ?? [];
     if (empty($ids)) respond(false, null, "No se seleccionaron elementos.");
     
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    
+    // Buscar archivos para eliminarlos físicamente
+    $stmt = $pdo->prepare("SELECT videoUrl, thumbnailUrl FROM videos WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
+    $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($videos as $v) {
+        $vPath = resolve_video_path($v['videoUrl']);
+        if ($vPath && file_exists($vPath)) {
+            @unlink($vPath);
+        }
+        
+        $tPath = resolve_video_path($v['thumbnailUrl']);
+        if ($tPath && file_exists($tPath) && basename($tPath) !== 'default.jpg' && basename($tPath) !== 'defaultaudio.jpg') {
+            @unlink($tPath);
+        }
+    }
+    
     $pdo->prepare("DELETE FROM videos WHERE id IN ($placeholders)")->execute($ids);
     
-    respond(true, "Se eliminaron " . count($ids) . " registros de la base de datos.");
+    respond(true, "Se eliminaron " . count($ids) . " videos y sus archivos.");
 }
 
 function admin_extreme_janitor($pdo, $input) {
@@ -359,20 +416,46 @@ function admin_extreme_janitor($pdo, $input) {
     
     $threshold = time() - ($minDays * 86400);
     
-    $sql = "DELETE FROM videos WHERE views <= ? AND createdAt < ?";
+    // First, select the videos to be deleted so we can remove their files
+    $selectSql = "SELECT id, videoUrl, thumbnailUrl FROM videos WHERE views <= ? AND createdAt < ?";
     $params = [$maxViews, $threshold];
     
     if ($cat !== 'ALL') {
-        $sql .= " AND category = ?";
+        $selectSql .= " AND category = ?";
         $params[] = $cat;
     }
     
-    $sql .= " LIMIT $limit";
+    $selectSql .= " LIMIT $limit";
     
-    $stmt = $pdo->prepare($sql);
+    $stmt = $pdo->prepare($selectSql);
     $stmt->execute($params);
+    $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    respond(true, "Janitor completado. Registros eliminados: " . $stmt->rowCount());
+    if (empty($videos)) {
+        respond(true, "Janitor completado. Registros eliminados: 0");
+    }
+    
+    $ids = array_column($videos, 'id');
+    
+    // Delete physical files
+    foreach ($videos as $v) {
+        $vPath = resolve_video_path($v['videoUrl']);
+        if ($vPath && file_exists($vPath)) {
+            @unlink($vPath);
+        }
+        
+        $tPath = resolve_video_path($v['thumbnailUrl']);
+        if ($tPath && file_exists($tPath) && basename($tPath) !== 'default.jpg' && basename($tPath) !== 'defaultaudio.jpg') {
+            @unlink($tPath);
+        }
+    }
+    
+    // Delete database records
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $deleteSql = "DELETE FROM videos WHERE id IN ($placeholders)";
+    $pdo->prepare($deleteSql)->execute($ids);
+    
+    respond(true, "Janitor completado. Registros y archivos eliminados: " . count($ids));
 }
 
 function admin_file_cleanup_preview($pdo, $type) {
