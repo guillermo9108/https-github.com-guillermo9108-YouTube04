@@ -231,6 +231,14 @@ export default function AdminMaintenance() {
                                     </div>
                                     <input type="range" min="1" max="500" step="5" value={config.maxGbLimit} onChange={e => setConfig({...config, maxGbLimit: parseInt(e.target.value)})} className="w-full accent-red-500 h-1 bg-slate-800 rounded-full appearance-none" />
                                 </div>
+
+                                <div>
+                                    <div className="flex justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Máximo de Videos</label>
+                                        <span className="text-[10px] font-bold text-amber-400">{config.maxDeleteLimit}</span>
+                                    </div>
+                                    <input type="range" min="10" max="1000" step="10" value={config.maxDeleteLimit} onChange={e => setConfig({...config, maxDeleteLimit: parseInt(e.target.value)})} className="w-full accent-amber-500 h-1 bg-slate-800 rounded-full appearance-none" />
+                                </div>
                             </div>
 
                             <button onClick={handlePreviewCleaner} disabled={cleaning} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all">

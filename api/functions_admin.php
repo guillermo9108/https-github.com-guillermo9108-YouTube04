@@ -335,6 +335,7 @@ function admin_smart_cleaner_preview($pdo, $input) {
     $minLikes = intval($input['minLikes'] ?? 0);
     $maxDislikes = intval($input['maxDislikes'] ?? 10);
     $maxGbLimit = floatval($input['maxGbLimit'] ?? 50);
+    $maxDeleteLimit = intval($input['maxDeleteLimit'] ?? 100);
     
     $threshold = time() - ($minDays * 86400);
     
@@ -353,9 +354,11 @@ function admin_smart_cleaner_preview($pdo, $input) {
     $preview = [];
     $totalBytes = 0;
     $maxBytes = $maxGbLimit * 1024 * 1024 * 1024;
+    $count = 0;
     
     foreach ($videos as $v) {
         if ($totalBytes >= $maxBytes) break;
+        if ($count >= $maxDeleteLimit) break;
         
         $path = resolve_video_path($v['videoUrl']);
         $size = 0;
@@ -370,6 +373,7 @@ function admin_smart_cleaner_preview($pdo, $input) {
             'views' => $v['views'],
             'size_fmt' => formatBytes($size)
         ];
+        $count++;
     }
     
     respond(true, [
