@@ -79,7 +79,7 @@ export default function AdminFinance() {
         try {
             await db.request('action=admin_handle_seller_verification', {
                 method: 'POST',
-                body: JSON.stringify({ reqId, status })
+                body: JSON.stringify({ id: reqId, status })
             });
             toast.success(`Vendedor ${status === 'APPROVED' ? 'Verificado' : 'Rechazado'}`);
             setSelectedIdentity(null);

@@ -533,7 +533,21 @@ function admin_handle_seller_verification($pdo, $input) {
         
         $pdo->prepare("UPDATE seller_verifications SET status = ? WHERE id = ?")->execute([$status, $id]);
         if ($status === 'APPROVED') {
-            $pdo->prepare("UPDATE users SET is_verified_seller = 1 WHERE id = ?")->execute([$uid]);
+            // Obtener los datos de la verificación para guardarlos en el perfil del usuario
+            $stmt = $pdo->prepare("SELECT fullName, address, mobile FROM seller_verifications WHERE id = ?");
+            $stmt->execute([$id]);
+            $sv = $stmt->fetch();
+            
+            if ($sv) {
+                $shippingDetails = json_encode([
+                    'fullName' => $sv['fullName'],
+                    'address' => $sv['address'],
+                    'phoneNumber' => $sv['mobile']
+                ]);
+                $pdo->prepare("UPDATE users SET is_verified_seller = 1, shippingDetails = ? WHERE id = ?")->execute([$shippingDetails, $uid]);
+            } else {
+                $pdo->prepare("UPDATE users SET is_verified_seller = 1 WHERE id = ?")->execute([$uid]);
+            }
         }
         $pdo->commit();
         respond(true);

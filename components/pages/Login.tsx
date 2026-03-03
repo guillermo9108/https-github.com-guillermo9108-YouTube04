@@ -8,6 +8,7 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [avatar, setAvatar] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   
@@ -34,9 +35,9 @@ export default function Login() {
 
     try {
       if (isLogin) {
-        await login(username, password);
+        await login(username, password, rememberMe);
       } else {
-        await register(username, password, avatar);
+        await register(username, password, avatar, rememberMe);
       }
       navigate('/');
     } catch (err: any) {
@@ -121,6 +122,19 @@ export default function Login() {
                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                  placeholder="Enter your password"
                />
+             </div>
+
+             <div className="flex items-center gap-2 py-1">
+               <input 
+                 type="checkbox" 
+                 id="rememberMe"
+                 checked={rememberMe}
+                 onChange={(e) => setRememberMe(e.target.checked)}
+                 className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900"
+               />
+               <label htmlFor="rememberMe" className="text-sm text-slate-400 cursor-pointer select-none">
+                 Conexión automática
+               </label>
              </div>
              
              {error && (

@@ -5,8 +5,8 @@ import { useToast } from './ToastContext';
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, avatar?: File | null) => Promise<void>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
+  register: (username: string, password: string, avatar?: File | null, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
   isLoading: boolean;
@@ -38,6 +38,8 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
     localStorage.removeItem('sp_current_user_id');
     localStorage.removeItem('sp_session_token');
     localStorage.removeItem('sp_offline_user');
+    sessionStorage.removeItem('sp_current_user_id');
+    sessionStorage.removeItem('sp_session_token');
     if (heartbeatTimerRef.current) window.clearTimeout(heartbeatTimerRef.current);
     window.dispatchEvent(new Event('sp_logout'));
   };
@@ -49,8 +51,8 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
     };
     window.addEventListener('sp_session_expired', handleExpired);
 
-    const savedId = localStorage.getItem('sp_current_user_id');
-    const savedToken = localStorage.getItem('sp_session_token');
+    const savedId = localStorage.getItem('sp_current_user_id') || sessionStorage.getItem('sp_current_user_id');
+    const savedToken = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
 
     const initAuth = async () => {
         if (savedId && savedToken) {
@@ -111,8 +113,8 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   }, [!!user]);
 
   const refreshUser = async () => {
-     const currentToken = localStorage.getItem('sp_session_token');
-     const currentId = localStorage.getItem('sp_current_user_id');
+     const currentToken = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
+     const currentId = localStorage.getItem('sp_current_user_id') || sessionStorage.getItem('sp_current_user_id');
      if (currentId && currentToken) {
         try {
             const u = await db.getUser(currentId);
@@ -129,29 +131,33 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
      }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, rememberMe: boolean = true) => {
     setIsLoading(true);
     try {
         const u = await db.login(username, password);
         u.balance = Number(u.balance);
         setUser(u);
         db.saveOfflineUser(u);
-        localStorage.setItem('sp_current_user_id', u.id);
-        if (u.sessionToken) localStorage.setItem('sp_session_token', u.sessionToken);
+        
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('sp_current_user_id', u.id);
+        if (u.sessionToken) storage.setItem('sp_session_token', u.sessionToken);
     } finally {
         setIsLoading(false);
     }
   };
 
-  const register = async (username: string, password: string, avatar?: File | null) => {
+  const register = async (username: string, password: string, avatar?: File | null, rememberMe: boolean = true) => {
     setIsLoading(true);
     try {
         const u = await db.register(username, password, avatar);
         u.balance = Number(u.balance);
         setUser(u);
         db.saveOfflineUser(u);
-        localStorage.setItem('sp_current_user_id', u.id);
-        if (u.sessionToken) localStorage.setItem('sp_session_token', u.sessionToken);
+        
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('sp_current_user_id', u.id);
+        if (u.sessionToken) storage.setItem('sp_session_token', u.sessionToken);
     } finally {
         setIsLoading(false);
     }
