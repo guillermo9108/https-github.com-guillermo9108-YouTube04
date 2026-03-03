@@ -17,10 +17,10 @@ function _get_user_data($pdo, $id) {
         if (empty($details['address']) || empty($details['fullName'])) {
             $sv = $pdo->prepare("SELECT fullName, address, mobile FROM seller_verifications WHERE userId = ? AND status = 'APPROVED' ORDER BY createdAt DESC LIMIT 1");
             $sv->execute([$id]);
-            $verification = $sv->fetch();
-            if ($verification) {
-                if (empty($details['fullName'])) $details['fullName'] = $verification['fullName'];
-                if (empty($details['address'])) $details['address'] = $verification['address'];
+            $verification = $sv->fetch(PDO::FETCH_ASSOC);
+            if ($verification && is_array($verification)) {
+                if (empty($details['fullName'])) $details['fullName'] = $verification['fullName'] ?? '';
+                if (empty($details['address'])) $details['address'] = $verification['address'] ?? '';
                 if (empty($details['phoneNumber']) && !empty($verification['mobile'])) $details['phoneNumber'] = $verification['mobile'];
             }
         }

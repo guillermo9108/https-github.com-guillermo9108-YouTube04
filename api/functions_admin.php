@@ -271,7 +271,7 @@ function admin_delete_transcode_profile($pdo, $ext) {
 }
 
 function admin_transcode_scan_filters($pdo, $input) {
-    $exts = $input['extensions']; // Array de extensiones a buscar, ej: ['avi', 'mkv']
+    $exts = $input['extensions'] ?? []; // Array de extensiones a buscar, ej: ['avi', 'mkv']
     if (empty($exts)) respond(false, null, "Debe seleccionar al menos una extensión.");
     
     $placeholders = implode(',', array_fill(0, count($exts), '?'));
