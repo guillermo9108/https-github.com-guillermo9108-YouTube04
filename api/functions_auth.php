@@ -13,9 +13,13 @@ function auth_login($pdo, $input) {
         $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $user['id']]);
+        
         unset($user['password_hash']);
-        $user['sessionId'] = $sid;
+        $user['sessionToken'] = $sid;
         $user['avatarUrl'] = fix_url($user['avatarUrl']);
+        $user['shippingDetails'] = json_decode($user['shippingDetails'] ?: '{}', true);
+        $user['balance'] = (float)$user['balance'];
+        
         respond(true, $user);
     }
     respond(false, null, "Credenciales inválidas");
@@ -27,17 +31,32 @@ function auth_register($pdo, $input) {
     try {
         $pdo->prepare("INSERT INTO users (id, username, password_hash, role, balance) VALUES (?, ?, ?, 'USER', 0)")
             ->execute([$id, $u, $p]);
-        respond(true, ['id' => $id, 'username' => $u]);
+        
+        // Auto-login after register
+        $sid = bin2hex(random_bytes(32));
+        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
+            ->execute([$sid, time(), $userAgent, $id]);
+            
+        respond(true, [
+            'id' => $id, 
+            'username' => $u, 
+            'role' => 'USER', 
+            'balance' => 0, 
+            'sessionToken' => $sid,
+            'shippingDetails' => (object)[]
+        ]);
     } catch (Exception $e) { respond(false, null, "El usuario ya existe"); }
 }
 
 function auth_heartbeat($pdo, $input) {
-    $uid = $input['userId']; $sid = $input['sessionId'];
+    $uid = $input['userId']; $sid = $input['sessionToken'] ?? $input['sessionId'] ?? '';
     $stmt = $pdo->prepare("SELECT id, currentSessionId, role, balance, vipExpiry, is_verified_seller FROM users WHERE id = ?");
     $stmt->execute([$uid]); $user = $stmt->fetch();
     if ($user && $user['currentSessionId'] === $sid) {
         $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
         $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
+        $user['balance'] = (float)$user['balance'];
         respond(true, $user);
     }
     respond(false, null, "Sesión expirada");
@@ -53,6 +72,7 @@ function auth_get_user($pdo, $id) {
     $stmt->execute([$id]); $u = $stmt->fetch();
     if ($u) {
         $u['avatarUrl'] = fix_url($u['avatarUrl']);
+        $u['balance'] = (float)$u['balance'];
         $details = json_decode($u['shippingDetails'] ?: '{}', true);
         
         // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
@@ -63,7 +83,7 @@ function auth_get_user($pdo, $id) {
             if ($verification) {
                 if (empty($details['fullName'])) $details['fullName'] = $verification['fullName'];
                 if (empty($details['address'])) $details['address'] = $verification['address'];
-                if (empty($details['phoneNumber'])) $details['phoneNumber'] = $verification['mobile'];
+                if (empty($details['phoneNumber']) && !empty($verification['mobile'])) $details['phoneNumber'] = $verification['mobile'];
             }
         }
         

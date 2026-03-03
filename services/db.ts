@@ -27,7 +27,7 @@ class DBService {
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const url = endpoint.startsWith('http') ? endpoint : `api/index.php?${endpoint}`;
-        const token = localStorage.getItem('sp_session_token');
+        const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
         
         const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
         
@@ -69,7 +69,7 @@ class DBService {
      * Utiliza la IP actual del navegador para evitar problemas de configuración
      */
     public getStreamerUrl(videoId: string): string {
-        const token = localStorage.getItem('sp_session_token') || '';
+        const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token') || '';
         return `api/index.php?action=stream&id=${videoId}&token=${token}`;
     }
 

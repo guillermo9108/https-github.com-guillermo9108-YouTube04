@@ -80,6 +80,12 @@ if (file_exists('functions_payment.php')) require_once 'functions_payment.php';
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
+// Extraer Token de Bearer si existe
+$headers = getallheaders();
+if (isset($headers['Authorization']) && preg_match('/Bearer\s+(.*)$/i', $headers['Authorization'], $matches)) {
+    $input['sessionToken'] = $matches[1];
+}
+
 try {
     switch ($action) {
         case 'get_detailed_stats': analytics_get_detailed_stats($pdo); break;
