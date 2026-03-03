@@ -3,9 +3,36 @@
  * AUTH - CORE FUNCTIONS V15.2 (Avatar Processing & ACID Sessions)
  */
 
+// Helper para obtener datos completos de usuario
+function _get_user_data($pdo, $id) {
+    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId FROM users WHERE id = ?");
+    $stmt->execute([$id]); 
+    $u = $stmt->fetch();
+    if ($u) {
+        $u['avatarUrl'] = fix_url($u['avatarUrl']);
+        $u['balance'] = (float)$u['balance'];
+        $details = json_decode($u['shippingDetails'] ?: '{}', true);
+        
+        // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
+        if (empty($details['address']) || empty($details['fullName'])) {
+            $sv = $pdo->prepare("SELECT fullName, address, mobile FROM seller_verifications WHERE userId = ? AND status = 'APPROVED' ORDER BY createdAt DESC LIMIT 1");
+            $sv->execute([$id]);
+            $verification = $sv->fetch();
+            if ($verification) {
+                if (empty($details['fullName'])) $details['fullName'] = $verification['fullName'];
+                if (empty($details['address'])) $details['address'] = $verification['address'];
+                if (empty($details['phoneNumber']) && !empty($verification['mobile'])) $details['phoneNumber'] = $verification['mobile'];
+            }
+        }
+        $u['shippingDetails'] = $details;
+        return $u;
+    }
+    return null;
+}
+
 function auth_login($pdo, $input) {
     $u = $input['username']; $p = $input['password'];
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ?");
     $stmt->execute([$u]); $user = $stmt->fetch();
     
     if ($user && password_verify($p, $user['password_hash'])) {
@@ -14,13 +41,9 @@ function auth_login($pdo, $input) {
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $user['id']]);
         
-        unset($user['password_hash']);
-        $user['sessionToken'] = $sid;
-        $user['avatarUrl'] = fix_url($user['avatarUrl']);
-        $user['shippingDetails'] = json_decode($user['shippingDetails'] ?: '{}', true);
-        $user['balance'] = (float)$user['balance'];
-        
-        respond(true, $user);
+        $data = _get_user_data($pdo, $user['id']);
+        $data['sessionToken'] = $sid;
+        respond(true, $data);
     }
     respond(false, null, "Credenciales inválidas");
 }
@@ -50,13 +73,15 @@ function auth_register($pdo, $input) {
 }
 
 function auth_heartbeat($pdo, $input) {
-    $uid = $input['userId']; $sid = $input['sessionToken'] ?? $input['sessionId'] ?? '';
-    $stmt = $pdo->prepare("SELECT id, currentSessionId, role, balance, vipExpiry, is_verified_seller FROM users WHERE id = ?");
-    $stmt->execute([$uid]); $user = $stmt->fetch();
+    $uid = $input['userId'] ?? $_GET['userId'] ?? ''; 
+    $sid = $input['sessionToken'] ?? $input['sessionId'] ?? '';
+    
+    if (!$uid) respond(false, null, "ID de usuario requerido");
+    
+    $user = _get_user_data($pdo, $uid);
     if ($user && $user['currentSessionId'] === $sid) {
         $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
         $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
-        $user['balance'] = (float)$user['balance'];
         respond(true, $user);
     }
     respond(false, null, "Sesión expirada");
@@ -68,28 +93,8 @@ function auth_logout($pdo, $input) {
 }
 
 function auth_get_user($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller FROM users WHERE id = ?");
-    $stmt->execute([$id]); $u = $stmt->fetch();
-    if ($u) {
-        $u['avatarUrl'] = fix_url($u['avatarUrl']);
-        $u['balance'] = (float)$u['balance'];
-        $details = json_decode($u['shippingDetails'] ?: '{}', true);
-        
-        // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
-        if (empty($details['address']) || empty($details['fullName'])) {
-            $sv = $pdo->prepare("SELECT fullName, address, mobile FROM seller_verifications WHERE userId = ? AND status = 'APPROVED' ORDER BY createdAt DESC LIMIT 1");
-            $sv->execute([$id]);
-            $verification = $sv->fetch();
-            if ($verification) {
-                if (empty($details['fullName'])) $details['fullName'] = $verification['fullName'];
-                if (empty($details['address'])) $details['address'] = $verification['address'];
-                if (empty($details['phoneNumber']) && !empty($verification['mobile'])) $details['phoneNumber'] = $verification['mobile'];
-            }
-        }
-        
-        $u['shippingDetails'] = $details;
-        respond(true, $u);
-    }
+    $u = _get_user_data($pdo, $id);
+    if ($u) respond(true, $u);
     respond(false, null, "No encontrado");
 }
 

@@ -141,7 +141,7 @@ export default function Channel() {
     <div className="pb-20 min-h-screen">
        {/* Background Blur Effect */}
        <div className="absolute top-0 left-0 right-0 h-64 overflow-hidden z-0 pointer-events-none opacity-40">
-           {channelUser.avatarUrl && <img src={channelUser.avatarUrl} className="w-full h-full object-cover blur-3xl scale-110 brightness-50" />}
+           {channelUser.avatarUrl && <img src={channelUser.avatarUrl} className="w-full h-full object-cover blur-3xl scale-110 brightness-50" referrerPolicy="no-referrer" />}
            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black"></div>
        </div>
 
@@ -150,7 +150,7 @@ export default function Channel() {
            {/* Avatar */}
            <div className="w-32 h-32 rounded-full border-4 border-black bg-slate-800 overflow-hidden shrink-0 shadow-2xl mb-4">
                {channelUser.avatarUrl ? (
-                   <img src={channelUser.avatarUrl} alt={channelUser.username} className="w-full h-full object-cover" />
+                   <img src={channelUser.avatarUrl} alt={channelUser.username} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                ) : (
                    <div className="w-full h-full flex items-center justify-center text-4xl text-slate-500">
                        <UserIcon size={48} />

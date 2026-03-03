@@ -79,9 +79,21 @@ if (file_exists('functions_payment.php')) require_once 'functions_payment.php';
 
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+if (!is_array($input)) $input = [];
+$input = array_merge($_GET, $input);
 
 // Extraer Token de Bearer si existe
-$headers = getallheaders();
+$headers = [];
+if (function_exists('getallheaders')) {
+    $headers = getallheaders();
+} else {
+    foreach ($_SERVER as $name => $value) {
+        if (substr($name, 0, 5) == 'HTTP_') {
+            $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+        }
+    }
+}
+
 if (isset($headers['Authorization']) && preg_match('/Bearer\s+(.*)$/i', $headers['Authorization'], $matches)) {
     $input['sessionToken'] = $matches[1];
 }

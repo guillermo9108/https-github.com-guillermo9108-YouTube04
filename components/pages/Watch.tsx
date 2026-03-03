@@ -313,7 +313,7 @@ export default function Watch() {
                     {isUnlocked ? (
                         <div className={`relative z-10 w-full h-full flex flex-col items-center justify-center ${video?.is_audio ? 'bg-slate-900/40 backdrop-blur-md' : ''}`}>
                             {video?.is_audio && video?.thumbnailUrl && !video.thumbnailUrl.includes('default.jpg') && (
-                                <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" />
+                                <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
                             <video 
                                 ref={videoRef} 
@@ -331,7 +331,7 @@ export default function Watch() {
                         </div>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                            {video && <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110"/>}
+                            {video && <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />}
                             <div className="relative z-10 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-[48px] shadow-2xl flex flex-col items-center text-center max-w-md animate-in zoom-in-95 mx-4">
                                 <Lock size={24} className="text-amber-500 mb-4"/>
                                 <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-6">Contenido Premium</h2>
@@ -353,7 +353,7 @@ export default function Watch() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8 mb-8">
                         <div className="flex items-center gap-4">
                             <Link to={`/channel/${video?.creatorId}`} className="w-12 h-12 rounded-2xl bg-slate-800 overflow-hidden shrink-0 border border-white/10">
-                                {video?.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{video?.creatorName?.[0]}</div>}
+                                {video?.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{video?.creatorName?.[0]}</div>}
                             </Link>
                             <div className="min-w-0">
                                 <Link to={`/channel/${video?.creatorId}`} className="font-black text-white hover:text-indigo-400 block truncate">@{video?.creatorName}</Link>
@@ -407,7 +407,7 @@ export default function Watch() {
                         </div>
                         <form onSubmit={handleAddComment} className="flex gap-4 mb-8">
                             <div className="w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden">
-                                {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{user?.username?.[0]}</div>}
+                                {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{user?.username?.[0]}</div>}
                             </div>
                             <div className="flex-1 flex gap-2">
                                 <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Escribe un comentario público..." className="flex-1 bg-transparent border-b border-white/10 focus:border-indigo-500 outline-none text-sm text-white py-2 transition-all" />
@@ -418,7 +418,7 @@ export default function Watch() {
                             {comments.map(c => (
                                 <div key={c.id} className="flex gap-4 group">
                                     <div className="w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden">
-                                        {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">{c.username?.[0]}</div>}
+                                        {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">{c.username?.[0]}</div>}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
@@ -471,7 +471,7 @@ export default function Watch() {
                             return (
                                 <Link key={v.id} to={`/watch/${v.id}${contextSuffix}`} className={`group flex gap-3 p-2 hover:bg-white/5 rounded-2xl transition-all ${isNextInQueue ? 'bg-indigo-500/[0.03] border border-indigo-500/10' : ''}`}>
                                     <div className="w-32 aspect-video bg-slate-900 rounded-xl overflow-hidden relative border border-white/5 shrink-0">
-                                        <img src={v.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform" loading="lazy" />
+                                        <img src={v.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform" loading="lazy" referrerPolicy="no-referrer" />
                                         {isNextInQueue && (
                                             <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center animate-in fade-in">
                                                 <div className="flex flex-col items-center">
@@ -518,7 +518,7 @@ export default function Watch() {
                             {comments.map(c => (
                                 <div key={c.id} className="flex gap-4 animate-in fade-in slide-in-from-bottom-2">
                                     <div className="w-10 h-10 rounded-2xl bg-slate-800 shrink-0 border border-white/5 overflow-hidden">
-                                        {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">{c.username?.[0]}</div>}
+                                        {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">{c.username?.[0]}</div>}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-baseline justify-between gap-2 mb-1">
@@ -571,7 +571,7 @@ export default function Watch() {
                                         className="w-full p-4 flex items-center gap-4 hover:bg-indigo-600 rounded-[24px] transition-all group active:scale-95"
                                     >
                                         <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-800 shrink-0 border border-white/5 shadow-lg">
-                                            {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-sm font-black text-white bg-slate-700">{s.username?.[0]}</div>}
+                                            {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-sm font-black text-white bg-slate-700">{s.username?.[0]}</div>}
                                         </div>
                                         <div className="text-left flex-1 min-w-0">
                                             <span className="text-sm font-black text-white group-hover:text-white block truncate">@{s.username}</span>

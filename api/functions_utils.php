@@ -36,7 +36,8 @@ function get_media_duration($path, $ffprobe) {
 function fix_url($url) {
     if (!$url) return null;
     if (strpos($url, 'http') === 0) return $url;
-    // Si empieza por api/, quitarlo para que el front lo maneje relativo a la base
+    // Si empieza por api/, hacerlo absoluto desde la raíz para evitar problemas de rutas relativas en el front
+    if (strpos($url, 'api/') === 0) return '/' . $url;
     return $url;
 }
 
@@ -56,23 +57,39 @@ function resolve_video_path($url) {
 }
 
 function streamVideo($id, $pdo) {
-    $stmt = $pdo->prepare("SELECT videoUrl, title FROM videos WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT videoUrl, title, price, creatorId FROM videos WHERE id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch();
     
-    if (!$video) { header("HTTP/1.1 404 Not Found"); exit; }
+    if (!$video) { 
+        write_log("Stream Error: Video ID $id not found", 'ERROR');
+        header("HTTP/1.1 404 Not Found"); 
+        exit; 
+    }
     
     $path = resolve_video_path($video['videoUrl']);
     
     if (!$path || !file_exists($path)) {
+        write_log("Stream Error: File not found for video $id. Path: " . ($path ?: 'NULL') . " Original: " . $video['videoUrl'], 'ERROR');
         header("HTTP/1.1 404 Not Found");
         echo "Archivo no encontrado en el servidor: " . $video['videoUrl'];
         exit;
     }
 
+    // Check if it's a directory (should not happen but for safety)
+    if (is_dir($path)) {
+        write_log("Stream Error: Path is a directory for video $id. Path: $path", 'ERROR');
+        header("HTTP/1.1 403 Forbidden");
+        exit;
+    }
+
     $size = filesize($path);
     $fm = @fopen($path, 'rb');
-    if (!$fm) { header("HTTP/1.1 500 Internal Server Error"); exit; }
+    if (!$fm) { 
+        write_log("Stream Error: Could not open file for video $id. Path: $path", 'ERROR');
+        header("HTTP/1.1 500 Internal Server Error"); 
+        exit; 
+    }
 
     $begin = 0;
     $end = $size - 1;

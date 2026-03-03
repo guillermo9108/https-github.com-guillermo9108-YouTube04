@@ -77,7 +77,7 @@ export default function MarketplaceItemView() {
                 <div className="space-y-4">
                     <div className="aspect-[3/4] bg-slate-950 rounded-[32px] overflow-hidden border border-slate-800 relative shadow-2xl">
                         {item.images && item.images.length > 0 ? (
-                            <img src={item.images[activeImg]} className={`w-full h-full object-cover ${item.status === 'AGOTADO' ? 'grayscale opacity-50' : ''}`} />
+                            <img src={item.images[activeImg]} className={`w-full h-full object-cover ${item.status === 'AGOTADO' ? 'grayscale opacity-50' : ''}`} referrerPolicy="no-referrer" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-800"><ShoppingBag size={80}/></div>
                         )}
@@ -98,7 +98,7 @@ export default function MarketplaceItemView() {
                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                             {item.images.map((img: string, i: number) => (
                                 <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all ${activeImg === i ? 'border-indigo-500 scale-105 shadow-lg' : 'border-slate-800 opacity-60 hover:opacity-100'}`}>
-                                    <img src={img} className="w-full h-full object-cover" />
+                                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </button>
                             ))}
                         </div>
@@ -147,7 +147,7 @@ export default function MarketplaceItemView() {
                             <div className="mb-8 bg-slate-950/50 p-5 rounded-3xl border border-white/5 space-y-4">
                                 <div className="flex items-center gap-4">
                                     <div className="w-14 h-14 rounded-2xl bg-slate-800 overflow-hidden border border-white/5 shadow-lg shrink-0">
-                                        {item.sellerAvatarUrl ? <img src={item.sellerAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-600"><User size={28}/></div>}
+                                        {item.sellerAvatarUrl ? <img src={item.sellerAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-slate-600"><User size={28}/></div>}
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Publicado por</div>
@@ -235,7 +235,7 @@ export default function MarketplaceItemView() {
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden border border-white/5 shadow-lg group-hover:scale-110 transition-transform">
-                                        {r.userAvatarUrl ? <img src={r.userAvatarUrl} className="w-full h-full object-cover"/> : <div className="flex items-center justify-center w-full h-full text-[10px] font-black text-slate-600">{r.username?.[0] || '?'}</div>}
+                                        {r.userAvatarUrl ? <img src={r.userAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="flex items-center justify-center w-full h-full text-[10px] font-black text-slate-600">{r.username?.[0] || '?'}</div>}
                                     </div>
                                     <div>
                                         <div className="text-xs font-black text-slate-200">@{r.username || 'Anónimo'}</div>

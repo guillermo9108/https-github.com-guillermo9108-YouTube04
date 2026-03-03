@@ -121,7 +121,7 @@ export default function Cart() {
                                 <div key={item.id} className={`flex gap-3 md:gap-4 p-3 md:p-4 ${index !== cart.length - 1 ? 'border-b border-slate-800' : ''}`}>
                                     {/* Image (Smaller on mobile) */}
                                     <div className="w-20 h-20 md:w-24 md:h-28 bg-black rounded-lg md:rounded-xl overflow-hidden shrink-0 border border-slate-800 relative group">
-                                        {item.images && item.images[0] && <img src={item.images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105"/>}
+                                        {item.images && item.images[0] && <img src={item.images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />}
                                         {hasDiscount && (
                                             <div className="absolute top-0 left-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br shadow-sm">
                                                 -{item.discountPercent}%

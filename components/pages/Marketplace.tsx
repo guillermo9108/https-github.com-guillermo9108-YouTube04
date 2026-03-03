@@ -190,6 +190,7 @@ export default function Marketplace() {
                                     src={item.images[0]} 
                                     className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${item.status === 'AGOTADO' ? 'grayscale opacity-50' : ''}`} 
                                     loading="lazy"
+                                    referrerPolicy="no-referrer"
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-slate-700"><ShoppingBag size={32}/></div>
