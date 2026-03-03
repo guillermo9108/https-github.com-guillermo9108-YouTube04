@@ -24,13 +24,14 @@ export default function Watch() {
     // Obtener contexto completo desde la URL
     const navigationContext = useMemo(() => {
         const hash = window.location.hash;
-        if (!hash.includes('?')) return { q: null, f: '', c: 'TODOS', p: 0 };
+        if (!hash.includes('?')) return { q: null, f: '', c: 'TODOS', p: 0, s: '' };
         const params = new URLSearchParams(hash.split('?')[1]);
         return {
             q: params.get('q'),
             f: params.get('f') || '',
             c: params.get('c') || 'TODOS',
-            p: parseInt(params.get('p') || '0')
+            p: parseInt(params.get('p') || '0'),
+            s: params.get('s') || ''
         };
     }, [id, window.location.hash]);
 
@@ -98,7 +99,7 @@ export default function Watch() {
                 filteredResults = res.videos;
                 hasMore = false; // getFolderVideos devuelve todo
             } else {
-                const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any);
+                const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any, navigationContext.s);
                 filteredResults = res.videos;
                 hasMore = res.hasMore;
             }
@@ -279,6 +280,7 @@ export default function Watch() {
         if (navigationContext.q) params.set('q', navigationContext.q);
         if (navigationContext.f) params.set('f', navigationContext.f);
         if (navigationContext.c !== 'TODOS') params.set('c', navigationContext.c);
+        if (navigationContext.s) params.set('s', navigationContext.s);
         params.set('p', String(relatedPage));
         const contextSuffix = params.toString() ? `?${params.toString()}` : '';
 
@@ -465,6 +467,7 @@ export default function Watch() {
                             if (navigationContext.q) params.set('q', navigationContext.q);
                             if (navigationContext.f) params.set('f', navigationContext.f);
                             if (navigationContext.c !== 'TODOS') params.set('c', navigationContext.c);
+                            if (navigationContext.s) params.set('s', navigationContext.s);
                             params.set('p', String(relatedPage));
                             const contextSuffix = params.toString() ? `?${params.toString()}` : '';
                             

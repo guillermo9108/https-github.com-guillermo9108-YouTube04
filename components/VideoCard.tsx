@@ -15,7 +15,7 @@ interface VideoCardProps {
   video: Video;
   isUnlocked: boolean;
   isWatched?: boolean;
-  context?: { query?: string, category?: string, folder?: string, page?: number };
+  context?: { query?: string, category?: string, folder?: string, page?: number, sort_order?: string };
 }
 
 const formatTimeAgo = (timestamp: number) => {
@@ -74,6 +74,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     if (context?.folder) params.set('f', context.folder);
     if (context?.category && context.category !== 'TODOS') params.set('c', context.category);
     if (context?.page !== undefined) params.set('p', String(context.page));
+    if (context?.sort_order) params.set('s', context.sort_order);
     
     const qs = params.toString();
     return qs ? `${base}?${qs}` : base;

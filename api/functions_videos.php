@@ -96,15 +96,24 @@ function video_get_all($pdo) {
     $category = trim($_GET['category'] ?? ''); 
     $mediaType = trim($_GET['media_type'] ?? 'ALL');
     $userSort = trim($_GET['sort_order'] ?? ''); 
+    $userId = trim($_GET['userId'] ?? '');
     $isShorts = !empty($_GET['shorts']); 
 
     $params = []; 
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
 
-    if ($isShorts) { $where[] = "v.duration < 180"; }
+    if ($isShorts) { 
+        $where[] = "v.duration < 180"; 
+        $where[] = "v.is_audio = 0"; // Solo videos en Shorts
+    }
+    
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
-    if ($mediaType === 'VIDEO') { $where[] = "v.is_audio = 0"; } 
-    elseif ($mediaType === 'AUDIO') { $where[] = "v.is_audio = 1"; }
+    
+    if (!$isShorts) {
+        if ($mediaType === 'VIDEO') { $where[] = "v.is_audio = 0"; } 
+        elseif ($mediaType === 'AUDIO') { $where[] = "v.is_audio = 1"; }
+    }
+
     if (!empty($category) && $category !== 'TODOS') { $where[] = "v.category = ?"; $params[] = $category; }
 
     $rootPath = '';
@@ -119,28 +128,40 @@ function video_get_all($pdo) {
     $whereClause = implode(" AND ", $where);
 
     // CLAVE: Determinar el orden a usar
-    // Prioridad: 1) userSort del frontend, 2) sortOrder de la carpeta/categoría, 3) LATEST
     $effectiveSort = $userSort;
     if (empty($effectiveSort)) {
         $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
     }
 
     // Construir ORDER BY
-    if ($isShorts || $effectiveSort === 'RANDOM') {
+    $orderParams = [];
+    if ($isShorts) {
+        if (!empty($userId)) {
+            // Prioridad: Suscritos > Likes > Vistas > Random
+            $orderBy = "(SELECT COUNT(*) FROM subscriptions s WHERE s.userId = ? AND s.creatorId = v.creatorId) DESC, v.likes DESC, v.views DESC, RAND()";
+            $orderParams[] = $userId;
+        } else {
+            $orderBy = "v.likes DESC, v.views DESC, RAND()";
+        }
+    } elseif ($effectiveSort === 'RANDOM') {
         $orderBy = "RAND()";
     } elseif ($effectiveSort === 'ALPHA') {
         $orderBy = "v.title ASC";
     } else {
-        // LATEST o default
         $orderBy = "v.createdAt DESC";
     }
+
+    // Combinar parámetros: los de ORDER BY (si hay subquery con ?) van antes o después?
+    // En mi caso, el subquery está en el ORDER BY, así que el parámetro va ahí.
+    // El orden de ejecución es WHERE -> ORDER BY. Así que los parámetros de WHERE van primero.
+    $finalParams = array_merge($params, $orderParams);
 
     $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
             FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
             WHERE $whereClause ORDER BY $orderBy LIMIT $limit OFFSET $offset";
 
     $stmt = $pdo->prepare($sql); 
-    $stmt->execute($params); 
+    $stmt->execute($finalParams); 
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $total = $pdo->prepare("SELECT COUNT(*) FROM videos v WHERE $whereClause"); 

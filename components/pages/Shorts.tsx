@@ -245,14 +245,12 @@ export default function Shorts() {
   const shareTimeout = useRef<any>(null);
 
   const fetchShorts = async (p: number) => {
-    if (loading || !hasMore) return;
+    if (loading || (!hasMore && p !== 0)) return;
     setLoading(true);
     
-    // Obtener el filtro persistente (Leído desde localStorage para coherencia global)
-    const mediaFilter = localStorage.getItem('sp_media_filter') || 'ALL';
-    
     try {
-        const res = await db.getShorts(p, 10, mediaFilter);
+        // Forzamos mediaType='VIDEO' para Shorts y pasamos el userId para el sistema de prioridad
+        const res = await db.getShorts(p, 10, 'VIDEO', '', user?.id);
         if (res.videos.length > 0) {
             setVideos(prev => p === 0 ? res.videos : [...prev, ...res.videos]);
             setHasMore(res.hasMore);
