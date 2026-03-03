@@ -5,12 +5,13 @@
 
 // Helper para obtener datos completos de usuario
 function _get_user_data($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId, lastDeviceId FROM users WHERE id = ?");
     $stmt->execute([$id]); 
     $u = $stmt->fetch();
     if ($u) {
         $u['avatarUrl'] = fix_url($u['avatarUrl']);
         $u['balance'] = (float)$u['balance'];
+        $u['deviceInfo'] = $u['lastDeviceId'] ?: 'Desconocido';
         $details = json_decode($u['shippingDetails'] ?: '{}', true);
         
         // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
@@ -37,9 +38,10 @@ function auth_login($pdo, $input) {
     
     if ($user && password_verify($p, $user['password_hash'])) {
         $sid = bin2hex(random_bytes(32));
-        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $deviceInfo = parse_user_agent($userAgent);
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
-            ->execute([$sid, time(), $userAgent, $user['id']]);
+            ->execute([$sid, time(), $deviceInfo, $user['id']]);
         
         $data = _get_user_data($pdo, $user['id']);
         $data['sessionToken'] = $sid;
@@ -80,8 +82,9 @@ function auth_heartbeat($pdo, $input) {
     
     $user = _get_user_data($pdo, $uid);
     if ($user && $user['currentSessionId'] === $sid) {
-        $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
-        $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $userAgent, $uid]);
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $deviceInfo = parse_user_agent($userAgent);
+        $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $deviceInfo, $uid]);
         respond(true, $user);
     }
     respond(false, null, "Sesión expirada");

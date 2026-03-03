@@ -36,6 +36,7 @@ export interface User {
   avatarUrl?: string;
   lastActive?: number;
   lastDeviceId?: string;
+  deviceInfo?: string;
   watchLater: string[];
   autoPurchaseLimit: number;
   defaultPrices?: Record<string, number>;

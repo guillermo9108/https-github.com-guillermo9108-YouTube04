@@ -129,3 +129,28 @@ function streamVideo($id, $pdo) {
     fclose($fm);
     exit;
 }
+
+function parse_user_agent($ua) {
+    if (empty($ua)) return "Desconocido";
+    
+    $os = "Desconocido";
+    if (preg_match('/android/i', $ua)) $os = "Android";
+    elseif (preg_match('/iphone|ipad|ipod/i', $ua)) $os = "iOS";
+    elseif (preg_match('/windows/i', $ua)) $os = "Windows";
+    elseif (preg_match('/macintosh|mac os x/i', $ua)) $os = "macOS";
+    elseif (preg_match('/linux/i', $ua)) $os = "Linux";
+
+    $browser = "Navegador";
+    if (preg_match('/chrome/i', $ua) && !preg_match('/edge|opr|opera/i', $ua)) $browser = "Chrome";
+    elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) $browser = "Safari";
+    elseif (preg_match('/firefox/i', $ua)) $browser = "Firefox";
+    elseif (preg_match('/edge/i', $ua)) $browser = "Edge";
+    elseif (preg_match('/opera|opr/i', $ua)) $browser = "Opera";
+    
+    // Detección de APK / WebView (común en apps Android)
+    if (preg_match('/wv|webview|crosswalk/i', $ua)) {
+        $browser = "App (WebView)";
+    }
+    
+    return "$os - $browser";
+}

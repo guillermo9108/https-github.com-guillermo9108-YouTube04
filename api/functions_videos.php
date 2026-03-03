@@ -138,7 +138,7 @@ function video_get_all($pdo) {
     if ($isShorts) {
         if (!empty($userId)) {
             // Prioridad: Suscritos > Likes > Vistas > Random
-            $orderBy = "(SELECT COUNT(*) FROM subscriptions s WHERE s.userId = ? AND s.creatorId = v.creatorId) DESC, v.likes DESC, v.views DESC, RAND()";
+            $orderBy = "(SELECT COUNT(*) FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId) DESC, v.likes DESC, v.views DESC, RAND()";
             $orderParams[] = $userId;
         } else {
             $orderBy = "v.likes DESC, v.views DESC, RAND()";

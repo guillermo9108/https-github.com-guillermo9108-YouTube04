@@ -534,7 +534,7 @@ export default function Profile() {
                     <Smartphone size={20} className="text-slate-500"/>
                     <div>
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Dispositivo</p>
-                        <p className="text-[10px] font-mono text-slate-400">{user.lastDeviceId || 'Desconocido'}</p>
+                        <p className="text-[10px] font-mono text-slate-400">{user.deviceInfo || user.lastDeviceId || 'Desconocido'}</p>
                     </div>
                 </div>
                 <Shield size={20} className="text-emerald-500"/>
