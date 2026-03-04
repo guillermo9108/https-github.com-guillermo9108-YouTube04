@@ -57,7 +57,7 @@ function resolve_video_path($url) {
 }
 
 function streamVideo($id, $pdo) {
-    $stmt = $pdo->prepare("SELECT videoUrl, title, price, creatorId FROM videos WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT videoUrl, title, price, creatorId, creatorRole FROM videos WHERE id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch();
     
@@ -65,6 +65,36 @@ function streamVideo($id, $pdo) {
         write_log("Stream Error: Video ID $id not found", 'ERROR');
         header("HTTP/1.1 404 Not Found"); 
         exit; 
+    }
+
+    // Basic Auth Check for streaming/downloading
+    $token = $_GET['token'] ?? '';
+    $isUnlocked = false;
+    if (!empty($token)) {
+        $stmtU = $pdo->prepare("SELECT id, role, vipExpiry FROM users WHERE currentSessionId = ?");
+        $stmtU->execute([$token]);
+        $user = $stmtU->fetch();
+        if ($user) {
+            $uid = $user['id'];
+            $isAdmin = trim(strtoupper($user['role'])) === 'ADMIN';
+            $isVip = $user['vipExpiry'] && $user['vipExpiry'] > time();
+            
+            // Check purchase
+            $stmtP = $pdo->prepare("SELECT 1 FROM purchases WHERE userId = ? AND videoId = ?");
+            $stmtP->execute([$uid, $id]);
+            $hasPurchased = $stmtP->fetchColumn();
+            
+            // Requisitos: Propietario, Admin, VIP (Acceso Total) o Compra
+            if ($hasPurchased || $isAdmin || $isVip || $uid === $video['creatorId']) {
+                $isUnlocked = true;
+            }
+        }
+    }
+
+    if (!$isUnlocked) {
+        header("HTTP/1.1 403 Forbidden");
+        echo "Acceso denegado. Debes comprar el contenido o tener una suscripción activa.";
+        exit;
     }
     
     $path = resolve_video_path($video['videoUrl']);
@@ -116,7 +146,13 @@ function streamVideo($id, $pdo) {
     header('Accept-Ranges: bytes');
     header("Content-Range: bytes $begin-$end/$size");
     header("Content-Length: " . ($end - $begin + 1));
-    header("Content-Disposition: inline; filename=\"" . basename($path) . "\"");
+    
+    // Si se solicita descarga, usar el título del video como nombre de archivo si es posible
+    $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
+    $cleanTitle = preg_replace('/[^A-Za-z0-9_\-]/', '_', $video['title'] ?: 'video');
+    $downloadName = $cleanTitle . '.' . $ext;
+    
+    header("Content-Disposition: $disposition; filename=\"$downloadName\"");
     header("Cache-Control: no-cache");
 
     fseek($fm, $begin);

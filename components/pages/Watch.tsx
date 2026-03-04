@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useParams, Link, useNavigate } from '../Router';
 import { 
     Loader2, Heart, ThumbsDown, MessageCircle, Lock, 
-    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter
+    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download
 } from 'lucide-react';
 import VideoCard from '../VideoCard';
 import { useToast } from '../../context/ToastContext';
@@ -141,7 +141,7 @@ export default function Watch() {
                     ]);
                     const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
                     const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
-                    setIsUnlocked(Boolean(access || isAdmin || (isVipActive && v.creatorRole === 'ADMIN') || user.id === v.creatorId));
+                    setIsUnlocked(Boolean(access || isAdmin || isVipActive || user.id === v.creatorId));
                     setInteraction(interact);
                     setIsSubscribed(sub);
                 }
@@ -392,6 +392,16 @@ export default function Watch() {
                                 <MessageCircle size={18}/>
                                 <span className="text-[10px] font-black uppercase tracking-widest">{comments.length}</span>
                             </button>
+
+                            {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app')) && isUnlocked && (
+                                <a 
+                                    href={`api/index.php/${(video?.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${video?.is_audio ? 'mp3' : 'mp4'}?action=stream&id=${video?.id}&token=${localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token')}&download=1`}
+                                    className="flex items-center gap-2 bg-emerald-600 border border-white/5 px-5 py-3 rounded-2xl text-white hover:bg-emerald-500 transition-all active:scale-95 shrink-0"
+                                >
+                                    <Download size={18}/>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
+                                </a>
+                            )}
                         </div>
                     </div>
 
