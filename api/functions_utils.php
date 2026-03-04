@@ -72,6 +72,9 @@ function resolve_video_path($url) {
 }
 
 function streamVideo($id, $pdo) {
+    // Limpiar cualquier salida previa para evitar corrupción del stream
+    while (ob_get_level()) ob_end_clean();
+
     // CORS Headers for APK/Webview
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, OPTIONS");
@@ -176,27 +179,34 @@ function streamVideo($id, $pdo) {
         'm4a' => 'audio/mp4',
         'aac' => 'audio/aac'
     ];
-    if (isset($mimes[$ext])) $mime = $mimes[$ext];
+    if (isset($_GET['download'])) {
+        $mime = 'application/octet-stream';
+        header("Content-Description: File Transfer");
+    } else {
+        if (isset($mimes[$ext])) $mime = $mimes[$ext];
+    }
 
     header("Content-Type: $mime");
     header('Accept-Ranges: bytes');
     header("X-Content-Type-Options: nosniff");
     
-    if (isset($_SERVER['HTTP_RANGE'])) {
+    if (isset($_SERVER['HTTP_RANGE']) && !isset($_GET['download'])) {
         header("Content-Range: bytes $begin-$end/$size");
     }
     header("Content-Length: " . ($end - $begin + 1));
     
     // Si se solicita descarga, usar el título del video como nombre de archivo si es posible
-    $disposition = isset($_GET['download']) ? 'attachment' : 'inline';
+    $isDownload = isset($_GET['download']);
+    $disposition = $isDownload ? 'attachment' : 'inline';
     $cleanTitle = preg_replace('/[^A-Za-z0-9_\-]/', '_', $video['title'] ?: 'video');
     $downloadName = $cleanTitle . '.' . $ext;
     
-    header("Content-Disposition: $disposition; filename=\"$downloadName\"");
+    // RFC 6266 compatible Content-Disposition
+    header("Content-Disposition: $disposition; filename=\"$downloadName\"; filename*=UTF-8''" . rawurlencode($downloadName));
     header("Cache-Control: no-cache, must-revalidate");
     header("Pragma: public");
     header("Expires: 0");
-    if (isset($_GET['download'])) {
+    if ($isDownload) {
         header("Content-Transfer-Encoding: binary");
     }
 
