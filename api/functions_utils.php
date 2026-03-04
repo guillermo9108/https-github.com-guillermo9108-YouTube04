@@ -82,7 +82,7 @@ function streamVideo($id, $pdo) {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT videoUrl, title, price, creatorId, creatorRole FROM videos WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT v.videoUrl, v.title, v.price, v.creatorId, u.role as creatorRole FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch();
     
@@ -105,7 +105,7 @@ function streamVideo($id, $pdo) {
             $isVip = $user['vipExpiry'] && $user['vipExpiry'] > time();
             
             // Check purchase
-            $stmtP = $pdo->prepare("SELECT 1 FROM purchases WHERE userId = ? AND videoId = ?");
+            $stmtP = $pdo->prepare("SELECT 1 FROM transactions WHERE buyerId = ? AND videoId = ? AND type = 'PURCHASE'");
             $stmtP->execute([$uid, $id]);
             $hasPurchased = $stmtP->fetchColumn();
             
