@@ -42,21 +42,46 @@ function fix_url($url) {
 }
 
 function resolve_video_path($url) {
+    if (!$url) return null;
+    
     // Si es una URL absoluta de otro servidor, no podemos resolverla localmente
     if (strpos($url, 'http') === 0) return null;
     
+    // Normalizar separadores de ruta
+    $url = str_replace('\\', '/', $url);
+    
     // Si la ruta es relativa a la API (empieza por api/uploads)
     if (strpos($url, 'api/') === 0) {
-        return __DIR__ . '/' . substr($url, 4);
+        $cleanUrl = substr($url, 4);
+        $path = __DIR__ . '/' . $cleanUrl;
+        if (file_exists($path)) return $path;
+        
+        // Intentar también en el nivel superior si la estructura es distinta
+        $pathParent = dirname(__DIR__) . '/' . $cleanUrl;
+        if (file_exists($pathParent)) return $pathParent;
     }
     
     // Si es una ruta absoluta del sistema (NAS/Synology)
     if (file_exists($url)) return $url;
     
+    // Intentar resolver rutas relativas al directorio raíz del proyecto
+    $rootPath = dirname(__DIR__) . '/' . ltrim($url, '/');
+    if (file_exists($rootPath)) return $rootPath;
+    
     return null;
 }
 
 function streamVideo($id, $pdo) {
+    // CORS Headers for APK/Webview
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: GET, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, Range");
+    header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges");
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        exit;
+    }
+
     $stmt = $pdo->prepare("SELECT videoUrl, title, price, creatorId, creatorRole FROM videos WHERE id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch();
@@ -139,12 +164,27 @@ function streamVideo($id, $pdo) {
 
     $mime = 'video/mp4';
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    if ($ext === 'mkv') $mime = 'video/x-matroska';
-    if ($ext === 'mp3') $mime = 'audio/mpeg';
+    $mimes = [
+        'mp4' => 'video/mp4',
+        'mkv' => 'video/x-matroska',
+        'webm' => 'video/webm',
+        'avi' => 'video/x-msvideo',
+        'mov' => 'video/quicktime',
+        'mp3' => 'audio/mpeg',
+        'wav' => 'audio/wav',
+        'flac' => 'audio/flac',
+        'm4a' => 'audio/mp4',
+        'aac' => 'audio/aac'
+    ];
+    if (isset($mimes[$ext])) $mime = $mimes[$ext];
 
     header("Content-Type: $mime");
     header('Accept-Ranges: bytes');
-    header("Content-Range: bytes $begin-$end/$size");
+    header("X-Content-Type-Options: nosniff");
+    
+    if (isset($_SERVER['HTTP_RANGE'])) {
+        header("Content-Range: bytes $begin-$end/$size");
+    }
     header("Content-Length: " . ($end - $begin + 1));
     
     // Si se solicita descarga, usar el título del video como nombre de archivo si es posible
@@ -153,7 +193,12 @@ function streamVideo($id, $pdo) {
     $downloadName = $cleanTitle . '.' . $ext;
     
     header("Content-Disposition: $disposition; filename=\"$downloadName\"");
-    header("Cache-Control: no-cache");
+    header("Cache-Control: no-cache, must-revalidate");
+    header("Pragma: public");
+    header("Expires: 0");
+    if (isset($_GET['download'])) {
+        header("Content-Transfer-Encoding: binary");
+    }
 
     fseek($fm, $begin);
     $cur = $begin;

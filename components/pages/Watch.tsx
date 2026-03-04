@@ -299,9 +299,8 @@ export default function Watch() {
 
     const streamUrl = useMemo(() => {
         if (!video) return '';
-        // Usamos el helper de Streamer en Node.js (Puerto 3001)
-        return db.getStreamerUrl(video.id);
-    }, [video?.id]);
+        return db.getStreamerUrl(video.id, user?.sessionToken);
+    }, [video?.id, user?.sessionToken]);
 
     const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${navigationContext.f.split('/').pop()}` : null);
 
@@ -395,7 +394,7 @@ export default function Watch() {
 
                             {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app')) && isUnlocked && (
                                 <a 
-                                    href={`api/index.php/${(video?.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${video?.is_audio ? 'mp3' : 'mp4'}?action=stream&id=${video?.id}&token=${localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token')}&download=1`}
+                                    href={`/api/index.php?action=stream&id=${video?.id}&token=${user?.sessionToken || localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token')}&download=1&file=${(video?.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${video?.is_audio ? 'mp3' : 'mp4'}`}
                                     className="flex items-center gap-2 bg-emerald-600 border border-white/5 px-5 py-3 rounded-2xl text-white hover:bg-emerald-500 transition-all active:scale-95 shrink-0"
                                 >
                                     <Download size={18}/>

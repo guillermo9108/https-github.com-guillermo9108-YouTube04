@@ -18,7 +18,7 @@ class DBService {
 
     public async logRemote(message: string, level: 'ERROR' | 'INFO' | 'WARNING' = 'ERROR') {
         try {
-            await fetch(`api/index.php?action=client_log`, {
+            await fetch(`/api/index.php?action=client_log`, {
                 method: 'POST',
                 body: JSON.stringify({ message, level })
             });
@@ -26,7 +26,7 @@ class DBService {
     }
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const url = endpoint.startsWith('http') ? endpoint : `api/index.php?${endpoint}`;
+        const url = endpoint.startsWith('http') ? endpoint : `/api/index.php?${endpoint}`;
         const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
         
         const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
@@ -68,9 +68,9 @@ class DBService {
      * Genera la URL para el reproductor usando el microservicio Node.js (Puerto 3001)
      * Utiliza la IP actual del navegador para evitar problemas de configuración
      */
-    public getStreamerUrl(videoId: string): string {
-        const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token') || '';
-        return `api/index.php?action=stream&id=${videoId}&token=${token}`;
+    public getStreamerUrl(videoId: string, customToken?: string): string {
+        const token = customToken || localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token') || '';
+        return `/api/index.php?action=stream&id=${videoId}&token=${token}`;
     }
 
     public async getVideos(page: number = 0, limit: number = 40, folder: string = '', search: string = '', category: string = '', mediaType: string = 'ALL', sortOrder: string = '', userId: string = ''): Promise<VideoPagedResponse> {
@@ -257,7 +257,7 @@ class DBService {
             if (thumb) fd.append('thumbnail', thumb);
             xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded, e.total); };
             xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(); };
-            xhr.onerror = () => reject(); xhr.open('POST', 'api/index.php?action=upload_video'); xhr.send(fd);
+            xhr.onerror = () => reject(); xhr.open('POST', '/api/index.php?action=upload_video'); xhr.send(fd);
         });
     }
 
