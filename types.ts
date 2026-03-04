@@ -136,6 +136,8 @@ export interface SystemSettings {
   is_transcoder_active?: boolean;
   maxResolution?: number;
   ftpSettings?: FtpSettings;
+  vapidPublicKey?: string;
+  vapidPrivateKey?: string;
 }
 
 export interface Transaction {

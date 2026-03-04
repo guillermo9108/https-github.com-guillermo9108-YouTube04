@@ -391,6 +391,35 @@ export default function Profile() {
 
           {activeSubTab === 'SETTINGS' && (
               <div className="space-y-6">
+                  <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 shadow-xl">
+                      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Bell size={20} className="text-indigo-400"/> Notificaciones Móviles</h3>
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                                  <Smartphone size={24}/>
+                              </div>
+                              <div>
+                                  <h4 className="text-white font-black text-sm uppercase tracking-widest">Alertas en Tiempo Real</h4>
+                                  <p className="text-slate-500 text-[10px] font-bold uppercase">Recibe avisos aunque no estés en la app.</p>
+                              </div>
+                          </div>
+                          <button 
+                              onClick={async () => {
+                                  try {
+                                      const { subscribeUserToPush } = await import('../../utils/push');
+                                      await subscribeUserToPush(user.id);
+                                      toast.success("Notificaciones activadas correctamente");
+                                  } catch (e: any) {
+                                      toast.error("Error al activar notificaciones: " + e.message);
+                                  }
+                              }}
+                              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-[0.1em] rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
+                          >
+                              <Zap size={14}/> Activar Notificaciones
+                          </button>
+                      </div>
+                  </div>
+
                   {/* Perfil & Avatar */}
                   <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 shadow-xl">
                       <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Camera size={20} className="text-indigo-400"/> Identidad Visual</h3>
@@ -529,15 +558,27 @@ export default function Profile() {
           <button onClick={logout} className="flex-1 bg-red-950/20 hover:bg-red-950/40 text-red-400 font-bold py-4 rounded-2xl border border-red-900/30 flex items-center justify-center gap-2 transition-all">
               <LogOut size={20}/> Cerrar Sesión Segura
           </button>
-          <div className="flex-1 bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-slate-800">
+          <div className="flex-1 bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-slate-800 group hover:border-indigo-500/30 transition-all">
                 <div className="flex items-center gap-3">
-                    <Smartphone size={20} className="text-slate-500"/>
+                    <div className="p-2 bg-slate-950 rounded-xl text-slate-500 group-hover:text-indigo-400 transition-colors">
+                        <Smartphone size={20}/>
+                    </div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Dispositivo</p>
-                        <p className="text-[10px] font-mono text-slate-400">{user.deviceInfo || user.lastDeviceId || 'Desconocido'}</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Identidad del Dispositivo</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-bold text-slate-300">
+                                {user.deviceInfo || user.lastDeviceId || 'Desconocido'}
+                            </p>
+                            {(user.deviceInfo?.includes('App (') || user.lastDeviceId?.includes('App (')) && (
+                                <span className="bg-amber-500/10 text-amber-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-500/20 uppercase">APK</span>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <Shield size={20} className="text-emerald-500"/>
+                <div className="flex flex-col items-end">
+                    <Shield size={16} className="text-emerald-500 mb-1"/>
+                    <p className="text-[8px] font-mono text-slate-600 uppercase">Sesión Protegida</p>
+                </div>
           </div>
       </div>
     </div>

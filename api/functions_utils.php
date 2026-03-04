@@ -148,7 +148,10 @@ function parse_user_agent($ua) {
     elseif (preg_match('/opera|opr/i', $ua)) $browser = "Opera";
     
     // Detección de APK / WebView (común en apps Android)
-    if (preg_match('/wv|webview|crosswalk/i', $ua)) {
+    $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? $_SERVER['HTTP_X_APP_PACKAGE'] ?? '';
+    if (!empty($requestedWith) && !in_array($requestedWith, ['com.android.browser', 'com.android.chrome', 'org.mozilla.firefox', 'com.google.android.apps.maps'])) {
+        $browser = "App ($requestedWith)";
+    } elseif (preg_match('/wv|webview|crosswalk/i', $ua)) {
         $browser = "App (WebView)";
     }
     

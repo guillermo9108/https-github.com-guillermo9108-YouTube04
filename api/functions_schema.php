@@ -192,7 +192,9 @@ function getAppSchema() {
                 'transferFee' => 'DECIMAL(10, 2) DEFAULT 5.00',
                 'vipPlans' => 'JSON DEFAULT NULL',
                 'paymentMethods' => 'JSON DEFAULT NULL',
-                'enableDebugLog' => 'TINYINT(1) DEFAULT 1'
+                'enableDebugLog' => 'TINYINT(1) DEFAULT 1',
+                'vapidPublicKey' => 'TEXT DEFAULT NULL',
+                'vapidPrivateKey' => 'TEXT DEFAULT NULL'
             ]
         ],
         'transactions' => [

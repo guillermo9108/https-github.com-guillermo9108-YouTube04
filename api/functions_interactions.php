@@ -19,6 +19,13 @@ function send_direct_notification($pdo, $userId, $type, $text, $link, $avatarUrl
     $jsonMeta = is_array($metadata) ? json_encode($metadata) : $metadata;
     $pdo->prepare("INSERT INTO notifications (id, userId, type, text, link, isRead, timestamp, avatarUrl, metadata) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)")
         ->execute([uniqid('n_'), $userId, $type, $text, $link, time(), $avatarUrl, $jsonMeta]);
+    
+    // Intentar enviar notificación push
+    try {
+        send_push_notification($pdo, $userId, "Nueva notificación", $text, $link);
+    } catch (Exception $e) {
+        write_log("Push Error: " . $e->getMessage(), 'ERROR');
+    }
 }
 
 function interact_notify_subscribers($pdo, $creatorId, $type, $text, $link, $imageOverride = null) {
@@ -216,6 +223,52 @@ function interact_transfer_balance($pdo, $input) {
         
         $pdo->commit(); respond(true);
     } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
+}
+
+function interact_subscribe_push($pdo, $input) {
+    $uid = $input['userId'];
+    $sub = $input['subscription']; // { endpoint, keys: { p256dh, auth } }
+    
+    if (empty($sub['endpoint'])) respond(false, null, "Endpoint requerido");
+    
+    $pdo->prepare("INSERT INTO push_subscriptions (endpoint, userId, p256dh, auth, createdAt) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE userId = ?, p256dh = ?, auth = ?")
+        ->execute([
+            $sub['endpoint'], 
+            $uid, 
+            $sub['keys']['p256dh'], 
+            $sub['keys']['auth'], 
+            time(),
+            $uid,
+            $sub['keys']['p256dh'],
+            $sub['keys']['auth']
+        ]);
+    respond(true);
+}
+
+function interact_unsubscribe_push($pdo, $input) {
+    $endpoint = $input['endpoint'];
+    $pdo->prepare("DELETE FROM push_subscriptions WHERE endpoint = ?")->execute([$endpoint]);
+    respond(true);
+}
+
+function send_push_notification($pdo, $userId, $title, $body, $url = '/') {
+    $stmt = $pdo->prepare("SELECT * FROM push_subscriptions WHERE userId = ?");
+    $stmt->execute([$userId]);
+    $subs = $stmt->fetchAll();
+    
+    if (empty($subs)) return;
+
+    // Obtener llaves VAPID
+    $stmtS = $pdo->query("SELECT vapidPublicKey, vapidPrivateKey FROM system_settings WHERE id = 1");
+    $settings = $stmtS->fetch();
+    
+    foreach ($subs as $sub) {
+        // Aquí se debería usar una librería como 'web-push' para PHP
+        // Por ahora, registramos el intento en el log
+        write_log("Push Notification Intent: To=$userId, Title=$title, Body=$body, Endpoint={$sub['endpoint']}");
+        
+        // Si el usuario configura FCM, se podría enviar vía cURL aquí
+    }
 }
 
 function interact_request_content($pdo, $input) {

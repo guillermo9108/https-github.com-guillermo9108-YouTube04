@@ -119,14 +119,6 @@ function video_get_all($pdo) {
         $params[] = $folderPath;
     }
 
-    $whereClause = implode(" AND ", $where);
-
-    // CLAVE: Determinar el orden a usar
-    $effectiveSort = $userSort;
-    if (empty($effectiveSort)) {
-        $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
-    }
-
     // Fallback para is_audio si no está bien en DB
     if ($mediaType === 'VIDEO') { 
         $where[] = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
@@ -134,7 +126,13 @@ function video_get_all($pdo) {
         $where[] = "v.is_audio = 1"; 
     }
 
-    // Construir ORDER BY
+    $whereClause = implode(" AND ", $where);
+
+    // CLAVE: Determinar el orden a usar
+    $effectiveSort = $userSort;
+    if (empty($effectiveSort)) {
+        $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
+    }
     $orderParams = [];
     if ($isShorts) {
         if (!empty($userId)) {
@@ -174,10 +172,10 @@ function video_get_all($pdo) {
     // Obtener categorías activas DENTRO de la carpeta actual (no globales)
     if (!empty($folder)) {
         // Si estamos en una carpeta, mostrar solo categorías de esa carpeta
-        $catParams = [$folderPath];
+        $catMatch = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
         $activeCatsSql = "SELECT DISTINCT category FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')";
         $activeCatsStmt = $pdo->prepare($activeCatsSql);
-        $activeCatsStmt->execute($catParams);
+        $activeCatsStmt->execute([$catMatch]);
         $activeCategories = $activeCatsStmt->fetchAll(PDO::FETCH_COLUMN);
     } else {
         // En la raíz, mostrar todas las categorías globales
@@ -398,8 +396,13 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '') {
         $itemPath = $fullPath . '/' . $item;
         if (is_dir($itemPath)) {
             if (!empty($search) && stripos($item, $search) === false) continue;
-            $rel = ltrim(str_replace($root, '', $itemPath), '/\\');
-            $match = str_replace('\\', '/', $itemPath) . '/%';
+            
+            // Normalizar para reemplazo
+            $normRoot = str_replace('\\', '/', $root);
+            $normItem = str_replace('\\', '/', $itemPath);
+            $rel = ltrim(str_replace($normRoot, '', $normItem), '/\\');
+            
+            $match = $normItem . '/%';
             $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')");
             $count->execute([$match]); 
             $total = (int)$count->fetchColumn();
