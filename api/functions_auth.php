@@ -103,19 +103,30 @@ function auth_get_user($pdo, $id) {
 
 function auth_update_user($pdo, $input) {
     $uid = $input['userId'];
-    $allowed = ['shippingDetails', 'avatarUrl', 'password'];
     $fields = []; $params = [];
     
+    // Si hay un archivo de avatar en $_FILES
+    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+        $avatarUrl = auth_upload_avatar($pdo, $uid, $_FILES['avatar']);
+        if ($avatarUrl) {
+            $fields[] = "avatarUrl = ?";
+            $params[] = $avatarUrl;
+        }
+    }
+
     foreach ($input as $k => $v) {
-        if ($k === 'password' && !empty($v)) {
+        if ($k === 'newPassword' && !empty($v)) {
             $fields[] = "password_hash = ?";
             $params[] = password_hash($v, PASSWORD_DEFAULT);
         } else if ($k === 'shippingDetails') {
             $fields[] = "shippingDetails = ?";
-            $params[] = json_encode($v);
-        } else if ($k === 'avatarUrl') {
+            $params[] = is_array($v) ? json_encode($v) : $v;
+        } else if ($k === 'avatarUrl' && !isset($_FILES['avatar'])) {
             $fields[] = "avatarUrl = ?";
             $params[] = $v;
+        } else if ($k === 'autoPurchaseLimit') {
+            $fields[] = "autoPurchaseLimit = ?";
+            $params[] = floatval($v);
         }
     }
     

@@ -245,6 +245,18 @@ function getAppSchema() {
                 'idx_notif_user' => 'userId',
                 'idx_notif_time' => 'timestamp'
             ]
+        ],
+        'push_subscriptions' => [
+            'cols' => [
+                'endpoint' => 'VARCHAR(255) PRIMARY KEY',
+                'userId' => 'VARCHAR(50)',
+                'p256dh' => 'VARCHAR(255) NOT NULL',
+                'auth' => 'VARCHAR(255) NOT NULL',
+                'createdAt' => 'BIGINT'
+            ],
+            'indices' => [
+                'idx_push_user' => 'userId'
+            ]
         ]
     ];
 }

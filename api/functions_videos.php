@@ -108,14 +108,8 @@ function video_get_all($pdo) {
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
-    
-    if (!$isShorts) {
-        if ($mediaType === 'VIDEO') { $where[] = "v.is_audio = 0"; } 
-        elseif ($mediaType === 'AUDIO') { $where[] = "v.is_audio = 1"; }
-    }
-
     if (!empty($category) && $category !== 'TODOS') { $where[] = "v.category = ?"; $params[] = $category; }
-
+    
     $rootPath = '';
     if (!empty($folder)) {
         $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
@@ -131,6 +125,13 @@ function video_get_all($pdo) {
     $effectiveSort = $userSort;
     if (empty($effectiveSort)) {
         $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
+    }
+
+    // Fallback para is_audio si no está bien en DB
+    if ($mediaType === 'VIDEO') { 
+        $where[] = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
+    } elseif ($mediaType === 'AUDIO') { 
+        $where[] = "v.is_audio = 1"; 
     }
 
     // Construir ORDER BY
@@ -366,15 +367,27 @@ function video_get_unprocessed($pdo) {
 function video_discover_subfolders($pdo, $currentRelPath = '', $search = '') {
     $stmt = $pdo->query("SELECT localLibraryPath, categories FROM system_settings WHERE id = 1");
     $settings = $stmt->fetch();
-    $root = rtrim($settings['localLibraryPath'], '/\\'); 
+    if (!$settings) return [];
+    
+    $root = rtrim($settings['localLibraryPath'] ?? '', '/\\'); 
     $categories = json_decode($settings['categories'] ?: '[]', true);
 
-    if (empty($root) || !is_dir($root)) return [];
+    if (empty($root)) return [];
+    
+    // Intentar resolver la ruta real para evitar problemas con enlaces simbólicos o rutas relativas
+    $realRoot = realpath($root);
+    if (!$realRoot) {
+        // Si realpath falla, intentamos usar la ruta tal cual si es un directorio
+        if (is_dir($root)) $realRoot = $root;
+        else return [];
+    }
 
-    $fullPath = str_replace('\\', '/', $root . '/' . $currentRelPath); 
+    $fullPath = str_replace('\\', '/', $realRoot . '/' . $currentRelPath); 
     if (!is_dir($fullPath)) return [];
 
     $items = scandir($fullPath); 
+    if ($items === false) return [];
+    
     $folders = [];
 
     // Obtener sortOrder de la carpeta actual para ordenar las subcarpetas
@@ -547,6 +560,9 @@ function video_scan_local($pdo, $input) {
         $path = str_replace('\\', '/', $file->getRealPath());
         $id = 'loc_' . md5($path);
         
+        $ext = strtolower($file->getExtension());
+        $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac']) ? 1 : 0;
+
         // Extract category from path
         $dir = dirname($path);
         $parts = explode('/', $dir);
@@ -561,8 +577,8 @@ function video_scan_local($pdo, $input) {
 
             if (!$stmt->fetch()) {
                 $title = pathinfo($path, PATHINFO_FILENAME);
-                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal) VALUES (?, ?, ?, ?, ?, 'PENDING', 1)")
-                    ->execute([$id, $title, $path, $adminId, time()]);
+                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?)")
+                    ->execute([$id, $title, $path, $adminId, time(), $isAudio]);
                 $new++;
             }
         } catch (Exception $e) {
