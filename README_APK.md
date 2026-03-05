@@ -60,29 +60,25 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 }
 ```
 
-## 3. Configuración del WebView (Rendimiento y Lógica)
+## 3. Implementación con React Native / Expo (Recomendado)
 
-Es vital configurar el WebView para que soporte la persistencia de datos (Carrito de compras y Sesión) y la reproducción fluida de video.
+Para una implementación moderna y multiplataforma, se recomienda usar **Expo** con `react-native-webview`. Hemos incluido un componente completo en `/mobile/webview.tsx` que maneja:
 
-```java
-WebView myWebView = findViewById(R.id.webview);
-WebSettings webSettings = myWebView.getSettings();
+*   **Descargas Nativas:** Intercepta enlaces de streaming y descarga archivos directamente al almacenamiento del dispositivo usando `expo-file-system`.
+*   **Galería:** Guarda automáticamente los videos descargados en la galería del teléfono (`expo-media-library`).
+*   **Pantalla Completa:** Gestión automática de orientación y modo inmersivo para videos.
+*   **Menú de Control:** Acceso rápido a descargas, recarga y configuración.
 
-webSettings.setJavaScriptEnabled(true);
-webSettings.setDomStorageEnabled(true); // CRÍTICO: Para el carrito y login
-webSettings.setDatabaseEnabled(true);
-webSettings.setAllowFileAccess(true);
-
-// Streaming sin interrupciones
-webSettings.setMediaPlaybackRequiresUserGesture(false); 
-webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-// User Agent Personalizado (Opcional, para identificar que vienen de la App)
-webSettings.setUserAgentString(webSettings.getUserAgentString() + " StreamPayAPK/1.0");
-
-myWebView.setWebViewClient(new WebViewClient());
-myWebView.setWebChromeClient(new WebChromeClient());
+### Instalación de Dependencias (en el proyecto Expo):
+```bash
+npx expo install react-native-webview expo-file-system expo-media-library expo-sharing expo-screen-orientation expo-notifications @react-native-async-storage/async-storage
 ```
+
+---
+
+## 4. Configuración del WebView Nativo (Java/Kotlin - Legado)
+
+Si prefiere usar Android Studio directamente, configure el WebView para que soporte la persistencia de datos y la reproducción fluida.
 
 ## 4. Manejo del Botón "Atrás" (Navegación)
 
