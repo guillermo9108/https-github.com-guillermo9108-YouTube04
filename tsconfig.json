@@ -21,5 +21,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "api", "src"]
+  "exclude": ["node_modules", "api", "src", "mobile"]
 }
