@@ -74,6 +74,10 @@ function resolve_video_path($url) {
 function streamVideo($id, $pdo) {
     // Limpiar cualquier salida previa para evitar corrupción del stream
     while (ob_get_level()) ob_end_clean();
+    
+    // Aumentar límites para archivos grandes
+    set_time_limit(0);
+    ignore_user_abort(true);
 
     // CORS Headers for APK/Webview
     header("Access-Control-Allow-Origin: *");
@@ -97,6 +101,13 @@ function streamVideo($id, $pdo) {
 
     // Basic Auth Check for streaming/downloading
     $token = $_GET['token'] ?? '';
+    if (empty($token)) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+        }
+    }
+    
     $isUnlocked = false;
     if (!empty($token)) {
         $stmtU = $pdo->prepare("SELECT id, role, vipExpiry FROM users WHERE currentSessionId = ?");
@@ -190,7 +201,7 @@ function streamVideo($id, $pdo) {
     header('Accept-Ranges: bytes');
     header("X-Content-Type-Options: nosniff");
     
-    if (isset($_SERVER['HTTP_RANGE']) && !isset($_GET['download'])) {
+    if (isset($_SERVER['HTTP_RANGE'])) {
         header("Content-Range: bytes $begin-$end/$size");
     }
     header("Content-Length: " . ($end - $begin + 1));
