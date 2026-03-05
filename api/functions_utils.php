@@ -82,8 +82,8 @@ function streamVideo($id, $pdo) {
     // CORS Headers for APK/Webview
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization, Range");
-    header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, Range, X-Requested-With");
+    header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges, Content-Disposition");
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         exit;
@@ -102,13 +102,14 @@ function streamVideo($id, $pdo) {
     // Basic Auth Check for streaming/downloading
     $token = $_GET['token'] ?? '';
     if (empty($token)) {
-        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
         if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
             $token = $matches[1];
         }
     }
     
     $isUnlocked = false;
+    $uid = 'GUEST';
     if (!empty($token)) {
         $stmtU = $pdo->prepare("SELECT id, role, vipExpiry FROM users WHERE currentSessionId = ?");
         $stmtU->execute([$token]);
@@ -127,14 +128,21 @@ function streamVideo($id, $pdo) {
             if ($hasPurchased || $isAdmin || $isVip || $uid === $video['creatorId']) {
                 $isUnlocked = true;
             }
+        } else {
+            write_log("Stream Auth: Token invalid or expired: " . substr($token, 0, 10) . "...", 'WARNING');
         }
+    } else {
+        write_log("Stream Auth: No token provided for video $id", 'WARNING');
     }
 
     if (!$isUnlocked) {
+        write_log("Stream Access Denied: User $uid for video $id", 'WARNING');
         header("HTTP/1.1 403 Forbidden");
         echo "Acceso denegado. Debes comprar el contenido o tener una suscripción activa.";
         exit;
     }
+    
+    write_log("Stream Access Granted: User $uid for video $id (Path: " . basename($video['videoUrl']) . ")", 'INFO');
     
     $path = resolve_video_path($video['videoUrl']);
     
@@ -159,6 +167,12 @@ function streamVideo($id, $pdo) {
         header("HTTP/1.1 500 Internal Server Error"); 
         exit; 
     }
+
+    // Desactivar compresión para el stream
+    if (function_exists('apache_setenv')) {
+        @apache_setenv('no-gzip', 1);
+    }
+    @ini_set('zlib.output_compression', 'Off');
 
     $begin = 0;
     $end = $size - 1;
@@ -190,6 +204,7 @@ function streamVideo($id, $pdo) {
         'm4a' => 'audio/mp4',
         'aac' => 'audio/aac'
     ];
+    
     if (isset($_GET['download'])) {
         $mime = 'application/octet-stream';
         header("Content-Description: File Transfer");
@@ -209,23 +224,46 @@ function streamVideo($id, $pdo) {
     // Si se solicita descarga, usar el título del video como nombre de archivo si es posible
     $isDownload = isset($_GET['download']);
     $disposition = $isDownload ? 'attachment' : 'inline';
-    $cleanTitle = preg_replace('/[^A-Za-z0-9_\-]/', '_', $video['title'] ?: 'video');
-    $downloadName = $cleanTitle . '.' . $ext;
+    
+    // Prioridad al nombre enviado por el front, si no, usar el título del video
+    $rawName = $_GET['filename'] ?? $video['title'] ?? 'video';
+    // Permitir puntos en el nombre pero limpiar otros caracteres raros
+    $cleanTitle = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $rawName);
+    
+    // Limitar longitud del nombre para evitar errores de sistema de archivos (max 100 chars)
+    if (strlen($cleanTitle) > 100) {
+        $cleanTitle = substr($cleanTitle, 0, 100);
+    }
+    
+    $downloadName = $cleanTitle;
+    // Asegurar que tenga la extensión correcta si no la tiene
+    if (strpos($downloadName, '.') === false) {
+        $downloadName .= '.' . $ext;
+    }
     
     // RFC 6266 compatible Content-Disposition
     header("Content-Disposition: $disposition; filename=\"$downloadName\"; filename*=UTF-8''" . rawurlencode($downloadName));
     header("Cache-Control: no-cache, must-revalidate");
     header("Pragma: public");
     header("Expires: 0");
+    
     if ($isDownload) {
         header("Content-Transfer-Encoding: binary");
+        // Algunos gestores de descarga prefieren el MIME real incluso en descargas
+        if ($mime === 'application/octet-stream' && isset($mimes[$ext])) {
+            $mime = $mimes[$ext];
+            header("Content-Type: $mime");
+        }
     }
 
     fseek($fm, $begin);
     $cur = $begin;
     while (!feof($fm) && $cur <= $end && (connection_status() == 0)) {
-        print fread($fm, min(1024 * 16, ($end - $cur) + 1));
-        $cur += 1024 * 16;
+        $chunkSize = 1024 * 128; // Aumentar tamaño de chunk a 128KB para mejor rendimiento
+        $data = fread($fm, min($chunkSize, ($end - $cur) + 1));
+        if ($data === false) break;
+        echo $data;
+        $cur += strlen($data);
         flush();
     }
     fclose($fm);
