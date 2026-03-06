@@ -207,11 +207,22 @@ export default function WebViewScreen() {
 
     // Extraer nombre del archivo de la URL si no se proporciona
     let cleanFilename = filename;
+    try {
+      const urlObj = new URL(url);
+      const urlFilename = urlObj.searchParams.get('filename');
+      if (urlFilename) cleanFilename = urlFilename;
+    } catch (e) {}
+
     if (!cleanFilename || cleanFilename === 'undefined') {
       try {
         const urlObj = new URL(url);
         const pathParts = urlObj.pathname.split('/');
-        cleanFilename = pathParts[pathParts.length - 1] || `archivo_${downloadId}`;
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.includes('.')) {
+          cleanFilename = lastPart;
+        } else {
+          cleanFilename = `archivo_${downloadId}`;
+        }
         cleanFilename = decodeURIComponent(cleanFilename);
       } catch {
         cleanFilename = `archivo_${downloadId}`;
@@ -232,8 +243,8 @@ export default function WebViewScreen() {
     setShowDownloads(true);
 
     try {
-      // Usar cacheDirectory para mayor compatibilidad con MediaLibrary
-      const downloadPath = `${FileSystem.cacheDirectory}${cleanFilename}`;
+      // Usar documentDirectory para mayor persistencia y compatibilidad
+      const downloadPath = `${FileSystem.documentDirectory}${cleanFilename}`;
 
       const downloadHeaders: Record<string, string> = {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
@@ -456,7 +467,7 @@ export default function WebViewScreen() {
         onFileDownload={({ nativeEvent }) => {
           handleDownload(nativeEvent.downloadUrl, '');
         }}
-        userAgent="Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        userAgent="Mozilla/5.0 (Linux; Android 12; StreamPayAPK) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
       />
 
       {!isFullscreen && (

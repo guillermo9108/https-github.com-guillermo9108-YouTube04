@@ -50,23 +50,23 @@ function resolve_video_path($url) {
     // Normalizar separadores de ruta
     $url = str_replace('\\', '/', $url);
     
-    // Si la ruta es relativa a la API (empieza por api/uploads)
+    // Si la ruta es relativa a la API (empieza por api/uploads o simplemente uploads)
     if (strpos($url, 'api/') === 0) {
         $cleanUrl = substr($url, 4);
         $path = __DIR__ . '/' . $cleanUrl;
         if (file_exists($path)) return $path;
-        
-        // Intentar también en el nivel superior si la estructura es distinta
-        $pathParent = dirname(__DIR__) . '/' . $cleanUrl;
-        if (file_exists($pathParent)) return $pathParent;
     }
     
+    // Intentar resolver relativo al directorio de la API (donde están los uploads)
+    $apiPath = __DIR__ . '/' . ltrim($url, '/');
+    if (file_exists($apiPath) && !is_dir($apiPath)) return $apiPath;
+
     // Si es una ruta absoluta del sistema (NAS/Synology)
-    if (file_exists($url)) return $url;
+    if (file_exists($url) && !is_dir($url)) return $url;
     
     // Intentar resolver rutas relativas al directorio raíz del proyecto
     $rootPath = dirname(__DIR__) . '/' . ltrim($url, '/');
-    if (file_exists($rootPath)) return $rootPath;
+    if (file_exists($rootPath) && !is_dir($rootPath)) return $rootPath;
     
     return null;
 }
@@ -281,7 +281,8 @@ function parse_user_agent($ua) {
     elseif (preg_match('/linux/i', $ua)) $os = "Linux";
 
     $browser = "Navegador";
-    if (preg_match('/chrome/i', $ua) && !preg_match('/edge|opr|opera/i', $ua)) $browser = "Chrome";
+    if (preg_match('/StreamPayAPK/i', $ua)) $browser = "App (StreamPay)";
+    elseif (preg_match('/chrome/i', $ua) && !preg_match('/edge|opr|opera/i', $ua)) $browser = "Chrome";
     elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) $browser = "Safari";
     elseif (preg_match('/firefox/i', $ua)) $browser = "Firefox";
     elseif (preg_match('/edge/i', $ua)) $browser = "Edge";

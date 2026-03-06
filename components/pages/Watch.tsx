@@ -392,7 +392,7 @@ export default function Watch() {
                                 <span className="text-[10px] font-black uppercase tracking-widest">{comments.length}</span>
                             </button>
 
-                            {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app')) && isUnlocked && (
+                            {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app') || user?.deviceInfo?.includes('StreamPayAPK') || user?.lastDeviceId?.includes('StreamPayAPK')) && isUnlocked && (
                                 <a 
                                     href={`/api/index.php?action=stream&id=${video?.id}&token=${user?.sessionToken || localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token') || ''}&download=1&filename=${encodeURIComponent((video?.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase())}.${video?.is_audio ? 'mp3' : 'mp4'}`}
                                     download=""
