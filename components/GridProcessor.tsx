@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useGrid } from '../context/GridContext';
+import { useAuth } from '../context/AuthContext';
 import { Loader2, Check, X, Sparkles, AlertCircle, Music } from 'lucide-react';
 import { db } from '../services/db';
 import { generateThumbnail } from '../utils/videoGenerator';
 
 export default function GridProcessor() {
     const { activeTask, completeTask, skipTask } = useGrid();
+    const { user } = useAuth();
     const videoRef = useRef<HTMLVideoElement>(null);
     const [status, setStatus] = useState<'INIT' | 'CAPTURING' | 'DONE' | 'ERROR'>('INIT');
     const [isAudioMode, setIsAudioMode] = useState(false);
@@ -33,7 +35,7 @@ export default function GridProcessor() {
         const isLocal = Boolean(activeTask.isLocal) || (activeTask as any).isLocal === 1 || (activeTask as any).isLocal === "1";
         
         if (isLocal) {
-            streamSrc = streamSrc.includes('action=stream') ? `${streamSrc}&t=${Date.now()}` : `api/index.php?action=stream&id=${activeTask.id}&t=${Date.now()}`;
+            streamSrc = db.getStreamerUrl(activeTask.id, user?.sessionToken);
         }
 
         if (isAudioMode) {

@@ -95,13 +95,13 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   useEffect(() => {
       let isMounted = true;
-      const canProcess = isAudio && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !isAnyCardProcessing && !failedExtractions.has(video.id);
+      const canProcess = isUnlocked && isAudio && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !isAnyCardProcessing && !failedExtractions.has(video.id);
       if (canProcess) {
           isAnyCardProcessing = true;
           setIsProcessing(true);
           const process = async () => {
               try {
-                  const streamUrl = video.videoUrl.includes('action=stream') ? video.videoUrl : `api/index.php?action=stream&id=${video.id}`;
+                  const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
                   const result = await generateThumbnail(streamUrl, true, true);
                   if (!isMounted) return;
                   if (result.duration > 0) {

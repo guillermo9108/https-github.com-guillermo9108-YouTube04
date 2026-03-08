@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { db } from '../../../services/db';
 import { Video, SystemSettings } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
+import { useAuth } from '../../../context/AuthContext';
 import { generateThumbnail } from '../../../utils/videoGenerator';
 import { 
     FolderSearch, Loader2, Terminal, Film, Wand2, Database, RefreshCw, 
@@ -16,6 +17,7 @@ interface ScannerPlayerProps {
 }
 
 const ScannerPlayer: React.FC<ScannerPlayerProps> = ({ video, onComplete }) => {
+    const { user } = useAuth();
     const [status, setStatus] = useState('Iniciando...');
     const [isAudio, setIsAudio] = useState(false);
     const processedRef = useRef(false);
@@ -39,7 +41,7 @@ const ScannerPlayer: React.FC<ScannerPlayerProps> = ({ video, onComplete }) => {
         setStatus('Extrayendo Metadatos...');
         
         try {
-            const streamUrl = video.videoUrl.includes('action=stream') ? video.videoUrl : `api/index.php?action=stream&id=${video.id}`;
+            const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
             const result = await generateThumbnail(streamUrl, force, true);
             
             if (!processedRef.current) {
@@ -61,7 +63,7 @@ const ScannerPlayer: React.FC<ScannerPlayerProps> = ({ video, onComplete }) => {
 
         const vid = videoRef.current;
         if (!vid) return;
-        vid.src = video.videoUrl.includes('action=stream') ? video.videoUrl : `api/index.php?action=stream&id=${video.id}`;
+        vid.src = db.getStreamerUrl(video.id, user?.sessionToken);
         vid.muted = true;
         vid.crossOrigin = "anonymous";
         

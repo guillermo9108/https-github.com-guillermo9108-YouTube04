@@ -302,6 +302,14 @@ export default function Watch() {
         return db.getStreamerUrl(video.id, user?.sessionToken);
     }, [video?.id, user?.sessionToken]);
 
+    const downloadUrl = useMemo(() => {
+        if (!video) return '';
+        const base = db.getStreamerUrl(video.id, user?.sessionToken);
+        const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
+        const ext = video.is_audio ? 'mp3' : 'mp4';
+        return `${base}&download=1&filename=${filename}.${ext}`;
+    }, [video?.id, user?.sessionToken, video?.title, video?.is_audio]);
+
     const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${navigationContext.f.split('/').pop()}` : null);
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
@@ -394,7 +402,7 @@ export default function Watch() {
 
                             {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app') || user?.deviceInfo?.includes('StreamPayAPK') || user?.lastDeviceId?.includes('StreamPayAPK')) && isUnlocked && (
                                 <a 
-                                    href={`/api/index.php?action=stream&id=${video?.id}&token=${user?.sessionToken || localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token') || ''}&download=1&filename=${encodeURIComponent((video?.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase())}.${video?.is_audio ? 'mp3' : 'mp4'}`}
+                                    href={downloadUrl}
                                     download=""
                                     className="flex items-center gap-2 bg-emerald-600 border border-white/5 px-5 py-3 rounded-2xl text-white hover:bg-emerald-500 transition-all active:scale-95 shrink-0"
                                 >

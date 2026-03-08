@@ -120,8 +120,8 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   const videoSrc = useMemo(() => {
     if (!isNear) return ""; 
     // Redirigir al puerto 3001 del streamer en Node.js
-    return db.getStreamerUrl(video.id);
-  }, [video.id, isNear]);
+    return db.getStreamerUrl(video.id, user?.sessionToken);
+  }, [video.id, isNear, user?.sessionToken]);
 
   if (!isNear) return <div className="w-full h-full snap-start bg-black shrink-0 flex items-center justify-center"><Loader2 className="animate-spin text-slate-800" /></div>;
 

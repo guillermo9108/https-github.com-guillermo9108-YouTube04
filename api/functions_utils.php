@@ -124,15 +124,25 @@ function streamVideo($id, $pdo) {
             $stmtP->execute([$uid, $id]);
             $hasPurchased = $stmtP->fetchColumn();
             
-            // Requisitos: Propietario, Admin, VIP (Acceso Total) o Compra
-            if ($hasPurchased || $isAdmin || $isVip || $uid === $video['creatorId']) {
+            // Requisitos: Propietario, Admin, VIP (Acceso Total), Compra o Gratis
+            if ($hasPurchased || $isAdmin || $isVip || $uid === $video['creatorId'] || floatval($video['price']) <= 0) {
                 $isUnlocked = true;
             }
         } else {
-            write_log("Stream Auth: Token invalid or expired: " . substr($token, 0, 10) . "...", 'WARNING');
+            // Si el token es inválido pero el video es gratis, permitir
+            if (floatval($video['price']) <= 0) {
+                $isUnlocked = true;
+            } else {
+                write_log("Stream Auth: Token invalid or expired: " . substr($token, 0, 10) . "...", 'WARNING');
+            }
         }
     } else {
-        write_log("Stream Auth: No token provided for video $id", 'WARNING');
+        // No hay token. Permitir si es gratis.
+        if (floatval($video['price']) <= 0) {
+            $isUnlocked = true;
+        } else {
+            write_log("Stream Auth: No token provided for video $id", 'WARNING');
+        }
     }
 
     if (!$isUnlocked) {
