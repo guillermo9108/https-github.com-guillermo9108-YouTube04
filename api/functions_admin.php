@@ -191,7 +191,23 @@ function admin_repair_db($pdo, $input) {
     require_once 'functions_schema.php';
     $schema = getAppSchema();
     foreach ($schema as $table => $def) syncTable($pdo, $table, $def);
-    respond(true, "Base de datos sincronizada con el esquema maestro.");
+    
+    // Reparar columna is_audio para registros existentes
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
+    $placeholders = implode(',', array_fill(0, count($audioExts), '?'));
+    $sql = "UPDATE videos SET is_audio = 1 WHERE is_audio = 0 AND (";
+    $clauses = [];
+    foreach ($audioExts as $ext) $clauses[] = "videoUrl LIKE ?";
+    $sql .= implode(' OR ', $clauses) . ")";
+    
+    $params = [];
+    foreach ($audioExts as $ext) $params[] = "%.$ext";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $fixed = $stmt->rowCount();
+    
+    respond(true, "Base de datos sincronizada. Se repararon $fixed registros de audio.");
 }
 
 function admin_cleanup_files($pdo) {

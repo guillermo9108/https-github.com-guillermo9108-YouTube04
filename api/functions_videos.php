@@ -123,7 +123,7 @@ function video_get_all($pdo) {
     if ($mediaType === 'VIDEO') { 
         $where[] = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
-        $where[] = "v.is_audio = 1"; 
+        $where[] = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac')"; 
     }
 
     $whereClause = implode(" AND ", $where);
@@ -167,7 +167,7 @@ function video_get_all($pdo) {
     $total->execute($params);
     $totalCount = $total->fetchColumn();
 
-    $subfolders = video_discover_subfolders($pdo, $folder, $search);
+    $subfolders = video_discover_subfolders($pdo, $folder, $search, $mediaType);
 
     // Obtener categorías activas DENTRO de la carpeta actual (no globales)
     if (!empty($folder)) {
@@ -362,79 +362,110 @@ function video_get_unprocessed($pdo) {
     respond(true, $videos);
 }
 
-function video_discover_subfolders($pdo, $currentRelPath = '', $search = '') {
-    $stmt = $pdo->query("SELECT localLibraryPath, categories FROM system_settings WHERE id = 1");
-    $settings = $stmt->fetch();
-    if (!$settings) return [];
-    
-    $root = rtrim($settings['localLibraryPath'] ?? '', '/\\'); 
-    $categories = json_decode($settings['categories'] ?: '[]', true);
-
+function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $mediaType = 'ALL') {
+    $stmt = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+    $root = rtrim($stmt->fetchColumn() ?: '', '/\\');
     if (empty($root)) return [];
+
+    $root = str_replace('\\', '/', $root);
+    $currentRelPath = trim(str_replace('\\', '/', $currentRelPath), '/');
     
-    // Intentar resolver la ruta real para evitar problemas con enlaces simbólicos o rutas relativas
-    $realRoot = realpath($root);
-    if (!$realRoot) {
-        // Si realpath falla, intentamos usar la ruta tal cual si es un directorio
-        if (is_dir($root)) $realRoot = $root;
-        else return [];
+    $prefix = $root;
+    if (!empty($currentRelPath)) {
+        $prefix .= '/' . $currentRelPath;
+    }
+    $prefix = rtrim($prefix, '/') . '/';
+    
+    // 1. Intentar descubrimiento por Base de Datos (Más robusto)
+    $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
+            WHERE videoUrl LIKE ? 
+            AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')";
+    $params = [$prefix . '%'];
+    
+    if ($mediaType === 'VIDEO') {
+        $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
+    } elseif ($mediaType === 'AUDIO') {
+        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac')";
     }
 
-    $fullPath = str_replace('\\', '/', $realRoot . '/' . $currentRelPath); 
+    if (!empty($search)) {
+        $sql .= " AND (title LIKE ? OR videoUrl LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $allVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $folderMap = [];
+    $prefixLen = strlen($prefix);
+
+    foreach ($allVideos as $v) {
+        $path = str_replace('\\', '/', $v['videoUrl']);
+        if (strpos($path, $prefix) !== 0) continue;
+        
+        $relative = substr($path, $prefixLen);
+        $parts = explode('/', $relative);
+        
+        if (count($parts) > 1) {
+            $folderName = $parts[0];
+            if (!isset($folderMap[$folderName])) {
+                $folderMap[$folderName] = [
+                    'name' => $folderName,
+                    'relativePath' => ($currentRelPath ? $currentRelPath . '/' : '') . $folderName,
+                    'count' => 0,
+                    'thumbnailUrl' => fix_url($v['thumbnailUrl'])
+                ];
+            }
+            $folderMap[$folderName]['count']++;
+        }
+    }
+
+    // Si encontramos algo por DB, lo usamos
+    if (!empty($folderMap)) {
+        $folders = array_values($folderMap);
+        // Ordenar alfabéticamente por defecto
+        usort($folders, function($a, $b) {
+            return strcasecmp($a['name'], $b['name']);
+        });
+        return $folders;
+    }
+
+    // 2. Fallback al sistema de archivos (Original)
+    $fullPath = $prefix;
     if (!is_dir($fullPath)) return [];
 
-    $items = scandir($fullPath); 
+    $items = @scandir($fullPath); 
     if ($items === false) return [];
     
     $folders = [];
-
-    // Obtener sortOrder de la carpeta actual para ordenar las subcarpetas
-    $parentSortOrder = get_folder_sort_order($pdo, $currentRelPath, '');
-
     foreach ($items as $item) {
         if ($item === '.' || $item === '..' || strpos($item, '.') === 0) continue;
-        $itemPath = $fullPath . '/' . $item;
+        $itemPath = $fullPath . $item;
         if (is_dir($itemPath)) {
             if (!empty($search) && stripos($item, $search) === false) continue;
             
-            // Normalizar para reemplazo
-            $normRoot = str_replace('\\', '/', $root);
-            $normItem = str_replace('\\', '/', $itemPath);
-            $rel = ltrim(str_replace($normRoot, '', $normItem), '/\\');
+            $rel = ltrim(str_replace($root, '', str_replace('\\', '/', $itemPath)), '/\\');
+            $match = str_replace('\\', '/', $itemPath) . '/%';
             
-            $match = $normItem . '/%';
             $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')");
             $count->execute([$match]); 
             $total = (int)$count->fetchColumn();
+            
             if ($total > 0 || empty($search)) {
                 $thumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA') LIMIT 1");
                 $thumb->execute([$match]);
-
-                // Buscar sortOrder específico de esta subcarpeta con herencia
-                // Usar la función mejorada get_folder_sort_order que hace herencia recursiva
-                $folderSortOrder = get_folder_sort_order($pdo, $rel, '');
 
                 $folders[] = [
                     'name' => $item, 
                     'relativePath' => $rel, 
                     'count' => $total, 
-                    'thumbnailUrl' => fix_url($thumb->fetchColumn()),
-                    'sortOrder' => $folderSortOrder,
-                    'inheritedSort' => true  // Indica que puede estar heredando del padre
+                    'thumbnailUrl' => fix_url($thumb->fetchColumn())
                 ];
             }
         }
     }
-
-    // Ordenar las carpetas según el sortOrder del padre
-    if ($parentSortOrder === 'ALPHA') {
-        usort($folders, function($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
-        });
-    } elseif ($parentSortOrder === 'RANDOM') {
-        shuffle($folders);
-    }
-    // LATEST: mantener orden original del sistema de archivos
 
     return $folders;
 }
