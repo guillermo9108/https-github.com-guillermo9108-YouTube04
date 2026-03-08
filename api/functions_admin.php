@@ -193,7 +193,7 @@ function admin_repair_db($pdo, $input) {
     foreach ($schema as $table => $def) syncTable($pdo, $table, $def);
     
     // Reparar columna is_audio para registros existentes
-    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
     $placeholders = implode(',', array_fill(0, count($audioExts), '?'));
     $sql = "UPDATE videos SET is_audio = 1 WHERE is_audio = 0 AND (";
     $clauses = [];

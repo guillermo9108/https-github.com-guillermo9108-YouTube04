@@ -189,7 +189,8 @@ export default function Home() {
 
     // Data State
     const [videos, setVideos] = useState<Video[]>([]);
-    const [folders, setFolders] = useState<{ name: string; count: number; thumbnailUrl: string; relativePath: string }[]>([]);
+    const [folders, setFolders] = useState<{ name: string; count: number; thumbnailUrl: string; relativePath: string; sortOrder?: string }[]>([]);
+    const [appliedSortOrder, setAppliedSortOrder] = useState<string>('');
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -259,6 +260,7 @@ export default function Home() {
             if (reset) {
                 setVideos(res.videos);
                 setFolders(res.folders as any);
+                setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
                 if (selectedCategory !== 'TODOS' && navigationPath.length === 0 && res.videos.length > 0 && systemSettings) {
                     const firstVid = res.videos[0];
@@ -554,7 +556,25 @@ export default function Home() {
                                     {folders.map(folder => (
                                         <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
                                             <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); setNavigationPath([...navigationPath, folder.name]); setSelectedCategory('TODOS'); setShowFolderGrid(true); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
-                                            <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none"><div className="flex justify-between items-start"><div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div><div className="flex flex-col items-end gap-2"><div className="bg-indigo-600/30 backdrop-blur-md px-2 py-0.5 rounded-lg border border-indigo-500/30"><span className="text-[8px] text-indigo-200 font-black uppercase tracking-widest">{folder.count} ITEMS</span></div>{isAdmin && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingFolder(folder); }} className="p-2 bg-slate-950/80 hover:bg-indigo-600 text-white rounded-xl border border-white/10 shadow-xl transition-all active:scale-90 pointer-events-auto"><Edit3 size={14}/></button>)}</div></div><div className="mt-auto"><h3 className="text-base font-black text-white uppercase tracking-tight text-left leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-indigo-300 transition-colors line-clamp-2">{folder.name}</h3><div className="w-6 h-1 bg-indigo-500 mt-2 rounded-full group-hover:w-full transition-all duration-700"></div></div></div>
+                                            <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        <div className="flex gap-1.5">
+                                                            {folder.sortOrder && folder.sortOrder !== 'LATEST' && (
+                                                                <div className="bg-amber-500/30 backdrop-blur-md px-2 py-0.5 rounded-lg border border-amber-500/30 flex items-center gap-1">
+                                                                    {folder.sortOrder === 'ALPHA' ? <SortAsc size={10} className="text-amber-400" /> : <Zap size={10} className="text-amber-400" />}
+                                                                    <span className="text-[8px] text-amber-200 font-black uppercase tracking-widest">{folder.sortOrder}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="bg-indigo-600/30 backdrop-blur-md px-2 py-0.5 rounded-lg border border-indigo-500/30">
+                                                                <span className="text-[8px] text-indigo-200 font-black uppercase tracking-widest">{folder.count} ITEMS</span>
+                                                            </div>
+                                                        </div>
+                                                        {isAdmin && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingFolder(folder); }} className="p-2 bg-slate-950/80 hover:bg-indigo-600 text-white rounded-xl border border-white/10 shadow-xl transition-all active:scale-90 pointer-events-auto"><Edit3 size={14}/></button>)}
+                                                    </div>
+                                                </div>
+                                                <div className="mt-auto"><h3 className="text-base font-black text-white uppercase tracking-tight text-left leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-indigo-300 transition-colors line-clamp-2">{folder.name}</h3><div className="w-6 h-1 bg-indigo-500 mt-2 rounded-full group-hover:w-full transition-all duration-700"></div></div></div>
                                         </div>
                                     ))}
                                 </div>
@@ -563,7 +583,29 @@ export default function Home() {
 
                         <div className="space-y-8">
                             {!searchQuery && ( <div className="flex items-center gap-3 px-1"><div className={`w-1.5 h-1.5 rounded-full ${mediaFilter === 'AUDIO' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-4">{selectedCategory !== 'TODOS' ? `Filtrando por: ${selectedCategory}` : (parentFolderName ? `Contenido en ${parentFolderName}` : 'Novedades')}{mediaFilter !== 'ALL' && <span className="text-slate-500 text-[9px] lowercase italic">({mediaFilter.toLowerCase()}s)</span>}{userSortOrder && <span className="text-indigo-400 text-[9px] lowercase border border-indigo-500/30 px-2 py-0.5 rounded-full">orden: {sortOptions.find(o => o.id === userSortOrder)?.label.toLowerCase()}</span>}<span className="w-12 h-px bg-white/10"></span></h2></div> )}
-                            {searchQuery && ( <div className="flex items-center justify-between px-1"><div className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-4">Resultados para: {searchQuery}<span className="w-12 h-px bg-white/10"></span></h2></div><button onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5"><X size={12}/> Limpiar</button></div> )}
+                            {searchQuery && ( 
+                                <div className="flex items-center justify-between px-1">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                                        <h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-4">
+                                            Resultados para: {searchQuery}
+                                            <span className="w-12 h-px bg-white/10"></span>
+                                        </h2>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button 
+                                            onClick={() => setShowSortMenu(!showSortMenu)} 
+                                            className={`p-2 rounded-xl transition-all border flex items-center gap-2 ${userSortOrder ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                        >
+                                            <ArrowDownUp size={12}/>
+                                            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">
+                                                {userSortOrder ? sortOptions.find(o => o.id === userSortOrder)?.label : 'Ordenar'}
+                                            </span>
+                                        </button>
+                                        <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5"><X size={12}/> Limpiar</button>
+                                    </div>
+                                </div> 
+                            )}
                             {videos.length > 0 ? ( <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-12">{videos.map(v => ( <VideoCard key={v.id} video={v} isUnlocked={isAdmin || user?.id === v.creatorId} isWatched={watchedIds.includes(v.id)} context={{ query: searchQuery, category: selectedCategory, folder: currentFolder, page: page, sort_order: userSortOrder }} /> ))}</div> ) : (folders.length === 0 && !loading) && ( <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4"><Folder size={80} /><p className="font-black uppercase tracking-widest">Sin contenido disponible</p></div> )}
                         </div>
 

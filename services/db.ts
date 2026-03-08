@@ -7,8 +7,9 @@ import {
 
 interface VideoPagedResponse {
     videos: Video[];
-    folders: { name: string; count: number }[];
+    folders: { name: string; count: number; sortOrder?: string; thumbnailUrl?: string; relativePath?: string }[];
     activeCategories: string[];
+    appliedSortOrder?: string;
     total: number;
     hasMore: boolean;
 }

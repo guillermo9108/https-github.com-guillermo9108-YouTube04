@@ -123,7 +123,7 @@ function video_get_all($pdo) {
     if ($mediaType === 'VIDEO') { 
         $where[] = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
-        $where[] = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac')"; 
+        $where[] = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b')"; 
     }
 
     $whereClause = implode(" AND ", $where);
@@ -378,14 +378,13 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     
     // 1. Intentar descubrimiento por Base de Datos (Más robusto)
     $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
-            WHERE videoUrl LIKE ? 
-            AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')";
+            WHERE videoUrl LIKE ?";
     $params = [$prefix . '%'];
     
     if ($mediaType === 'VIDEO') {
         $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
     } elseif ($mediaType === 'AUDIO') {
-        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac')";
+        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac' OR videoUrl LIKE '%.ogg' OR videoUrl LIKE '%.opus' OR videoUrl LIKE '%.m4b')";
     }
 
     if (!empty($search)) {
@@ -449,7 +448,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $rel = ltrim(str_replace($root, '', str_replace('\\', '/', $itemPath)), '/\\');
             $match = str_replace('\\', '/', $itemPath) . '/%';
             
-            $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')");
+            $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ?");
             $count->execute([$match]); 
             $total = (int)$count->fetchColumn();
             
@@ -595,7 +594,7 @@ function video_scan_local($pdo, $input) {
         $id = 'loc_' . md5($path);
         
         $ext = strtolower($file->getExtension());
-        $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac']) ? 1 : 0;
+        $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']) ? 1 : 0;
 
         // Extract category from path
         $dir = dirname($path);

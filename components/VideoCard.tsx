@@ -95,20 +95,24 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   useEffect(() => {
       let isMounted = true;
-      const canProcess = isUnlocked && isAudio && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !isAnyCardProcessing && !failedExtractions.has(video.id);
+      const canProcess = isUnlocked && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !isAnyCardProcessing && !failedExtractions.has(video.id);
       if (canProcess) {
           isAnyCardProcessing = true;
           setIsProcessing(true);
           const process = async () => {
               try {
                   const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
-                  const result = await generateThumbnail(streamUrl, true, true);
+                  const result = await generateThumbnail(streamUrl, isAudio, false); // No saltar imagen
                   if (!isMounted) return;
-                  if (result.duration > 0) {
+                  if (result.duration > 0 || result.thumbnail) {
                       const fd = new FormData();
                       fd.append('id', video.id);
                       fd.append('duration', String(result.duration || video.duration));
                       fd.append('success', '1');
+                      if (result.thumbnail) {
+                          fd.append('thumbnail', result.thumbnail);
+                          setLocalThumb(URL.createObjectURL(result.thumbnail));
+                      }
                       await db.request('action=update_video_metadata', { method: 'POST', body: fd });
                       db.setHomeDirty();
                   } else { failedExtractions.add(video.id); }
@@ -118,7 +122,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           const t = setTimeout(process, 1000);
           return () => { isMounted = false; clearTimeout(t); };
       }
-  }, [video.id, isAudio, hasDefaultThumb, isVisible, isProcessing, localThumb]);
+  }, [video.id, isAudio, hasDefaultThumb, isVisible, isProcessing, localThumb, isUnlocked]);
 
   useEffect(() => {
       return () => {
