@@ -103,7 +103,7 @@ function video_get_all($pdo) {
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
 
     if ($isShorts) { 
-        $where[] = "v.duration < 180"; 
+        $where[] = "(v.duration < 180 OR v.duration = 0)"; 
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
     }
     
@@ -298,7 +298,7 @@ function video_get_related($pdo, $videoId) {
 /**
  * Obtiene videos de la misma carpeta con el orden configurado
  */
-function video_get_folder_videos($pdo, $videoId) {
+function video_get_folder_videos($pdo, $videoId, $userSort = '') {
     $stmtV = $pdo->prepare("SELECT videoUrl, category FROM videos WHERE id = ?");
     $stmtV->execute([$videoId]);
     $currentVideo = $stmtV->fetch();
@@ -308,12 +308,13 @@ function video_get_folder_videos($pdo, $videoId) {
         return;
     }
 
-    $videoPath = $currentVideo['videoUrl'];
+    $videoPath = str_replace('\\', '/', $currentVideo['videoUrl']);
     $category = $currentVideo['category'];
 
     // Obtener la carpeta del video
     $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
     $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
+    $rootPath = str_replace('\\', '/', $rootPath);
 
     $folderPath = dirname($videoPath);
     $relativePath = '';
@@ -322,12 +323,15 @@ function video_get_folder_videos($pdo, $videoId) {
     }
 
     // Obtener el sortOrder configurado
-    $sortOrder = get_folder_sort_order($pdo, $relativePath, $category);
+    $effectiveSort = $userSort;
+    if (empty($effectiveSort)) {
+        $effectiveSort = get_folder_sort_order($pdo, $relativePath, $category);
+    }
 
     // Construir ORDER BY según sortOrder
-    if ($sortOrder === 'RANDOM') {
+    if ($effectiveSort === 'RANDOM') {
         $orderBy = "RAND()";
-    } elseif ($sortOrder === 'ALPHA') {
+    } elseif ($effectiveSort === 'ALPHA') {
         $orderBy = "title ASC";
     } else {
         $orderBy = "createdAt DESC";
@@ -337,14 +341,14 @@ function video_get_folder_videos($pdo, $videoId) {
     $folderMatch = str_replace('\\', '/', $folderPath) . '/%';
     $stmt = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
                            FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
-                           WHERE v.videoUrl LIKE ? AND v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
+                           WHERE REPLACE(v.videoUrl, '\\\\', '/') LIKE ? AND v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
                            ORDER BY $orderBy");
     $stmt->execute([$folderMatch]);
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     video_process_rows($videos);
 
-    respond(true, ['videos' => $videos, 'sortOrder' => $sortOrder]);
+    respond(true, ['videos' => $videos, 'sortOrder' => $effectiveSort]);
 }
 
 /**
@@ -378,7 +382,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     
     // 1. Intentar descubrimiento por Base de Datos (Más robusto)
     $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
-            WHERE videoUrl LIKE ?";
+            WHERE REPLACE(videoUrl, '\\\\', '/') LIKE ?";
     $params = [$prefix . '%'];
     
     if ($mediaType === 'VIDEO') {
@@ -388,7 +392,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     }
 
     if (!empty($search)) {
-        $sql .= " AND (title LIKE ? OR videoUrl LIKE ?)";
+        $sql .= " AND (title LIKE ? OR REPLACE(videoUrl, '\\\\', '/') LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
     }
@@ -397,15 +401,21 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     $stmt->execute($params);
     $allVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    write_log("Folder Discovery: Prefix=$prefix, Found=" . count($allVideos) . " videos matching prefix", 'INFO');
+    
     $folderMap = [];
     $prefixLen = strlen($prefix);
 
     foreach ($allVideos as $v) {
         $path = str_replace('\\', '/', $v['videoUrl']);
-        if (strpos($path, $prefix) !== 0) continue;
+        if (strpos($path, $prefix) !== 0) {
+            // Reintento con normalización más agresiva
+            $path = '/' . ltrim($path, '/');
+            if (strpos($path, $prefix) !== 0) continue;
+        }
         
         $relative = substr($path, $prefixLen);
-        $parts = explode('/', $relative);
+        $parts = explode('/', ltrim($relative, '/'));
         
         if (count($parts) > 1) {
             $folderName = $parts[0];
@@ -418,8 +428,13 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
                 ];
             }
             $folderMap[$folderName]['count']++;
+            if (!$folderMap[$folderName]['thumbnailUrl'] && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
+                $folderMap[$folderName]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
+            }
         }
     }
+    
+    write_log("Folder Discovery: Mapped " . count($folderMap) . " subfolders", 'INFO');
 
     // Si encontramos algo por DB, lo usamos
     if (!empty($folderMap)) {
@@ -490,7 +505,8 @@ function video_upload($pdo, $post, $files) {
     $stmt->execute([$id, $post['title'], $post['description'], floatval($post['price']), $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time()]);
 
     require_once 'functions_interactions.php';
-    interact_notify_subscribers($pdo, $post['userId'], 'UPLOAD', "Nuevo contenido: {$post['title']}", "/watch/{$id}", $thumbPath);
+    // La notificación se enviará en video_organize_single cuando se procese el video
+    // interact_notify_subscribers($pdo, $post['userId'], 'UPLOAD', "Nuevo contenido: {$post['title']}", "/watch/{$id}", $thumbPath);
 
     respond(true);
 }
@@ -522,12 +538,28 @@ function video_organize_single($pdo, $id, $settings) {
     $stmt->execute([$id]); 
     $v = $stmt->fetch(); 
     if (!$v) return;
-    $meta = smartParseFilename($v['videoUrl'], $v['category'], json_decode($settings['categories'] ?? '[]', true));
-    $price = (floatval($v['price'] ?? 0) > 0) ? $v['price'] : getPriceForCategory($meta['category'], $settings, $meta['parent_category']);
-    $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$meta['title'], $meta['category'], $meta['parent_category'], $meta['collection'], $price, $id]);
 
-    require_once 'functions_interactions.php';
-    interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$meta['title']}", "/watch/{$id}", $v['thumbnailUrl']);
+    $isLocal = (int)$v['isLocal'] === 1;
+    $oldCategory = $v['category'];
+
+    $meta = smartParseFilename($v['videoUrl'], $v['category'], json_decode($settings['categories'] ?? '[]', true));
+    
+    // Solo actualizar categoría si es local o si estaba en PENDING
+    $newCategory = $v['category'];
+    if ($isLocal || $oldCategory === 'PENDING') {
+        $newCategory = $meta['category'];
+    }
+
+    $catPrice = getPriceForCategory($newCategory, $settings, $meta['parent_category']);
+    $price = (floatval($v['price'] ?? 0) > 0) ? $v['price'] : $catPrice;
+
+    $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$meta['title'], $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
+
+    // Notificar solo si pasa de PENDING a una categoría real, o si es un upload manual que acaba de procesarse
+    if ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING') {
+        require_once 'functions_interactions.php';
+        interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$meta['title']}", "/watch/{$id}", $v['thumbnailUrl']);
+    }
 }
 
 function smartParseFilename($path, $currentCategory, $categories) {

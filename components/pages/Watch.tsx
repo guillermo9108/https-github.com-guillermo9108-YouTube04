@@ -95,7 +95,7 @@ export default function Watch() {
 
             if (navigationContext.f) {
                 // Si estamos en una carpeta, usar getFolderVideos para mantener el sortOrder
-                const res = await db.getFolderVideos(id || '');
+                const res = await db.getFolderVideos(id || '', navigationContext.s);
                 filteredResults = res.videos;
                 hasMore = false; // getFolderVideos devuelve todo
             } else {
@@ -258,8 +258,17 @@ export default function Watch() {
 
     const handleVideoEnded = async () => {
         if (!video || !user) return;
-        const currentIndex = seriesQueue.findIndex(v => v.id === video.id);
-        let nextVid = seriesQueue[currentIndex + 1];
+        
+        // Intentar encontrar el video actual en la cola
+        let currentIndex = seriesQueue.findIndex(v => v.id === video.id);
+        
+        // Si no está en la cola (ej: navegación directa), intentar usar relatedVideos
+        if (currentIndex === -1 && relatedVideos.length > 0) {
+            // El siguiente sería el primero de los relacionados
+            currentIndex = -1; 
+        }
+
+        let nextVid = seriesQueue[currentIndex + 1] || relatedVideos[0];
         
         if (!nextVid && hasMoreRelated) {
              toast.info("Cargando siguiente episodio...");
@@ -267,9 +276,6 @@ export default function Watch() {
              return;
         }
 
-        if (!nextVid && !navigationContext.q && relatedVideos.length > 0) {
-            nextVid = relatedVideos[0];
-        }
         if (!nextVid) return;
 
         const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
