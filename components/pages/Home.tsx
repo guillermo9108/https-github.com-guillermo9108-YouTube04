@@ -3,12 +3,17 @@ import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Video, Notification as AppNotification, User, SystemSettings, Category } from '../../types';
+import { useNotifications } from '../../context/NotificationContext';
 import { 
-    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp
+    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic
 } from 'lucide-react';
 import { useNavigate, Link, useLocation } from '../Router';
-import AIConcierge from '../AIConcierge';
 import { useToast } from '../../context/ToastContext';
+
+// Refactored Components
+import Sidebar from '../home/Sidebar';
+import Breadcrumbs from '../home/Breadcrumbs';
+import FolderEditModal from '../home/FolderEditModal';
 
 // Helper de tiempo relativo para notificaciones
 const formatTimeAgo = (timestamp: number) => {
@@ -17,150 +22,6 @@ const formatTimeAgo = (timestamp: number) => {
     if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
     if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
     return `hace ${Math.floor(diff / 86400)} d`;
-};
-
-const Sidebar: React.FC<{ isOpen: boolean, onClose: () => void, user: User | null, isAdmin: boolean, logout: () => void }> = ({ isOpen, onClose, user, isAdmin, logout }) => {
-    const navigate = useNavigate();
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 z-[100] animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="absolute top-0 left-0 bottom-0 w-[280px] bg-slate-900 border-r border-white/5 shadow-2xl flex flex-col animate-in slide-in-from-left duration-500">
-                <div className="p-6 bg-slate-950 border-b border-white/5 relative">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X size={20}/></button>
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-600 border-2 border-white/10 overflow-hidden shadow-lg">
-                            {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center font-black text-white text-xl">{user?.username?.[0] || '?'}</div>}
-                        </div>
-                        <div className="min-w-0">
-                            <div className="font-black text-white truncate">@{user?.username || 'Usuario'}</div>
-                            <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{user?.role}</div>
-                        </div>
-                    </div>
-                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tu Saldo</p>
-                        <div className="text-xl font-black text-emerald-400">{Number(user?.balance || 0).toFixed(2)} $</div>
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                    <button onClick={() => { navigate('/'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
-                        <HomeIcon size={20} className="text-slate-500 group-hover:text-indigo-400"/>
-                        <span className="text-xs font-black uppercase tracking-widest">Inicio</span>
-                    </button>
-                    <button onClick={() => { navigate('/profile'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
-                        <UserIcon size={20} className="text-slate-500 group-hover:text-indigo-400"/>
-                        <span className="text-xs font-black uppercase tracking-widest">Mi Perfil</span>
-                    </button>
-                    <button onClick={() => { navigate('/watch-later'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
-                        <Bell size={20} className="text-slate-500 group-hover:text-amber-400"/>
-                        <span className="text-xs font-black uppercase tracking-widest">Ver más tarde</span>
-                    </button>
-                    <button onClick={() => { navigate('/vip'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
-                        <Crown size={20} className="text-slate-500 group-hover:text-amber-500"/>
-                        <span className="text-xs font-black uppercase tracking-widest">VIP & Recargas</span>
-                    </button>
-                    {isAdmin && (
-                        <div className="pt-4 mt-4 border-t border-white/5">
-                            <button onClick={() => { navigate('/admin'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition-all border border-indigo-500/20">
-                                <ShieldCheck size={20}/><span className="text-xs font-black uppercase tracking-widest">Panel Admin</span>
-                            </button>
-                        </div>
-                    )}
-                </div>
-                <div className="p-4 bg-slate-950/50 border-t border-white/5">
-                    <button onClick={() => { logout(); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all">
-                        <LogOut size={20}/><span className="text-xs font-black uppercase tracking-widest">Cerrar Sesión</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const Breadcrumbs: React.FC<{ 
-    path: string[], 
-    onNavigate: (index: number) => void
-}> = ({ path, onNavigate }) => (
-    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-2 animate-in fade-in flex-1 min-w-0 [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
-        {path.map((segment, i) => (
-            <React.Fragment key={`${segment}-${i}`}>
-                {i > 0 && <ChevronRight size={10} className="text-white/20 shrink-0"/>}
-                <button 
-                    onClick={() => onNavigate(i)}
-                    className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${i === path.length - 1 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                >
-                    {segment}
-                </button>
-            </React.Fragment>
-        ))}
-    </div>
-);
-
-const FolderEditModal: React.FC<{ 
-    folder: any, 
-    initialPrice: number,
-    initialSortOrder: string,
-    onClose: () => void, 
-    onSave: (price: number, sortOrder: string) => Promise<void> 
-}> = ({ folder, initialPrice, initialSortOrder, onClose, onSave }) => {
-    const [price, setPrice] = useState<number>(initialPrice);
-    const [sortOrder, setSortOrder] = useState<string>(initialSortOrder);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        setPrice(initialPrice);
-        setSortOrder(initialSortOrder);
-    }, [folder.relativePath, initialPrice, initialSortOrder]);
-
-    return (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-slate-900 border border-white/10 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95">
-                <div className="p-6 bg-slate-950 border-b border-white/5 flex justify-between items-center">
-                    <div>
-                        <h3 className="font-black text-white uppercase text-xs tracking-widest">Configurar Carpeta</h3>
-                        <p className="text-[10px] text-indigo-400 font-bold uppercase truncate max-w-[200px]">{folder.name}</p>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-slate-500"><X size={20}/></button>
-                </div>
-                <div className="p-6 space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Precio Sugerido ($)</label>
-                        <div className="relative">
-                            <DollarSign className="absolute left-4 top-3.5 text-emerald-500" size={18}/>
-                            <input 
-                                type="number" step="0.1" value={price} onChange={e => setPrice(parseFloat(e.target.value))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-4 text-white font-black text-2xl focus:border-emerald-500 outline-none transition-all shadow-inner"
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Orden de la Colección</label>
-                        <div className="relative">
-                            <SortAsc className="absolute left-4 top-3.5 text-indigo-400" size={18}/>
-                            <select 
-                                value={sortOrder} onChange={e => setSortOrder(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-4 text-white font-black text-xs uppercase focus:border-indigo-500 outline-none transition-all shadow-inner appearance-none"
-                            >
-                                <option value="LATEST">Recientes (Default)</option>
-                                <option value="ALPHA">Alfabético (A-Z)</option>
-                                <option value="RANDOM">Aleatorio</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
-                         <p className="text-[9px] text-indigo-300 leading-snug font-bold uppercase">Esto aplicará recursivamente a todos los videos y subcarpetas dentro de: <span className="text-white italic">{folder.name}</span></p>
-                    </div>
-                    <button 
-                        onClick={() => { setLoading(true); onSave(price, sortOrder).finally(() => setLoading(false)); }} 
-                        disabled={loading} 
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all text-xs uppercase tracking-widest"
-                    >
-                        {loading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Aplicar a Jerarquía
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 export default function Home() {
@@ -177,6 +38,7 @@ export default function Home() {
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [navVisible, setNavVisible] = useState(true);
     const [editingFolder, setEditingFolder] = useState<any | null>(null);
+    const [isListening, setIsListening] = useState(false);
     
     // Filtros Persistentes
     const [mediaFilter, setMediaFilter] = useState<'ALL' | 'VIDEO' | 'AUDIO'>(() => {
@@ -211,10 +73,10 @@ export default function Home() {
     const [activeCategories, setActiveCategories] = useState<string[]>(['TODOS']);
     
     // Secondary Data
+    const { notifications: rtNotifications, unreadCount: rtUnreadCount, markAsRead } = useNotifications();
     const [watchedIds, setWatchedIds] = useState<string[]>([]);
     const [notifs, setNotifs] = useState<AppNotification[]>([]);
     const [suggestions, setSuggestions] = useState<any[]>([]);
-    const [geminiActive, setGeminiActive] = useState(false);
 
     const searchContainerRef = useRef<HTMLFormElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -243,7 +105,6 @@ export default function Home() {
     useEffect(() => {
         db.getSystemSettings().then(s => {
             setSystemSettings(s);
-            setGeminiActive(!!s.geminiKey);
         });
         if (user) {
             db.getUserActivity(user.id).then(act => setWatchedIds(act?.watched || []));
@@ -329,15 +190,75 @@ export default function Home() {
         setSearchQuery(val);
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
         searchTimeout.current = setTimeout(async () => {
-            try { const res = await db.getSearchSuggestions(val); setSuggestions(res || []); setShowSuggestions(true); } catch(e) {}
+            if (!val.trim()) {
+                setSuggestions([]);
+                return;
+            }
+
+            try { 
+                // 1. Obtener sugerencias base del servidor (historial, etc)
+                const dbRes = await db.getSearchSuggestions(val); 
+                let finalSuggestions = dbRes || [];
+                
+                // 2. Búsqueda Multi-término Local (Ej: "amor 7")
+                // Filtramos sobre los videos ya cargados en memoria para dar resultados instantáneos exactos
+                const terms = val.toLowerCase().trim().split(/\s+/);
+                if (terms.length > 0) {
+                    const localMatches = videos.filter(v => {
+                        const title = v.title.toLowerCase();
+                        // Cada término debe estar presente en el título
+                        return terms.every(term => title.includes(term));
+                    }).slice(0, 5).map(v => ({
+                        id: v.id,
+                        label: v.title,
+                        type: v.is_audio ? 'AUDIO' : 'VIDEO'
+                    }));
+
+                    // Evitar duplicados entre DB y Local
+                    const existingIds = new Set(finalSuggestions.map(s => s.id));
+                    const uniqueLocal = localMatches.filter(m => !existingIds.has(m.id));
+                    
+                    finalSuggestions = [...uniqueLocal, ...finalSuggestions];
+                }
+                
+                setSuggestions(finalSuggestions); 
+                setShowSuggestions(true); 
+            } catch(e) {}
         }, 300);
     };
 
+    const toggleVoiceSearch = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            toast.error("Tu navegador no soporta búsqueda por voz");
+            return;
+        }
+        
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setSearchQuery(transcript);
+            handleSearchChange(transcript);
+        };
+        recognition.start();
+    };
+
     const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault(); const term = searchQuery.trim();
-        if (term.length >= 2) { db.saveSearch(term); }
-        updateUrlSearch(term); setShowSuggestions(false);
-        if (searchInputRef.current) { searchInputRef.current.blur(); }
+        e.preventDefault(); 
+        const term = searchQuery.trim();
+        if (term.length >= 2) { 
+            db.saveSearch(term); 
+        }
+        updateUrlSearch(term); 
+        setShowSuggestions(false);
+        if (searchInputRef.current) { 
+            searchInputRef.current.blur(); 
+        }
+        // Forzar recarga con el nuevo término
+        fetchVideos(0, true);
     };
 
     const handleSuggestionClick = (s: any) => {
@@ -391,7 +312,26 @@ export default function Home() {
         setShowNotifMenu(false); navigate(n.link);
     };
 
-    const unreadCount = useMemo(() => notifs.filter(n => Number(n.isRead) === 0).length, [notifs]);
+    const totalUnreadCount = useMemo(() => {
+        const dbUnread = notifs.filter(n => Number(n.isRead) === 0).length;
+        return dbUnread + rtUnreadCount;
+    }, [notifs, rtUnreadCount]);
+
+    const allNotifications = useMemo(() => {
+        // Convert real-time notifications to the format expected by the UI
+        const formattedRt = rtNotifications.map(rn => ({
+            id: rn.id,
+            userId: user?.id || '',
+            text: rn.message,
+            type: 'SHARE' as any,
+            timestamp: rn.timestamp,
+            link: rn.videoId ? `/watch/${rn.videoId}` : '/',
+            isRead: false as any,
+            metadata: { videoId: rn.videoId }
+        }));
+        return [...formattedRt, ...notifs].sort((a, b) => b.timestamp - a.timestamp);
+    }, [rtNotifications, notifs, user?.id]);
+
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
     const getSuggestionIcon = (type: string) => {
@@ -430,9 +370,14 @@ export default function Home() {
                                 onChange={(e) => handleSearchChange(e.target.value)} 
                                 onFocus={() => handleSearchChange(searchQuery)}
                                 placeholder="Explorar biblioteca..." 
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-10 py-2.5 text-sm text-white focus:bg-white/10 focus:border-indigo-500 outline-none transition-all shadow-inner" 
+                                className={`w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-20 py-2.5 text-sm text-white focus:bg-white/10 focus:border-indigo-500 outline-none transition-all shadow-inner ${isListening ? 'ring-2 ring-red-500 animate-pulse' : ''}`} 
                             />
-                            {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="absolute right-3 top-3 text-slate-400 hover:text-white"><X size={16}/></button>}
+                            <div className="absolute right-3 top-2 flex items-center gap-1">
+                                {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="p-1.5 text-slate-400 hover:text-white"><X size={16}/></button>}
+                                <button type="button" onClick={toggleVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? 'text-red-500 bg-red-500/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                                    <Mic size={18}/>
+                                </button>
+                            </div>
                             {showSuggestions && suggestions.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top">
                                     <div className="p-2 bg-slate-950 border-b border-white/5 flex items-center justify-between">
@@ -447,7 +392,9 @@ export default function Home() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors truncate uppercase tracking-tighter">{s.label}</div>
-                                                    <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{s.type === 'HISTORY' ? 'RECUPERAR BÚSQUEDA' : (s.type === 'FOLDER' ? 'NAVEGAR A CARPETA' : s.type)}</div>
+                                                    <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
+                                                        {s.type === 'HISTORY' ? 'RECUPERAR BÚSQUEDA' : (s.type === 'FOLDER' ? 'NAVEGAR A CARPETA' : s.type)}
+                                                    </div>
                                                 </div>
                                                 <ChevronRight size={14} className="text-slate-700 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
                                             </button>
@@ -458,17 +405,17 @@ export default function Home() {
                         </form>
 
                         <div className="relative shrink-0">
-                            <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white relative active:scale-95 transition-transform">
-                                <Bell size={22} className={unreadCount > 0 ? "animate-bounce" : ""} />
-                                {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-black">{unreadCount}</span>}
+                            <button onClick={() => { setShowNotifMenu(!showNotifMenu); if (!showNotifMenu) markAsRead(); }} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white relative active:scale-95 transition-transform">
+                                <Bell size={22} className={totalUnreadCount > 0 ? "animate-bounce" : ""} />
+                                {totalUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-black">{totalUnreadCount}</span>}
                             </button>
                             {showNotifMenu && (
                                 <div className="absolute top-full right-0 mt-3 w-80 bg-slate-900 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden z-[80] animate-in fade-in zoom-in-95 origin-top-right">
                                     <div className="p-5 bg-slate-950 border-b border-white/5 flex justify-between items-center"><h4 className="font-black text-white uppercase text-[10px] tracking-widest">Notificaciones</h4></div>
                                     <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
-                                        {notifs.length === 0 ? (
+                                        {allNotifications.length === 0 ? (
                                             <div className="py-12 text-center text-slate-600 flex flex-col items-center gap-3"><MessageSquare size={32} className="opacity-20" /><p className="text-[10px] font-black uppercase tracking-widest">Sin alertas</p></div>
-                                        ) : notifs.map(n => (
+                                        ) : allNotifications.map((n: any) => (
                                             <button key={n.id} onClick={() => handleNotifClick(n)} className={`w-full p-4 flex gap-4 text-left border-b border-white/5 transition-all hover:bg-white/5 ${Number(n.isRead) === 0 ? 'bg-indigo-500/[0.04]' : 'opacity-70'}`}>
                                                 <div className={`shrink-0 overflow-hidden shadow-lg ${n.type === 'UPLOAD' ? 'w-20 aspect-video rounded-lg' : 'w-12 h-12 rounded-xl'} bg-slate-800 flex items-center justify-center border border-white/5`}>
                                                     {n.avatarUrl ? <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Bell size={16} className="text-slate-500" />}
@@ -508,7 +455,7 @@ export default function Home() {
                                 <button onClick={() => { handleNavigate(-1); setSearchQuery(''); updateUrlSearch(''); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90"><HomeIcon size={16}/></button>
                                 <button onClick={() => { if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); } setShowFolderGrid(!showFolderGrid); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${showFolderGrid ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`}><ChevronDown size={16} className={`transition-transform duration-300 ${showFolderGrid ? 'rotate-180' : ''}`} /></button>
                             </div>
-                            <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx) => { handleNavigate(idx); if(searchQuery) {setSearchQuery(''); updateUrlSearch('');} }} /></div>
+                            <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx: number) => { handleNavigate(idx); if(searchQuery) {setSearchQuery(''); updateUrlSearch('');} }} /></div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-auto z-30">
                                 <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 shrink-0 shadow-inner">
                                     <button onClick={() => setMediaFilter('ALL')} className={`p-1.5 rounded-lg transition-all ${mediaFilter === 'ALL' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`} title="Todo"><Layers size={13}/></button>
@@ -615,7 +562,6 @@ export default function Home() {
             </div>
 
             {editingFolder && ( <FolderEditModal folder={editingFolder} initialPrice={editingFolderConfig.price} initialSortOrder={editingFolderConfig.sortOrder} onClose={() => setEditingFolder(null)} onSave={handleBulkEditFolder} /> )}
-            <AIConcierge videos={videos} isVisible={geminiActive} />
         </div>
     );
 }

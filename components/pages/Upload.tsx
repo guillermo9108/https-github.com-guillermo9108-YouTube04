@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload as UploadIcon, FileVideo, X, Plus, Image as ImageIcon, Tag, Layers, Loader2, DollarSign, Settings, Save, Edit3, Wand2, Clock, Sparkles, Music } from 'lucide-react';
+import { Upload as UploadIcon, FileVideo, X, Plus, Image as ImageIcon, Tag, Layers, Loader2, DollarSign, Settings, Save, Edit3, Wand2, Clock, Music } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpload } from '../../context/UploadContext';
 import { useNavigate } from '../Router';
@@ -7,7 +7,6 @@ import { VideoCategory, Category, SystemSettings } from '../../types';
 import { db } from '../../services/db';
 import { useToast } from '../../context/ToastContext';
 import { generateThumbnail } from '../../utils/videoGenerator';
-import { aiService } from '../../services/ai';
 
 const ThumbnailPreview = ({ file }: { file: File }) => {
     const [src, setSrc] = useState<string>('');
@@ -238,7 +237,6 @@ export default function Upload() {
                        <div className="flex-1 min-w-0 w-full space-y-3">
                           <div className="flex items-center gap-2">
                               <input type="text" value={titles[idx]} onChange={(e) => updateTitle(idx, e.target.value)} className="flex-1 bg-transparent border-b border-white/5 focus:border-indigo-500 outline-none text-sm font-black text-white p-1 transition-all placeholder:text-slate-700" placeholder="Título" required />
-                              <button type="button" onClick={() => aiService.suggestMetadata(f.name).then(s => s && updateTitle(idx, s.title))} className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl active:scale-90 transition-all"><Sparkles size={16}/></button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                               <div className="relative"><Tag size={12} className="absolute left-3 top-3 text-slate-500"/><select value={categories[idx]} onChange={(e) => updateCategory(idx, e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 py-2.5 pl-9 pr-3 outline-none focus:border-indigo-500 uppercase font-black appearance-none cursor-pointer">{availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}</select></div>

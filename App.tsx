@@ -29,6 +29,7 @@ import { CartProvider } from './context/CartContext';
 import { ServerTaskProvider } from './context/ServerTaskContext';
 import { ToastProvider } from './context/ToastContext';
 import { GridProvider } from './context/GridContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { db } from './services/db';
 import { Loader2, WifiOff } from 'lucide-react';
 
@@ -107,7 +108,8 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <UploadProvider>
+        <NotificationProvider>
+          <UploadProvider>
             <ServerTaskProvider>
                 <CartProvider>
                     <GridProvider>
@@ -163,7 +165,8 @@ export default function App() {
                 </CartProvider>
             </ServerTaskProvider>
         </UploadProvider>
-      </AuthProvider>
+      </NotificationProvider>
+    </AuthProvider>
     </ToastProvider>
   );
 }
