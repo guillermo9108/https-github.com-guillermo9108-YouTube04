@@ -34,7 +34,7 @@ export default function Home() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [showNotifMenu, setShowNotifMenu] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [showFolderGrid, setShowFolderGrid] = useState(true); 
+    const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false); 
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [navVisible, setNavVisible] = useState(true);
     const [editingFolder, setEditingFolder] = useState<any | null>(null);
@@ -117,6 +117,7 @@ export default function Home() {
         if (loading || (loadingMore && !reset)) return;
         if (reset) { setLoading(true); setVideos([]); setFolders([]); } else { setLoadingMore(true); }
         try {
+            // Petición principal de videos y carpetas
             const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder);
             
             if (reset) {
@@ -137,51 +138,49 @@ export default function Home() {
 
                 setVideos(finalVideos);
                 
-                // Asegurar que las carpetas se muestren siempre que no haya una búsqueda excluyente
-                // o forzar la carga de carpetas si estamos navegando
+                // LÓGICA DE CARPETAS: Independiente de la categoría si estamos navegando
                 let finalFolders = res.folders as any || [];
-                if (finalFolders.length === 0 && !searchQuery) {
-                    // Intento de recuperación si el backend falló al devolver carpetas en la ruta actual
+                
+                // Si estamos filtrando por categoría pero NO hay búsqueda, 
+                // queremos seguir viendo las carpetas de la ruta actual para no perder el contexto de navegación.
+                if (selectedCategory !== 'TODOS' && !searchQuery && finalFolders.length === 0) {
                     try {
-                        const recoverRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', userSortOrder);
-                        if (recoverRes.folders && recoverRes.folders.length > 0) {
-                            finalFolders = recoverRes.folders;
+                        // Petición específica para recuperar carpetas ignorando categoría
+                        const folderRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', '');
+                        if (folderRes.folders && folderRes.folders.length > 0) {
+                            finalFolders = folderRes.folders;
+                        }
+                    } catch(e) {
+                        console.error("Error recovering folders:", e);
+                    }
+                }
+
+                // Si hay búsqueda pero no carpetas coincidentes, mostramos las carpetas de la ruta actual
+                // para que el usuario pueda seguir navegando si lo desea.
+                if (searchQuery && finalFolders.length === 0) {
+                    try {
+                        const folderRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '');
+                        if (folderRes.folders && folderRes.folders.length > 0) {
+                            finalFolders = folderRes.folders as any;
                         }
                     } catch(e) {}
                 }
-                setFolders(finalFolders);
 
+                setFolders(finalFolders);
                 setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
-                
-                // Si hay búsqueda pero no carpetas, intentar mostrar carpetas de la ruta actual
-                if (searchQuery && finalFolders.length === 0) {
-                    const folderRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '');
-                    if (folderRes.folders && folderRes.folders.length > 0) {
-                        setFolders(folderRes.folders as any);
-                    }
-                }
-
-                if (selectedCategory !== 'TODOS' && navigationPath.length === 0 && res.videos.length > 0 && systemSettings) {
-                    const firstVid = res.videos[0];
-                    const rawPath = (firstVid as any).rawPath || firstVid.videoUrl;
-                    const rootPath = systemSettings.localLibraryPath || '';
-                    if (rawPath.startsWith(rootPath)) {
-                        const relative = rawPath.substring(rootPath.length).replace(/^[\\/]+/, '');
-                        const segments = relative.split(/[\\/]/).filter(Boolean);
-                        if (segments.length > 1) {
-                            const newPath = segments.slice(0, -1);
-                            if (newPath.length > 0) {
-                                const finalPath = (newPath[newPath.length-1].toLowerCase() === selectedCategory.toLowerCase()) ? newPath.slice(0, -1) : newPath;
-                                if (finalPath.length > 0) { setNavigationPath(finalPath); setShowFolderGrid(true); setNavVisible(true); }
-                            }
-                        }
-                    }
-                }
-            } else { setVideos(prev => [...prev, ...res.videos]); }
-            setHasMore(res.hasMore); setPage(p);
-        } catch (e) { toast.error("Error al sincronizar catálogo"); } 
-        finally { setLoading(false); setLoadingMore(false); }
+            } else { 
+                setVideos(prev => [...prev, ...res.videos]); 
+            }
+            setHasMore(res.hasMore); 
+            setPage(p);
+        } catch (e) { 
+            toast.error("Error al sincronizar catálogo"); 
+        } 
+        finally { 
+            setLoading(false); 
+            setLoadingMore(false); 
+        }
     };
 
     // 3. Scroll Inteligente
@@ -317,7 +316,7 @@ export default function Home() {
             db.saveSearch(s.label);
         } else if (s.type === 'FOLDER') {
             setSearchQuery(''); updateUrlSearch(''); setNavigationPath(prev => [...prev, s.label]);
-            setSelectedCategory('TODOS'); setShowFolderGrid(true); setVideos([]); 
+            setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); setVideos([]); 
         } else {
             db.saveSearch(searchQuery || s.label);
             const contextParam = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : '';
@@ -330,12 +329,12 @@ export default function Home() {
     const handleNavigate = (index: number) => {
         if (index === -1) { setNavigationPath([]); } 
         else { setNavigationPath(navigationPath.slice(0, index + 1)); }
-        setSelectedCategory('TODOS'); setShowFolderGrid(true); setNavVisible(true);
+        setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); setNavVisible(true);
     };
 
     const handleCategoryClick = (cat: string) => {
         setSelectedCategory(cat);
-        if (cat !== 'TODOS') { setShowFolderGrid(true); setNavVisible(true); }
+        if (cat !== 'TODOS') { setNavVisible(true); }
     };
 
     const handleBulkEditFolder = async (price: number, sortOrder: string) => {
@@ -499,8 +498,10 @@ export default function Home() {
                     <div className="flex flex-col gap-2 max-w-7xl mx-auto">
                         <div className="flex items-center gap-2 w-full">
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
-                                <button onClick={() => { handleNavigate(-1); setSearchQuery(''); updateUrlSearch(''); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90"><HomeIcon size={16}/></button>
-                                <button onClick={() => { if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); } setShowFolderGrid(!showFolderGrid); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${showFolderGrid ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`}><ChevronDown size={16} className={`transition-transform duration-300 ${showFolderGrid ? 'rotate-180' : ''}`} /></button>
+                                <button onClick={() => { handleNavigate(-1); setSearchQuery(''); updateUrlSearch(''); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
+                                {folders.length > 0 && (
+                                    <button onClick={() => { if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); } setIsFolderGridCollapsed(!isFolderGridCollapsed); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${!isFolderGridCollapsed ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`} title={isFolderGridCollapsed ? "Mostrar carpetas" : "Ocultar carpetas"}><ChevronDown size={16} className={`transition-transform duration-300 ${!isFolderGridCollapsed ? 'rotate-180' : ''}`} /></button>
+                                )}
                             </div>
                             <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx: number) => { handleNavigate(idx); if(searchQuery) {setSearchQuery(''); updateUrlSearch('');} }} /></div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-auto z-30">
@@ -543,13 +544,13 @@ export default function Home() {
                     <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
                 ) : (
                     <div className="space-y-12 animate-in fade-in duration-1000">
-                        {showFolderGrid && folders.length > 0 && (
+                        {folders.length > 0 && !isFolderGridCollapsed && (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3 px-1"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em]">{searchQuery ? 'Carpetas coincidentes' : 'Explorar Carpetas'}</h2></div>
                                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-6 duration-500">
                                     {folders.map(folder => (
                                         <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
-                                            <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); setNavigationPath([...navigationPath, folder.name]); setSelectedCategory('TODOS'); setShowFolderGrid(true); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
+                                            <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); setNavigationPath([...navigationPath, folder.name]); setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
                                             <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none">
                                                 <div className="flex justify-between items-start">
                                                     <div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div>
