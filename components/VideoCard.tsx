@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -52,7 +52,13 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [shouldLoadImg, setShouldLoadImg] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const isAdmin = user?.role === 'ADMIN';
+  const isOwner = user?.id === video.creatorId;
+  const canEdit = isAdmin || isOwner;
 
   const isAudio = Boolean(video.is_audio);
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg');
@@ -140,6 +146,69 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           toast.success(!inWatchLater ? "Añadido a Ver más tarde" : "Eliminado de Ver más tarde");
           refreshUser();
       } catch (e) {}
+  };
+
+  useEffect(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+          if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+              setShowMenu(false);
+          }
+      };
+      if (showMenu) {
+          document.addEventListener('mousedown', handleClickOutside);
+      }
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
+  const handleShare = (e: React.MouseEvent) => {
+      e.preventDefault(); e.stopPropagation();
+      const url = `${window.location.origin}${watchUrl}`;
+      if (navigator.share) {
+          navigator.share({ title: video.title, url }).catch(() => {});
+      } else {
+          navigator.clipboard.writeText(url);
+          toast.success("Enlace copiado al portapapeles");
+      }
+      setShowMenu(false);
+  };
+
+  const handleDownload = (e: React.MouseEvent) => {
+      e.preventDefault(); e.stopPropagation();
+      const base = db.getStreamerUrl(video.id, user?.sessionToken);
+      const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
+      const ext = video.is_audio ? 'mp3' : 'mp4';
+      const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setShowMenu(false);
+  };
+
+  const canDownload = useMemo(() => {
+      if (!user || !isUnlocked) return false;
+      const isApp = (user.deviceInfo?.includes('com.streampay.app') || 
+                     user.lastDeviceId?.includes('com.streampay.app') || 
+                     user.deviceInfo?.includes('StreamPayAPK') || 
+                     user.lastDeviceId?.includes('StreamPayAPK'));
+      return isApp;
+  }, [user, isUnlocked]);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.confirm("¿Estás seguro de eliminar este video?")) return;
+      try {
+          await db.deleteVideo(video.id, user?.id || '');
+          toast.success("Video eliminado correctamente");
+          db.setHomeDirty();
+          window.location.reload(); // Recargar para actualizar lista
+      } catch (e) {
+          toast.error("Error al eliminar video");
+      }
+      setShowMenu(false);
   };
 
   const displayThumb = useMemo(() => {
@@ -232,7 +301,48 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 </div>
             </div>
         </div>
-        <button className="shrink-0 text-slate-600 hover:text-white self-start opacity-0 group-hover:opacity-100 transition-opacity p-1"><MoreVertical size={20} /></button>
+        <div className="relative" ref={menuRef}>
+            <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }} 
+                className={`shrink-0 text-slate-600 hover:text-white self-start transition-all p-1 rounded-lg hover:bg-white/5 ${showMenu ? 'opacity-100 text-white bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
+            >
+                <MoreVertical size={20} />
+            </button>
+            
+            {showMenu && (
+                <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-bottom-right">
+                    <div className="p-1">
+                        <button onClick={handleShare} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Share2 size={14} className="text-slate-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
+                        </button>
+                        {canDownload && (
+                            <button onClick={handleDownload} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                                <Download size={14} className="text-slate-500" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
+                            </button>
+                        )}
+                        <button onClick={handleWatchLater} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
+                        </button>
+                        {canEdit && (
+                            <>
+                                <div className="h-px bg-white/5 my-1"></div>
+                                <Link to={`/edit/${video.id}`} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                                    <Edit3 size={14} className="text-slate-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Editar</span>
+                                </Link>
+                                <button onClick={handleDelete} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left">
+                                    <Trash2 size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Eliminar</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
       </div>
     </div>
   );

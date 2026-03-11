@@ -118,11 +118,41 @@ export default function Home() {
         if (reset) { setLoading(true); setVideos([]); setFolders([]); } else { setLoadingMore(true); }
         try {
             const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder);
+            
             if (reset) {
-                setVideos(res.videos);
-                setFolders(res.folders as any);
+                let finalVideos = res.videos;
+                
+                // Refuerzo de búsqueda multi-término local
+                if (searchQuery.trim().includes(' ')) {
+                    const terms = searchQuery.toLowerCase().trim().split(/\s+/);
+                    // Filtramos los resultados del backend para asegurar que cumplen con TODOS los términos
+                    // Esto corrige casos donde el backend solo hace un LIKE simple
+                    finalVideos = res.videos.filter(v => {
+                        const title = v.title.toLowerCase();
+                        return terms.every(term => title.includes(term));
+                    });
+                    
+                    // Si el filtrado local dejó muy pocos resultados, mantenemos los originales 
+                    // para no dejar la pantalla vacía si el backend tenía una lógica distinta
+                    if (finalVideos.length === 0 && res.videos.length > 0) {
+                        finalVideos = res.videos;
+                    }
+                }
+
+                setVideos(finalVideos);
+                setFolders(res.folders as any || []);
                 setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
+                
+                // Si no hay carpetas en la respuesta de búsqueda, pero estamos en una ruta, 
+                // intentamos obtener las carpetas de esa ruta sin el filtro de búsqueda
+                if (searchQuery && (!res.folders || res.folders.length === 0)) {
+                    const folderRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '');
+                    if (folderRes.folders && folderRes.folders.length > 0) {
+                        setFolders(folderRes.folders as any);
+                    }
+                }
+
                 if (selectedCategory !== 'TODOS' && navigationPath.length === 0 && res.videos.length > 0 && systemSettings) {
                     const firstVid = res.videos[0];
                     const rawPath = (firstVid as any).rawPath || firstVid.videoUrl;
@@ -201,25 +231,33 @@ export default function Home() {
                 let finalSuggestions = dbRes || [];
                 
                 // 2. Búsqueda Multi-término Local (Ej: "amor 7")
-                // Filtramos sobre los videos ya cargados en memoria para dar resultados instantáneos exactos
+                // Buscamos en TODOS los videos si es posible, o al menos en los actuales
                 const terms = val.toLowerCase().trim().split(/\s+/);
-                if (terms.length > 0) {
-                    const localMatches = videos.filter(v => {
-                        const title = v.title.toLowerCase();
-                        // Cada término debe estar presente en el título
-                        return terms.every(term => title.includes(term));
-                    }).slice(0, 5).map(v => ({
-                        id: v.id,
-                        label: v.title,
-                        type: v.is_audio ? 'AUDIO' : 'VIDEO'
-                    }));
+                
+                // Intentar encontrar coincidencias en los videos actuales
+                const localMatches = videos.filter(v => {
+                    const title = v.title.toLowerCase();
+                    return terms.every(term => title.includes(term));
+                }).slice(0, 5).map(v => ({
+                    id: v.id,
+                    label: v.title,
+                    type: v.is_audio ? 'AUDIO' : 'VIDEO'
+                }));
 
-                    // Evitar duplicados entre DB y Local
-                    const existingIds = new Set(finalSuggestions.map(s => s.id));
-                    const uniqueLocal = localMatches.filter(m => !existingIds.has(m.id));
-                    
-                    finalSuggestions = [...uniqueLocal, ...finalSuggestions];
-                }
+                // También buscar en carpetas
+                const folderMatches = folders.filter(f => {
+                    const name = f.name.toLowerCase();
+                    return terms.every(term => name.includes(term));
+                }).slice(0, 3).map(f => ({
+                    label: f.name,
+                    type: 'FOLDER'
+                }));
+
+                // Combinar y evitar duplicados
+                const existingLabels = new Set(finalSuggestions.map(s => s.label.toLowerCase()));
+                const extra = [...localMatches, ...folderMatches].filter(m => !existingLabels.has(m.label.toLowerCase()));
+                
+                finalSuggestions = [...extra, ...finalSuggestions];
                 
                 setSuggestions(finalSuggestions); 
                 setShowSuggestions(true); 

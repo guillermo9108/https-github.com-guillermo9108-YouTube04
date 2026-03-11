@@ -266,21 +266,20 @@ export default function Watch() {
         // Intentar encontrar el video actual en la cola
         let currentIndex = seriesQueue.findIndex(v => v.id === video.id);
         
-        // Si no está en la cola (ej: navegación directa), intentar usar relatedVideos
-        if (currentIndex === -1 && relatedVideos.length > 0) {
-            // El siguiente sería el primero de los relacionados
-            currentIndex = -1; 
+        // Si es el último de la página y hay más, cargar más antes de saltar
+        if (currentIndex === seriesQueue.length - 1 && hasMoreRelated && !navigationContext.f) {
+            toast.info("Cargando siguientes resultados...");
+            await fetchRelated(relatedPage + 1);
+            // Re-calcular índice tras la carga
+            currentIndex = seriesQueue.findIndex(v => v.id === video.id);
         }
 
         let nextVid = seriesQueue[currentIndex + 1] || relatedVideos[0];
         
-        if (!nextVid && hasMoreRelated) {
-             toast.info("Cargando siguiente episodio...");
-             await fetchRelated(relatedPage + 1);
-             return;
+        if (!nextVid) {
+            toast.info("Has llegado al final de la lista");
+            return;
         }
-
-        if (!nextVid) return;
 
         const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
         const isVip = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
@@ -466,6 +465,7 @@ export default function Watch() {
                             if (v.id === id) return null; 
                             
                             const isNextInQueue = seriesQueue.findIndex(sq => sq.id === video?.id) + 1 === idx;
+                            const isCurrent = v.id === id;
                             
                             const params = new URLSearchParams();
                             if (navigationContext.q) params.set('q', navigationContext.q);
@@ -476,21 +476,43 @@ export default function Watch() {
                             const contextSuffix = params.toString() ? `?${params.toString()}` : '';
                             
                             return (
-                                <Link key={v.id} to={`/watch/${v.id}${contextSuffix}`} className={`group flex gap-3 p-2 hover:bg-white/5 rounded-2xl transition-all ${isNextInQueue ? 'bg-indigo-500/[0.03] border border-indigo-500/10' : ''}`}>
+                                <Link 
+                                    key={v.id} 
+                                    to={`/watch/${v.id}${contextSuffix}`} 
+                                    className={`group flex gap-3 p-2 hover:bg-white/5 rounded-2xl transition-all relative ${isCurrent ? 'bg-indigo-500/10 border border-indigo-500/20' : isNextInQueue ? 'bg-white/5' : ''}`}
+                                >
                                     <div className="w-32 aspect-video bg-slate-900 rounded-xl overflow-hidden relative border border-white/5 shrink-0">
-                                        <img src={v.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform" loading="lazy" referrerPolicy="no-referrer" />
-                                        {isNextInQueue && (
-                                            <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center animate-in fade-in">
-                                                <div className="flex flex-col items-center">
-                                                    <Play size={20} className="text-white fill-current"/>
-                                                    <span className="text-[8px] font-black text-white uppercase mt-1">Siguiente</span>
+                                        <img src={v.thumbnailUrl} className={`w-full h-full object-cover group-hover:scale-110 transition-transform ${isCurrent ? 'opacity-40' : ''}`} loading="lazy" referrerPolicy="no-referrer" />
+                                        
+                                        {isCurrent && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="flex gap-1 items-end h-4">
+                                                    <div className="w-1 bg-indigo-500 animate-[bounce_1s_infinite_0ms]"></div>
+                                                    <div className="w-1 bg-indigo-500 animate-[bounce_1s_infinite_200ms]"></div>
+                                                    <div className="w-1 bg-indigo-500 animate-[bounce_1s_infinite_400ms]"></div>
                                                 </div>
+                                            </div>
+                                        )}
+
+                                        {isNextInQueue && !isCurrent && (
+                                            <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Play size={20} className="text-white fill-current"/>
+                                            </div>
+                                        )}
+
+                                        {/* Indicador de Precio/Bloqueo */}
+                                        {Number(v.price) > 0 && (
+                                            <div className="absolute top-1 right-1 bg-amber-500 text-black text-[7px] font-black px-1.5 py-0.5 rounded-md shadow-lg">
+                                                {v.price} $
                                             </div>
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0 py-1">
-                                        <h4 className="text-[11px] font-black text-white line-clamp-2 uppercase leading-tight group-hover:text-indigo-400 transition-colors">{v.title}</h4>
-                                        <div className="text-[9px] text-slate-500 font-bold uppercase mt-1">@{v.creatorName}</div>
+                                        <h4 className={`text-[11px] font-black line-clamp-2 uppercase leading-tight transition-colors ${isCurrent ? 'text-indigo-400' : 'text-white group-hover:text-indigo-400'}`}>{v.title}</h4>
+                                        <div className="text-[9px] text-slate-500 font-bold uppercase mt-1 flex items-center gap-1">
+                                            <span className="truncate">@{v.creatorName}</span>
+                                            {isCurrent && <span className="text-indigo-500 ml-auto text-[7px] tracking-widest animate-pulse">REPRODUCIENDO</span>}
+                                        </div>
                                     </div>
                                 </Link>
                             );
