@@ -118,7 +118,7 @@ export default function Home() {
         if (reset) { setLoading(true); setVideos([]); setFolders([]); } else { setLoadingMore(true); }
         try {
             // Petición principal de videos y carpetas
-            const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder);
+            const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder, user?.id);
             
             if (reset) {
                 let finalVideos = res.videos;
@@ -138,30 +138,41 @@ export default function Home() {
 
                 setVideos(finalVideos);
                 
-                // LÓGICA DE CARPETAS: Independiente de la categoría si estamos navegando
-                let finalFolders = res.folders as any || [];
+                // LÓGICA DE CARPETAS MEJORADA - Asegurar que sea un array
+                let rawFolders = res.folders;
+                let finalFolders: any[] = [];
                 
-                // Si estamos filtrando por categoría pero NO hay búsqueda, 
-                // queremos seguir viendo las carpetas de la ruta actual para no perder el contexto de navegación.
-                if (selectedCategory !== 'TODOS' && !searchQuery && finalFolders.length === 0) {
+                if (Array.isArray(rawFolders)) {
+                    finalFolders = rawFolders;
+                } else if (rawFolders && typeof rawFolders === 'object') {
+                    // Si es un objeto, convertirlo a array si tiene sentido
+                    finalFolders = Object.values(rawFolders);
+                }
+                
+                // Si estamos en una ruta y no hay carpetas, intentamos recuperarlas
+                if (finalFolders.length === 0 && !searchQuery) {
                     try {
-                        // Petición específica para recuperar carpetas ignorando categoría
-                        const folderRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', '');
-                        if (folderRes.folders && folderRes.folders.length > 0) {
-                            finalFolders = folderRes.folders;
+                        const structureRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', '', user?.id);
+                        const recovered = structureRes.folders;
+                        if (Array.isArray(recovered)) {
+                            finalFolders = recovered;
+                        } else if (recovered && typeof recovered === 'object') {
+                            finalFolders = Object.values(recovered);
                         }
                     } catch(e) {
-                        console.error("Error recovering folders:", e);
+                        console.error("Error recovering folder structure:", e);
                     }
                 }
 
-                // Si hay búsqueda pero no carpetas coincidentes, mostramos las carpetas de la ruta actual
-                // para que el usuario pueda seguir navegando si lo desea.
+                // Si hay búsqueda, el backend filtra. Mostramos las del nivel actual como fallback si no hay coincidencias.
                 if (searchQuery && finalFolders.length === 0) {
                     try {
-                        const folderRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '');
-                        if (folderRes.folders && folderRes.folders.length > 0) {
-                            finalFolders = folderRes.folders as any;
+                        const currentLevelRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '', user?.id);
+                        const recovered = currentLevelRes.folders;
+                        if (Array.isArray(recovered) && recovered.length > 0) {
+                            finalFolders = recovered;
+                        } else if (recovered && typeof recovered === 'object' && Object.keys(recovered).length > 0) {
+                            finalFolders = Object.values(recovered);
                         }
                     } catch(e) {}
                 }
@@ -601,7 +612,30 @@ export default function Home() {
                                     </div>
                                 </div> 
                             )}
-                            {videos.length > 0 ? ( <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-12">{videos.map(v => ( <VideoCard key={v.id} video={v} isUnlocked={isAdmin || user?.id === v.creatorId} isWatched={watchedIds.includes(v.id)} context={{ query: searchQuery, category: selectedCategory, folder: currentFolder, page: page, sort_order: userSortOrder }} /> ))}</div> ) : (folders.length === 0 && !loading) && ( <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4"><Folder size={80} /><p className="font-black uppercase tracking-widest">Sin contenido disponible</p></div> )}
+                            {videos.length > 0 ? ( 
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-12">
+                                    {videos.map(v => ( 
+                                        <VideoCard 
+                                            key={v.id} 
+                                            video={v} 
+                                            isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
+                                            isWatched={watchedIds.includes(v.id)} 
+                                            context={{ 
+                                                query: searchQuery, 
+                                                category: selectedCategory, 
+                                                folder: currentFolder, 
+                                                page: page, 
+                                                sort_order: userSortOrder || appliedSortOrder 
+                                            }} 
+                                        /> 
+                                    ))}
+                                </div> 
+                            ) : (folders.length === 0 && !loading) && ( 
+                                <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4">
+                                    <Folder size={80} />
+                                    <p className="font-black uppercase tracking-widest">Sin contenido disponible</p>
+                                </div> 
+                            )}
                         </div>
 
                         {hasMore && ( <div ref={loadMoreRef} className="py-20 flex flex-col items-center justify-center gap-3"><Loader2 className="animate-spin text-slate-700" size={32} /><p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Cargando más resultados...</p></div> )}

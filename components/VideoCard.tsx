@@ -57,9 +57,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = user?.role === 'ADMIN';
-  const isOwner = user?.id === video.creatorId;
-  const canEdit = isAdmin || isOwner;
+    const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
+    const isOwner = user?.id === video.creatorId;
+    const canEdit = isAdmin || isOwner;
 
   const isAudio = Boolean(video.is_audio);
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg');
@@ -138,6 +138,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       };
   }, [localThumb, isProcessing]);
 
+  // Sincronizar estado de "Ver más tarde" con el usuario
+  useEffect(() => {
+      setInWatchLater(user?.watchLater?.includes(video.id) || false);
+  }, [user?.watchLater, video.id]);
+
   const handleWatchLater = async (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
       if (!user) {
@@ -168,7 +173,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   const handleShare = (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
-      const url = `${window.location.origin}${watchUrl}`;
+      const url = `${window.location.origin}/#${watchUrl}`;
       console.log("Sharing URL:", url);
       if (navigator.share) {
           navigator.share({ title: video.title, url }).catch((err) => {
@@ -184,15 +189,20 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       setShowMenu(false);
   };
 
-  const handleDownload = (e: React.MouseEvent) => {
-      e.preventDefault(); e.stopPropagation();
+  const handleDownload = async (e: React.MouseEvent, forceDownload: boolean = false) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
       setShowMenu(false);
 
-      if (!isUnlocked) {
+      // 1. Comprobar acceso (Admin, Propietario, VIP o Compra previa)
+      const isVip = !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000);
+      const hasAccess = isAdmin || isOwner || isVip || isUnlocked;
+
+      if (!hasAccess && !forceDownload) {
           setShowPurchaseModal(true);
           return;
       }
 
+      // 2. Comprobar App Oficial (Solo si no es Admin)
       const isApp = (user?.deviceInfo?.includes('com.streampay.app') || 
                      user?.lastDeviceId?.includes('com.streampay.app') || 
                      user?.deviceInfo?.includes('StreamPayAPK') || 
@@ -203,17 +213,23 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           return;
       }
 
-      const base = db.getStreamerUrl(video.id, user?.sessionToken);
-      const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
-      const ext = video.is_audio ? 'mp3' : 'mp4';
-      const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
-      
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = "";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // 3. Proceder con la descarga
+      try {
+          const base = db.getStreamerUrl(video.id, user?.sessionToken);
+          const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
+          const ext = video.is_audio ? 'mp3' : 'mp4';
+          const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
+          
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = "";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success("Iniciando descarga...");
+      } catch (err) {
+          toast.error("Error al iniciar descarga");
+      }
   };
 
   const handlePurchase = async () => {
@@ -227,7 +243,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           toast.success("¡Compra exitosa!");
           setShowPurchaseModal(false);
           refreshUser();
-          window.location.reload(); 
+          
+          // Descarga automática tras compra
+          setTimeout(() => {
+              handleDownload(null as any, true);
+          }, 500);
       } catch (e: any) {
           toast.error(e.message || "Error en la compra");
       }
@@ -350,15 +370,15 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             {showMenu && (
                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-bottom-right">
                     <div className="p-1">
-                        <button onClick={handleShare} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
                             <Share2 size={14} className="text-slate-500" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
                         </button>
-                        <button onClick={handleDownload} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
                             <Download size={14} className="text-slate-500" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
                         </button>
-                        <button onClick={handleWatchLater} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWatchLater(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
                             <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
                             <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
                         </button>

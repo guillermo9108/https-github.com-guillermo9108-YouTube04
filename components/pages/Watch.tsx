@@ -84,7 +84,7 @@ export default function Watch() {
         setShowComments(false);
         setExtractionAttempted(false); 
         return () => { setThrottled(false); };
-    }, [id]);
+    }, [id, navigationContext.s]);
 
     const fetchRelated = async (p: number) => {
         if (loadingMoreRelated || (!hasMoreRelated && p !== navigationContext.p)) return;
@@ -99,11 +99,11 @@ export default function Watch() {
 
             if (navigationContext.f) {
                 // Si estamos en una carpeta, usar getFolderVideos para mantener el sortOrder
-                const res = await db.getFolderVideos(id || '', navigationContext.s);
+                const res = await db.getFolderVideos(id || '', navigationContext.s || '', user?.id);
                 filteredResults = res.videos;
                 hasMore = false; // getFolderVideos devuelve todo
             } else {
-                const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any, navigationContext.s);
+                const res = await db.getVideos(p, 40, navigationContext.f, navigationContext.q || '', navigationContext.c, mediaFilter as any, navigationContext.s, user?.id);
                 filteredResults = res.videos;
                 hasMore = res.hasMore;
             }
