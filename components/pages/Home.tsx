@@ -125,28 +125,37 @@ export default function Home() {
                 // Refuerzo de búsqueda multi-término local
                 if (searchQuery.trim().includes(' ')) {
                     const terms = searchQuery.toLowerCase().trim().split(/\s+/);
-                    // Filtramos los resultados del backend para asegurar que cumplen con TODOS los términos
-                    // Esto corrige casos donde el backend solo hace un LIKE simple
                     finalVideos = res.videos.filter(v => {
                         const title = v.title.toLowerCase();
                         return terms.every(term => title.includes(term));
                     });
                     
-                    // Si el filtrado local dejó muy pocos resultados, mantenemos los originales 
-                    // para no dejar la pantalla vacía si el backend tenía una lógica distinta
                     if (finalVideos.length === 0 && res.videos.length > 0) {
                         finalVideos = res.videos;
                     }
                 }
 
                 setVideos(finalVideos);
-                setFolders(res.folders as any || []);
+                
+                // Asegurar que las carpetas se muestren siempre que no haya una búsqueda excluyente
+                // o forzar la carga de carpetas si estamos navegando
+                let finalFolders = res.folders as any || [];
+                if (finalFolders.length === 0 && !searchQuery) {
+                    // Intento de recuperación si el backend falló al devolver carpetas en la ruta actual
+                    try {
+                        const recoverRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', userSortOrder);
+                        if (recoverRes.folders && recoverRes.folders.length > 0) {
+                            finalFolders = recoverRes.folders;
+                        }
+                    } catch(e) {}
+                }
+                setFolders(finalFolders);
+
                 setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
                 
-                // Si no hay carpetas en la respuesta de búsqueda, pero estamos en una ruta, 
-                // intentamos obtener las carpetas de esa ruta sin el filtro de búsqueda
-                if (searchQuery && (!res.folders || res.folders.length === 0)) {
+                // Si hay búsqueda pero no carpetas, intentar mostrar carpetas de la ruta actual
+                if (searchQuery && finalFolders.length === 0) {
                     const folderRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '');
                     if (folderRes.folders && folderRes.folders.length > 0) {
                         setFolders(folderRes.folders as any);

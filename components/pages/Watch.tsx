@@ -108,12 +108,23 @@ export default function Watch() {
                 hasMore = res.hasMore;
             }
             
+            let finalResults = filteredResults;
+            
+            // Refuerzo de orden local si el backend no lo aplicó correctamente
+            if (navigationContext.s === 'ALPHA') {
+                finalResults = [...filteredResults].sort((a, b) => naturalCollator.compare(a.title, b.title));
+            } else if (navigationContext.s === 'LATEST') {
+                finalResults = [...filteredResults].sort((a, b) => b.createdAt - a.createdAt);
+            } else if (navigationContext.s === 'OLDEST') {
+                finalResults = [...filteredResults].sort((a, b) => a.createdAt - b.createdAt);
+            }
+
             if (p === navigationContext.p || navigationContext.f) {
-                setRelatedVideos(filteredResults.filter(v => v.id !== id));
-                setSeriesQueue(filteredResults);
+                setRelatedVideos(finalResults.filter(v => v.id !== id));
+                setSeriesQueue(finalResults);
             } else {
-                setRelatedVideos(prev => [...prev, ...filteredResults.filter(v => v.id !== id)]);
-                setSeriesQueue(prev => [...prev, ...filteredResults]);
+                setRelatedVideos(prev => [...prev, ...finalResults.filter(v => v.id !== id)]);
+                setSeriesQueue(prev => [...prev, ...finalResults]);
             }
             setHasMoreRelated(hasMore);
             setRelatedPage(p);

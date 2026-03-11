@@ -53,6 +53,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [isVisible, setIsVisible] = useState(false);
   const [shouldLoadImg, setShouldLoadImg] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -139,13 +140,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   const handleWatchLater = async (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
-      if (!user) return;
+      if (!user) {
+          toast.error("Debes iniciar sesión");
+          return;
+      }
       try {
           await db.toggleWatchLater(user.id, video.id);
           setInWatchLater(!inWatchLater);
           toast.success(!inWatchLater ? "Añadido a Ver más tarde" : "Eliminado de Ver más tarde");
           refreshUser();
-      } catch (e) {}
+      } catch (e) {
+          console.error("Watch later failed:", e);
+      }
   };
 
   useEffect(() => {
@@ -163,8 +169,14 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const handleShare = (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
       const url = `${window.location.origin}${watchUrl}`;
+      console.log("Sharing URL:", url);
       if (navigator.share) {
-          navigator.share({ title: video.title, url }).catch(() => {});
+          navigator.share({ title: video.title, url }).catch((err) => {
+              console.error("Share failed:", err);
+              // Fallback to clipboard if share is cancelled or fails
+              navigator.clipboard.writeText(url);
+              toast.success("Enlace copiado");
+          });
       } else {
           navigator.clipboard.writeText(url);
           toast.success("Enlace copiado al portapapeles");
@@ -174,6 +186,23 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   const handleDownload = (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
+      setShowMenu(false);
+
+      if (!isUnlocked) {
+          setShowPurchaseModal(true);
+          return;
+      }
+
+      const isApp = (user?.deviceInfo?.includes('com.streampay.app') || 
+                     user?.lastDeviceId?.includes('com.streampay.app') || 
+                     user?.deviceInfo?.includes('StreamPayAPK') || 
+                     user?.lastDeviceId?.includes('StreamPayAPK'));
+
+      if (!isApp && !isAdmin) {
+          toast.error("La descarga solo está disponible en la App oficial");
+          return;
+      }
+
       const base = db.getStreamerUrl(video.id, user?.sessionToken);
       const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
       const ext = video.is_audio ? 'mp3' : 'mp4';
@@ -185,17 +214,24 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setShowMenu(false);
   };
 
-  const canDownload = useMemo(() => {
-      if (!user || !isUnlocked) return false;
-      const isApp = (user.deviceInfo?.includes('com.streampay.app') || 
-                     user.lastDeviceId?.includes('com.streampay.app') || 
-                     user.deviceInfo?.includes('StreamPayAPK') || 
-                     user.lastDeviceId?.includes('StreamPayAPK'));
-      return isApp;
-  }, [user, isUnlocked]);
+  const handlePurchase = async () => {
+      if (!user || !video) return;
+      if (Number(user.balance) < Number(video.price)) {
+          toast.error("Saldo insuficiente");
+          return;
+      }
+      try {
+          await db.purchaseVideo(user.id, video.id);
+          toast.success("¡Compra exitosa!");
+          setShowPurchaseModal(false);
+          refreshUser();
+          window.location.reload(); 
+      } catch (e: any) {
+          toast.error(e.message || "Error en la compra");
+      }
+  };
 
   const handleDelete = async (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
@@ -217,52 +253,54 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, isAudio]);
 
   return (
-    <div ref={cardRef} className={`flex flex-col gap-3 group ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
-      <Link 
-        to={watchUrl} 
-        className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.03] transition-all duration-500 block ring-1 ring-white/5 hover:ring-indigo-500/40"
-      >
-        {displayThumb ? (
-            <img 
-              src={displayThumb} 
-              alt={video.title} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out animate-in fade-in"
-              loading="lazy" 
-              referrerPolicy="no-referrer"
-              onError={() => setImgError(true)}
-            />
-        ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
-                <div className="relative">
-                    {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
-                    {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
+    <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
+      <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.03] transition-all duration-500 block ring-1 ring-white/5 hover:ring-indigo-500/40">
+        <Link 
+            to={watchUrl} 
+            className="absolute inset-0 z-0"
+        >
+            {displayThumb ? (
+                <img 
+                src={displayThumb} 
+                alt={video.title} 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out animate-in fade-in"
+                loading="lazy" 
+                referrerPolicy="no-referrer"
+                onError={() => setImgError(true)}
+                />
+            ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
+                    <div className="relative">
+                        {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
+                        {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
+        </Link>
         
         {locationLabel && (
-            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-slate-300 px-2 py-0.5 rounded-lg border border-white/10 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-slate-300 px-2 py-0.5 rounded-lg border border-white/10 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                 <Folder size={8} className="text-indigo-400" /> {locationLabel}
             </div>
         )}
 
-        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
+        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
            {formatDuration(video.duration)}
         </div>
 
         {isNew && !isWatched && !isAudio && (
-            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest">NUEVO</div>
+            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
         )}
 
         <button 
             onClick={handleWatchLater}
-            className={`absolute top-2 right-2 p-2 rounded-xl backdrop-blur-md border border-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 ${inWatchLater ? 'bg-indigo-600 text-white' : 'bg-black/40 text-slate-300 hover:text-white'}`}
+            className={`absolute top-2 right-2 p-2 rounded-xl backdrop-blur-md border border-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 z-10 ${inWatchLater ? 'bg-indigo-600 text-white' : 'bg-black/40 text-slate-300 hover:text-white'}`}
         >
             <Clock size={16} fill={inWatchLater ? "currentColor" : "none"} />
         </button>
 
         {isWatched && (
-             <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px]">
+             <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">
                  <div className="flex items-center gap-2 text-slate-200 bg-indigo-600/80 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
                     <CheckCircle2 size={14} /> <span className="text-[10px] font-black tracking-widest uppercase">VISTO</span>
                  </div>
@@ -270,11 +308,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         )}
         
         {!isUnlocked && !isWatched && (
-            <div className="absolute bottom-2 left-2 bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-500/20">
+            <div className="absolute bottom-2 left-2 bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-500/20 pointer-events-none">
                 {video.price} $
             </div>
         )}
-      </Link>
+      </div>
 
       <div className="flex gap-3 px-1">
         <Link to={`/channel/${video.creatorId}`} className="shrink-0 mt-1">
@@ -316,12 +354,10 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                             <Share2 size={14} className="text-slate-500" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
                         </button>
-                        {canDownload && (
-                            <button onClick={handleDownload} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                                <Download size={14} className="text-slate-500" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
-                            </button>
-                        )}
+                        <button onClick={handleDownload} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Download size={14} className="text-slate-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
+                        </button>
                         <button onClick={handleWatchLater} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
                             <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
                             <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
@@ -344,6 +380,32 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             )}
         </div>
       </div>
+
+      {/* Purchase Modal for Download */}
+      {showPurchaseModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className="bg-slate-900 border border-white/10 p-8 rounded-[40px] shadow-2xl flex flex-col items-center text-center max-w-sm animate-in zoom-in-95">
+                  <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-6">
+                      <Download size={32} className="text-amber-500" />
+                  </div>
+                  <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Desbloquear para Descargar</h2>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-8 leading-relaxed">Este contenido es premium. Debes comprarlo para poder descargarlo y verlo offline.</p>
+                  
+                  <div className="w-full space-y-3">
+                      <button onClick={handlePurchase} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
+                          COMPRAR POR {video.price} $
+                      </button>
+                      <button onClick={() => setShowPurchaseModal(false)} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-2xl transition-all">
+                          CANCELAR
+                      </button>
+                  </div>
+                  
+                  <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                      Tu saldo: <span className="text-white">{Number(user?.balance || 0).toFixed(2)} $</span>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 });
