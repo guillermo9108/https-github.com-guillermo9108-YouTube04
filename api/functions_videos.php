@@ -111,19 +111,25 @@ function video_get_all($pdo) {
     if (!empty($category) && $category !== 'TODOS') { $where[] = "v.category = ?"; $params[] = $category; }
     
     $rootPath = '';
+    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+    $rootPath = rtrim($stmtS->fetchColumn() ?: '', '/\\');
+
     if (!empty($folder)) {
-        $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-        $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
         $folderPath = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
         $where[] = "v.videoUrl LIKE ?"; 
         $params[] = $folderPath;
     }
 
-    // Fallback para is_audio si no está bien en DB
+    // Filtro de Media Type
+    $mediaWhere = "";
     if ($mediaType === 'VIDEO') { 
-        $where[] = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
+        $mediaWhere = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
-        $where[] = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b')"; 
+        $mediaWhere = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b')"; 
+    }
+    
+    if ($mediaWhere) {
+        $where[] = $mediaWhere;
     }
 
     $whereClause = implode(" AND ", $where);
@@ -150,9 +156,6 @@ function video_get_all($pdo) {
         $orderBy = "v.createdAt DESC";
     }
 
-    // Combinar parámetros: los de ORDER BY (si hay subquery con ?) van antes o después?
-    // En mi caso, el subquery está en el ORDER BY, así que el parámetro va ahí.
-    // El orden de ejecución es WHERE -> ORDER BY. Así que los parámetros de WHERE van primero.
     $finalParams = array_merge($params, $orderParams);
 
     $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
@@ -169,18 +172,26 @@ function video_get_all($pdo) {
 
     $subfolders = video_discover_subfolders($pdo, $folder, $search, $mediaType);
 
-    // Obtener categorías activas DENTRO de la carpeta actual (no globales)
+    // Obtener categorías activas DENTRO de la carpeta actual (no globales) y filtradas por mediaType
+    $catWhere = ["category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')"];
+    $catParams = [];
+    
     if (!empty($folder)) {
-        // Si estamos en una carpeta, mostrar solo categorías de esa carpeta
         $catMatch = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
-        $activeCatsSql = "SELECT DISTINCT category FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')";
-        $activeCatsStmt = $pdo->prepare($activeCatsSql);
-        $activeCatsStmt->execute([$catMatch]);
-        $activeCategories = $activeCatsStmt->fetchAll(PDO::FETCH_COLUMN);
-    } else {
-        // En la raíz, mostrar todas las categorías globales
-        $activeCategories = $pdo->query("SELECT DISTINCT category FROM videos WHERE category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')")->fetchAll(PDO::FETCH_COLUMN);
+        $catWhere[] = "videoUrl LIKE ?";
+        $catParams[] = $catMatch;
     }
+    
+    if ($mediaWhere) {
+        // Reutilizamos mediaWhere pero quitando el alias 'v.' si lo tuviera (no lo tiene en este caso)
+        $catWhere[] = str_replace('v.', '', $mediaWhere);
+    }
+    
+    $catWhereClause = implode(" AND ", $catWhere);
+    $activeCatsSql = "SELECT DISTINCT category FROM videos WHERE $catWhereClause";
+    $activeCatsStmt = $pdo->prepare($activeCatsSql);
+    $activeCatsStmt->execute($catParams);
+    $activeCategories = $activeCatsStmt->fetchAll(PDO::FETCH_COLUMN);
 
     video_process_rows($videos);
 
@@ -191,11 +202,8 @@ function video_get_all($pdo) {
         $firstVideo = $videos[0];
         $videoPath = $firstVideo['rawPath'] ?? $firstVideo['videoUrl'] ?? '';
 
-        $stmtNav = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-        $rootNav = rtrim($stmtNav->fetchColumn(), '/\\');
-
-        if ($rootNav && strpos($videoPath, $rootNav) === 0) {
-            $relPath = trim(substr($videoPath, strlen($rootNav)), '/\\');
+        if ($rootPath && strpos($videoPath, $rootPath) === 0) {
+            $relPath = trim(substr($videoPath, strlen($rootPath)), '/\\');
             $segments = array_filter(explode('/', str_replace('\\', '/', $relPath)));
             $segments = array_values($segments);
 
@@ -246,7 +254,7 @@ function video_get_one($pdo, $id) {
 }
 
 function video_get_by_creator($pdo, $userId) {
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? ORDER BY createdAt DESC");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') ORDER BY createdAt DESC");
     $stmt->execute([$userId]); 
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     video_process_rows($videos); 
@@ -380,10 +388,14 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     }
     $prefix = rtrim($prefix, '/') . '/';
     
+    // Normalización para búsqueda en DB
+    $dbPrefix = str_replace('/', '%', $prefix); // Esto no es muy preciso para LIKE
+    // Mejor usar el prefix tal cual pero asegurar que el videoUrl en DB se compare bien
+    
     // 1. Intentar descubrimiento por Base de Datos (Más robusto)
     $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
-            WHERE REPLACE(videoUrl, '\\\\', '/') LIKE ?";
-    $params = [$prefix . '%'];
+            WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)";
+    $params = [$prefix . '%', str_replace('/', '\\', $prefix) . '%'];
     
     if ($mediaType === 'VIDEO') {
         $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
@@ -404,14 +416,15 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     write_log("Folder Discovery: Prefix=$prefix, Found=" . count($allVideos) . " videos matching prefix", 'INFO');
     
     $folderMap = [];
+    $prefixLower = strtolower($prefix);
     $prefixLen = strlen($prefix);
 
     foreach ($allVideos as $v) {
         $path = str_replace('\\', '/', $v['videoUrl']);
-        if (strpos($path, $prefix) !== 0) {
-            // Reintento con normalización más agresiva
-            $path = '/' . ltrim($path, '/');
-            if (strpos($path, $prefix) !== 0) continue;
+        $pathLower = strtolower($path);
+        
+        if (strpos($pathLower, $prefixLower) !== 0) {
+            continue;
         }
         
         $relative = substr($path, $prefixLen);
@@ -419,17 +432,18 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         
         if (count($parts) > 1) {
             $folderName = $parts[0];
-            if (!isset($folderMap[$folderName])) {
-                $folderMap[$folderName] = [
+            $folderKey = strtolower($folderName);
+            if (!isset($folderMap[$folderKey])) {
+                $folderMap[$folderKey] = [
                     'name' => $folderName,
                     'relativePath' => ($currentRelPath ? $currentRelPath . '/' : '') . $folderName,
                     'count' => 0,
                     'thumbnailUrl' => fix_url($v['thumbnailUrl'])
                 ];
             }
-            $folderMap[$folderName]['count']++;
-            if (!$folderMap[$folderName]['thumbnailUrl'] && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
-                $folderMap[$folderName]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
+            $folderMap[$folderKey]['count']++;
+            if (!$folderMap[$folderKey]['thumbnailUrl'] && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
+                $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
             }
         }
     }
@@ -448,7 +462,10 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
 
     // 2. Fallback al sistema de archivos (Original)
     $fullPath = $prefix;
-    if (!is_dir($fullPath)) return [];
+    if (!is_dir($fullPath)) {
+        write_log("Folder Discovery: Full path $fullPath is not a directory", 'WARN');
+        return [];
+    }
 
     $items = @scandir($fullPath); 
     if ($items === false) return [];
@@ -463,13 +480,13 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $rel = ltrim(str_replace($root, '', str_replace('\\', '/', $itemPath)), '/\\');
             $match = str_replace('\\', '/', $itemPath) . '/%';
             
-            $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ?");
-            $count->execute([$match]); 
+            $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)");
+            $count->execute([$match, str_replace('/', '\\', $match)]); 
             $total = (int)$count->fetchColumn();
             
             if ($total > 0 || empty($search)) {
-                $thumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA') LIMIT 1");
-                $thumb->execute([$match]);
+                $thumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?) AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA') LIMIT 1");
+                $thumb->execute([$match, str_replace('/', '\\', $match)]);
 
                 $folders[] = [
                     'name' => $item, 
@@ -590,17 +607,19 @@ function getPriceForCategory($category, $settings, $parent_category = null) {
     $cats = json_decode($settings['categories'] ?? '[]', true);
     foreach ($cats as $c) {
         if (strcasecmp($c['name'], $category) === 0 && isset($c['price'])) {
-            return floatval($c['price']);
+            $val = floatval($c['price']);
+            return ($val > 0) ? $val : 1.0;
         }
     }
     if ($parent_category) {
         foreach ($cats as $c) {
             if (strcasecmp($c['name'], $parent_category) === 0 && isset($c['price'])) {
-                return floatval($c['price']);
+                $val = floatval($c['price']);
+                return ($val > 0) ? $val : 1.0;
             }
         }
     }
-    return 0;
+    return 1.0; // Default price to avoid free access by accident
 }
 
 function video_scan_local($pdo, $input) {
@@ -642,7 +661,8 @@ function video_scan_local($pdo, $input) {
 
             if (!$stmt->fetch()) {
                 $title = pathinfo($path, PATHINFO_FILENAME);
-                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?)")
+                // Default price 1.0 to avoid free access by accident
+                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, 1.0)")
                     ->execute([$id, $title, $path, $adminId, time(), $isAudio]);
                 $new++;
             }
@@ -661,7 +681,8 @@ function video_scan_local($pdo, $input) {
         $updated = false;
         foreach ($newCategories as $catName) {
             if (!in_array(strtolower($catName), $existingNames)) {
-                $cats[] = ['name' => $catName, 'price' => 0, 'sortOrder' => 'LATEST'];
+                // Default price 1.0 for newly discovered categories
+                $cats[] = ['name' => $catName, 'price' => 1.0, 'sortOrder' => 'LATEST'];
                 $existingNames[] = strtolower($catName);
                 $updated = true;
             }
