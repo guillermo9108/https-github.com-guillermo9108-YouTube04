@@ -123,8 +123,22 @@ function admin_update_category_price($pdo, $input) {
 function admin_add_balance($pdo, $input) {
     $uid = $input['userId'];
     $amt = floatval($input['amount']);
-    $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$amt, $uid]);
-    respond(true);
+    $reason = $input['reason'] ?? 'Ajuste administrativo';
+    
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$amt, $uid]);
+        
+        // Registro de auditoría
+        $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'ADMIN_ADJUSTMENT', ?, ?, 0)")
+            ->execute([uniqid('tx_adj_'), $uid, $amt, time(), $reason]);
+            
+        $pdo->commit();
+        respond(true);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        respond(false, null, $e->getMessage());
+    }
 }
 
 function admin_get_finance_requests($pdo) {
@@ -134,15 +148,45 @@ function admin_get_finance_requests($pdo) {
 }
 
 function admin_handle_balance_request($pdo, $input) {
-    $rid = $input['reqId']; $status = $input['status']; $pdo->beginTransaction();
-    $stmt = $pdo->prepare("SELECT userId, amount FROM balance_requests WHERE id = ?"); $stmt->execute([$rid]); $r = $stmt->fetch();
-    if ($status === 'APPROVED') $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$r['amount'], $r['userId']]);
-    $pdo->prepare("UPDATE balance_requests SET status = ? WHERE id = ?")->execute([$status, $rid]);
-    $pdo->commit(); respond(true);
+    $rid = $input['reqId']; 
+    $status = $input['status']; 
+    $reason = $input['reason'] ?? null;
+    
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT userId, amount FROM balance_requests WHERE id = ?"); 
+        $stmt->execute([$rid]); 
+        $r = $stmt->fetch();
+        
+        if ($status === 'APPROVED') {
+            $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$r['amount'], $r['userId']]);
+            
+            // Registro de transacción
+            $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'DEPOSIT', ?, 'Recarga de Saldo (Aprobada)', 1)")
+                ->execute([uniqid('tx_dep_'), $r['userId'], $r['amount'], time()]);
+        }
+        
+        $pdo->prepare("UPDATE balance_requests SET status = ?, rejectionReason = ? WHERE id = ?")->execute([$status, $reason, $rid]);
+        
+        if ($status === 'REJECTED' && $reason) {
+            require_once 'functions_interactions.php';
+            send_direct_notification($pdo, $r['userId'], 'SYSTEM', "Tu solicitud de saldo ha sido rechazada. Motivo: $reason", "/profile");
+        }
+        
+        $pdo->commit(); 
+        respond(true);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        respond(false, null, $e->getMessage());
+    }
 }
 
 function admin_handle_vip_request($pdo, $input) {
-    $rid = $input['reqId']; $status = $input['status']; $pdo->beginTransaction();
+    $rid = $input['reqId']; 
+    $status = $input['status']; 
+    $reason = $input['reason'] ?? null;
+    
+    $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare("SELECT * FROM vip_requests WHERE id = ?"); $stmt->execute([$rid]); $r = $stmt->fetch();
         if ($status === 'APPROVED') {
@@ -176,8 +220,18 @@ function admin_handle_vip_request($pdo, $input) {
             
             require_once 'functions_interactions.php';
             send_direct_notification($pdo, $r['userId'], 'SYSTEM', "Tu solicitud de '{$plan['name']}' ha sido aprobada.", "/profile");
+        } else if ($status === 'REJECTED') {
+            $pdo->prepare("UPDATE vip_requests SET status = ?, rejectionReason = ? WHERE id = ?")->execute([$status, $reason, $rid]);
+            if ($reason) {
+                require_once 'functions_interactions.php';
+                send_direct_notification($pdo, $r['userId'], 'SYSTEM', "Tu solicitud VIP ha sido rechazada. Motivo: $reason", "/profile");
+            }
         }
-        $pdo->prepare("UPDATE vip_requests SET status = ? WHERE id = ?")->execute([$status, $rid]);
+        
+        if ($status !== 'REJECTED') {
+            $pdo->prepare("UPDATE vip_requests SET status = ? WHERE id = ?")->execute([$status, $rid]);
+        }
+        
         $pdo->commit(); respond(true);
     } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
 }
@@ -287,21 +341,55 @@ function admin_delete_transcode_profile($pdo, $ext) {
 }
 
 function admin_transcode_scan_filters($pdo, $input) {
-    $exts = $input['extensions'] ?? []; // Array de extensiones a buscar, ej: ['avi', 'mkv']
-    if (empty($exts)) respond(false, null, "Debe seleccionar al menos una extensión.");
+    $mode = $input['mode'] ?? 'PREVIEW';
+    $onlyNonMp4 = isset($input['onlyNonMp4']) ? (bool)$input['onlyNonMp4'] : false;
+    $onlyIncompatible = isset($input['onlyIncompatible']) ? (bool)$input['onlyIncompatible'] : false;
+    $onlyAudios = isset($input['onlyAudios']) ? (bool)$input['onlyAudios'] : false;
     
-    $placeholders = implode(',', array_fill(0, count($exts), '?'));
-    $sql = "UPDATE videos SET transcode_status = 'WAITING' WHERE transcode_status = 'NONE' AND (";
-    $clauses = [];
-    foreach ($exts as $e) $clauses[] = "videoUrl LIKE ?";
-    $sql .= implode(' OR ', $clauses) . ")";
-    
+    $where = ["transcode_status = 'NONE'", "isLocal = 1"];
     $params = [];
-    foreach ($exts as $e) $params[] = "%.$e";
     
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    respond(true, "Videos añadidos a la cola: " . $stmt->rowCount());
+    if ($onlyNonMp4) {
+        $where[] = "videoUrl NOT LIKE '%.mp4'";
+    }
+    
+    if ($onlyIncompatible) {
+        $incompatibleExts = ['mkv', 'avi', 'ts', 'mov', 'wmv', 'flv', 'webm', 'm4v'];
+        $clauses = [];
+        foreach ($incompatibleExts as $e) {
+            $clauses[] = "videoUrl LIKE ?";
+            $params[] = "%.$e";
+        }
+        $where[] = "(" . implode(' OR ', $clauses) . ")";
+    }
+
+    if ($onlyAudios) {
+        $where[] = "is_audio = 1";
+    }
+    
+    // Compatibilidad con envío de extensiones explícitas
+    if (isset($input['extensions']) && is_array($input['extensions']) && !empty($input['extensions'])) {
+        $clauses = [];
+        foreach ($input['extensions'] as $e) {
+            $clauses[] = "videoUrl LIKE ?";
+            $params[] = "%.$e";
+        }
+        $where[] = "(" . implode(' OR ', $clauses) . ")";
+    }
+    
+    $whereSql = implode(' AND ', $where);
+    
+    if ($mode === 'PREVIEW') {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE $whereSql");
+        $stmt->execute($params);
+        $count = $stmt->fetchColumn();
+        respond(true, ['count' => (int)$count]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING' WHERE $whereSql");
+        $stmt->execute($params);
+        $count = $stmt->rowCount();
+        respond(true, ['count' => $count, 'message' => "Videos añadidos a la cola: $count"]);
+    }
 }
 
 function admin_transcode_batch($pdo) {
@@ -365,7 +453,15 @@ function admin_smart_cleaner_preview($pdo, $input) {
     
     $threshold = time() - ($minDays * 86400);
     
-    $sql = "SELECT id, title, views, videoUrl FROM videos WHERE isLocal = 1 AND views <= ? AND likes <= ? AND dislikes >= ? AND createdAt < ?";
+    // Protección: Excluir videos comprados
+    $sql = "SELECT id, title, views, videoUrl FROM videos 
+            WHERE isLocal = 1 
+            AND views <= ? 
+            AND likes <= ? 
+            AND dislikes >= ? 
+            AND createdAt < ?
+            AND id NOT IN (SELECT videoId FROM transactions WHERE type = 'PURCHASE' AND videoId IS NOT NULL)";
+    
     $params = [$maxViews, $minLikes, $maxDislikes, $threshold];
     
     if ($cat !== 'ALL') {
@@ -447,7 +543,11 @@ function admin_extreme_janitor($pdo, $input) {
     $threshold = time() - ($minDays * 86400);
     
     // First, select the videos to be deleted so we can remove their files
-    $selectSql = "SELECT id, videoUrl, thumbnailUrl FROM videos WHERE views <= ? AND createdAt < ?";
+    // Protección: Excluir videos comprados
+    $selectSql = "SELECT id, videoUrl, thumbnailUrl FROM videos 
+                  WHERE views <= ? 
+                  AND createdAt < ?
+                  AND id NOT IN (SELECT videoId FROM transactions WHERE type = 'PURCHASE' AND videoId IS NOT NULL)";
     $params = [$maxViews, $threshold];
     
     if ($cat !== 'ALL') {
@@ -536,6 +636,13 @@ function admin_client_log($input) {
 function admin_get_seller_verification_requests($pdo) {
     $stmt = $pdo->query("SELECT sv.*, u.username FROM seller_verifications sv JOIN users u ON sv.userId = u.id WHERE sv.status = 'PENDING' ORDER BY sv.createdAt DESC");
     respond(true, $stmt->fetchAll());
+}
+
+function admin_run_video_worker($pdo) {
+    // Intentar ejecutar el worker en segundo plano
+    $cmd = "php " . __DIR__ . "/video_worker.php > /dev/null 2>&1 &";
+    @shell_exec($cmd);
+    respond(true, "Worker iniciado en segundo plano.");
 }
 
 function admin_handle_seller_verification($pdo, $input) {

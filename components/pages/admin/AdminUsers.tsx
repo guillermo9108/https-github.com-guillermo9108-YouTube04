@@ -30,6 +30,7 @@ export default function AdminUsers() {
     
     // Manual Balance State
     const [addBalanceAmount, setAddBalanceAmount] = useState('');
+    const [addBalanceReason, setAddBalanceReason] = useState('');
     const [addBalanceTarget, setAddBalanceTarget] = useState('');
     const [rechargeSearch, setRechargeSearch] = useState('');
     const [rechargeSuggestions, setRechargeSuggestions] = useState<User[]>([]);
@@ -107,9 +108,10 @@ export default function AdminUsers() {
             return;
         }
         try {
-            await db.adminAddBalance(currentUser.id, addBalanceTarget, parseFloat(addBalanceAmount));
+            await db.adminAddBalance(currentUser.id, addBalanceTarget, parseFloat(addBalanceAmount), addBalanceReason);
             toast.success("Saldo inyectado correctamente");
             setAddBalanceAmount('');
+            setAddBalanceReason('');
             clearRechargeForm();
             loadUsers();
         } catch (e: any) {
@@ -259,6 +261,17 @@ export default function AdminUsers() {
                                     value={addBalanceAmount} 
                                     onChange={e => setAddBalanceAmount(e.target.value)} 
                                     placeholder="0.00" 
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest ml-1">Motivo / Referencia</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 outline-none" 
+                                    value={addBalanceReason} 
+                                    onChange={e => setAddBalanceReason(e.target.value)} 
+                                    placeholder="Ej: Bono fidelidad, Corrección..." 
                                 />
                             </div>
 

@@ -38,10 +38,11 @@ if (!$isAuto) {
     die("[INFO] Transcodificación automática desactivada en ajustes web.\n");
 }
 
-// 2. Protección: Verificar si ya hay un ffmpeg corriendo en el sistema
-$check = shell_exec('pgrep ffmpeg');
-if (!empty($check)) {
-    die("[INFO] FFmpeg ya está trabajando en otro proceso. Saltando ciclo.\n");
+// 2. Protección: Verificar si ya hay procesos FFmpeg corriendo en el sistema
+$check = shell_exec('pgrep ffmpeg | wc -l');
+$count = (int)trim($check);
+if ($count >= 2) {
+    die("[INFO] Ya hay 2 procesos FFmpeg trabajando. Saltando ciclo para evitar saturación.\n");
 }
 
 // 3. Buscar siguiente video en cola WAITING

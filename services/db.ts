@@ -277,8 +277,8 @@ class DBService {
     public async addReview(itemId: string, userId: string, rating: number, comment: string): Promise<void> { return this.request<void>(`action=add_review`, { method: 'POST', body: JSON.stringify({ itemId, userId, rating, comment }) }); }
 
     public async getBalanceRequests(): Promise<{balance: BalanceRequest[], vip: VipRequest[], activeVip?: Partial<User>[]}> { return this.request<{balance: BalanceRequest[], vip: VipRequest[], activeVip?: Partial<User>[]}>('action=get_balance_requests'); }
-    public async handleBalanceRequest(adminId: string, reqId: string, status: string): Promise<void> { return this.request<void>(`action=handle_balance_request`, { method: 'POST', body: JSON.stringify({ adminId, reqId, status }) }); }
-    public async handleVipRequest(adminId: string, reqId: string, status: string): Promise<void> { return this.request<void>(`action=handle_vip_request`, { method: 'POST', body: JSON.stringify({ adminId, reqId, status }) }); }
+    public async handleBalanceRequest(adminId: string, reqId: string, status: string, reason: string = ''): Promise<void> { return this.request<void>(`action=handle_balance_request`, { method: 'POST', body: JSON.stringify({ adminId, reqId, status, reason }) }); }
+    public async handleVipRequest(adminId: string, reqId: string, status: string, reason: string = ''): Promise<void> { return this.request<void>(`action=handle_vip_request`, { method: 'POST', body: JSON.stringify({ adminId, reqId, status, reason }) }); }
     
     public async purchaseVipInstant(userId: string, plan: VipPlan): Promise<void> { return this.request<void>(`action=purchase_vip_instant`, { method: 'POST', body: JSON.stringify({ userId, plan }) }); }
     
@@ -300,7 +300,7 @@ class DBService {
     }
 
     public async transferBalance(userId: string, targetUsername: string, amount: number): Promise<void> { return this.request<void>(`action=transfer_balance`, { method: 'POST', body: JSON.stringify({ userId, targetUsername, amount }) }); }
-    public async adminAddBalance(adminId: string, targetId: string, amount: number): Promise<void> { return this.request<void>(`action=admin_add_balance`, { method: 'POST', body: JSON.stringify({ adminId, userId: targetId, amount }) }); }
+    public async adminAddBalance(adminId: string, targetId: string, amount: number, reason: string = ''): Promise<void> { return this.request<void>(`action=admin_add_balance`, { method: 'POST', body: JSON.stringify({ adminId, userId: targetId, amount, reason }) }); }
     public async getGlobalTransactions(): Promise<any> { return this.request<any>('action=get_global_transactions'); }
 
     public async getAllUsers(): Promise<User[]> { return this.request<User[]>('action=get_all_users'); }

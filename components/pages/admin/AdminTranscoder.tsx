@@ -32,7 +32,8 @@ export default function AdminTranscoder() {
 
     const [filters, setFilters] = useState({ 
         onlyNonMp4: true, 
-        onlyIncompatible: false 
+        onlyIncompatible: false,
+        onlyAudios: false
     });
 
     const loadData = async () => {
@@ -302,9 +303,17 @@ export default function AdminTranscoder() {
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
                         <h3 className="font-bold text-white mb-4 text-xs uppercase flex items-center gap-2"><Filter size={14}/> Filtros de Auto-Encolado</h3>
                         <div className="space-y-3">
-                            <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer">
+                            <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
                                 <input type="checkbox" checked={filters.onlyNonMp4} onChange={e => setFilters({...filters, onlyNonMp4: e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
-                                <span className="text-[11px] text-slate-300 font-bold uppercase">Solo no-MP4</span>
+                                <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">Solo no-MP4</span>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" checked={filters.onlyIncompatible} onChange={e => setFilters({...filters, onlyIncompatible: e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
+                                <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">Formatos Incompatibles</span>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" checked={filters.onlyAudios} onChange={e => setFilters({...filters, onlyAudios: e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
+                                <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">Solo Audios</span>
                             </label>
                             <div className="grid grid-cols-2 gap-2 mt-4">
                                 <button onClick={() => handleScanFilter('PREVIEW')} disabled={isScanning} className="bg-slate-800 text-slate-300 py-2.5 rounded-lg text-[10px] font-black uppercase">Escanear</button>

@@ -125,7 +125,7 @@ function video_get_all($pdo) {
     if ($mediaType === 'VIDEO') { 
         $mediaWhere = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
-        $mediaWhere = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b')"; 
+        $mediaWhere = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b' OR v.videoUrl LIKE '%.mp4a')"; 
     }
     
     if ($mediaWhere) {
@@ -178,8 +178,9 @@ function video_get_all($pdo) {
     
     if (!empty($folder)) {
         $catMatch = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
-        $catWhere[] = "videoUrl LIKE ?";
+        $catWhere[] = "(REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)";
         $catParams[] = $catMatch;
+        $catParams[] = str_replace('/', '\\', $catMatch);
     }
     
     if ($mediaWhere) {
@@ -400,7 +401,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     if ($mediaType === 'VIDEO') {
         $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
     } elseif ($mediaType === 'AUDIO') {
-        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac' OR videoUrl LIKE '%.ogg' OR videoUrl LIKE '%.opus' OR videoUrl LIKE '%.m4b')";
+        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac' OR videoUrl LIKE '%.ogg' OR videoUrl LIKE '%.opus' OR videoUrl LIKE '%.m4b' OR videoUrl LIKE '%.mp4a')";
     }
 
     if (!empty($search)) {
@@ -412,8 +413,6 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $allVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    write_log("Folder Discovery: Prefix=$prefix, Found=" . count($allVideos) . " videos matching prefix", 'INFO');
     
     $folderMap = [];
     $prefixLower = strtolower($prefix);
@@ -428,6 +427,8 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         }
         
         $relative = substr($path, $prefixLen);
+        if (!$relative) continue;
+
         $parts = explode('/', ltrim($relative, '/'));
         
         if (count($parts) > 1) {
@@ -518,8 +519,22 @@ function video_upload($pdo, $post, $files) {
         move_uploaded_file($files['thumbnail']['tmp_name'], 'uploads/thumbnails/' . $thumbName);
         $thumbPath = 'api/uploads/thumbnails/' . $thumbName;
     }
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $post['title'], $post['description'], floatval($post['price']), $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time()]);
+    $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
+    $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
+
+    $price = floatval($post['price'] ?? 0);
+    if ($price <= 0) $price = 1.00;
+
+    $transcodeStatus = 'NONE';
+    if ($autoTranscode === 1) {
+        $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
+        if ($ext !== 'mp4' && $ext !== 'mp3') {
+            $transcodeStatus = 'WAITING';
+        }
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus]);
 
     require_once 'functions_interactions.php';
     // La notificación se enviará en video_organize_single cuando se procese el video
@@ -661,9 +676,23 @@ function video_scan_local($pdo, $input) {
 
             if (!$stmt->fetch()) {
                 $title = pathinfo($path, PATHINFO_FILENAME);
+                
+                // Lógica de Auto-Encolado para el Transcodificador
+                $transcodeStatus = 'NONE';
+                $stmtS = $pdo->query("SELECT autoTranscode FROM system_settings WHERE id = 1");
+                $autoTranscode = (int)$stmtS->fetchColumn();
+                
+                if ($autoTranscode === 1) {
+                    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                    // Encolar si no es MP4 (video) o MP3 (audio)
+                    if ($ext !== 'mp4' && $ext !== 'mp3') {
+                        $transcodeStatus = 'WAITING';
+                    }
+                }
+
                 // Default price 1.0 to avoid free access by accident
-                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, 1.0)")
-                    ->execute([$id, $title, $path, $adminId, time(), $isAudio]);
+                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, 1.00, ?)")
+                    ->execute([$id, $title, $path, $adminId, time(), $isAudio, $transcodeStatus]);
                 $new++;
             }
         } catch (Exception $e) {

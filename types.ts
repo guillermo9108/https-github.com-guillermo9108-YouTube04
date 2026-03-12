@@ -242,6 +242,8 @@ export interface BalanceRequest {
     userId: string;
     username: string;
     amount: number;
+    proofText?: string;
+    proofImageUrl?: string;
     createdAt: number;
 }
 

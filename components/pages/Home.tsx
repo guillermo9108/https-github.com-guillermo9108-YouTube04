@@ -208,7 +208,12 @@ export default function Home() {
     }, []);
 
     // 4. Trigger de carga
-    useEffect(() => { fetchVideos(0, true); }, [currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder]);
+    useEffect(() => { 
+        setSelectedCategory('TODOS');
+        fetchVideos(0, true); 
+    }, [mediaFilter]);
+
+    useEffect(() => { fetchVideos(0, true); }, [currentFolder, searchQuery, selectedCategory, userSortOrder]);
 
     // 5. Infinite Scroll
     useEffect(() => {

@@ -494,10 +494,25 @@ export default function AdminLibrary() {
                             <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">2</div>
                             <h3 className="font-black text-white text-xs uppercase tracking-widest">Extracción Automática</h3>
                         </div>
-                        <button onClick={() => handleStep2()} disabled={activeScan || stats.available === 0} className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white shadow-xl transition-all flex items-center justify-center gap-2">
-                            {activeScan ? <Zap size={18} className="animate-pulse text-yellow-300" /> : <Film size={18}/>} 
-                            {activeScan ? 'MOTOR ACTIVO...' : `INICIAR MOTOR AUTOMÁTICO (${stats.available})`}
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleStep2()} disabled={activeScan || stats.available === 0} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white shadow-xl transition-all flex items-center justify-center gap-2">
+                                {activeScan ? <Zap size={18} className="animate-pulse text-yellow-300" /> : <Film size={18}/>} 
+                                {activeScan ? 'MOTOR ACTIVO...' : `CLIENTE (${stats.available})`}
+                            </button>
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        await db.request('action=admin_run_video_worker');
+                                        toast.success("Worker de servidor iniciado");
+                                        addToLog("Servidor: Iniciando extracción FFmpeg en segundo plano...");
+                                    } catch(e: any) { toast.error(e.message); }
+                                }} 
+                                className="bg-slate-800 hover:bg-slate-700 text-white px-4 rounded-2xl transition-all flex items-center justify-center"
+                                title="Usar Servidor (FFmpeg)"
+                            >
+                                <HardDrive size={18}/>
+                            </button>
+                        </div>
                         <p className="text-[9px] text-slate-500 font-bold uppercase text-center">EL PROCESO CONTINUARÁ HASTA TERMINAR TODA LA LIBRERÍA</p>
                     </div>
 

@@ -67,19 +67,46 @@ export default function AdminFinance() {
 
     const handleVipReq = async (reqId: string, action: 'APPROVED' | 'REJECTED') => {
         if (!currentUser) return;
+        let reason = '';
+        if (action === 'REJECTED') {
+            const r = prompt("Motivo del rechazo (opcional):");
+            if (r === null) return; // Cancelado
+            reason = r;
+        }
         try {
-            await db.handleVipRequest(currentUser.id, reqId, action);
+            await db.handleVipRequest(currentUser.id, reqId, action, reason);
             toast.success(`VIP ${action === 'APPROVED' ? 'Activado' : 'Rechazado'}`);
+            loadData();
+        } catch (e: any) { toast.error("Error: " + e.message); }
+    };
+
+    const handleBalanceReq = async (reqId: string, action: 'APPROVED' | 'REJECTED') => {
+        if (!currentUser) return;
+        let reason = '';
+        if (action === 'REJECTED') {
+            const r = prompt("Motivo del rechazo (opcional):");
+            if (r === null) return; // Cancelado
+            reason = r;
+        }
+        try {
+            await db.handleBalanceRequest(currentUser.id, reqId, action, reason);
+            toast.success(`Recarga ${action === 'APPROVED' ? 'Aprobada' : 'Rechazada'}`);
             loadData();
         } catch (e: any) { toast.error("Error: " + e.message); }
     };
 
     const handleSellerReq = async (reqId: string, status: 'APPROVED' | 'REJECTED') => {
         if (!currentUser) return;
+        let reason = '';
+        if (status === 'REJECTED') {
+            const r = prompt("Motivo del rechazo (opcional):");
+            if (r === null) return; // Cancelado
+            reason = r;
+        }
         try {
             await db.request('action=admin_handle_seller_verification', {
                 method: 'POST',
-                body: JSON.stringify({ id: reqId, status })
+                body: JSON.stringify({ id: reqId, status, reason })
             });
             toast.success(`Vendedor ${status === 'APPROVED' ? 'Verificado' : 'Rechazado'}`);
             setSelectedIdentity(null);
@@ -152,6 +179,59 @@ export default function AdminFinance() {
                             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center"><Crown size={24} /></div>
                         </div>
                     </div>
+
+                    {/* Balance Requests Table */}
+                    {requests.balance.length > 0 && (
+                        <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+                            <div className="p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <TrendingUp size={18} className="text-emerald-400"/>
+                                    <h3 className="font-black text-white uppercase text-xs tracking-widest">Recargas de Saldo</h3>
+                                </div>
+                                <span className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">{requests.balance.length} Pendientes</span>
+                            </div>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="text-[10px] text-slate-500 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
+                                        <tr>
+                                            <th className="px-6 py-4">Usuario</th>
+                                            <th className="px-6 py-4">Monto</th>
+                                            <th className="px-6 py-4">Comprobantes</th>
+                                            <th className="px-6 py-4 text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {requests.balance.map(req => (
+                                            <tr key={req.id} className="hover:bg-slate-800/30 transition-colors group">
+                                                <td className="px-6 py-4 font-bold text-white">@{req.username}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-white font-black text-xs uppercase mb-0.5">{req.amount} $</div>
+                                                    <div className="text-[10px] text-slate-500 font-bold uppercase">Recarga Directa</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex gap-2">
+                                                        {req.proofText && (
+                                                            <button onClick={() => setSelectedProof({ text: req.proofText })} className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-lg"><MessageSquare size={16}/></button>
+                                                        )}
+                                                        {req.proofImageUrl && (
+                                                            <button onClick={() => setSelectedProof({ image: req.proofImageUrl })} className="w-10 h-10 rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition-all shadow-lg bg-black"><img src={req.proofImageUrl} className="w-full h-full object-cover opacity-60 hover:opacity-100" /></button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex justify-end gap-3">
+                                                        <button onClick={() => handleBalanceReq(req.id, 'APPROVED')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-900/40 active:scale-95 transition-all">Aprobar</button>
+                                                        <button onClick={() => handleBalanceReq(req.id, 'REJECTED')} className="bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white p-2 rounded-xl active:scale-95 transition-all"><X size={16}/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {/* VIP Requests Table */}
                     <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">

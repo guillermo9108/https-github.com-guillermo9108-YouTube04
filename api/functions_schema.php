@@ -122,6 +122,7 @@ function getAppSchema() {
                 'userId' => 'VARCHAR(50)',
                 'amount' => 'DECIMAL(10, 2)',
                 'status' => "ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING'",
+                'rejectionReason' => 'TEXT DEFAULT NULL',
                 'createdAt' => 'BIGINT'
             ]
         ],
@@ -134,6 +135,7 @@ function getAppSchema() {
                 'proofText' => 'TEXT DEFAULT NULL',
                 'proofImageUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'status' => "ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING'",
+                'rejectionReason' => 'TEXT DEFAULT NULL',
                 'createdAt' => 'BIGINT'
             ]
         ],
