@@ -35,7 +35,7 @@ $ffmpeg = $bins['ffmpeg'];
 $ffprobe = $bins['ffprobe'];
 
 // Protección: Verificar si ya hay demasiados procesos FFmpeg corriendo
-$check = shell_exec('pgrep ffmpeg | wc -l');
+$check = shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
 $count = (int)trim($check);
 if ($count >= 3) {
     die("[INFO] Ya hay 3 o más procesos FFmpeg trabajando. Saltando ciclo para evitar saturación del servidor.\n");
@@ -44,6 +44,16 @@ if ($count >= 3) {
 echo "--- DIAGNÓSTICO DE BINARIOS ---\n";
 echo "[INFO] Usando FFMPEG: $ffmpeg\n";
 echo "[INFO] Usando FFPROBE: $ffprobe\n";
+
+// Test ffprobe
+$testCmd = "$ffprobe -version 2>&1";
+$testOutput = shell_exec($testCmd);
+if (strpos($testOutput, 'ffprobe version') === false) {
+    echo "[ERROR] FFPROBE no parece funcionar correctamente o no se puede ejecutar.\n";
+    echo "[DEBUG] Salida: " . substr($testOutput, 0, 100) . "...\n";
+} else {
+    echo "[INFO] FFPROBE verificado OK.\n";
+}
 echo "-------------------------------\n";
 
 $batchSize = 10;

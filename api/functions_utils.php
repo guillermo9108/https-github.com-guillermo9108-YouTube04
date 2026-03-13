@@ -28,9 +28,27 @@ function get_ffmpeg_binaries($pdo) {
 }
 
 function get_media_duration($path, $ffprobe) {
+    // Intentar obtener duración del formato
     $cmd = "$ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
     $duration = shell_exec($cmd);
-    return floatval($duration);
+    
+    if ($duration === null || trim($duration) === "" || floatval($duration) <= 0) {
+        // Intentar obtener duración de los streams (más lento pero más compatible con algunos audios)
+        $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+        $duration = shell_exec($cmd);
+    }
+    
+    if ($duration === null || trim($duration) === "" || floatval($duration) <= 0) {
+        // Último intento: streams de audio
+        $cmd = "$ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+        $duration = shell_exec($cmd);
+    }
+
+    $val = floatval($duration);
+    if ($val <= 0) {
+        write_log("FFPROBE Error: No se pudo obtener duración para $path. Comando: $cmd", 'ERROR');
+    }
+    return $val;
 }
 
 function fix_url($url) {

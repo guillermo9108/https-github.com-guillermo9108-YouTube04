@@ -399,8 +399,8 @@ function admin_transcode_batch($pdo) {
 
 function admin_stop_transcoder($pdo) {
     $pdo->exec("UPDATE system_settings SET is_transcoder_active = 0 WHERE id = 1");
-    // Intentar matar procesos ffmpeg (solo Linux/Synology)
-    @shell_exec("pkill ffmpeg");
+    // Intentar matar procesos ffmpeg (más portable que pkill)
+    @shell_exec("ps aux | grep ffmpeg | grep -v grep | awk '{print $2}' | xargs kill -9");
     respond(true, "Transcodificador detenido y procesos eliminados.");
 }
 
@@ -677,5 +677,76 @@ function admin_handle_seller_verification($pdo, $input) {
     } catch (Exception $e) {
         $pdo->rollBack();
         respond(false, null, $e->getMessage());
+    }
+}
+
+/**
+ * Realiza la transcodificación de un solo video (Uso interno por worker)
+ */
+function _admin_perform_transcode_single($pdo, $video, $bins) {
+    $ffmpeg = $bins['ffmpeg'];
+    $videoId = $video['id'];
+    $videoUrl = $video['videoUrl'];
+    $inputPath = resolve_video_path($videoUrl);
+
+    if (!$inputPath || !file_exists($inputPath)) {
+        write_log("Transcode: Archivo de entrada no encontrado: $videoUrl", 'ERROR');
+        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
+        return false;
+    }
+
+    // Determinar perfil según extensión de entrada
+    $ext = strtolower(pathinfo($inputPath, PATHINFO_EXTENSION));
+    $stmt = $pdo->prepare("SELECT * FROM transcode_profiles WHERE extension = ?");
+    $stmt->execute([$ext]);
+    $profile = $stmt->fetch();
+
+    if (!$profile) {
+        // Perfil por defecto: Convertir a MP4 compatible
+        $profile = [
+            'command_args' => '-c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k -movflags +faststart',
+            'extension' => 'mp4'
+        ];
+    }
+
+    $outputExt = (strpos($profile['command_args'], 'libmp3lame') !== false || $profile['extension'] === 'mp3') ? 'mp3' : 'mp4';
+    $outputPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t.' . $outputExt;
+    
+    // Evitar colisión si ya existe el archivo de salida
+    if (file_exists($outputPath)) {
+        @unlink($outputPath);
+    }
+
+    // Actualizar estado a PROCESSING
+    $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING' WHERE id = ?")->execute([$videoId]);
+
+    $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
+    write_log("Transcode: Iniciando $videoId: $cmd");
+    
+    $output = [];
+    $returnVar = 0;
+    exec($cmd, $output, $returnVar);
+
+    if ($returnVar === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
+        // Éxito
+        $newFilename = basename($outputPath);
+        $newUrl = dirname($videoUrl) . '/' . $newFilename;
+        if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
+        
+        // Actualizar base de datos
+        $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE' WHERE id = ?")
+            ->execute([$newUrl, $videoId]);
+        
+        // Opcional: Eliminar el original para ahorrar espacio si se desea
+        // @unlink($inputPath);
+        
+        write_log("Transcode: Éxito $videoId -> $newUrl");
+        return true;
+    } else {
+        // Fallo
+        $errorMsg = implode(" | ", array_slice($output, -3));
+        write_log("Transcode: Falló $videoId. Error: $errorMsg", 'ERROR');
+        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
+        return false;
     }
 }

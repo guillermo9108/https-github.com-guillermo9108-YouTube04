@@ -222,18 +222,21 @@ function video_get_all($pdo) {
         $firstVideo = $videos[0];
         $videoPath = $firstVideo['rawPath'] ?? $firstVideo['videoUrl'] ?? '';
 
-        if ($rootPath && strpos($videoPath, $rootPath) === 0) {
-            $relPath = trim(substr($videoPath, strlen($rootPath)), '/\\');
-            $segments = array_filter(explode('/', str_replace('\\', '/', $relPath)));
-            $segments = array_values($segments);
+        foreach ($roots as $rootPath) {
+            if ($rootPath && strpos($videoPath, $rootPath) === 0) {
+                $relPath = trim(substr($videoPath, strlen($rootPath)), '/\\');
+                $segments = array_filter(explode('/', str_replace('\\', '/', $relPath)));
+                $segments = array_values($segments);
 
-            if (count($segments) > 1) {
-                // Quitar el nombre del archivo
-                array_pop($segments);
-                $navigationInfo = [
-                    'suggestedPath' => $segments,
-                    'parentFolder' => end($segments)
-                ];
+                if (count($segments) > 1) {
+                    // Quitar el nombre del archivo
+                    array_pop($segments);
+                    $navigationInfo = [
+                        'suggestedPath' => $segments,
+                        'parentFolder' => end($segments)
+                    ];
+                }
+                break;
             }
         }
     }
@@ -318,7 +321,7 @@ function video_get_related($pdo, $videoId) {
         }
     }
 
-    $sortOrder = get_folder_sort_order($pdo, $relativePath, $cat);
+    $sortOrder = get_folder_sort_order($pdo, $relativePath, $currentVideo['category']);
 
     // Construir ORDER BY según sortOrder
     if ($sortOrder === 'RANDOM') {
@@ -385,6 +388,7 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
     }
 
     // Obtener videos de la misma carpeta
+    $folderPath = dirname($videoPath);
     $folderMatch = str_replace('\\', '/', $folderPath) . '/%';
     $stmt = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
                            FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
@@ -516,39 +520,53 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     }
 
     // 2. Fallback al sistema de archivos (Original)
-    $fullPath = $prefix;
-    if (!is_dir($fullPath)) {
-        write_log("Folder Discovery: Full path $fullPath is not a directory", 'WARN');
-        return [];
-    }
-
-    $items = @scandir($fullPath); 
-    if ($items === false) return [];
-    
     $folders = [];
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..' || strpos($item, '.') === 0) continue;
-        $itemPath = $fullPath . $item;
-        if (is_dir($itemPath)) {
-            if (!empty($search) && stripos($item, $search) === false) continue;
-            
-            $rel = ltrim(str_replace($root, '', str_replace('\\', '/', $itemPath)), '/\\');
-            $match = str_replace('\\', '/', $itemPath) . '/%';
-            
-            $count = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)");
-            $count->execute([$match, str_replace('/', '\\', $match)]); 
-            $total = (int)$count->fetchColumn();
-            
-            if ($total > 0 || empty($search)) {
-                $thumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?) AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA') LIMIT 1");
-                $thumb->execute([$match, str_replace('/', '\\', $match)]);
+    foreach ($roots as $root) {
+        $fullPath = $root;
+        if (!empty($currentRelPath)) {
+            $fullPath .= '/' . $currentRelPath;
+        }
+        $fullPath = rtrim($fullPath, '/') . '/';
 
-                $folders[] = [
-                    'name' => $item, 
-                    'relativePath' => $rel, 
-                    'count' => $total, 
-                    'thumbnailUrl' => fix_url($thumb->fetchColumn())
-                ];
+        if (!is_dir($fullPath)) {
+            continue;
+        }
+
+        $items = @scandir($fullPath); 
+        if ($items === false) continue;
+        
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..' || strpos($item, '.') === 0) continue;
+            $itemPath = $fullPath . $item;
+            if (is_dir($itemPath)) {
+                if (!empty($search) && stripos($item, $search) === false) continue;
+                
+                $rel = ($currentRelPath ? $currentRelPath . '/' : '') . $item;
+                $folderKey = strtolower($item);
+                
+                if (isset($folderMap[$folderKey])) continue; // Evitar duplicados si ya se encontró por DB
+
+                $match = str_replace('\\', '/', $itemPath) . '/%';
+                $matchEscaped = str_replace('/', '\\', $match);
+                
+                // Optimización: Verificar existencia primero (más rápido que contar todo)
+                $check = $pdo->prepare("SELECT COUNT(*) as total, MAX(thumbnailUrl) as thumb FROM videos 
+                                       WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)
+                                       AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')
+                                       LIMIT 1");
+                $check->execute([$match, $matchEscaped]);
+                $res = $check->fetch();
+                $total = (int)($res['total'] ?? 0);
+                
+                if ($total > 0 || (empty($search) && is_dir($itemPath))) {
+                    $folders[] = [
+                        'name' => $item, 
+                        'relativePath' => $rel, 
+                        'count' => $total, 
+                        'thumbnailUrl' => fix_url($res['thumb'] ?? '')
+                    ];
+                    $folderMap[$folderKey] = true;
+                }
             }
         }
     }

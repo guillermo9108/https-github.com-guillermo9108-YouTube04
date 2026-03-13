@@ -39,7 +39,7 @@ if (!$isAuto) {
 }
 
 // 2. Protección: Verificar si ya hay procesos FFmpeg corriendo en el sistema
-$check = shell_exec('pgrep ffmpeg | wc -l');
+$check = shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
 $count = (int)trim($check);
 if ($count >= 2) {
     die("[INFO] Ya hay 2 procesos FFmpeg trabajando. Saltando ciclo para evitar saturación.\n");
