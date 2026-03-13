@@ -14,6 +14,7 @@ import { useToast } from '../../context/ToastContext';
 import Sidebar from '../home/Sidebar';
 import Breadcrumbs from '../home/Breadcrumbs';
 import FolderEditModal from '../home/FolderEditModal';
+import FolderNavigationModal from '../home/FolderNavigationModal';
 
 // Helper de tiempo relativo para notificaciones
 const formatTimeAgo = (timestamp: number) => {
@@ -36,6 +37,7 @@ export default function Home() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false); 
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
     const [navVisible, setNavVisible] = useState(true);
     const [editingFolder, setEditingFolder] = useState<any | null>(null);
     const [isListening, setIsListening] = useState(false);
@@ -69,7 +71,14 @@ export default function Home() {
 
     const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [selectedCategory, setSelectedCategory] = useState('TODOS');
-    const [navigationPath, setNavigationPath] = useState<string[]>([]);
+    const [navigationPath, setNavigationPath] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('sp_nav_path');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
     const [activeCategories, setActiveCategories] = useState<string[]>(['TODOS']);
     
     // Secondary Data
@@ -100,6 +109,7 @@ export default function Home() {
     // Persistencia de preferencias
     useEffect(() => { localStorage.setItem('sp_media_filter', mediaFilter); }, [mediaFilter]);
     useEffect(() => { localStorage.setItem('sp_user_sort', userSortOrder); }, [userSortOrder]);
+    useEffect(() => { localStorage.setItem('sp_nav_path', JSON.stringify(navigationPath)); }, [navigationPath]);
 
     // 1. Cargar configuración inicial
     useEffect(() => {
@@ -515,6 +525,7 @@ export default function Home() {
                         <div className="flex items-center gap-2 w-full">
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
                                 <button onClick={() => { handleNavigate(-1); setSearchQuery(''); updateUrlSearch(''); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
+                                <button onClick={() => setIsFolderModalOpen(true)} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Explorar carpetas"><Folder size={16}/></button>
                                 {folders.length > 0 && (
                                     <button onClick={() => { if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); } setIsFolderGridCollapsed(!isFolderGridCollapsed); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${!isFolderGridCollapsed ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`} title={isFolderGridCollapsed ? "Mostrar carpetas" : "Ocultar carpetas"}><ChevronDown size={16} className={`transition-transform duration-300 ${!isFolderGridCollapsed ? 'rotate-180' : ''}`} /></button>
                                 )}
@@ -649,6 +660,17 @@ export default function Home() {
             </div>
 
             {editingFolder && ( <FolderEditModal folder={editingFolder} initialPrice={editingFolderConfig.price} initialSortOrder={editingFolderConfig.sortOrder} onClose={() => setEditingFolder(null)} onSave={handleBulkEditFolder} /> )}
+            
+            <FolderNavigationModal 
+                isOpen={isFolderModalOpen} 
+                onClose={() => setIsFolderModalOpen(false)} 
+                currentPath={navigationPath} 
+                onNavigate={(path) => {
+                    setNavigationPath(path);
+                    setSelectedCategory('TODOS');
+                    if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); }
+                }} 
+            />
         </div>
     );
 }
