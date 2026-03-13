@@ -11,39 +11,66 @@ function write_log($msg, $level = 'INFO') {
 
 function get_ffmpeg_binaries($pdo) {
     $stmt = $pdo->query("SELECT ffmpegPath FROM system_settings WHERE id = 1");
-    $custom = $stmt->fetchColumn();
+    $savedPath = $stmt->fetchColumn();
     
-    $ffmpeg = $custom ?: 'ffmpeg';
-    $ffprobe = str_replace('ffmpeg', 'ffprobe', $ffmpeg);
+    // Rutas candidatas para Synology y sistemas Linux comunes
+    $ffmpegCandidates = [
+        $savedPath,
+        '/usr/bin/ffmpeg',
+        '/usr/local/bin/ffmpeg',
+        '/volume1/@appstore/VideoStation/bin/ffmpeg',
+        '/volume1/@appstore/ffmpeg/bin/ffmpeg',
+        'ffmpeg'
+    ];
     
-    // Si es Synology y no hay ruta custom, probar rutas comunes
-    if ($ffmpeg === 'ffmpeg' && PHP_OS === 'Linux') {
-        $synoPaths = ['/usr/bin/ffmpeg', '/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
-        foreach ($synoPaths as $p) {
-            if (@is_executable($p)) { $ffmpeg = $p; $ffprobe = str_replace('ffmpeg', 'ffprobe', $p); break; }
+    $ffprobeCandidates = [
+        str_replace('ffmpeg', 'ffprobe', $savedPath),
+        '/usr/bin/ffprobe',
+        '/usr/local/bin/ffprobe',
+        '/volume1/@appstore/VideoStation/bin/ffprobe',
+        '/volume1/@appstore/ffmpeg/bin/ffprobe',
+        '/volume1/@appstore/ffprobe/bin/ffprobe',
+        'ffprobe'
+    ];
+
+    $finalFfmpeg = 'ffmpeg';
+    foreach (array_unique(array_filter($ffmpegCandidates)) as $cmd) {
+        $out = @shell_exec("$cmd -version 2>&1");
+        if ($out && strpos($out, 'ffmpeg version') !== false) {
+            $finalFfmpeg = $cmd;
+            break;
         }
     }
-    
-    return ['ffmpeg' => $ffmpeg, 'ffprobe' => $ffprobe];
+
+    $finalFfprobe = 'ffprobe';
+    foreach (array_unique(array_filter($ffprobeCandidates)) as $cmd) {
+        $out = @shell_exec("$cmd -version 2>&1");
+        if ($out && strpos($out, 'ffprobe version') !== false) {
+            $finalFfprobe = $cmd;
+            break;
+        }
+    }
+
+    return ['ffmpeg' => $finalFfmpeg, 'ffprobe' => $finalFfprobe];
 }
 
 function get_media_duration($path, $ffprobe) {
-    // Intentar obtener duración del formato
+    // 1. Intentar obtener duración del formato (más rápido)
     $cmd = "$ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
-    $duration = shell_exec($cmd);
+    $duration = trim(shell_exec($cmd) ?? '');
     
-    if ($duration === null || trim($duration) === "" || floatval($duration) <= 0) {
-        // Intentar obtener duración de los streams (más lento pero más compatible con algunos audios)
-        $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
-        $duration = shell_exec($cmd);
-    }
-    
-    if ($duration === null || trim($duration) === "" || floatval($duration) <= 0) {
-        // Último intento: streams de audio
-        $cmd = "$ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
-        $duration = shell_exec($cmd);
-    }
+    if (floatval($duration) > 0) return floatval($duration);
 
+    // 2. Intentar obtener duración del stream de audio (común en MP3)
+    $cmd = "$ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+    $duration = trim(shell_exec($cmd) ?? '');
+    
+    if (floatval($duration) > 0) return floatval($duration);
+
+    // 3. Intentar obtener duración del stream de video
+    $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+    $duration = trim(shell_exec($cmd) ?? '');
+    
     $val = floatval($duration);
     if ($val <= 0) {
         write_log("FFPROBE Error: No se pudo obtener duración para $path. Comando: $cmd", 'ERROR');

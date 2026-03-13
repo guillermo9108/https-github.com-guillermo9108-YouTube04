@@ -697,19 +697,33 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
     // Determinar perfil según extensión de entrada
     $ext = strtolower(pathinfo($inputPath, PATHINFO_EXTENSION));
+    $isAudioInput = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']);
+    
     $stmt = $pdo->prepare("SELECT * FROM transcode_profiles WHERE extension = ?");
     $stmt->execute([$ext]);
     $profile = $stmt->fetch();
 
     if (!$profile) {
-        // Perfil por defecto: Convertir a MP4 compatible
-        $profile = [
-            'command_args' => '-c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k -movflags +faststart',
-            'extension' => 'mp4'
-        ];
+        if ($isAudioInput) {
+            // Perfil por defecto para audio: Asegurar MP3 compatible
+            $profile = [
+                'command_args' => '-c:a libmp3lame -b:a 192k',
+                'extension' => 'mp3'
+            ];
+        } else {
+            // Perfil por defecto para video: Convertir a MP4 compatible
+            $profile = [
+                'command_args' => '-c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k -movflags +faststart',
+                'extension' => 'mp4'
+            ];
+        }
     }
 
-    $outputExt = (strpos($profile['command_args'], 'libmp3lame') !== false || $profile['extension'] === 'mp3') ? 'mp3' : 'mp4';
+    // Determinar extensión de salida
+    $outputExt = $profile['extension'];
+    if (strpos($profile['command_args'], 'libmp3lame') !== false) $outputExt = 'mp3';
+    if (strpos($profile['command_args'], 'libx264') !== false) $outputExt = 'mp4';
+    
     $outputPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t.' . $outputExt;
     
     // Evitar colisión si ya existe el archivo de salida

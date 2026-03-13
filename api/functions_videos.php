@@ -98,6 +98,7 @@ function get_child_categories($pdo, $folderPath) {
 
 function video_get_all($pdo) {
     $limit = intval($_GET['limit'] ?? 40); 
+    if ($limit > 500) $limit = 500; // Protección contra peticiones masivas que causan timeout
     $offset = intval($_GET['offset'] ?? 0);
     $search = trim($_GET['search'] ?? ''); 
     $folder = trim($_GET['folder'] ?? ''); 
@@ -217,7 +218,7 @@ function video_get_all($pdo) {
 
     // Información adicional de navegación
     $navigationInfo = null;
-    if (!empty($category) && $category !== 'TODOS' && empty($folder) && count($videos) > 0) {
+    if (!empty($category) && $category !== 'TODOS' && empty($folder) && count($videos) > 0 && !empty($roots)) {
         // Si estamos filtrando por categoría sin carpeta, encontrar la carpeta padre
         $firstVideo = $videos[0];
         $videoPath = $firstVideo['rawPath'] ?? $firstVideo['videoUrl'] ?? '';
@@ -333,7 +334,7 @@ function video_get_related($pdo, $videoId) {
     }
 
     $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? ORDER BY $orderBy LIMIT 12");
-    $stmt->execute([$cat, $videoId]); 
+    $stmt->execute([$currentVideo['category'], $videoId]); 
     $videos = $stmt->fetchAll();
     video_process_rows($videos); 
     respond(true, $videos);
@@ -427,149 +428,129 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     if (empty($roots)) return [];
 
     $currentRelPath = trim(str_replace('\\', '/', $currentRelPath), '/');
-    
-    $clauses = [];
-    $params = [];
+    $folderMap = [];
+
     foreach ($roots as $root) {
         $prefix = $root;
         if (!empty($currentRelPath)) {
             $prefix .= '/' . $currentRelPath;
         }
         $prefix = rtrim($prefix, '/') . '/';
-        $clauses[] = "REPLACE(videoUrl, '\\\\', '/') LIKE ?";
-        $params[] = $prefix . '%';
-    }
-    
-    // 1. Intentar descubrimiento por Base de Datos
-    $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
-            WHERE (" . implode(" OR ", $clauses) . ")";
-    
-    if ($mediaType === 'VIDEO') {
-        $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
-    } elseif ($mediaType === 'AUDIO') {
-        $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac' OR videoUrl LIKE '%.ogg' OR videoUrl LIKE '%.opus' OR videoUrl LIKE '%.m4b' OR videoUrl LIKE '%.mp4a')";
-    }
+        $prefixLen = strlen($prefix);
 
-    if (!empty($search)) {
-        $sql .= " AND (title LIKE ? OR REPLACE(videoUrl, '\\\\', '/') LIKE ?)";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
-    }
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $allVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $folderMap = [];
-
-    foreach ($allVideos as $v) {
-        $path = str_replace('\\', '/', $v['videoUrl']);
+        // SQL Optimizado: Agrupar por el primer segmento de la ruta relativa
+        // Buscamos videos que tengan al menos un nivel más de carpeta (contengan un '/')
+        $sql = "SELECT 
+                    SUBSTRING_INDEX(SUBSTRING(REPLACE(videoUrl, '\\\\', '/'), ? + 1), '/', 1) as folderName,
+                    COUNT(*) as videoCount,
+                    MAX(thumbnailUrl) as thumb
+                FROM videos 
+                WHERE REPLACE(videoUrl, '\\\\', '/') LIKE ?
+                AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
         
-        // Encontrar a qué root pertenece este video
-        $matchedRoot = null;
-        $prefixLen = 0;
-        foreach ($roots as $root) {
-            $prefix = $root;
-            if (!empty($currentRelPath)) {
-                $prefix .= '/' . $currentRelPath;
-            }
-            $prefix = rtrim($prefix, '/') . '/';
-            
-            if (strpos(strtolower($path), strtolower($prefix)) === 0) {
-                $matchedRoot = $prefix;
-                $prefixLen = strlen($prefix);
-                break;
-            }
-        }
-        
-        if (!$matchedRoot) continue;
-        
-        $relative = substr($path, $prefixLen);
-        if (!$relative) continue;
+        $params = [$prefixLen, $prefix . '%/%'];
 
-        $parts = explode('/', ltrim($relative, '/'));
-        
-        if (count($parts) > 1) {
-            $folderName = $parts[0];
-            $folderKey = strtolower($folderName);
-            if (!isset($folderMap[$folderKey])) {
-                $folderMap[$folderKey] = [
-                    'name' => $folderName,
-                    'relativePath' => ($currentRelPath ? $currentRelPath . '/' : '') . $folderName,
-                    'count' => 0,
-                    'thumbnailUrl' => fix_url($v['thumbnailUrl'])
-                ];
-            }
-            $folderMap[$folderKey]['count']++;
-            if ((!isset($folderMap[$folderKey]['thumbnailUrl']) || !$folderMap[$folderKey]['thumbnailUrl'] || str_contains($folderMap[$folderKey]['thumbnailUrl'], 'default')) && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
-                $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
-            }
-        }
-    }
-    
-    write_log("Folder Discovery: Mapped " . count($folderMap) . " subfolders", 'INFO');
-
-    // Si encontramos algo por DB, lo usamos
-    if (!empty($folderMap)) {
-        $folders = array_values($folderMap);
-        // Ordenar alfabéticamente por defecto
-        usort($folders, function($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
-        });
-        return $folders;
-    }
-
-    // 2. Fallback al sistema de archivos (Original)
-    $folders = [];
-    foreach ($roots as $root) {
-        $fullPath = $root;
-        if (!empty($currentRelPath)) {
-            $fullPath .= '/' . $currentRelPath;
-        }
-        $fullPath = rtrim($fullPath, '/') . '/';
-
-        if (!is_dir($fullPath)) {
-            continue;
+        if ($mediaType === 'VIDEO') {
+            $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
+        } elseif ($mediaType === 'AUDIO') {
+            $sql .= " AND (is_audio = 1 OR videoUrl LIKE '%.mp3' OR videoUrl LIKE '%.wav' OR videoUrl LIKE '%.aac' OR videoUrl LIKE '%.m4a' OR videoUrl LIKE '%.flac' OR videoUrl LIKE '%.ogg' OR videoUrl LIKE '%.opus' OR videoUrl LIKE '%.m4b' OR videoUrl LIKE '%.mp4a')";
         }
 
-        $items = @scandir($fullPath); 
-        if ($items === false) continue;
-        
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..' || strpos($item, '.') === 0) continue;
-            $itemPath = $fullPath . $item;
-            if (is_dir($itemPath)) {
-                if (!empty($search) && stripos($item, $search) === false) continue;
-                
-                $rel = ($currentRelPath ? $currentRelPath . '/' : '') . $item;
-                $folderKey = strtolower($item);
-                
-                if (isset($folderMap[$folderKey])) continue; // Evitar duplicados si ya se encontró por DB
+        if (!empty($search)) {
+            $sql .= " AND (title LIKE ? OR REPLACE(videoUrl, '\\\\', '/') LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
 
-                $match = str_replace('\\', '/', $itemPath) . '/%';
-                $matchEscaped = str_replace('/', '\\', $match);
+        $sql .= " GROUP BY folderName";
+        
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($results as $row) {
+                $folderName = $row['folderName'];
+                if (empty($folderName)) continue;
                 
-                // Optimización: Verificar existencia primero (más rápido que contar todo)
-                $check = $pdo->prepare("SELECT COUNT(*) as total, MAX(thumbnailUrl) as thumb FROM videos 
-                                       WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)
-                                       AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')
-                                       LIMIT 1");
-                $check->execute([$match, $matchEscaped]);
-                $res = $check->fetch();
-                $total = (int)($res['total'] ?? 0);
-                
-                if ($total > 0 || (empty($search) && is_dir($itemPath))) {
-                    $folders[] = [
-                        'name' => $item, 
-                        'relativePath' => $rel, 
-                        'count' => $total, 
-                        'thumbnailUrl' => fix_url($res['thumb'] ?? '')
+                $folderKey = strtolower($folderName);
+                if (!isset($folderMap[$folderKey])) {
+                    $folderMap[$folderKey] = [
+                        'name' => $folderName,
+                        'relativePath' => ($currentRelPath ? $currentRelPath . '/' : '') . $folderName,
+                        'count' => 0,
+                        'thumbnailUrl' => fix_url($row['thumb'])
                     ];
-                    $folderMap[$folderKey] = true;
+                }
+                $folderMap[$folderKey]['count'] += (int)$row['videoCount'];
+                
+                // Preferir miniaturas que no sean la por defecto
+                if ((strpos($folderMap[$folderKey]['thumbnailUrl'] ?? '', 'default') !== false) && $row['thumb'] && strpos($row['thumb'], 'default') === false) {
+                    $folderMap[$folderKey]['thumbnailUrl'] = fix_url($row['thumb']);
+                }
+            }
+        } catch (Exception $e) {
+            write_log("Error in optimized folder discovery: " . $e->getMessage(), 'ERROR');
+        }
+    }
+
+    // Si no encontramos nada por DB o queremos asegurar carpetas vacías (opcional), 
+    // podríamos mantener el fallback de filesystem, pero solo si no hay resultados o búsqueda activa.
+    if (empty($folderMap) || !empty($search)) {
+        foreach ($roots as $root) {
+            $fullPath = $root;
+            if (!empty($currentRelPath)) {
+                $fullPath .= '/' . $currentRelPath;
+            }
+            $fullPath = rtrim($fullPath, '/') . '/';
+
+            if (!is_dir($fullPath)) {
+                continue;
+            }
+
+            $items = @scandir($fullPath); 
+            if ($items === false) continue;
+            
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..' || strpos($item, '.') === 0) continue;
+                $itemPath = $fullPath . $item;
+                if (is_dir($itemPath)) {
+                    if (!empty($search) && stripos($item, $search) === false) continue;
+                    
+                    $rel = ($currentRelPath ? $currentRelPath . '/' : '') . $item;
+                    $folderKey = strtolower($item);
+                    
+                    if (isset($folderMap[$folderKey])) continue; // Evitar duplicados si ya se encontró por DB
+
+                    $match = str_replace('\\', '/', $itemPath) . '/%';
+                    $matchEscaped = str_replace('/', '\\', $match);
+                    
+                    // Optimización: Verificar existencia primero (más rápido que contar todo)
+                    $check = $pdo->prepare("SELECT COUNT(*) as total, MAX(thumbnailUrl) as thumb FROM videos 
+                                           WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)
+                                           AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')
+                                           LIMIT 1");
+                    $check->execute([$match, $matchEscaped]);
+                    $res = $check->fetch();
+                    $total = (int)($res['total'] ?? 0);
+                    
+                    if ($total > 0 || (empty($search) && is_dir($itemPath))) {
+                        $folderMap[$folderKey] = [
+                            'name' => $item, 
+                            'relativePath' => $rel, 
+                            'count' => $total, 
+                            'thumbnailUrl' => fix_url($res['thumb'] ?? '')
+                        ];
+                    }
                 }
             }
         }
     }
+
+    $folders = array_values($folderMap);
+    usort($folders, function($a, $b) {
+        return strcasecmp($a['name'], $b['name']);
+    });
 
     return $folders;
 }
