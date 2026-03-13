@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Folder, ChevronRight, ChevronLeft, Loader2, Home } from 'lucide-react';
+import { X, Folder, ChevronRight, ChevronLeft, Loader2, Home, Play, Download } from 'lucide-react';
 import { db } from '../../services/db';
+import { Video } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useNavigate } from '../Router';
 
 interface FolderNavigationModalProps {
     isOpen: boolean;
@@ -11,9 +15,15 @@ interface FolderNavigationModalProps {
 }
 
 export default function FolderNavigationModal({ isOpen, onClose, currentPath, onNavigate }: FolderNavigationModalProps) {
+    const { user } = useAuth();
+    const toast = useToast();
+    const navigate = useNavigate();
     const [modalPath, setModalPath] = useState<string[]>(currentPath);
     const [folders, setFolders] = useState<{ name: string; count: number; thumbnailUrl: string; relativePath: string }[]>([]);
+    const [videos, setVideos] = useState<Video[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
     useEffect(() => {
         if (isOpen) {
@@ -28,7 +38,7 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
             setLoading(true);
             try {
                 const pathStr = modalPath.join('/');
-                const res = await db.getVideos(0, 1, pathStr, '', 'TODOS', 'ALL', '', '');
+                const res = await db.getVideos(0, 100, pathStr, '', 'TODOS', 'ALL', '', user?.id || '');
                 
                 let rawFolders = res.folders;
                 let finalFolders: any[] = [];
@@ -40,6 +50,7 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
                 }
                 
                 setFolders(finalFolders);
+                setVideos(res.videos || []);
             } catch (e) {
                 console.error("Error fetching folders for modal:", e);
             } finally {
@@ -68,6 +79,51 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
     const handleGoHome = () => {
         setModalPath([]);
         onNavigate([]);
+    };
+
+    const handleVideoClick = (video: Video) => {
+        onClose();
+        navigate(`/watch/${video.id}`);
+    };
+
+    const handleDownload = async (e: React.MouseEvent, video: Video) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+
+        const isOwner = user?.id === video.creatorId;
+        const isVip = !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000);
+        const isUnlocked = isAdmin || isOwner || isVip; // Simplified check for modal
+
+        if (!isUnlocked) {
+            toast.error("Necesitas acceso para descargar este archivo");
+            return;
+        }
+
+        const isApp = (user?.deviceInfo?.includes('com.streampay.app') || 
+                       user?.lastDeviceId?.includes('com.streampay.app') || 
+                       user?.deviceInfo?.includes('StreamPayAPK') || 
+                       user?.lastDeviceId?.includes('StreamPayAPK'));
+
+        if (!isApp && !isAdmin) {
+            toast.error("La descarga solo está disponible en la App oficial");
+            return;
+        }
+
+        try {
+            const base = db.getStreamerUrl(video.id, user?.sessionToken);
+            const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
+            const ext = video.is_audio ? 'mp3' : 'mp4';
+            const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
+            
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = "";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Iniciando descarga...");
+        } catch (err) {
+            toast.error("Error al iniciar descarga");
+        }
     };
 
     return (
@@ -120,9 +176,9 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
                     {loading ? (
                         <div className="h-full flex flex-col items-center justify-center gap-3 opacity-50">
                             <Loader2 size={32} className="animate-spin text-indigo-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cargando carpetas...</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cargando contenido...</span>
                         </div>
-                    ) : folders.length > 0 ? (
+                    ) : (folders.length > 0 || videos.length > 0) ? (
                         <div className="grid grid-cols-1 gap-2">
                             {modalPath.length > 0 && (
                                 <button 
@@ -135,6 +191,8 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
                                     <span className="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-white">Volver</span>
                                 </button>
                             )}
+                            
+                            {/* Folders List */}
                             {folders.map((folder) => (
                                 <button 
                                     key={folder.name}
@@ -157,11 +215,50 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
                                     <ChevronRight size={16} className="text-slate-700 group-hover:text-white group-hover:translate-x-1 transition-all" />
                                 </button>
                             ))}
+
+                            {/* Videos List */}
+                            {videos.map((video) => (
+                                <div 
+                                    key={video.id}
+                                    className="w-full p-4 flex items-center gap-4 hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5 text-left"
+                                >
+                                    <button 
+                                        onClick={() => handleVideoClick(video)}
+                                        className="flex-1 flex items-center gap-4 min-w-0"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-white/5 shrink-0 relative">
+                                            {video.thumbnailUrl ? (
+                                                <img src={video.thumbnailUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-700 group-hover:text-indigo-500 transition-colors">
+                                                    <Play size={20} />
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                                                <Play size={16} className="text-white fill-white" />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-black text-white uppercase tracking-tight truncate group-hover:text-indigo-400 transition-colors">{video.title}</h4>
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                                {video.is_audio ? 'Audio' : 'Video'} • {video.views} vistas
+                                            </p>
+                                        </div>
+                                    </button>
+                                    <button 
+                                        onClick={(e) => handleDownload(e, video)}
+                                        className="p-3 bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-xl border border-white/10 transition-all active:scale-90"
+                                        title="Descargar"
+                                    >
+                                        <Download size={16} />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center gap-4 opacity-20 py-20">
                             <Folder size={48} />
-                            <p className="text-[10px] font-black uppercase tracking-widest">No hay subcarpetas</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest">No hay contenido</p>
                         </div>
                     )}
                 </div>
@@ -172,7 +269,7 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
                         onClick={onClose}
                         className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/20"
                     >
-                        Cerrar Explorador
+                        Ver Contenido
                     </button>
                 </div>
             </div>
