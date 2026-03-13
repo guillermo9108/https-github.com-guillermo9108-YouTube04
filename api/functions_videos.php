@@ -72,19 +72,27 @@ function get_folder_sort_order($pdo, $folderPath, $categoryName = '') {
  * Solo retorna categorías que existen en videos dentro de esa carpeta
  */
 function get_child_categories($pdo, $folderPath) {
-    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
     if (empty($folderPath)) {
-        // En la raíz, retornar todas las categorías
         return $pdo->query("SELECT DISTINCT category FROM videos WHERE category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')")->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    // Construir el path completo
-    $fullPath = str_replace('\\', '/', $rootPath . '/' . $folderPath) . '/%';
+    $clauses = [];
+    $params = [];
+    foreach ($roots as $root) {
+        $clauses[] = "REPLACE(videoUrl, '\\\\', '/') LIKE ?";
+        $params[] = $root . '/' . $folderPath . '/%';
+    }
+    
+    if (empty($clauses)) return [];
 
-    $stmt = $pdo->prepare("SELECT DISTINCT category FROM videos WHERE videoUrl LIKE ? AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')");
-    $stmt->execute([$fullPath]);
+    $stmt = $pdo->prepare("SELECT DISTINCT category FROM videos WHERE (" . implode(" OR ", $clauses) . ") AND category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')");
+    $stmt->execute($params);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);
 }
 
@@ -110,14 +118,21 @@ function video_get_all($pdo) {
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
     if (!empty($category) && $category !== 'TODOS') { $where[] = "v.category = ?"; $params[] = $category; }
     
-    $rootPath = '';
-    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $rootPath = rtrim($stmtS->fetchColumn() ?: '', '/\\');
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
     if (!empty($folder)) {
-        $folderPath = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
-        $where[] = "v.videoUrl LIKE ?"; 
-        $params[] = $folderPath;
+        $clauses = [];
+        foreach ($roots as $root) {
+            $clauses[] = "REPLACE(v.videoUrl, '\\\\', '/') LIKE ?";
+            $params[] = $root . '/' . $folder . '/%';
+        }
+        if (!empty($clauses)) {
+            $where[] = "(" . implode(" OR ", $clauses) . ")";
+        }
     }
 
     // Filtro de Media Type
@@ -177,10 +192,14 @@ function video_get_all($pdo) {
     $catParams = [];
     
     if (!empty($folder)) {
-        $catMatch = str_replace('\\', '/', $rootPath . '/' . $folder) . '/%';
-        $catWhere[] = "(REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)";
-        $catParams[] = $catMatch;
-        $catParams[] = str_replace('/', '\\', $catMatch);
+        $clauses = [];
+        foreach ($roots as $root) {
+            $clauses[] = "REPLACE(videoUrl, '\\\\', '/') LIKE ?";
+            $catParams[] = $root . '/' . $folder . '/%';
+        }
+        if (!empty($clauses)) {
+            $catWhere[] = "(" . implode(" OR ", $clauses) . ")";
+        }
     }
     
     if ($mediaWhere) {
@@ -238,13 +257,20 @@ function video_get_one($pdo, $id) {
 
     // Obtener el sortOrder de la carpeta/categoría del video
     $videoPath = $v['videoUrl'] ?? '';
-    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
     $relativePath = '';
-    if ($rootPath && strpos($videoPath, $rootPath) === 0) {
-        $relativePath = trim(substr($videoPath, strlen($rootPath)), '/\\');
-        $relativePath = dirname($relativePath);
+    $videoPathNorm = str_replace('\\', '/', $videoPath);
+    foreach ($roots as $root) {
+        if (strpos(strtolower($videoPathNorm), strtolower($root)) === 0) {
+            $rel = trim(substr($videoPathNorm, strlen($root)), '/');
+            $relativePath = dirname($rel) === '.' ? '' : dirname($rel);
+            break;
+        }
     }
 
     $v['folderSortOrder'] = get_folder_sort_order($pdo, $relativePath, $v['category']);
@@ -273,17 +299,23 @@ function video_get_related($pdo, $videoId) {
         return;
     }
 
-    $cat = $currentVideo['category'];
     $videoPath = $currentVideo['videoUrl'];
 
     // Obtener el sortOrder de la carpeta/categoría
-    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
     $relativePath = '';
-    if ($rootPath && strpos($videoPath, $rootPath) === 0) {
-        $relativePath = trim(substr($videoPath, strlen($rootPath)), '/\\');
-        $relativePath = dirname($relativePath);
+    $videoPathNorm = str_replace('\\', '/', $videoPath);
+    foreach ($roots as $root) {
+        if (strpos(strtolower($videoPathNorm), strtolower($root)) === 0) {
+            $rel = trim(substr($videoPathNorm, strlen($root)), '/');
+            $relativePath = dirname($rel) === '.' ? '' : dirname($rel);
+            break;
+        }
     }
 
     $sortOrder = get_folder_sort_order($pdo, $relativePath, $cat);
@@ -321,14 +353,20 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
     $category = $currentVideo['category'];
 
     // Obtener la carpeta del video
-    $stmtS = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $rootPath = rtrim($stmtS->fetchColumn(), '/\\');
-    $rootPath = str_replace('\\', '/', $rootPath);
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
-    $folderPath = dirname($videoPath);
     $relativePath = '';
-    if ($rootPath && strpos($folderPath, $rootPath) === 0) {
-        $relativePath = trim(substr($folderPath, strlen($rootPath)), '/\\');
+    $videoPathNorm = str_replace('\\', '/', $videoPath);
+    foreach ($roots as $root) {
+        if (strpos(strtolower($videoPathNorm), strtolower($root)) === 0) {
+            $rel = trim(substr($videoPathNorm, strlen($root)), '/');
+            $relativePath = dirname($rel) === '.' ? '' : dirname($rel);
+            break;
+        }
     }
 
     // Obtener el sortOrder configurado
@@ -376,27 +414,31 @@ function video_get_unprocessed($pdo) {
 }
 
 function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $mediaType = 'ALL') {
-    $stmt = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
-    $root = rtrim($stmt->fetchColumn() ?: '', '/\\');
-    if (empty($root)) return [];
+    $stmt = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmt->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
-    $root = str_replace('\\', '/', $root);
+    if (empty($roots)) return [];
+
     $currentRelPath = trim(str_replace('\\', '/', $currentRelPath), '/');
     
-    $prefix = $root;
-    if (!empty($currentRelPath)) {
-        $prefix .= '/' . $currentRelPath;
+    $clauses = [];
+    $params = [];
+    foreach ($roots as $root) {
+        $prefix = $root;
+        if (!empty($currentRelPath)) {
+            $prefix .= '/' . $currentRelPath;
+        }
+        $prefix = rtrim($prefix, '/') . '/';
+        $clauses[] = "REPLACE(videoUrl, '\\\\', '/') LIKE ?";
+        $params[] = $prefix . '%';
     }
-    $prefix = rtrim($prefix, '/') . '/';
     
-    // Normalización para búsqueda en DB
-    $dbPrefix = str_replace('/', '%', $prefix); // Esto no es muy preciso para LIKE
-    // Mejor usar el prefix tal cual pero asegurar que el videoUrl en DB se compare bien
-    
-    // 1. Intentar descubrimiento por Base de Datos (Más robusto)
+    // 1. Intentar descubrimiento por Base de Datos
     $sql = "SELECT videoUrl, thumbnailUrl, is_audio FROM videos 
-            WHERE (REPLACE(videoUrl, '\\\\', '/') LIKE ? OR videoUrl LIKE ?)";
-    $params = [$prefix . '%', str_replace('/', '\\', $prefix) . '%'];
+            WHERE (" . implode(" OR ", $clauses) . ")";
     
     if ($mediaType === 'VIDEO') {
         $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
@@ -415,16 +457,28 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     $allVideos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $folderMap = [];
-    $prefixLower = strtolower($prefix);
-    $prefixLen = strlen($prefix);
 
     foreach ($allVideos as $v) {
         $path = str_replace('\\', '/', $v['videoUrl']);
-        $pathLower = strtolower($path);
         
-        if (strpos($pathLower, $prefixLower) !== 0) {
-            continue;
+        // Encontrar a qué root pertenece este video
+        $matchedRoot = null;
+        $prefixLen = 0;
+        foreach ($roots as $root) {
+            $prefix = $root;
+            if (!empty($currentRelPath)) {
+                $prefix .= '/' . $currentRelPath;
+            }
+            $prefix = rtrim($prefix, '/') . '/';
+            
+            if (strpos(strtolower($path), strtolower($prefix)) === 0) {
+                $matchedRoot = $prefix;
+                $prefixLen = strlen($prefix);
+                break;
+            }
         }
+        
+        if (!$matchedRoot) continue;
         
         $relative = substr($path, $prefixLen);
         if (!$relative) continue;
@@ -443,7 +497,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
                 ];
             }
             $folderMap[$folderKey]['count']++;
-            if (!$folderMap[$folderKey]['thumbnailUrl'] && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
+            if ((!isset($folderMap[$folderKey]['thumbnailUrl']) || !$folderMap[$folderKey]['thumbnailUrl'] || str_contains($folderMap[$folderKey]['thumbnailUrl'], 'default')) && $v['thumbnailUrl'] && !str_contains($v['thumbnailUrl'], 'default')) {
                 $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
             }
         }
