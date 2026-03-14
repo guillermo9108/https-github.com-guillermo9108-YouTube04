@@ -341,7 +341,7 @@ export default function Watch() {
                 <div className="relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group">
                     {isUnlocked ? (
                         <div className={`relative z-10 w-full h-full flex flex-col items-center justify-center ${video?.is_audio ? 'bg-slate-900/40 backdrop-blur-md' : ''}`}>
-                            {video?.is_audio && video?.thumbnailUrl && !video.thumbnailUrl.includes('default.jpg') && (
+                            {video?.is_audio && video?.thumbnailUrl && (
                                 <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
                             <video 
@@ -382,7 +382,13 @@ export default function Watch() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8 mb-8">
                         <div className="flex items-center gap-4">
                             <Link to={`/channel/${video?.creatorId}`} className="w-12 h-12 rounded-2xl bg-slate-800 overflow-hidden shrink-0 border border-white/10">
-                                {video?.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{video?.creatorName?.[0]}</div>}
+                                {video?.creatorAvatarUrl ? (
+                                    <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">
+                                        {video?.creatorName?.[0]}
+                                    </div>
+                                )}
                             </Link>
                             <div className="min-w-0">
                                 <Link to={`/channel/${video?.creatorId}`} className="font-black text-white hover:text-indigo-400 block truncate">@{video?.creatorName}</Link>

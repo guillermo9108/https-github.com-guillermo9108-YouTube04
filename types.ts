@@ -125,6 +125,9 @@ export interface SystemSettings {
   currencyConversion?: number;
   enableDebugLog?: boolean;
   autoTranscode?: boolean | number;
+  defaultVideoThumb?: string;
+  defaultAudioThumb?: string;
+  defaultAvatar?: string;
   tropipayClientId?: string;
   tropipayClientSecret?: string;
   paymentMethods?: {

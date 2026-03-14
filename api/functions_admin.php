@@ -35,7 +35,8 @@ function admin_update_settings($pdo, $input) {
         'currencyConversion', 'enableYoutube', 'autoTranscode', 'transcodePreset', 'proxyUrl', 'categories',
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
-        'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey'
+        'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
+        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar'
     ];
     
     $fields = []; $params = [];

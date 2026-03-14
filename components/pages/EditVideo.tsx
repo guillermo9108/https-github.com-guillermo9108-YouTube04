@@ -9,7 +9,7 @@ import { Video } from '../../types';
 const EditVideo: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
     const toast = useToast();
     const [video, setVideo] = useState<Video | null>(null);
@@ -25,12 +25,21 @@ const EditVideo: React.FC = () => {
 
     useEffect(() => {
         const loadVideo = async () => {
-            if (!id) return;
+            if (authLoading) return; // Esperar a que el auth esté listo
+            
+            console.log("EditVideo: Loading video with ID:", id);
+            if (!id) {
+                console.warn("EditVideo: No ID provided");
+                setLoading(false);
+                return;
+            }
             try {
                 const v = await db.getVideo(id);
+                console.log("EditVideo: Video data received:", v);
                 if (v) {
                     // Verificar permisos
                     if (v.creatorId !== user?.id && !isAdmin) {
+                        console.warn("EditVideo: Permission denied. Creator:", v.creatorId, "User:", user?.id, "isAdmin:", isAdmin);
                         toast.error("No tienes permiso para editar este video");
                         navigate('/');
                         return;
@@ -42,15 +51,19 @@ const EditVideo: React.FC = () => {
                         price: Number(v.price) || 1.00,
                         category: v.category || ''
                     });
+                } else {
+                    console.warn("EditVideo: Video not found");
                 }
             } catch (e) {
+                console.error("EditVideo: Error loading video:", e);
                 toast.error("Error al cargar el video");
             } finally {
                 setLoading(false);
+                console.log("EditVideo: Loading finished");
             }
         };
         loadVideo();
-    }, [id, user, isAdmin, navigate, toast]);
+    }, [id, user?.id, isAdmin, authLoading, navigate, toast]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

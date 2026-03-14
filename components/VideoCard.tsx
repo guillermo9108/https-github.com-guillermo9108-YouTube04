@@ -63,7 +63,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     const canEdit = isAdmin || isOwner;
 
   const isAudio = Boolean(video.is_audio);
-  const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg');
+  const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
 
   // Obtener nombre de la carpeta (último segmento de la ruta)
   const locationLabel = useMemo(() => {
@@ -271,7 +271,15 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   const displayThumb = useMemo(() => {
       if (!shouldLoadImg) return null; // No retornamos nada hasta ser visibles
-      return localThumb || (!imgError && video.thumbnailUrl && !video.thumbnailUrl.includes('default.jpg') ? video.thumbnailUrl : (isAudio ? "api/uploads/thumbnails/defaultaudio.jpg" : null));
+      if (localThumb) return localThumb;
+      
+      // Si hay error en la imagen, intentar usar el default absoluto
+      if (imgError) {
+          return isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : null;
+      }
+
+      // Si tenemos una URL, usarla. El backend ya inyecta los defaults si no hay miniatura propia.
+      return video.thumbnailUrl || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : null);
   }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, isAudio]);
 
   return (

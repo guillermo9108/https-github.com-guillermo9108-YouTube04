@@ -9,6 +9,15 @@ function write_log($msg, $level = 'INFO') {
     file_put_contents('transcode_log.txt', $line, FILE_APPEND);
 }
 
+function get_system_settings($pdo) {
+    static $settings = null;
+    if ($settings === null) {
+        $stmt = $pdo->query("SELECT * FROM system_settings WHERE id = 1");
+        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    return $settings;
+}
+
 function get_ffmpeg_binaries($pdo) {
     $stmt = $pdo->query("SELECT ffmpegPath FROM system_settings WHERE id = 1");
     $savedPath = $stmt->fetchColumn();

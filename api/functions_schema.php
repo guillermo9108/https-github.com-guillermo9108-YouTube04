@@ -197,6 +197,9 @@ function getAppSchema() {
                 'vipPlans' => 'JSON DEFAULT NULL',
                 'paymentMethods' => 'JSON DEFAULT NULL',
                 'enableDebugLog' => 'TINYINT(1) DEFAULT 1',
+                'defaultVideoThumb' => 'VARCHAR(255) DEFAULT NULL',
+                'defaultAudioThumb' => 'VARCHAR(255) DEFAULT NULL',
+                'defaultAvatar' => 'VARCHAR(255) DEFAULT NULL',
                 'vapidPublicKey' => 'TEXT DEFAULT NULL',
                 'vapidPrivateKey' => 'TEXT DEFAULT NULL'
             ]

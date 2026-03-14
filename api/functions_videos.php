@@ -5,6 +5,9 @@
 
 function video_process_rows(&$rows) {
     if (!$rows) return;
+    global $pdo;
+    $settings = get_system_settings($pdo);
+
     foreach ($rows as &$v) {
         $v['rawPath'] = $v['videoUrl'];
         $isLocal = (isset($v['isLocal']) && ($v['isLocal'] == 1 || $v['isLocal'] === "1" || $v['isLocal'] === true));
@@ -13,11 +16,26 @@ function video_process_rows(&$rows) {
             $v['videoUrl'] = "api/index.php?action=stream&id=" . $v['id'];
             $v['isLocal'] = true;
         }
-        if (isset($v['thumbnailUrl'])) { $v['thumbnailUrl'] = fix_url($v['thumbnailUrl']); }
-        if (isset($v['creatorAvatarUrl'])) { $v['creatorAvatarUrl'] = fix_url($v['creatorAvatarUrl']); }
-        if (!isset($v['transcode_status'])) $v['transcode_status'] = 'NONE';
+        
         $ext = strtolower(pathinfo($v['rawPath'] ?? '', PATHINFO_EXTENSION));
         $v['is_audio'] = (isset($v['is_audio']) && $v['is_audio'] == 1) || in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac']);
+
+        if (empty($v['thumbnailUrl'])) {
+            if ($v['is_audio']) {
+                $v['thumbnailUrl'] = $settings['defaultAudioThumb'] ?? '';
+            } else {
+                $v['thumbnailUrl'] = $settings['defaultVideoThumb'] ?? '';
+            }
+        }
+
+        if (isset($v['thumbnailUrl'])) { $v['thumbnailUrl'] = fix_url($v['thumbnailUrl']); }
+        if (isset($v['creatorAvatarUrl'])) { 
+            if (empty($v['creatorAvatarUrl'])) {
+                $v['creatorAvatarUrl'] = $settings['defaultAvatar'] ?? '';
+            }
+            $v['creatorAvatarUrl'] = fix_url($v['creatorAvatarUrl']); 
+        }
+        if (!isset($v['transcode_status'])) $v['transcode_status'] = 'NONE';
     }
 }
 

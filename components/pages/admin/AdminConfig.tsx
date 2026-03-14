@@ -204,6 +204,32 @@ export default function AdminConfig() {
                 </div>
             )}
 
+            <SectionHeader id="DEFAULTS" label="Imágenes por Defecto" icon={Maximize} color="text-indigo-400" />
+            {activeSection === 'DEFAULTS' && (
+                <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-5 animate-in slide-in-from-top-2">
+                    <div className="space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Miniatura Video (Default)</label>
+                            <input type="text" value={settings?.defaultVideoThumb || ''} onChange={e => updateValue('defaultVideoThumb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Miniatura Audio (Default)</label>
+                            <input type="text" value={settings?.defaultAudioThumb || ''} onChange={e => updateValue('defaultAudioThumb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Avatar Usuario (Default)</label>
+                            <input type="text" value={settings?.defaultAvatar || ''} onChange={e => updateValue('defaultAvatar', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
+                        </div>
+                    </div>
+                    <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10 flex items-start gap-3">
+                        <Info size={16} className="text-indigo-400 mt-0.5 shrink-0"/>
+                        <p className="text-[9px] text-slate-400 leading-relaxed italic">
+                            Estas imágenes se mostrarán automáticamente cuando un contenido no tenga una miniatura propia o un usuario no haya subido su foto de perfil.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <SectionHeader id="VIP" label="Planes & Membresías" icon={Crown} color="text-amber-400" />
             {activeSection === 'VIP' && (
                 <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-4 animate-in slide-in-from-top-2">

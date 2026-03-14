@@ -9,6 +9,10 @@ function _get_user_data($pdo, $id) {
     $stmt->execute([$id]); 
     $u = $stmt->fetch();
     if ($u) {
+        if (empty($u['avatarUrl'])) {
+            $settings = get_system_settings($pdo);
+            $u['avatarUrl'] = $settings['defaultAvatar'] ?? '';
+        }
         $u['avatarUrl'] = fix_url($u['avatarUrl']);
         $u['balance'] = (float)$u['balance'];
         $u['deviceInfo'] = $u['lastDeviceId'] ?: 'Desconocido';

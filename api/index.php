@@ -234,6 +234,15 @@ try {
         case 'admin_file_cleanup_preview': admin_file_cleanup_preview($pdo, $_GET['type'] ?? ''); break;
         case 'client_log': admin_client_log($input); break;
         case 'admin_organize_paquete': admin_organize_paquete($pdo, $input); break;
+        case 'admin_ban_user': admin_ban_user($pdo, $input); break;
+        case 'admin_unban_user': admin_unban_user($pdo, $input); break;
+        case 'admin_change_user_role': admin_change_user_role($pdo, $input); break;
+        case 'admin_delete_user': admin_delete_user($pdo, $input); break;
+        case 'admin_suspend_seller': admin_suspend_seller($pdo, $input); break;
+        case 'admin_feature_listing': admin_feature_listing($pdo, $input); break;
+        case 'admin_deep_cleanup': admin_deep_cleanup($pdo); break;
+        case 'admin_get_seller_verification_requests': admin_get_seller_verification_requests($pdo); break;
+        case 'admin_handle_seller_verification': admin_handle_seller_verification($pdo, $input); break;
         case 'list_ftp_files': if(function_exists('listFtpFiles')) listFtpFiles($pdo, $_GET['path'] ?? '/'); else respond(false, null, "Módulo FTP no disponible"); break;
         case 'import_ftp_file': if(function_exists('importFtpFile')) importFtpFile($pdo, $input); else respond(false, null, "Módulo FTP no disponible"); break;
         case 'scan_ftp_recursive': if(function_exists('scanFtpRecursive')) scanFtpRecursive($pdo, $input); else respond(false, null, "Módulo FTP no disponible"); break;
