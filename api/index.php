@@ -105,6 +105,13 @@ try {
         case 'submit_seller_verification': interact_submit_seller_verification($pdo, $input); break;
         case 'get_seller_verification_requests': admin_get_seller_verification_requests($pdo); break;
         case 'admin_handle_seller_verification': admin_handle_seller_verification($pdo, $input); break;
+        case 'admin_ban_user': admin_ban_user($pdo, $input); break;
+        case 'admin_unban_user': admin_unban_user($pdo, $input); break;
+        case 'admin_change_user_role': admin_change_user_role($pdo, $input); break;
+        case 'admin_delete_user': admin_delete_user($pdo, $input); break;
+        case 'admin_suspend_seller': admin_suspend_seller($pdo, $input); break;
+        case 'admin_feature_listing': admin_feature_listing($pdo, $input); break;
+        case 'admin_deep_cleanup': admin_deep_cleanup($pdo); break;
         case 'submit_manual_vip_request': 
             $uid = $_POST['userId'];
             $planRaw = $_POST['planSnapshot'];
@@ -141,6 +148,7 @@ try {
         case 'get_unprocessed_videos': video_get_unprocessed($pdo); break;
         case 'upload_video': video_upload($pdo, $_POST, $_FILES); break;
         case 'update_video_metadata': video_update_metadata($pdo, $_POST, $_FILES); break;
+        case 'update_video': video_update($pdo, $input); break;
         case 'delete_video': video_delete($pdo, $input); break;
         case 'get_scan_folders': video_get_scan_folders($pdo); break;
         case 'get_admin_library_stats': video_get_admin_stats($pdo); break;

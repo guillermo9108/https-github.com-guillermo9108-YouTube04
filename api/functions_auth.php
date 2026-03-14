@@ -5,13 +5,15 @@
 
 // Helper para obtener datos completos de usuario
 function _get_user_data($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId, lastDeviceId FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId, lastDeviceId, watchLater, defaultPrices FROM users WHERE id = ?");
     $stmt->execute([$id]); 
     $u = $stmt->fetch();
     if ($u) {
         $u['avatarUrl'] = fix_url($u['avatarUrl']);
         $u['balance'] = (float)$u['balance'];
         $u['deviceInfo'] = $u['lastDeviceId'] ?: 'Desconocido';
+        $u['watchLater'] = json_decode($u['watchLater'] ?: '[]', true);
+        $u['defaultPrices'] = json_decode($u['defaultPrices'] ?: '{}', true);
         $details = json_decode($u['shippingDetails'] ?: '{}', true);
         
         // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
@@ -127,6 +129,17 @@ function auth_update_user($pdo, $input) {
         } else if ($k === 'autoPurchaseLimit') {
             $fields[] = "autoPurchaseLimit = ?";
             $params[] = floatval($v);
+        } else if ($k === 'toggleWatchLater') {
+            $stmt = $pdo->prepare("SELECT watchLater FROM users WHERE id = ?");
+            $stmt->execute([$uid]);
+            $current = json_decode($stmt->fetchColumn() ?: '[]', true);
+            if (in_array($v, $current)) {
+                $current = array_values(array_filter($current, function($id) use ($v) { return $id !== $v; }));
+            } else {
+                $current[] = $v;
+            }
+            $fields[] = "watchLater = ?";
+            $params[] = json_encode($current);
         }
     }
     

@@ -18,7 +18,8 @@ function getAppSchema() {
                 'defaultPrices' => 'JSON DEFAULT NULL',
                 'shippingDetails' => 'JSON DEFAULT NULL',
                 'vipExpiry' => 'BIGINT DEFAULT 0',
-                'is_verified_seller' => 'TINYINT(1) DEFAULT 0'
+                'is_verified_seller' => 'TINYINT(1) DEFAULT 0',
+                'is_banned' => 'TINYINT(1) DEFAULT 0'
             ]
         ],
         'videos' => [
@@ -86,6 +87,7 @@ function getAppSchema() {
                 'category' => 'VARCHAR(100)',
                 'itemCondition' => 'VARCHAR(50)',
                 'status' => "ENUM('ACTIVO', 'AGOTADO', 'ELIMINADO') DEFAULT 'ACTIVO'",
+                'is_featured' => 'TINYINT(1) DEFAULT 0',
                 'createdAt' => 'BIGINT'
             ]
         ],

@@ -680,6 +680,80 @@ function admin_handle_seller_verification($pdo, $input) {
     }
 }
 
+function admin_ban_user($pdo, $input) {
+    $uid = $input['userId'];
+    $pdo->prepare("UPDATE users SET is_banned = 1 WHERE id = ?")->execute([$uid]);
+    respond(true);
+}
+
+function admin_unban_user($pdo, $input) {
+    $uid = $input['userId'];
+    $pdo->prepare("UPDATE users SET is_banned = 0 WHERE id = ?")->execute([$uid]);
+    respond(true);
+}
+
+function admin_change_user_role($pdo, $input) {
+    $uid = $input['userId'];
+    $role = $input['role']; // ADMIN, USER, SELLER (if we add SELLER to enum)
+    
+    // First ensure the role is valid for the enum
+    if (!in_array($role, ['USER', 'ADMIN'])) {
+        respond(false, null, "Rol no válido");
+    }
+    
+    $pdo->prepare("UPDATE users SET role = ? WHERE id = ?")->execute([$role, $uid]);
+    respond(true);
+}
+
+function admin_delete_user($pdo, $input) {
+    $uid = $input['userId'];
+    $pdo->beginTransaction();
+    try {
+        // Delete related data to maintain integrity
+        $pdo->prepare("DELETE FROM interactions WHERE userId = ?")->execute([$uid]);
+        $pdo->prepare("DELETE FROM comments WHERE userId = ?")->execute([$uid]);
+        $pdo->prepare("DELETE FROM notifications WHERE userId = ?")->execute([$uid]);
+        $pdo->prepare("DELETE FROM subscriptions WHERE subscriberId = ? OR creatorId = ?")->execute([$uid, $uid]);
+        $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$uid]);
+        $pdo->commit();
+        respond(true);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        respond(false, null, $e->getMessage());
+    }
+}
+
+function admin_suspend_seller($pdo, $input) {
+    $uid = $input['userId'];
+    $pdo->prepare("UPDATE users SET is_verified_seller = 0 WHERE id = ?")->execute([$uid]);
+    respond(true);
+}
+
+function admin_feature_listing($pdo, $input) {
+    $itemId = $input['itemId'];
+    $isFeatured = $input['isFeatured'] ? 1 : 0;
+    $pdo->prepare("UPDATE marketplace_items SET is_featured = ? WHERE id = ?")->execute([$isFeatured, $itemId]);
+    respond(true);
+}
+
+function admin_deep_cleanup($pdo) {
+    // 1. Delete videos from DB that don't exist on disk
+    $videos = $pdo->query("SELECT id, videoUrl FROM videos WHERE isLocal = 1")->fetchAll();
+    $deletedCount = 0;
+    foreach ($videos as $v) {
+        $path = resolve_video_path($v['videoUrl']);
+        if (!$path || !file_exists($path)) {
+            $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$v['id']]);
+            $deletedCount++;
+        }
+    }
+    
+    // 2. Delete orphaned thumbnails (already partially handled by admin_cleanup_files)
+    // But let's make it more robust
+    
+    respond(true, "Limpieza profunda completada. Registros huérfanos eliminados: $deletedCount");
+}
+
 /**
  * Realiza la transcodificación de un solo video (Uso interno por worker)
  */

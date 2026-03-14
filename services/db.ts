@@ -249,6 +249,9 @@ class DBService {
     public async deleteVideo(videoId: string, userId: string): Promise<void> {
         return this.request<void>(`action=delete_video`, { method: 'POST', body: JSON.stringify({ id: videoId, userId }) });
     }
+    public async updateVideo(videoId: string, userId: string, data: any): Promise<void> {
+        return this.request<void>(`action=update_video`, { method: 'POST', body: JSON.stringify({ id: videoId, userId, ...data }) });
+    }
 
     public async uploadVideo(title: string, desc: string, price: number, cat: string, dur: number, user: User, file: File, thumb: File | null, onProgress: (p: number, l: number, t: number) => void): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -326,6 +329,13 @@ class DBService {
     public async fixLibraryMetadata(): Promise<any> { return this.request<any>(`action=fix_library_metadata`, { method: 'POST' }); }
     public async adminCleanupSystemFiles(): Promise<any> { return this.request<any>(`action=admin_cleanup_files`, { method: 'POST' }); }
     public async adminRepairDb(): Promise<any> { return this.request<any>(`action=admin_repair_db`, { method: 'POST' }); }
+    public async adminBanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_ban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
+    public async adminUnbanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_unban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
+    public async adminChangeUserRole(userId: string, role: string): Promise<void> { return this.request<void>(`action=admin_change_user_role`, { method: 'POST', body: JSON.stringify({ userId, role }) }); }
+    public async adminDeleteUser(userId: string): Promise<void> { return this.request<void>(`action=admin_delete_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
+    public async adminSuspendSeller(userId: string): Promise<void> { return this.request<void>(`action=admin_suspend_seller`, { method: 'POST', body: JSON.stringify({ userId }) }); }
+    public async adminFeatureListing(itemId: string, isFeatured: boolean): Promise<void> { return this.request<void>(`action=admin_feature_listing`, { method: 'POST', body: JSON.stringify({ itemId, isFeatured }) }); }
+    public async adminDeepCleanup(): Promise<any> { return this.request<any>(`action=admin_deep_cleanup`, { method: 'POST' }); }
     public invalidateCache(key?: string) {
         if (!key || key.includes('get_videos')) {
         }

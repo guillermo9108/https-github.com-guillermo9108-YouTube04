@@ -54,6 +54,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [shouldLoadImg, setShouldLoadImg] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -253,17 +254,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-      e.preventDefault(); e.stopPropagation();
-      if (!window.confirm("¿Estás seguro de eliminar este video?")) return;
+  const handleDelete = async (e?: React.MouseEvent) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      
       try {
           await db.deleteVideo(video.id, user?.id || '');
           toast.success("Video eliminado correctamente");
           db.setHomeDirty();
-          window.location.reload(); // Recargar para actualizar lista
+          window.location.reload(); 
       } catch (e) {
           toast.error("Error al eliminar video");
       }
+      setShowDeleteConfirm(false);
       setShowMenu(false);
   };
 
@@ -389,7 +391,10 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                                     <Edit3 size={14} className="text-slate-500" />
                                     <span className="text-[10px] font-black uppercase tracking-widest">Editar</span>
                                 </Link>
-                                <button onClick={handleDelete} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left">
+                                <button 
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); setShowMenu(false); }}
+                                    className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left"
+                                >
                                     <Trash2 size={14} />
                                     <span className="text-[10px] font-black uppercase tracking-widest">Eliminar</span>
                                 </button>
@@ -400,6 +405,32 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             )}
         </div>
       </div>
+
+      {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className="bg-slate-900 border border-white/10 rounded-[40px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in duration-300 text-center">
+                  <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <Trash2 size={32} className="text-red-500" />
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">¿Eliminar video?</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-8 leading-relaxed">Esta acción no se puede deshacer. El archivo se borrará permanentemente.</p>
+                  <div className="flex flex-col gap-3">
+                      <button 
+                          onClick={() => handleDelete()}
+                          className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl transition-all shadow-xl active:scale-95"
+                      >
+                          ELIMINAR
+                      </button>
+                      <button 
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-2xl transition-all"
+                      >
+                          CANCELAR
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* Purchase Modal for Download */}
       {showPurchaseModal && (

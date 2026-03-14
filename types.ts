@@ -43,6 +43,7 @@ export interface User {
   shippingDetails?: any;
   vipExpiry?: number;
   is_verified_seller?: boolean | number;
+  is_banned?: boolean | number;
 }
 
 export interface Video {
@@ -196,6 +197,7 @@ export interface MarketplaceItem {
     reviewCount?: number;
     sellerAvatarUrl?: string;
     isVerifiedSeller?: boolean | number;
+    is_featured?: boolean | number;
 }
 
 export interface MarketplaceReview {

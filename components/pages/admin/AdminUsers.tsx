@@ -4,7 +4,7 @@ import { db } from '../../../services/db';
 import { User } from '../../../types';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
-import { Search, Users, Wallet, Shield, ChevronLeft, ChevronRight, RefreshCw, Smartphone, TrendingUp, UserCheck, X } from 'lucide-react';
+import { Search, Users, Wallet, Shield, ChevronLeft, ChevronRight, RefreshCw, Smartphone, TrendingUp, UserCheck, X, Ban, UserPlus, Trash2 } from 'lucide-react';
 
 const StatCard = ({ label, value, icon: Icon, color }: any) => (
     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
@@ -119,6 +119,40 @@ export default function AdminUsers() {
         }
     };
 
+    const handleBan = async (uid: string) => {
+        if (!window.confirm("¿Bloquear acceso a este usuario?")) return;
+        try {
+            await db.adminBanUser(uid);
+            toast.success("Usuario bloqueado");
+            loadUsers();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleUnban = async (uid: string) => {
+        try {
+            await db.adminUnbanUser(uid);
+            toast.success("Usuario desbloqueado");
+            loadUsers();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleRoleChange = async (uid: string, role: string) => {
+        try {
+            await db.adminChangeUserRole(uid, role);
+            toast.success("Rol actualizado");
+            loadUsers();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleDeleteUser = async (uid: string) => {
+        if (!window.confirm("¿ELIMINAR PERMANENTEMENTE? Esta acción no se puede deshacer.")) return;
+        try {
+            await db.adminDeleteUser(uid);
+            toast.success("Usuario eliminado");
+            loadUsers();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in pb-24">
             {/* Stats Row */}
@@ -169,18 +203,26 @@ export default function AdminUsers() {
                                         <td className="px-4 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-full bg-slate-800 overflow-hidden shrink-0 border border-white/5">
-                                                    {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-600">{u?.username?.[0] || '?'}</div>}
+                                                    {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer"/> : <div className="w-full h-full flex items-center justify-center font-bold text-slate-600">{u?.username?.[0] || '?'}</div>}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="text-sm font-bold text-white truncate">@{u.username}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="text-sm font-bold text-white truncate">@{u.username}</div>
+                                                        {u.is_banned ? <Ban size={10} className="text-red-500" /> : null}
+                                                    </div>
                                                     <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Activo: {u.lastActive ? new Date(u.lastActive * 1000).toLocaleDateString() : 'Nunca'}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${u.role?.trim().toUpperCase() === 'ADMIN' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-400'}`}>
-                                                {u.role || 'USER'}
-                                            </span>
+                                            <select 
+                                                value={u.role || 'USER'} 
+                                                onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                                className={`bg-transparent border-none text-[9px] font-black uppercase tracking-tighter cursor-pointer outline-none ${u.role?.trim().toUpperCase() === 'ADMIN' ? 'text-amber-400' : 'text-slate-400'}`}
+                                            >
+                                                <option value="USER" className="bg-slate-900">USER</option>
+                                                <option value="ADMIN" className="bg-slate-900">ADMIN</option>
+                                            </select>
                                         </td>
                                         <td className="px-4 py-4 font-mono font-bold text-emerald-400 text-sm">
                                             {Number(u.balance).toFixed(2)}
@@ -192,7 +234,15 @@ export default function AdminUsers() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-4 text-right">
-                                            <button onClick={() => selectUserForRecharge(u)} className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" title="Recargar este usuario"><TrendingUp size={16}/></button>
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => selectUserForRecharge(u)} className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500/20" title="Recargar"><TrendingUp size={14}/></button>
+                                                {u.is_banned ? (
+                                                    <button onClick={() => handleUnban(u.id)} className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20" title="Desbloquear"><UserPlus size={14}/></button>
+                                                ) : (
+                                                    <button onClick={() => handleBan(u.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20" title="Bloquear"><Ban size={14}/></button>
+                                                )}
+                                                <button onClick={() => handleDeleteUser(u.id)} className="p-1.5 bg-red-900/20 text-red-500 rounded-lg hover:bg-red-900/40" title="Eliminar"><Trash2 size={14}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../../services/db';
 import { MarketplaceItem } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
-import { Trash2, Search, Filter, Package, Tag, AlertCircle } from 'lucide-react';
+import { Trash2, Search, Filter, Package, Tag, AlertCircle, Star, UserX } from 'lucide-react';
 
 export default function AdminMarket() {
     const toast = useToast();
@@ -28,6 +28,23 @@ export default function AdminMarket() {
         } catch(e: any) {
             toast.error("Error: " + e.message);
         }
+    };
+
+    const handleToggleFeature = async (itemId: string, current: boolean) => {
+        try {
+            await db.adminFeatureListing(itemId, !current);
+            toast.success(current ? "Artículo ya no es destacado" : "Artículo destacado");
+            loadItems();
+        } catch(e: any) { toast.error(e.message); }
+    };
+
+    const handleSuspendSeller = async (userId: string) => {
+        if (!confirm("¿Suspender permisos de venta a este usuario?")) return;
+        try {
+            await db.adminSuspendSeller(userId);
+            toast.success("Vendedor suspendido");
+            loadItems();
+        } catch(e: any) { toast.error(e.message); }
     };
 
     const filteredItems = useMemo(() => {
@@ -98,9 +115,25 @@ export default function AdminMarket() {
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start">
                                     <h4 className="font-bold text-white truncate text-sm" title={item.title}>{item.title}</h4>
-                                    {item.status !== 'ELIMINADO' && (
-                                        <button onClick={() => handleDeleteListing(item.id)} className="text-slate-500 hover:text-red-500 p-1 -mt-1 -mr-2" title="Eliminar"><Trash2 size={16}/></button>
-                                    )}
+                                    <div className="flex items-center gap-1 -mt-1 -mr-2">
+                                        <button 
+                                            onClick={() => handleToggleFeature(item.id, !!item.is_featured)} 
+                                            className={`p-1 transition-colors ${item.is_featured ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}`}
+                                            title={item.is_featured ? "Quitar destacado" : "Destacar"}
+                                        >
+                                            <Star size={16} fill={item.is_featured ? "currentColor" : "none"}/>
+                                        </button>
+                                        <button 
+                                            onClick={() => handleSuspendSeller(item.sellerId)} 
+                                            className="text-slate-600 hover:text-red-400 p-1"
+                                            title="Suspender Vendedor"
+                                        >
+                                            <UserX size={16}/>
+                                        </button>
+                                        {item.status !== 'ELIMINADO' && (
+                                            <button onClick={() => handleDeleteListing(item.id)} className="text-slate-600 hover:text-red-500 p-1" title="Eliminar"><Trash2 size={16}/></button>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 <div className="text-xs text-slate-400 mt-0.5 mb-2 flex items-center gap-1">

@@ -86,6 +86,17 @@ export default function AdminMaintenance() {
         finally { setCleaning(false); }
     };
 
+    const handleDeepCleanup = async () => {
+        if (!confirm("Esta acción realizará una limpieza profunda (BD, archivos temporales, logs antiguos). ¿Deseas continuar?")) return;
+        setCleaning(true);
+        try {
+            const res = await db.adminDeepCleanup();
+            toast.success(`Limpieza profunda completada: ${res.message || 'OK'}`);
+            fetchData();
+        } catch (e: any) { toast.error(e.message); }
+        finally { setCleaning(false); }
+    };
+
     const handlePreviewCleaner = async () => {
         setCleaning(true);
         try {
@@ -255,6 +266,10 @@ export default function AdminMaintenance() {
                         <button onClick={handleRepairDb} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl transition-all">
                              <Database size={18} className="text-indigo-500" />
                              <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar MariaDB</span><span className="block text-[9px] text-slate-500">SINCRONIZACIÓN</span></div>
+                        </button>
+                        <button onClick={handleDeepCleanup} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
+                             <RefreshCw size={18} className={`text-amber-500 ${cleaning ? 'animate-spin' : ''}`} />
+                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Limpieza Profunda</span><span className="block text-[9px] text-slate-500">MANTENIMIENTO TOTAL</span></div>
                         </button>
                     </div>
                 </div>

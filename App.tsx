@@ -15,6 +15,7 @@ import Marketplace from './components/pages/Marketplace';
 import MarketplaceItem from './components/pages/MarketplaceItem';
 import MarketplaceCreate from './components/pages/MarketplaceCreate';
 import MarketplaceEdit from './components/pages/MarketplaceEdit';
+import EditVideo from './components/pages/EditVideo';
 import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
 import WatchLater from './components/pages/WatchLater';
@@ -139,6 +140,7 @@ export default function App() {
                                 <Route path="/cart" element={<SetupGuard><ProtectedRoute><Cart /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/vip" element={<SetupGuard><ProtectedRoute><VipStore /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace/edit/:id" element={<SetupGuard><ProtectedRoute><MarketplaceEdit /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/edit/:id" element={<SetupGuard><ProtectedRoute><EditVideo /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace/:id" element={<SetupGuard><ProtectedRoute><MarketplaceItem /></ProtectedRoute></SetupGuard>} />
                                 
                                 {/* Admin Routes Independientes */}

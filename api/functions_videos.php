@@ -858,4 +858,38 @@ function video_delete($pdo, $input) {
     $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$id]); 
     respond(true);
 }
+
+function video_update($pdo, $input) {
+    $id = $input['id'];
+    $userId = $input['userId'];
+    
+    // Verificar propiedad o admin
+    $stmt = $pdo->prepare("SELECT creatorId FROM videos WHERE id = ?");
+    $stmt->execute([$id]);
+    $video = $stmt->fetch();
+    
+    if (!$video) respond(false, null, "Video no encontrado");
+    
+    $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $userStmt->execute([userId]);
+    $userRole = $userStmt->fetchColumn();
+    
+    if ($video['creatorId'] !== $userId && $userRole !== 'ADMIN') {
+        respond(false, null, "No tienes permiso para editar este video");
+    }
+    
+    $fields = [];
+    $params = [];
+    
+    if (isset($input['title'])) { $fields[] = "title = ?"; $params[] = $input['title']; }
+    if (isset($input['description'])) { $fields[] = "description = ?"; $params[] = $input['description']; }
+    if (isset($input['price'])) { $fields[] = "price = ?"; $params[] = floatval($input['price']); }
+    if (isset($input['category'])) { $fields[] = "category = ?"; $params[] = $input['category']; }
+    
+    if (empty($fields)) respond(false, null, "Nada que actualizar");
+    
+    $params[] = $id;
+    $pdo->prepare("UPDATE videos SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+    respond(true);
+}
 ?>
