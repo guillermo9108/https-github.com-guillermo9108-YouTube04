@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-const RouterContext = createContext<{ pathname: string }>({ pathname: '/' });
+const RouterContext = createContext<{ pathname: string; search: string }>({ pathname: '/', search: '' });
 const OutletContext = createContext<React.ReactNode>(null);
 
 export function useLocation() {
@@ -73,22 +73,24 @@ export function Navigate({ to }: { to: string; replace?: boolean }) {
 }
 
 export function HashRouter({ children }: { children?: React.ReactNode }) {
-  const [pathname, setPathname] = useState(() => {
+  const [state, setState] = useState(() => {
       const h = window.location.hash.slice(1) || '/';
-      return h.split('?')[0];
+      const [pathname, search] = h.split('?');
+      return { pathname, search: search ? `?${search}` : '' };
   });
 
   useEffect(() => {
     const handler = () => {
       let h = window.location.hash.slice(1) || '/';
-      setPathname(h.split('?')[0]);
+      const [pathname, search] = h.split('?');
+      setState({ pathname, search: search ? `?${search}` : '' });
     };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
   return (
-    <RouterContext.Provider value={{ pathname }}>
+    <RouterContext.Provider value={state}>
       {children}
     </RouterContext.Provider>
   );

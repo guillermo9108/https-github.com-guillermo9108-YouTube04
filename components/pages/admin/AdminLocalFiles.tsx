@@ -232,7 +232,7 @@ export default function AdminLocalFiles() {
                         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
                             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4"><HardDrive size={14}/> Volúmenes Activos</h4>
                             {stats?.volumes?.map((vol: any, idx: number) => {
-                                const usedPercent = Math.round(((vol.total - vol.free) / vol.total) * 100);
+                                const usedPercent = vol.total > 0 ? Math.round(((vol.total - vol.free) / vol.total) * 100) : 0;
                                 return (
                                     <div key={idx} className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                         <div className="flex justify-between items-center mb-2">

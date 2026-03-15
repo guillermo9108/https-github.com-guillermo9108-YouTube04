@@ -125,6 +125,7 @@ function video_get_all($pdo) {
     $userSort = trim($_GET['sort_order'] ?? ''); 
     $userId = trim($_GET['userId'] ?? '');
     $isShorts = !empty($_GET['shorts']); 
+    $seed = trim($_GET['seed'] ?? '');
 
     $params = []; 
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
@@ -174,6 +175,13 @@ function video_get_all($pdo) {
         $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
     }
     $orderParams = [];
+    $randClause = "RAND()";
+    if (!empty($seed)) {
+        // Convertir seed a número para MySQL RAND()
+        $seedNum = abs(crc32($seed));
+        $randClause = "RAND($seedNum)";
+    }
+
     if ($isShorts) {
         $now = time();
         if (!empty($userId)) {
@@ -182,14 +190,14 @@ function video_get_all($pdo) {
             $orderBy = "
                 (CASE WHEN (SELECT 1 FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId LIMIT 1) THEN 100 ELSE 0 END + 
                 ((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5)) DESC, 
-                RAND()";
+                $randClause";
             $orderParams[] = $userId;
         } else {
             // Para invitados: Popularidad con decaimiento temporal
-            $orderBy = "((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5) DESC, RAND()";
+            $orderBy = "((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5) DESC, $randClause";
         }
     } elseif ($effectiveSort === 'RANDOM') {
-        $orderBy = "RAND()";
+        $orderBy = $randClause;
     } elseif ($effectiveSort === 'ALPHA') {
         $orderBy = "v.title ASC";
     } else {
@@ -861,12 +869,26 @@ function video_fix_metadata($pdo) {
 }
 
 function video_get_admin_stats($pdo) {
+    $total = (int)$pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn();
+    $pending = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PENDING'")->fetchColumn();
+    $processing = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PROCESSING'")->fetchColumn();
+    $failed = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'FAILED_METADATA'")->fetchColumn();
+    $broken = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'BROKEN'")->fetchColumn();
+    $locked = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE locked_at > 0")->fetchColumn();
+    
+    // Public are those that are NOT pending, processing, failed, or broken
+    $public = $total - ($pending + $processing + $failed + $broken);
+    if ($public < 0) $public = 0;
+
     respond(true, [
-        'total' => $pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn(),
-        'pending' => $pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PENDING'")->fetchColumn(),
-        'processing' => $pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PROCESSING'")->fetchColumn(),
-        'failed' => $pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'FAILED_METADATA'")->fetchColumn(),
-        'locked' => $pdo->query("SELECT COUNT(*) FROM videos WHERE locked_at > 0")->fetchColumn()
+        'total' => $total,
+        'pending' => $pending,
+        'processing' => $processing,
+        'failed' => $failed,
+        'broken' => $broken,
+        'locked' => $locked,
+        'available' => $pending,
+        'public' => $public
     ]);
 }
 

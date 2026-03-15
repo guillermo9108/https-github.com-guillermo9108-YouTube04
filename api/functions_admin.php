@@ -277,8 +277,42 @@ function admin_cleanup_files($pdo) {
 }
 
 function admin_get_local_stats($pdo) {
-    $stmt = $pdo->query("SELECT COUNT(*) as total, SUM(CASE WHEN transcode_status='DONE' THEN 1 ELSE 0 END) as transcoded, SUM(CASE WHEN transcode_status='WAITING' THEN 1 ELSE 0 END) as in_queue FROM videos WHERE isLocal = 1");
-    respond(true, $stmt->fetch());
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $paths = json_decode($s['libraryPaths'] ?: '[]', true);
+    if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    $paths = array_unique(array_filter($paths));
+
+    $volumes = [];
+    foreach ($paths as $path) {
+        if (is_dir($path)) {
+            $free = @disk_free_space($path);
+            $total = @disk_total_space($path);
+            // Convert to GB
+            $freeGB = $free ? round($free / (1024 * 1024 * 1024), 2) : 0;
+            $totalGB = $total ? round($total / (1024 * 1024 * 1024), 2) : 0;
+            
+            // Count videos in this path
+            $stmtV = $pdo->prepare("SELECT COUNT(*) FROM videos WHERE videoUrl LIKE ?");
+            $stmtV->execute([$path . '%']);
+            $count = (int)$stmtV->fetchColumn();
+
+            $volumes[] = [
+                'name' => basename($path) ?: $path,
+                'path' => $path,
+                'total' => $totalGB,
+                'free' => $freeGB,
+                'video_count' => $count
+            ];
+        }
+    }
+
+    $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
+
+    respond(true, [
+        'volumes' => $volumes,
+        'category_stats' => $category_stats
+    ]);
 }
 
 function admin_get_logs() {

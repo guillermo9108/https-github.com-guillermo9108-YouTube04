@@ -169,14 +169,14 @@ export default function AdminLibrary() {
         try {
             const adminStats = await db.getAdminLibraryStats();
             setStats({
-                pending: adminStats.pending,
-                locked: adminStats.locked,
-                available: adminStats.available,
-                processing: adminStats.processing,
-                public: adminStats.total - (adminStats.pending + adminStats.processing + adminStats.failed),
-                broken: adminStats.broken,
-                failed: adminStats.failed,
-                total: adminStats.total
+                pending: Number(adminStats.pending) || 0,
+                locked: Number(adminStats.locked) || 0,
+                available: Number(adminStats.available) || 0,
+                processing: Number(adminStats.processing) || 0,
+                public: Number(adminStats.public !== undefined ? adminStats.public : (adminStats.total - (adminStats.pending + adminStats.processing + adminStats.failed))),
+                broken: Number(adminStats.broken) || 0,
+                failed: Number(adminStats.failed) || 0,
+                total: Number(adminStats.total) || 0
             });
         } catch(e) {}
     };

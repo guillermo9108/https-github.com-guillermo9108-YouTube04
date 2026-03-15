@@ -235,6 +235,7 @@ export default function Shorts() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const sessionSeed = useMemo(() => Math.random().toString(36).substring(7), []);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -249,7 +250,7 @@ export default function Shorts() {
     setLoading(true);
     
     try {
-        const res = await db.getShorts(p, 10, 'VIDEO', '', user?.id);
+        const res = await db.getShorts(p, 10, 'VIDEO', '', user?.id, sessionSeed);
         if (res.videos.length > 0) {
             setVideos(prev => {
                 const newBatch = res.videos;

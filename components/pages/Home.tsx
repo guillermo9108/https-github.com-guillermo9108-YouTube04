@@ -61,25 +61,38 @@ export default function Home() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     
-    // Filters State - Inicializar desde URL
-    const initialQuery = useMemo(() => {
-        const hash = window.location.hash;
-        if (!hash.includes('?')) return '';
-        const params = new URLSearchParams(hash.split('?')[1]);
-        return params.get('q') || '';
-    }, []);
-
-    const [searchQuery, setSearchQuery] = useState(initialQuery);
-    const [selectedCategory, setSelectedCategory] = useState('TODOS');
-    const [navigationPath, setNavigationPath] = useState<string[]>(() => {
+    // Filters State - Inicializar desde URL y Search Params
+    const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    
+    const initialQuery = queryParams.get('q') || '';
+    const initialCategory = queryParams.get('cat') || 'TODOS';
+    const initialPath = useMemo(() => {
+        const folderParam = queryParams.get('folder');
+        if (folderParam) return folderParam.split('/').filter(Boolean);
         try {
             const saved = localStorage.getItem('sp_nav_path');
             return saved ? JSON.parse(saved) : [];
         } catch (e) {
             return [];
         }
-    });
+    }, [queryParams]);
+
+    const [searchQuery, setSearchQuery] = useState(initialQuery);
+    const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+    const [navigationPath, setNavigationPath] = useState<string[]>(initialPath);
     const [activeCategories, setActiveCategories] = useState<string[]>(['TODOS']);
+
+    // Sincronizar estado con URL cuando cambia la búsqueda o navegación
+    useEffect(() => {
+        const q = queryParams.get('q') || '';
+        const cat = queryParams.get('cat') || 'TODOS';
+        const folderParam = queryParams.get('folder');
+        const path = folderParam ? folderParam.split('/').filter(Boolean) : [];
+
+        setSearchQuery(q);
+        setSelectedCategory(cat);
+        setNavigationPath(path);
+    }, [location.search, queryParams]);
     
     // Secondary Data
     const { notifications: rtNotifications, unreadCount: rtUnreadCount, markAsRead } = useNotifications();
@@ -244,10 +257,28 @@ export default function Home() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const updateUrlSearch = (term: string) => {
-        const hashBase = '/';
-        if (term.trim()) { navigate(`${hashBase}?q=${encodeURIComponent(term.trim())}`, { replace: true }); }
-        else { navigate(hashBase, { replace: true }); }
+    const updateUrl = (params: { q?: string; folder?: string[]; cat?: string }, replace = false) => {
+        const newParams = new URLSearchParams(location.search);
+        
+        if (params.q !== undefined) {
+            if (params.q) newParams.set('q', params.q);
+            else newParams.delete('q');
+        }
+        
+        if (params.folder !== undefined) {
+            const pathStr = params.folder.join('/');
+            if (pathStr) newParams.set('folder', pathStr);
+            else newParams.delete('folder');
+        }
+        
+        if (params.cat !== undefined) {
+            if (params.cat !== 'TODOS') newParams.set('cat', params.cat);
+            else newParams.delete('cat');
+        }
+
+        const searchStr = newParams.toString();
+        const to = searchStr ? `/?${searchStr}` : '/';
+        navigate(to, { replace });
     };
 
     const handleSearchChange = (val: string) => {
@@ -324,7 +355,7 @@ export default function Home() {
         if (term.length >= 2) { 
             db.saveSearch(term); 
         }
-        updateUrlSearch(term); 
+        updateUrl({ q: term }); 
         setShowSuggestions(false);
         if (searchInputRef.current) { 
             searchInputRef.current.blur(); 
@@ -337,12 +368,13 @@ export default function Home() {
         setShowSuggestions(false);
         if (searchInputRef.current) { searchInputRef.current.blur(); }
         if (s.type === 'HISTORY' || s.type === 'CATEGORY') {
-            setSearchQuery(s.label); updateUrlSearch(s.label);
-            if (s.type === 'CATEGORY') setSelectedCategory(s.label);
+            setSearchQuery(s.label); 
+            updateUrl({ q: s.label, cat: s.type === 'CATEGORY' ? s.label : undefined });
             db.saveSearch(s.label);
         } else if (s.type === 'FOLDER') {
-            setSearchQuery(''); updateUrlSearch(''); setNavigationPath(prev => [...prev, s.label]);
-            setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); setVideos([]); 
+            setSearchQuery(''); 
+            updateUrl({ q: '', folder: [...navigationPath, s.label], cat: 'TODOS' });
+            setIsFolderGridCollapsed(false); setVideos([]); 
         } else {
             db.saveSearch(searchQuery || s.label);
             const contextParam = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : '';
@@ -353,13 +385,13 @@ export default function Home() {
     };
 
     const handleNavigate = (index: number) => {
-        if (index === -1) { setNavigationPath([]); } 
-        else { setNavigationPath(navigationPath.slice(0, index + 1)); }
-        setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); setNavVisible(true);
+        const newPath = index === -1 ? [] : navigationPath.slice(0, index + 1);
+        updateUrl({ folder: newPath, cat: 'TODOS' });
+        setIsFolderGridCollapsed(false); setNavVisible(true);
     };
 
     const handleCategoryClick = (cat: string) => {
-        setSelectedCategory(cat);
+        updateUrl({ cat });
         if (cat !== 'TODOS') { setNavVisible(true); }
     };
 
@@ -445,7 +477,7 @@ export default function Home() {
                                 className={`w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-20 py-2.5 text-sm text-white focus:bg-white/10 focus:border-indigo-500 outline-none transition-all shadow-inner ${isListening ? 'ring-2 ring-red-500 animate-pulse' : ''}`} 
                             />
                             <div className="absolute right-3 top-2 flex items-center gap-1">
-                                {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="p-1.5 text-slate-400 hover:text-white"><X size={16}/></button>}
+                                {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); updateUrl({ q: '' }); fetchVideos(0, true); }} className="p-1.5 text-slate-400 hover:text-white"><X size={16}/></button>}
                                 <button type="button" onClick={toggleVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? 'text-red-500 bg-red-500/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                                     <Mic size={18}/>
                                 </button>
@@ -524,13 +556,13 @@ export default function Home() {
                     <div className="flex flex-col gap-2 max-w-7xl mx-auto">
                         <div className="flex items-center gap-2 w-full">
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
-                                <button onClick={() => { handleNavigate(-1); setSearchQuery(''); updateUrlSearch(''); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
+                                <button onClick={() => { handleNavigate(-1); updateUrl({ q: '', folder: [], cat: 'TODOS' }); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
                                 <button onClick={() => setIsFolderModalOpen(true)} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Explorar carpetas"><Folder size={16}/></button>
                                 {folders.length > 0 && (
-                                    <button onClick={() => { if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); } setIsFolderGridCollapsed(!isFolderGridCollapsed); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${!isFolderGridCollapsed ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`} title={isFolderGridCollapsed ? "Mostrar carpetas" : "Ocultar carpetas"}><ChevronDown size={16} className={`transition-transform duration-300 ${!isFolderGridCollapsed ? 'rotate-180' : ''}`} /></button>
+                                    <button onClick={() => { if (searchQuery) { updateUrl({ q: '' }); } setIsFolderGridCollapsed(!isFolderGridCollapsed); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${!isFolderGridCollapsed ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`} title={isFolderGridCollapsed ? "Mostrar carpetas" : "Ocultar carpetas"}><ChevronDown size={16} className={`transition-transform duration-300 ${!isFolderGridCollapsed ? 'rotate-180' : ''}`} /></button>
                                 )}
                             </div>
-                            <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx: number) => { handleNavigate(idx); if(searchQuery) {setSearchQuery(''); updateUrlSearch('');} }} /></div>
+                            <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx: number) => { handleNavigate(idx); if(searchQuery) { updateUrl({ q: '' }); } }} /></div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-auto z-30">
                                 <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 shrink-0 shadow-inner">
                                     <button onClick={() => setMediaFilter('ALL')} className={`p-1.5 rounded-lg transition-all ${mediaFilter === 'ALL' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`} title="Todo"><Layers size={13}/></button>
@@ -577,7 +609,7 @@ export default function Home() {
                                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-6 duration-500">
                                     {folders.map(folder => (
                                         <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
-                                            <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); setNavigationPath([...navigationPath, folder.name]); setSelectedCategory('TODOS'); setIsFolderGridCollapsed(false); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
+                                            <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); setIsFolderGridCollapsed(false); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
                                             <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none">
                                                 <div className="flex justify-between items-start">
                                                     <div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div>
@@ -624,7 +656,7 @@ export default function Home() {
                                                 {userSortOrder ? sortOptions.find(o => o.id === userSortOrder)?.label : 'Ordenar'}
                                             </span>
                                         </button>
-                                        <button onClick={() => { setSearchQuery(''); updateUrlSearch(''); fetchVideos(0, true); }} className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5"><X size={12}/> Limpiar</button>
+                                        <button onClick={() => { updateUrl({ q: '' }); fetchVideos(0, true); }} className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5"><X size={12}/> Limpiar</button>
                                     </div>
                                 </div> 
                             )}
@@ -666,9 +698,8 @@ export default function Home() {
                 onClose={() => setIsFolderModalOpen(false)} 
                 currentPath={navigationPath} 
                 onNavigate={(path) => {
-                    setNavigationPath(path);
-                    setSelectedCategory('TODOS');
-                    if (searchQuery) { setSearchQuery(''); updateUrlSearch(''); }
+                    updateUrl({ q: '', folder: path, cat: 'TODOS' });
+                    setIsFolderGridCollapsed(false);
                 }} 
             />
         </div>
