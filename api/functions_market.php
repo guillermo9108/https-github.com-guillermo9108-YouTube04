@@ -93,7 +93,11 @@ function market_add_review($pdo, $input) {
 
 function market_admin_get_items($pdo) {
     $stmt = $pdo->query("SELECT m.*, u.username as sellerName FROM marketplace_items m JOIN users u ON m.sellerId = u.id ORDER BY createdAt DESC");
-    respond(true, $stmt->fetchAll());
+    $items = $stmt->fetchAll();
+    foreach ($items as &$i) {
+        $i['images'] = json_decode($i['images'] ?: '[]', true);
+    }
+    respond(true, $items);
 }
 
 function market_get_my_sales($pdo, $userId) {
