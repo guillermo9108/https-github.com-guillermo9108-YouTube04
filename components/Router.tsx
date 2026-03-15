@@ -40,6 +40,11 @@ export function useParams(): Record<string, string | undefined> {
     return { id: marketEditMatch[1] };
   }
 
+  const editVideoMatch = pathname.match(/\/edit\/([^/?&]+)/);
+  if (editVideoMatch) {
+    return { id: editVideoMatch[1] };
+  }
+
   const marketMatch = pathname.match(/\/marketplace\/([^/?&]+)/);
   if (marketMatch && !pathname.includes('/marketplace/create') && !pathname.includes('/marketplace/edit') && !pathname.endsWith('/marketplace')) {
     return { id: marketMatch[1] };

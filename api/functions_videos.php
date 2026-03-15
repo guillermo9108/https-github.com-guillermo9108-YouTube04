@@ -889,7 +889,7 @@ function video_update($pdo, $input) {
     if (!$video) respond(false, null, "Video no encontrado");
     
     $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
-    $userStmt->execute([userId]);
+    $userStmt->execute([$userId]);
     $userRole = $userStmt->fetchColumn();
     
     if ($video['creatorId'] !== $userId && $userRole !== 'ADMIN') {

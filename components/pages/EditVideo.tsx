@@ -91,9 +91,20 @@ const EditVideo: React.FC = () => {
 
     if (!video) {
         return (
-            <div className="text-center py-20">
-                <p className="text-slate-400">Video no encontrado</p>
-                <button onClick={() => navigate(-1)} className="mt-4 text-indigo-400 hover:underline">Volver</button>
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-white/5 shadow-2xl">
+                    <Loader2 className="w-10 h-10 text-slate-700" />
+                </div>
+                <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Video no encontrado</h2>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto mb-8">
+                    El video que intentas editar no existe, ha sido eliminado o no tienes los permisos necesarios.
+                </p>
+                <button 
+                    onClick={() => navigate('/')} 
+                    className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold transition-all active:scale-95 border border-white/5"
+                >
+                    Volver al inicio
+                </button>
             </div>
         );
     }
