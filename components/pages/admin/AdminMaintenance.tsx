@@ -135,8 +135,12 @@ export default function AdminMaintenance() {
 
     const copyCronCommand = () => {
         const cmd = `* * * * * php ${window.location.pathname.replace('index.html', '')}api/video_worker.php >> ${window.location.pathname.replace('index.html', '')}api/worker_log.txt 2>&1`;
-        navigator.clipboard.writeText(cmd);
-        toast.success("Comando copiado al portapapeles");
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(cmd);
+            toast.success("Comando copiado al portapapeles");
+        } else {
+            toast.info("Copia este comando: " + cmd);
+        }
     };
 
     return (

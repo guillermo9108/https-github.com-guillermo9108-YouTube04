@@ -149,8 +149,12 @@ export default function VipStore() {
     };
 
     const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        toast.success("Copiado al portapapeles");
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text);
+            toast.success("Copiado al portapapeles");
+        } else {
+            toast.info("Copia este texto: " + text);
+        }
     };
 
     const getPriceDisplayForMethod = (methodKey: string) => {

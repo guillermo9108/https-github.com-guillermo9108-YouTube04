@@ -9,7 +9,7 @@ export function useLocation() {
 }
 
 export function useNavigate() {
-  return (to: string | number, options?: { replace?: boolean }) => {
+  return React.useCallback((to: string | number, options?: { replace?: boolean }) => {
     if (typeof to === 'number') {
       window.history.go(to);
     } else {
@@ -19,7 +19,7 @@ export function useNavigate() {
         window.location.hash = to;
       }
     }
-  };
+  }, []);
 }
 
 export function useParams(): Record<string, string | undefined> {

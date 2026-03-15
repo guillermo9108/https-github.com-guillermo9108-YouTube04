@@ -180,12 +180,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           navigator.share({ title: video.title, url }).catch((err) => {
               console.error("Share failed:", err);
               // Fallback to clipboard if share is cancelled or fails
-              navigator.clipboard.writeText(url);
-              toast.success("Enlace copiado");
+              if (navigator.clipboard) {
+                  navigator.clipboard.writeText(url);
+                  toast.success("Enlace copiado");
+              }
           });
-      } else {
+      } else if (navigator.clipboard) {
           navigator.clipboard.writeText(url);
           toast.success("Enlace copiado al portapapeles");
+      } else {
+          toast.info("Copia el enlace: " + url);
       }
       setShowMenu(false);
   };

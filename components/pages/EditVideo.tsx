@@ -15,55 +15,53 @@ const EditVideo: React.FC = () => {
     const [video, setVideo] = useState<Video | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [loadedId, setLoadedId] = useState<string | null>(null);
     
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        price: 1.00,
+        price: '1.00',
         category: ''
     });
 
     useEffect(() => {
         const loadVideo = async () => {
-            if (authLoading) return; // Esperar a que el auth esté listo
+            if (authLoading) return;
             
-            console.log("EditVideo: Loading video with ID:", id);
             if (!id) {
-                console.warn("EditVideo: No ID provided");
                 setLoading(false);
                 return;
             }
+
+            // Evitar recargar si ya tenemos este video cargado
+            if (loadedId === id) return;
+            
             try {
                 const v = await db.getVideo(id);
-                console.log("EditVideo: Video data received:", v);
                 if (v) {
-                    // Verificar permisos
                     if (v.creatorId !== user?.id && !isAdmin) {
-                        console.warn("EditVideo: Permission denied. Creator:", v.creatorId, "User:", user?.id, "isAdmin:", isAdmin);
                         toast.error("No tienes permiso para editar este video");
                         navigate('/');
                         return;
                     }
                     setVideo(v);
+                    setLoadedId(id);
                     setFormData({
                         title: v.title || '',
                         description: v.description || '',
-                        price: Number(v.price) || 1.00,
+                        price: String(v.price || '1.00'),
                         category: v.category || ''
                     });
-                } else {
-                    console.warn("EditVideo: Video not found");
                 }
             } catch (e) {
-                console.error("EditVideo: Error loading video:", e);
+                console.error("EditVideo Error:", e);
                 toast.error("Error al cargar el video");
             } finally {
                 setLoading(false);
-                console.log("EditVideo: Loading finished");
             }
         };
         loadVideo();
-    }, [id, user?.id, isAdmin, authLoading, navigate, toast]);
+    }, [id, user?.id, isAdmin, authLoading, navigate, toast, loadedId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,7 +69,10 @@ const EditVideo: React.FC = () => {
         
         setSaving(true);
         try {
-            await db.updateVideo(id, user.id, formData);
+            await db.updateVideo(id, user.id, {
+                ...formData,
+                price: Number(formData.price)
+            });
             toast.success("Video actualizado correctamente");
             navigate(-1);
         } catch (e: any) {
@@ -147,10 +148,13 @@ const EditVideo: React.FC = () => {
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Precio ($)</label>
                             <input 
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={formData.price}
-                                onChange={e => setFormData({...formData, price: Number(e.target.value)})}
+                                onChange={e => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                                    setFormData({...formData, price: val});
+                                }}
                                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-colors"
                                 required
                             />
