@@ -249,10 +249,13 @@ export default function Shorts() {
     setLoading(true);
     
     try {
-        // Forzamos mediaType='VIDEO' para Shorts y pasamos el userId para el sistema de prioridad
         const res = await db.getShorts(p, 10, 'VIDEO', '', user?.id);
         if (res.videos.length > 0) {
-            setVideos(prev => p === 0 ? res.videos : [...prev, ...res.videos]);
+            setVideos(prev => {
+                const newBatch = res.videos;
+                if (p === 0) return diversifyBatch(newBatch, []);
+                return [...prev, ...diversifyBatch(newBatch, prev)];
+            });
             setHasMore(res.hasMore);
             setPage(p);
         } else {
@@ -263,6 +266,23 @@ export default function Shorts() {
     } finally {
         setLoading(false);
     }
+  };
+
+  // Función para evitar que aparezcan videos del mismo creador consecutivamente
+  const diversifyBatch = (batch: Video[], existing: Video[]) => {
+    if (batch.length <= 1) return batch;
+    const result: Video[] = [];
+    const pool = [...batch];
+    let lastId = existing.length > 0 ? existing[existing.length - 1].creatorId : null;
+
+    while (pool.length > 0) {
+      let index = pool.findIndex(v => v.creatorId !== lastId);
+      if (index === -1) index = 0; // Si no hay opción, tomamos el siguiente
+      const [v] = pool.splice(index, 1);
+      result.push(v);
+      lastId = v.creatorId;
+    }
+    return result;
   };
   
   useEffect(() => {

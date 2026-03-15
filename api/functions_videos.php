@@ -175,12 +175,18 @@ function video_get_all($pdo) {
     }
     $orderParams = [];
     if ($isShorts) {
+        $now = time();
         if (!empty($userId)) {
-            // Prioridad: Suscritos > Likes > Vistas > Random
-            $orderBy = "(SELECT COUNT(*) FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId) DESC, v.likes DESC, v.views DESC, RAND()";
+            // Algoritmo de Ranking Dinámico (Estilo Facebook/Reddit)
+            // Prioriza: Suscripciones + (Popularidad / Tiempo^1.5) + Aleatoriedad controlada
+            $orderBy = "
+                (CASE WHEN (SELECT 1 FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId LIMIT 1) THEN 100 ELSE 0 END + 
+                ((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5)) DESC, 
+                RAND()";
             $orderParams[] = $userId;
         } else {
-            $orderBy = "v.likes DESC, v.views DESC, RAND()";
+            // Para invitados: Popularidad con decaimiento temporal
+            $orderBy = "((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5) DESC, RAND()";
         }
     } elseif ($effectiveSort === 'RANDOM') {
         $orderBy = "RAND()";
