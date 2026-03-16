@@ -201,6 +201,7 @@ try {
         case 'update_system_settings': admin_update_settings($pdo, $input); break;
         case 'admin_upload_default_thumb': admin_upload_default_thumb($pdo, $_POST, $_FILES); break;
         case 'get_channel_content': get_channel_content($pdo, $input); break;
+        case 'upload_channel_images': upload_channel_images($pdo, $_POST, $_FILES); break;
         case 'admin_bulk_edit_folder': admin_bulk_edit_folder($pdo, $input); break;
         case 'admin_update_category_price': admin_update_category_price($pdo, $input); break;
         case 'admin_add_balance': admin_add_balance($pdo, $input); break;

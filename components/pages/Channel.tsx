@@ -5,18 +5,22 @@ import { db } from '../../services/db';
 import { User, Video } from '../../types';
 import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
-import { User as UserIcon, Bell, Loader2, Check, Trash2, Upload, Play, Smartphone, Music, Image as ImageIcon, Layers } from 'lucide-react';
-import { Link } from '../Router';
+import { User as UserIcon, Bell, Loader2, Check, Trash2, Upload, Play, Smartphone, Music, Image as ImageIcon, Layers, Plus } from 'lucide-react';
+import { Link, useNavigate } from '../Router';
+import ImageUploadModal from '../channel/ImageUploadModal';
 
 export default function Channel() {
   const { userId } = useParams();
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   
   // Data State
   const [channelUser, setChannelUser] = useState<User | null>(null);
-  const [allVideos, setAllVideos] = useState<Video[]>([]);
+  const [allContent, setAllContent] = useState<Video[]>([]);
+  const [filteredContent, setFilteredContent] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [showImageUpload, setShowImageUpload] = useState(false);
   
   // Pagination State
   const [visibleCount, setVisibleCount] = useState(12);
@@ -27,41 +31,56 @@ export default function Channel() {
   const [purchases, setPurchases] = useState<string[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // 1. Initial Data Load (Channel Info & Videos)
-  useEffect(() => {
-    if (!userId) {
-        setLoading(false);
-        return;
-    }
-    
-    // Reset pagination when channel changes
-    setVisibleCount(12);
-    setAllVideos([]);
-    
-    const loadChannel = async () => {
-        setLoading(true);
-        try {
-            // 1. Get User Details
-            const u = await db.getUser(userId);
-            setChannelUser(u);
-
-            // 2. Get User Videos
-            const vids = await db.getChannelContent(userId, filter);
-            setAllVideos(vids);
-
-            // 3. Calc Stats
-            const totalViews = vids.reduce((acc: number, curr: Video) => acc + Number(curr.views), 0);
-            setStats({ views: totalViews, uploads: vids.length });
-
-        } catch (e) {
-            console.error("Failed to load channel", e);
-        } finally {
+    // 1. Initial Data Load (Channel Info & All Content)
+    useEffect(() => {
+        if (!userId) {
             setLoading(false);
+            return;
         }
-    };
+        
+        // Reset pagination when channel changes
+        setVisibleCount(12);
+        
+        const loadChannel = async () => {
+            setLoading(true);
+            try {
+                // 1. Get User Details
+                const u = await db.getUser(userId);
+                setChannelUser(u);
 
-    loadChannel();
-  }, [userId, filter]);
+                // 2. Get ALL User Content once for snappy filtering
+                const content = await db.getChannelContent(userId, 'ALL');
+                setAllContent(content);
+
+                // 3. Calc Stats
+                const totalViews = content.reduce((acc: number, curr: Video) => acc + Number(curr.views), 0);
+                setStats({ views: totalViews, uploads: content.length });
+
+            } catch (e) {
+                console.error("Failed to load channel", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadChannel();
+    }, [userId]);
+
+    // 2. Snappy Frontend Filtering
+    useEffect(() => {
+        let filtered = [...allContent];
+        if (filter === 'VIDEOS') {
+            filtered = allContent.filter(v => !v.is_audio && v.duration >= 60 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+        } else if (filter === 'SHORTS') {
+            filtered = allContent.filter(v => !v.is_audio && v.duration < 60 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+        } else if (filter === 'AUDIOS') {
+            filtered = allContent.filter(v => v.is_audio);
+        } else if (filter === 'IMAGES') {
+            filtered = allContent.filter(v => v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+        }
+        setFilteredContent(filtered);
+        setVisibleCount(12); // Reset visible count on filter change
+    }, [filter, allContent]);
 
   // 2. User Specific Checks (Subscription & Purchases)
   // Separated into its own effect to ensure it runs reliably when currentUser loads
@@ -74,11 +93,11 @@ export default function Channel() {
               const subStatus = await db.checkSubscription(currentUser.id, userId);
               setIsSubscribed(subStatus);
 
-              // Check Purchases (only if we have videos loaded)
-              if (allVideos.length > 0) {
-                  const checks = allVideos.slice(0, 50).map((v: Video) => db.hasPurchased(currentUser.id, v.id));
+              // Check Purchases (only if we have content loaded)
+              if (allContent.length > 0) {
+                  const checks = allContent.slice(0, 50).map((v: Video) => db.hasPurchased(currentUser.id, v.id));
                   const results = await Promise.all(checks);
-                  const p = allVideos.filter((_: Video, i: number) => results[i]).map((v: Video) => v.id);
+                  const p = allContent.filter((_: Video, i: number) => results[i]).map((v: Video) => v.id);
                   setPurchases(p);
               }
           } catch (e) {
@@ -87,15 +106,15 @@ export default function Channel() {
       };
 
       checkUserStatus();
-  }, [currentUser, userId, allVideos.length]); // Re-run if user logs in or videos load
+  }, [currentUser, userId, allContent.length]); // Re-run if user logs in or content loads
 
   // 3. Infinite Scroll Logic (Same as Home)
   useEffect(() => {
-      if (visibleCount >= allVideos.length) return;
+      if (visibleCount >= filteredContent.length) return;
 
       const observer = new IntersectionObserver((entries) => {
           if (entries[0].isIntersecting) {
-              setVisibleCount(prev => Math.min(prev + 12, allVideos.length));
+              setVisibleCount(prev => Math.min(prev + 12, filteredContent.length));
           }
       }, {
           threshold: 0.1,
@@ -104,7 +123,7 @@ export default function Channel() {
 
       if (loadMoreRef.current) observer.observe(loadMoreRef.current);
       return () => observer.disconnect();
-  }, [visibleCount, allVideos.length]);
+  }, [visibleCount, filteredContent.length]);
 
   const toggleSubscribe = async () => {
       if (!currentUser || !userId) return;
@@ -122,10 +141,10 @@ export default function Channel() {
   };
 
   const handleDeleteVideo = async (videoId: string) => {
-      if (!currentUser || !confirm("Permanently delete this video?")) return;
+      if (!currentUser || !confirm("Permanently delete this item?")) return;
       try {
           await db.deleteVideo(videoId, currentUser.id);
-          setAllVideos(prev => prev.filter(v => v.id !== videoId));
+          setAllContent(prev => prev.filter(v => v.id !== videoId));
           setStats(prev => ({...prev, uploads: prev.uploads - 1}));
       } catch(e: any) {
           alert("Delete failed: " + e.message);
@@ -149,12 +168,6 @@ export default function Channel() {
 
        {/* Channel Header Info */}
        <div className="relative z-10 px-4 pt-20 flex flex-col items-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {currentUser?.id === userId && (
-               <Link to="/upload" className="absolute top-6 right-6 flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/10 rounded-2xl text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 z-10">
-                   <Upload size={16} />
-                   Subir Contenido
-               </Link>
-           )}
            {/* Avatar */}
            <div className="w-32 h-32 rounded-full border-4 border-black bg-slate-800 overflow-hidden shrink-0 shadow-2xl mb-4">
                {channelUser.avatarUrl ? (
@@ -192,67 +205,94 @@ export default function Channel() {
            </div>
        </div>
 
-       {/* Filters Section */}
-       <div className="px-4 mb-8 relative z-10">
-           <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-               {[
-                   { id: 'ALL', label: 'Todo', icon: Layers },
-                   { id: 'VIDEO', label: 'Videos', icon: Play },
-                   { id: 'SHORTS', label: 'Shorts', icon: Smartphone },
-                   { id: 'AUDIO', label: 'Audio', icon: Music },
-                   { id: 'IMAGE', label: 'Imágenes', icon: ImageIcon }
-               ].map((f) => (
-                   <button
-                       key={f.id}
-                       onClick={() => setFilter(f.id)}
-                       className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border ${
-                           filter === f.id 
-                           ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' 
-                           : 'bg-slate-900 text-slate-400 border-white/5 hover:bg-slate-800'
-                       }`}
-                   >
-                       <f.icon size={14} />
-                       {f.label}
-                   </button>
-               ))}
-           </div>
-       </div>
+        {/* Filters Section */}
+        <div className="px-4 mb-8 relative z-10">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+                {[
+                    { id: 'ALL', label: 'Todo', icon: Layers },
+                    { id: 'VIDEOS', label: 'Videos', icon: Play },
+                    { id: 'SHORTS', label: 'Shorts', icon: Smartphone },
+                    { id: 'AUDIOS', label: 'Audio', icon: Music },
+                    { id: 'IMAGES', label: 'Imágenes', icon: ImageIcon }
+                ].map((f) => (
+                    <button
+                        key={f.id}
+                        onClick={() => setFilter(f.id)}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border ${
+                            filter === f.id 
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' 
+                            : 'bg-slate-900 text-slate-400 border-white/5 hover:bg-slate-800'
+                        }`}
+                    >
+                        <f.icon size={14} />
+                        {f.label}
+                    </button>
+                ))}
 
-       {/* Videos Grid */}
-       <div className="px-4 md:px-12 relative z-10">
-           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">Contenido</h2>
-           {allVideos.length === 0 ? (
-               <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
-           ) : (
-               <>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-                       {allVideos.slice(0, visibleCount).map(video => (
-                            <div key={video.id} className="relative group">
-                                <VideoCard 
-                                    video={video} 
-                                    isUnlocked={isUnlocked(video.id, video.creatorId)}
-                                    isWatched={false} 
-                                />
-                                {(currentUser?.id === channelUser.id || currentUser?.role === 'ADMIN') && (
-                                    <button 
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteVideo(video.id); }} 
-                                        className="absolute top-2 left-2 bg-red-600/80 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                                        title="Delete Video"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                )}
-                            </div>
-                       ))}
-                   </div>
-                   
-                   {/* Infinite Scroll Sentinel */}
-                   <div ref={loadMoreRef} className="h-20 flex items-center justify-center opacity-50">
-                        {visibleCount < allVideos.length && <Loader2 className="animate-spin text-slate-600"/>}
-                   </div>
-               </>
-           )}
-       </div>
+                {/* Upload Button Integrated in Filters */}
+                {currentUser?.id === userId && (
+                    <button 
+                        onClick={() => {
+                            if (filter === 'IMAGES') {
+                                setShowImageUpload(true);
+                            } else {
+                                navigate('/upload');
+                            }
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border bg-white text-black border-white hover:bg-slate-200 ml-auto"
+                    >
+                        <Plus size={14} />
+                        {filter === 'IMAGES' ? 'Subir Imágenes' : 'Subir Contenido'}
+                    </button>
+                )}
+            </div>
+        </div>
+
+        {/* Videos Grid */}
+        <div className="px-4 md:px-12 relative z-10">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">Contenido</h2>
+            {filteredContent.length === 0 ? (
+                <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+                        {filteredContent.slice(0, visibleCount).map(video => (
+                             <div key={video.id} className="relative group">
+                                 <VideoCard 
+                                     video={video} 
+                                     isUnlocked={isUnlocked(video.id, video.creatorId)}
+                                     isWatched={false} 
+                                 />
+                                 {(currentUser?.id === channelUser.id || currentUser?.role === 'ADMIN') && (
+                                     <button 
+                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteVideo(video.id); }} 
+                                         className="absolute top-2 left-2 bg-red-600/80 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                         title="Delete Item"
+                                     >
+                                         <Trash2 size={16} />
+                                     </button>
+                                 )}
+                             </div>
+                        ))}
+                    </div>
+                    
+                    {/* Infinite Scroll Sentinel */}
+                    <div ref={loadMoreRef} className="h-20 flex items-center justify-center opacity-50">
+                         {visibleCount < filteredContent.length && <Loader2 className="animate-spin text-slate-600"/>}
+                    </div>
+                </>
+            )}
+        </div>
+
+        {showImageUpload && (
+            <ImageUploadModal 
+                onClose={() => setShowImageUpload(false)}
+                onSuccess={() => {
+                    // Refresh content
+                    db.getChannelContent(userId!, 'ALL').then(setAllContent);
+                }}
+            />
+        )}
     </div>
   );
 }

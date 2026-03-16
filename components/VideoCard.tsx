@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useSettings } from '../context/SettingsContext';
 import { generateThumbnail } from '../utils/videoGenerator';
 
 // Sistema de control global para no saturar el servidor
@@ -42,6 +43,7 @@ const formatDuration = (seconds: number) => {
 
 const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, context }) => {
   const { user, refreshUser } = useAuth();
+  const { settings } = useSettings();
   const toast = useToast();
   const isNew = (Date.now() / 1000 - video.createdAt) < 86400;
   
@@ -63,6 +65,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     const canEdit = isAdmin || isOwner;
 
   const isAudio = Boolean(video.is_audio);
+  const isImage = useMemo(() => video.videoUrl.match(/\.(jpg|jpeg|png)$/i), [video.videoUrl]);
+  
+  const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
 
   // Obtener nombre de la carpeta (último segmento de la ruta)
@@ -277,14 +282,13 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       if (!shouldLoadImg) return null; // No retornamos nada hasta ser visibles
       if (localThumb) return localThumb;
       
-      // Si hay error en la imagen, intentar usar el default absoluto
-      if (imgError) {
-          return isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : null;
+      // Si hay error en la imagen o no hay miniatura, intentar usar el default de configuración
+      if (imgError || !video.thumbnailUrl) {
+          return defaultThumb || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg");
       }
 
-      // Si tenemos una URL, usarla. El backend ya inyecta los defaults si no hay miniatura propia.
-      return video.thumbnailUrl || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : null);
-  }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, isAudio]);
+      return video.thumbnailUrl;
+  }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, isAudio, defaultThumb]);
 
   return (
     <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
@@ -305,7 +309,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
                     <div className="relative">
-                        {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
+                        {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
                         {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
                     </div>
                 </div>
@@ -318,9 +322,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             </div>
         )}
 
-        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
-           {formatDuration(video.duration)}
-        </div>
+        {!isImage && (
+            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
+               {formatDuration(video.duration)}
+            </div>
+        )}
 
         {isNew && !isWatched && !isAudio && (
             <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
@@ -350,8 +356,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
       <div className="flex gap-3 px-1">
         <Link to={`/channel/${video.creatorId}`} className="shrink-0 mt-1">
-            {video.creatorAvatarUrl ? (
-                <img src={video.creatorAvatarUrl} className="w-10 h-10 rounded-2xl object-cover bg-slate-900 border border-white/5 group-hover:border-indigo-500 transition-colors shadow-md" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+            {video.creatorAvatarUrl || settings?.defaultAvatar ? (
+                <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-2xl object-cover bg-slate-900 border border-white/5 group-hover:border-indigo-500 transition-colors shadow-md" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
             ) : (
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-black text-white shadow-inner uppercase">{video.creatorName?.[0] || '?'}</div>
             )}

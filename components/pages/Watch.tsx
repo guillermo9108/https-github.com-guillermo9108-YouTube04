@@ -2,10 +2,11 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Video, Comment, UserInteraction, Category } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { useParams, Link, useNavigate } from '../Router';
 import { 
     Loader2, Heart, ThumbsDown, MessageCircle, Lock, 
-    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download, RotateCw
+    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download, RotateCw, Maximize, Minimize
 } from 'lucide-react';
 import VideoCard from '../VideoCard';
 import { useToast } from '../../context/ToastContext';
@@ -21,6 +22,7 @@ const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivit
 export default function Watch() {
     const { id } = useParams();
     const { user, refreshUser } = useAuth();
+    const { settings } = useSettings();
     const { setThrottled } = useGrid();
     const navigate = useNavigate();
     const toast = useToast();
@@ -45,6 +47,8 @@ export default function Watch() {
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [interaction, setInteraction] = useState<UserInteraction | null>(null);
     const [rotation, setRotation] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const videoContainerRef = useRef<HTMLDivElement>(null);
     const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
     const [seriesQueue, setSeriesQueue] = useState<Video[]>([]); 
     
@@ -272,6 +276,25 @@ export default function Watch() {
         }
     };
 
+    const toggleFullscreen = () => {
+        if (!videoContainerRef.current) return;
+        if (!document.fullscreenElement) {
+            videoContainerRef.current.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
     const handleVideoEnded = async () => {
         if (!video || !user) return;
         
@@ -335,22 +358,29 @@ export default function Watch() {
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
 
+    const isAudio = Boolean(video?.is_audio);
+    const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
+    const posterUrl = video?.thumbnailUrl || defaultThumb || (isAudio ? '/api/uploads/thumbnails/defaultaudio.jpg' : '/api/uploads/thumbnails/default.jpg');
+
     return (
         <div className="flex flex-col bg-slate-950 min-h-screen animate-in fade-in relative">
             {/* Contenedor de Video Pegajoso - Mejorado para móviles */}
             <div className="w-full bg-black sticky top-0 z-[45] shadow-2xl border-b border-white/5 overflow-hidden">
-                <div className="relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group">
+                <div 
+                    ref={videoContainerRef}
+                    className={`relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group ${isFullscreen ? 'h-screen max-w-none aspect-auto' : ''}`}
+                >
                     {isUnlocked ? (
                         <div className={`relative z-10 w-full h-full flex flex-col items-center justify-center ${video?.is_audio ? 'bg-slate-900/40 backdrop-blur-md' : ''}`}>
-                            {video?.is_audio && video?.thumbnailUrl && (
-                                <img src={video.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
+                            {(video?.is_audio || !video?.thumbnailUrl) && (
+                                <img src={posterUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
                             <video 
                                 ref={videoRef} 
                                 src={streamUrl} 
                                 controls 
                                 autoPlay 
-                                poster={video?.thumbnailUrl} 
+                                poster={posterUrl} 
                                 className="w-full h-full object-contain transition-transform duration-300" 
                                 style={{ transform: `rotate(${rotation}deg)` }}
                                 onEnded={handleVideoEnded} 
@@ -359,6 +389,26 @@ export default function Watch() {
                                 onPause={() => setThrottled(false)}
                                 onTimeUpdate={handleTimeUpdate}
                             />
+
+                            {/* Floating Controls Overlay - Visible on Hover or Fullscreen */}
+                            <div className={`absolute inset-0 z-20 transition-opacity flex flex-col justify-between p-4 ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                <div className="flex justify-end gap-2">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setRotation(prev => (prev + 90) % 360); }}
+                                        className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
+                                        title="Girar Video"
+                                    >
+                                        <RotateCw size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                        className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
+                                        title={isFullscreen ? "Salir de Pantalla Completa" : "Pantalla Completa"}
+                                    >
+                                        {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -384,8 +434,8 @@ export default function Watch() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8 mb-8">
                         <div className="flex items-center gap-4">
                             <Link to={`/channel/${video?.creatorId}`} className="w-12 h-12 rounded-2xl bg-slate-800 overflow-hidden shrink-0 border border-white/10">
-                                {video?.creatorAvatarUrl ? (
-                                    <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                {video?.creatorAvatarUrl || settings?.defaultAvatar ? (
+                                    <img src={video?.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">
                                         {video?.creatorName?.[0]}

@@ -898,6 +898,48 @@ function get_channel_content($pdo, $input) {
     respond(true, $items);
 }
 
+function upload_channel_images($pdo, $post, $files) {
+    $userId = $post['userId'];
+    $title = $post['title'];
+    $description = $post['description'] ?? '';
+    $type = $post['type'] ?? 'INDEPENDENT';
+    $count = (int)($post['count'] ?? 0);
+
+    $uploadedIds = [];
+    for ($i = 0; $i < $count; $i++) {
+        $key = "image_$i";
+        if (isset($files[$key]) && $files[$key]['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($files[$key]['name'], PATHINFO_EXTENSION);
+            $filename = uniqid('img_') . '.' . $ext;
+            $target = 'uploads/videos/' . $filename; 
+            
+            if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
+                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $id = uniqid();
+                $stmt->execute([
+                    $id,
+                    $title . ($count > 1 ? " (" . ($i + 1) . "/$count)" : ""),
+                    $description,
+                    $target,
+                    $target, 
+                    $userId,
+                    time(),
+                    'IMAGES',
+                    0,
+                    0
+                ]);
+                $uploadedIds[] = $id;
+            }
+        }
+    }
+
+    if (empty($uploadedIds)) {
+        respond(false, null, "No se pudieron subir las imágenes");
+    }
+
+    respond(true, ['ids' => $uploadedIds]);
+}
+
 function video_get_admin_stats($pdo) {
     $total = (int)$pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn();
     $pending = (int)$pdo->query("SELECT COUNT(*) FROM videos WHERE category = 'PENDING'")->fetchColumn();

@@ -31,6 +31,7 @@ import { ServerTaskProvider } from './context/ServerTaskContext';
 import { ToastProvider } from './context/ToastContext';
 import { GridProvider } from './context/GridContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { db } from './services/db';
 import { Loader2, WifiOff } from 'lucide-react';
 
@@ -108,6 +109,7 @@ const SetupGuard = ({ children }: { children?: React.ReactNode }) => {
 export default function App() {
   return (
     <ToastProvider>
+      <SettingsProvider>
       <AuthProvider>
         <NotificationProvider>
           <UploadProvider>
@@ -169,6 +171,7 @@ export default function App() {
         </UploadProvider>
       </NotificationProvider>
     </AuthProvider>
+    </SettingsProvider>
     </ToastProvider>
   );
 }

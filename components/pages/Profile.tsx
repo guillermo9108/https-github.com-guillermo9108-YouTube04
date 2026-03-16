@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { db } from '../../services/db';
 import { Transaction, Notification as AppNotification } from '../../types';
 import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, ChevronRight, User as UserIcon, RefreshCw, Smartphone, Loader2, Settings, Save, Zap, Heart, Truck, Camera, Lock, Eye, EyeOff, UserCheck, Bell, MessageSquare, Trash2, CheckCircle2, Crown, Calendar, Clock as ClockIcon, ShieldCheck, AlertTriangle, Fingerprint, MapPin, Smartphone as PhoneIcon, X } from 'lucide-react';
@@ -9,6 +10,7 @@ import { useNavigate } from '../Router';
 
 export default function Profile() {
   const { user, logout, refreshUser } = useAuth();
+  const { settings: systemSettings } = useSettings();
   const toast = useToast();
   const navigate = useNavigate();
   
@@ -162,7 +164,7 @@ export default function Profile() {
               <div className="text-center md:text-left flex flex-col md:flex-row items-center gap-6">
                   <div className="relative group">
                       <div className="w-24 h-24 rounded-full border-4 border-white/20 overflow-hidden bg-slate-800 shadow-2xl">
-                          {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white/20">{user?.username?.[0] || '?'}</div>}
+                          {avatarPreview || systemSettings?.defaultAvatar ? <img src={avatarPreview || systemSettings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white/20">{user?.username?.[0] || '?'}</div>}
                       </div>
                   </div>
                   <div>
@@ -289,7 +291,7 @@ export default function Profile() {
                                             className="w-full p-3 flex items-center gap-3 hover:bg-indigo-600 transition-colors border-b border-white/5 last:border-0"
                                         >
                                             <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-900 shrink-0">
-                                                {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white/20">{s.username?.[0] || '?'}</div>}
+                                                {s.avatarUrl || systemSettings?.defaultAvatar ? <img src={s.avatarUrl || systemSettings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white/20">{s.username?.[0] || '?'}</div>}
                                             </div>
                                             <span className="text-sm font-bold text-white">@{s.username}</span>
                                             <UserCheck size={14} className="ml-auto opacity-30"/>
@@ -336,7 +338,7 @@ export default function Profile() {
                                 className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 items-start ${!isRead ? 'bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/5' : 'bg-slate-950/40 border-white/5 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'}`}
                             >
                                 <div className="w-12 h-12 rounded-xl bg-slate-800 shrink-0 overflow-hidden border border-white/10">
-                                    {n.avatarUrl ? <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center"><Bell size={18} className="text-slate-500"/></div>}
+                                    {n.avatarUrl || systemSettings?.defaultAvatar ? <img src={n.avatarUrl || systemSettings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center"><Bell size={18} className="text-slate-500"/></div>}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start mb-1">
@@ -426,7 +428,7 @@ export default function Profile() {
                       <div className="flex flex-col items-center gap-6">
                          <div className="relative group">
                             <div className="w-32 h-32 rounded-full border-4 border-indigo-500/30 overflow-hidden bg-slate-950 shadow-2xl relative">
-                                {avatarPreview ? <img src={avatarPreview} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : null}
+                                {avatarPreview || systemSettings?.defaultAvatar ? <img src={avatarPreview || systemSettings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : null}
                                 <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer">
                                     <Camera size={32} className="text-white mb-1"/>
                                     <span className="text-[10px] font-black text-white uppercase">Cambiar</span>

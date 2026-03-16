@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
 import { useServerTask } from '../context/ServerTaskContext';
+import { useSettings } from '../context/SettingsContext';
 import { Link, useLocation, Outlet, useNavigate } from './Router';
 import { db } from '../services/db';
 import { Notification as AppNotification } from '../types';
@@ -41,6 +42,7 @@ const ServerTaskIndicator = () => {
 export default function Layout() {
   const location = useLocation();
   const { user } = useAuth();
+  const { settings } = useSettings();
 
   // Reset scroll automatically when changing sections
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function Layout() {
 
   const Avatar = ({ size=24, className='' }: any) => (
       <div className={`rounded-full overflow-hidden bg-indigo-600 flex items-center justify-center shrink-0 ${className}`} style={{width: size, height: size}}>
-        {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-white font-bold uppercase" style={{fontSize: size*0.4}}>{user?.username?.[0] || '?'}</span>}
+        {user?.avatarUrl || settings?.defaultAvatar ? <img src={user?.avatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" /> : <span className="text-white font-bold uppercase" style={{fontSize: size*0.4}}>{user?.username?.[0] || '?'}</span>}
       </div>
   );
 
