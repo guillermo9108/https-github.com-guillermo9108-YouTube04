@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useParams, Link, useNavigate } from '../Router';
 import { 
     Loader2, Heart, ThumbsDown, MessageCircle, Lock, 
-    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download
+    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download, RotateCw
 } from 'lucide-react';
 import VideoCard from '../VideoCard';
 import { useToast } from '../../context/ToastContext';
@@ -44,6 +44,7 @@ export default function Watch() {
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [interaction, setInteraction] = useState<UserInteraction | null>(null);
+    const [rotation, setRotation] = useState(0);
     const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
     const [seriesQueue, setSeriesQueue] = useState<Video[]>([]); 
     
@@ -350,7 +351,8 @@ export default function Watch() {
                                 controls 
                                 autoPlay 
                                 poster={video?.thumbnailUrl} 
-                                className="w-full h-full object-contain" 
+                                className="w-full h-full object-contain transition-transform duration-300" 
+                                style={{ transform: `rotate(${rotation}deg)` }}
                                 onEnded={handleVideoEnded} 
                                 crossOrigin="anonymous" 
                                 onPlay={() => setThrottled(true)} 
@@ -416,6 +418,10 @@ export default function Watch() {
                                     <span className="text-xs font-black">{dislikes}</span>
                                 </button>
                             </div>
+
+                            <button onClick={() => setRotation(prev => (prev + 90) % 360)} className="flex items-center justify-center bg-slate-900 border border-white/5 p-3.5 rounded-2xl text-slate-300 hover:text-white transition-all active:scale-95 shrink-0" title="Girar Pantalla">
+                                <RotateCw size={18}/>
+                            </button>
 
                             <button onClick={() => setShowShareModal(true)} className="flex items-center justify-center bg-slate-900 border border-white/5 p-3.5 rounded-2xl text-slate-300 hover:text-white transition-all active:scale-95 shrink-0" title="Compartir">
                                 <Share2 size={18}/>

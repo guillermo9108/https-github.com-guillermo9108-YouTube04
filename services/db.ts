@@ -348,6 +348,21 @@ class DBService {
     public async listFtpFiles(path: string): Promise<FtpFile[]> { return this.request<FtpFile[]>(`action=list_ftp_files&path=${encodeURIComponent(path)}`); }
     public async importFtpFile(path: string): Promise<void> { return this.request<void>(`action=import_ftp_file&path=${encodeURIComponent(path)}`, { method: 'POST' }); }
     public async scanFtpRecursive(path: string): Promise<{scanned: number, added: number}> { return this.request<{scanned: number, added: number}>(`action=scan_ftp_recursive&path=${encodeURIComponent(path)}`, { method: 'POST' }); }
+
+    public async uploadDefaultThumbnail(type: 'video' | 'audio' | 'avatar', file: File): Promise<string> {
+        const formData = new FormData();
+        formData.append('type', type);
+        formData.append('image', file);
+        const res = await this.request<{url: string}>(`action=admin_upload_default_thumb`, {
+            method: 'POST',
+            body: formData
+        });
+        return res.url;
+    }
+
+    public async getChannelContent(userId: string, filter: string = 'ALL'): Promise<any[]> {
+        return this.request<any[]>(`action=get_channel_content&userId=${userId}&filter=${filter}`);
+    }
 }
 
 export const db = new DBService();

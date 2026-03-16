@@ -207,19 +207,53 @@ export default function AdminConfig() {
             <SectionHeader id="DEFAULTS" label="Imágenes por Defecto" icon={Maximize} color="text-indigo-400" />
             {activeSection === 'DEFAULTS' && (
                 <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-5 animate-in slide-in-from-top-2">
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Miniatura Video (Default)</label>
-                            <input type="text" value={settings?.defaultVideoThumb || ''} onChange={e => updateValue('defaultVideoThumb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Miniatura Audio (Default)</label>
-                            <input type="text" value={settings?.defaultAudioThumb || ''} onChange={e => updateValue('defaultAudioThumb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Avatar Usuario (Default)</label>
-                            <input type="text" value={settings?.defaultAvatar || ''} onChange={e => updateValue('defaultAvatar', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" placeholder="URL o ruta de imagen..." />
-                        </div>
+                    <div className="space-y-6">
+                        {[
+                            { id: 'video', label: 'Miniatura Video', key: 'defaultVideoThumb' as keyof SystemSettings },
+                            { id: 'audio', label: 'Miniatura Audio', key: 'defaultAudioThumb' as keyof SystemSettings },
+                            { id: 'avatar', label: 'Avatar Usuario', key: 'defaultAvatar' as keyof SystemSettings }
+                        ].map(item => (
+                            <div key={item.id} className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">{item.label} (Default)</label>
+                                <div className="flex gap-3">
+                                    <div className="flex-1 relative">
+                                        <input 
+                                            type="text" 
+                                            value={settings?.[item.key] as string || ''} 
+                                            onChange={e => updateValue(item.key, e.target.value)} 
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none pr-10" 
+                                            placeholder="URL o ruta de imagen..." 
+                                        />
+                                        {settings?.[item.key] && (
+                                            <div className="absolute right-2 top-2 w-6 h-6 rounded-lg overflow-hidden border border-white/10">
+                                                <img src={settings[item.key] as string} className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <label className="bg-slate-800 hover:bg-slate-700 text-white px-4 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-95 border border-slate-700">
+                                        <Smartphone size={14} className="mr-2 text-indigo-400"/>
+                                        <span className="text-[9px] font-black uppercase">Subir</span>
+                                        <input 
+                                            type="file" 
+                                            accept="image/*" 
+                                            className="hidden" 
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    try {
+                                                        const url = await db.uploadDefaultThumbnail(item.id as any, file);
+                                                        updateValue(item.key, url);
+                                                        toast.success(`${item.label} actualizada`);
+                                                    } catch (err) {
+                                                        toast.error("Error al subir imagen");
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                     <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10 flex items-start gap-3">
                         <Info size={16} className="text-indigo-400 mt-0.5 shrink-0"/>

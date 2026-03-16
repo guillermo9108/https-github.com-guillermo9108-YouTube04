@@ -149,7 +149,13 @@ function interact_get_comments($pdo, $vid) {
 function interact_add_comment($pdo, $input) {
     $id = uniqid('c_'); $now = time();
     $pdo->prepare("INSERT INTO comments (id, videoId, userId, text, timestamp) VALUES (?, ?, ?, ?, ?)")->execute([$id, $input['videoId'], $input['userId'], $input['text'], $now]);
-    respond(true, ['id' => $id, 'timestamp' => $now]);
+    
+    // Return full comment data for immediate UI update
+    $stmt = $pdo->prepare("SELECT c.*, u.username, u.avatarUrl as userAvatarUrl FROM comments c JOIN users u ON c.userId = u.id WHERE c.id = ?");
+    $stmt->execute([$id]);
+    $comment = $stmt->fetch();
+    
+    respond(true, $comment);
 }
 
 function interact_toggle_subscribe($pdo, $input) {

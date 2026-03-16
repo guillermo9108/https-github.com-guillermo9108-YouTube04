@@ -5,7 +5,8 @@ import { db } from '../../services/db';
 import { User, Video } from '../../types';
 import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
-import { User as UserIcon, Bell, Loader2, Check, Trash2 } from 'lucide-react';
+import { User as UserIcon, Bell, Loader2, Check, Trash2, Upload, Play, Smartphone, Music, Image as ImageIcon, Layers } from 'lucide-react';
+import { Link } from '../Router';
 
 export default function Channel() {
   const { userId } = useParams();
@@ -15,6 +16,7 @@ export default function Channel() {
   const [channelUser, setChannelUser] = useState<User | null>(null);
   const [allVideos, setAllVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('ALL');
   
   // Pagination State
   const [visibleCount, setVisibleCount] = useState(12);
@@ -44,7 +46,7 @@ export default function Channel() {
             setChannelUser(u);
 
             // 2. Get User Videos
-            const vids = await db.getVideosByCreator(userId);
+            const vids = await db.getChannelContent(userId, filter);
             setAllVideos(vids);
 
             // 3. Calc Stats
@@ -59,7 +61,7 @@ export default function Channel() {
     };
 
     loadChannel();
-  }, [userId]);
+  }, [userId, filter]);
 
   // 2. User Specific Checks (Subscription & Purchases)
   // Separated into its own effect to ensure it runs reliably when currentUser loads
@@ -147,6 +149,12 @@ export default function Channel() {
 
        {/* Channel Header Info */}
        <div className="relative z-10 px-4 pt-20 flex flex-col items-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+           {currentUser?.id === userId && (
+               <Link to="/upload" className="absolute top-6 right-6 flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/10 rounded-2xl text-white text-xs font-black uppercase tracking-widest transition-all active:scale-95 z-10">
+                   <Upload size={16} />
+                   Subir Contenido
+               </Link>
+           )}
            {/* Avatar */}
            <div className="w-32 h-32 rounded-full border-4 border-black bg-slate-800 overflow-hidden shrink-0 shadow-2xl mb-4">
                {channelUser.avatarUrl ? (
@@ -164,7 +172,7 @@ export default function Channel() {
                <div className="text-slate-400 text-sm flex items-center justify-center gap-3 mb-6">
                    <span>@{channelUser.username}</span>
                    <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                   <span>{stats.uploads} videos</span>
+                   <span>{stats.uploads} contenidos</span>
                    <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
                    <span>{stats.views} views</span>
                </div>
@@ -184,11 +192,37 @@ export default function Channel() {
            </div>
        </div>
 
+       {/* Filters Section */}
+       <div className="px-4 mb-8 relative z-10">
+           <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+               {[
+                   { id: 'ALL', label: 'Todo', icon: Layers },
+                   { id: 'VIDEO', label: 'Videos', icon: Play },
+                   { id: 'SHORTS', label: 'Shorts', icon: Smartphone },
+                   { id: 'AUDIO', label: 'Audio', icon: Music },
+                   { id: 'IMAGE', label: 'Imágenes', icon: ImageIcon }
+               ].map((f) => (
+                   <button
+                       key={f.id}
+                       onClick={() => setFilter(f.id)}
+                       className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border ${
+                           filter === f.id 
+                           ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/20' 
+                           : 'bg-slate-900 text-slate-400 border-white/5 hover:bg-slate-800'
+                       }`}
+                   >
+                       <f.icon size={14} />
+                       {f.label}
+                   </button>
+               ))}
+           </div>
+       </div>
+
        {/* Videos Grid */}
        <div className="px-4 md:px-12 relative z-10">
-           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">Videos</h2>
+           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">Contenido</h2>
            {allVideos.length === 0 ? (
-               <div className="text-center py-20 text-slate-500">This user hasn't uploaded any videos yet.</div>
+               <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
            ) : (
                <>
                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">

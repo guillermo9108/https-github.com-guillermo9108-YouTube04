@@ -267,13 +267,61 @@ function admin_repair_db($pdo, $input) {
 
 function admin_cleanup_files($pdo) {
     $videos = $pdo->query("SELECT thumbnailUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
-    $files = glob('uploads/thumbnails/*.jpg');
-    $deleted = 0;
-    foreach ($files as $f) {
-        $name = 'api/' . $f;
-        if (!in_array($name, $videos)) { unlink($f); $deleted++; }
+    $avatars = $pdo->query("SELECT avatarUrl FROM users")->fetchAll(PDO::FETCH_COLUMN);
+    $market = $pdo->query("SELECT images FROM marketplace_items")->fetchAll(PDO::FETCH_COLUMN);
+    
+    $usedFiles = array_merge($videos, $avatars);
+    foreach ($market as $imgs) {
+        $decoded = json_decode($imgs ?: '[]', true);
+        if (is_array($decoded)) $usedFiles = array_merge($usedFiles, $decoded);
     }
+    
+    // Normalize used files to local paths
+    $localUsed = [];
+    foreach ($usedFiles as $u) {
+        if (strpos($u, 'api/') === 0) $localUsed[] = substr($u, 4);
+        elseif (strpos($u, '/') === 0 && strpos($u, '/api/') === 0) $localUsed[] = substr($u, 5);
+    }
+    
+    $dirs = ['uploads/thumbnails/', 'uploads/avatars/', 'uploads/market/'];
+    $deleted = 0;
+    foreach ($dirs as $dir) {
+        if (!is_dir($dir)) continue;
+        $files = glob($dir . '*');
+        foreach ($files as $f) {
+            if (is_file($f) && !in_array($f, $localUsed)) {
+                unlink($f);
+                $deleted++;
+            }
+        }
+    }
+    
     respond(true, "Limpieza completada. Archivos eliminados: $deleted");
+}
+
+function admin_upload_default_thumb($pdo, $post, $files) {
+    if (!isset($files['image'])) respond(false, null, "No se subió ninguna imagen");
+    
+    $type = $post['type'] ?? 'video';
+    $ext = pathinfo($files['image']['name'], PATHINFO_EXTENSION) ?: 'jpg';
+    $name = "default_{$type}_" . time() . "." . $ext;
+    $target = "uploads/defaults/";
+    if (!is_dir($target)) mkdir($target, 0777, true);
+    
+    if (move_uploaded_file($files['image']['tmp_name'], $target . $name)) {
+        $url = "api/" . $target . $name;
+        $field = "";
+        if ($type === 'video') $field = "defaultVideoThumb";
+        elseif ($type === 'audio') $field = "defaultAudioThumb";
+        elseif ($type === 'avatar') $field = "defaultAvatar";
+        
+        if ($field) {
+            $pdo->prepare("UPDATE system_settings SET $field = ? WHERE id = 1")->execute([$url]);
+        }
+        
+        respond(true, ['url' => $url]);
+    }
+    respond(false, null, "Error al mover el archivo");
 }
 
 function admin_get_local_stats($pdo) {

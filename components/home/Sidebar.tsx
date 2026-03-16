@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Home as HomeIcon, User as UserIcon, Bell, Crown, ShieldCheck, LogOut } from 'lucide-react';
+import { X, Home as HomeIcon, User as UserIcon, Bell, Crown, ShieldCheck, LogOut, Play } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { User } from '../../types';
 import { useNotifications } from '../../context/NotificationContext';
@@ -44,6 +44,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, user, isAdmin, logou
                     <button onClick={() => { navigate('/profile'); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
                         <UserIcon size={20} className="text-slate-500 group-hover:text-indigo-400"/>
                         <span className="text-xs font-black uppercase tracking-widest">Mi Perfil</span>
+                    </button>
+                    <button onClick={() => { navigate(`/channel/${user?.id}`); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group">
+                        <Play size={20} className="text-slate-500 group-hover:text-indigo-400"/>
+                        <span className="text-xs font-black uppercase tracking-widest">Mi Canal</span>
                     </button>
                     <button onClick={() => { markAsRead(); onClose(); }} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 text-slate-300 hover:text-white transition-all group relative">
                         <Bell size={20} className="text-slate-500 group-hover:text-indigo-400"/>

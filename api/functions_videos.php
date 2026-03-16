@@ -158,9 +158,9 @@ function video_get_all($pdo) {
     // Filtro de Media Type
     $mediaWhere = "";
     if ($mediaType === 'VIDEO') { 
-        $mediaWhere = "(v.is_audio = 0 OR v.is_audio IS NULL)"; 
+        $mediaWhere = "v.is_audio = 0"; 
     } elseif ($mediaType === 'AUDIO') { 
-        $mediaWhere = "(v.is_audio = 1 OR v.videoUrl LIKE '%.mp3' OR v.videoUrl LIKE '%.wav' OR v.videoUrl LIKE '%.aac' OR v.videoUrl LIKE '%.m4a' OR v.videoUrl LIKE '%.flac' OR v.videoUrl LIKE '%.ogg' OR v.videoUrl LIKE '%.opus' OR v.videoUrl LIKE '%.m4b' OR v.videoUrl LIKE '%.mp4a')"; 
+        $mediaWhere = "v.is_audio = 1"; 
     }
     
     if ($mediaWhere) {
@@ -866,6 +866,36 @@ function video_reorganize_all($pdo) {
 function video_fix_metadata($pdo) {
     $stmt = $pdo->query("UPDATE videos SET category = 'PENDING', locked_at = 0 WHERE duration = 0 OR thumbnailUrl IS NULL");
     respond(true, ['fixedBroken' => $stmt->rowCount()]);
+}
+
+function get_channel_content($pdo, $input) {
+    $userId = $input['userId'];
+    $filter = $input['filter'] ?? 'ALL';
+    
+    $where = ["creatorId = ?"];
+    $params = [$userId];
+    
+    if ($filter === 'VIDEOS') {
+        $where[] = "is_audio = 0 AND duration >= 60 AND (videoUrl NOT LIKE '%.jpg' AND videoUrl NOT LIKE '%.png' AND videoUrl NOT LIKE '%.jpeg')";
+    } elseif ($filter === 'SHORTS') {
+        $where[] = "is_audio = 0 AND duration < 60 AND (videoUrl NOT LIKE '%.jpg' AND videoUrl NOT LIKE '%.png' AND videoUrl NOT LIKE '%.jpeg')";
+    } elseif ($filter === 'AUDIOS') {
+        $where[] = "is_audio = 1";
+    } elseif ($filter === 'IMAGES') {
+        $where[] = "(videoUrl LIKE '%.jpg' OR videoUrl LIKE '%.png' OR videoUrl LIKE '%.jpeg')";
+    }
+    
+    $sql = "SELECT * FROM videos WHERE " . implode(' AND ', $where) . " ORDER BY createdAt DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $items = $stmt->fetchAll();
+    
+    foreach ($items as &$i) {
+        $i['thumbnailUrl'] = fix_url($i['thumbnailUrl']);
+        $i['videoUrl'] = fix_url($i['videoUrl']);
+    }
+    
+    respond(true, $items);
 }
 
 function video_get_admin_stats($pdo) {
