@@ -491,17 +491,17 @@ export default function Watch() {
                                 </div>
 
                                 {/* Center Play/Pause and Seek for Fullscreen/Mobile */}
-                                <div className="flex items-center justify-center gap-12">
-                                    <button onClick={(e) => seek(-10, e)} className="p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90">
-                                        <RotateCw size={32} className="transform -rotate-180" />
-                                        <span className="absolute text-[10px] font-black">10</span>
+                                <div className="flex items-center justify-center gap-6 sm:gap-12">
+                                    <button onClick={(e) => seek(-10, e)} className="p-2.5 sm:p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90 relative flex items-center justify-center">
+                                        <RotateCw size={20} className="sm:w-8 sm:h-8 transform -rotate-180" />
+                                        <span className="absolute text-[7px] sm:text-[10px] font-black">10</span>
                                     </button>
-                                    <button onClick={togglePlay} className="p-8 bg-indigo-600/80 backdrop-blur-md rounded-full text-white hover:bg-indigo-500 transition-all shadow-2xl pointer-events-auto active:scale-90">
-                                        {videoRef.current?.paused ? <Play size={48} fill="currentColor" /> : <div className="flex gap-2"><div className="w-3 h-12 bg-white rounded-full"></div><div className="w-3 h-12 bg-white rounded-full"></div></div>}
+                                    <button onClick={togglePlay} className="p-4 sm:p-8 bg-indigo-600/80 backdrop-blur-md rounded-full text-white hover:bg-indigo-500 transition-all shadow-2xl pointer-events-auto active:scale-90 flex items-center justify-center">
+                                        {videoRef.current?.paused ? <Play size={28} className="sm:w-12 sm:h-12" fill="currentColor" /> : <div className="flex gap-1 sm:gap-2"><div className="w-1.5 sm:w-3 h-5 sm:h-12 bg-white rounded-full"></div><div className="w-1.5 sm:w-3 h-5 sm:h-12 bg-white rounded-full"></div></div>}
                                     </button>
-                                    <button onClick={(e) => seek(10, e)} className="p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90">
-                                        <RotateCw size={32} />
-                                        <span className="absolute text-[10px] font-black">10</span>
+                                    <button onClick={(e) => seek(10, e)} className="p-2.5 sm:p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90 relative flex items-center justify-center">
+                                        <RotateCw size={20} className="sm:w-8 sm:h-8" />
+                                        <span className="absolute text-[7px] sm:text-[10px] font-black">10</span>
                                     </button>
                                 </div>
 

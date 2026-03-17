@@ -437,18 +437,32 @@ export default function Home() {
     }, [rtNotifications, notifs, user?.id]);
 
     const processedVideos = useMemo(() => {
-        if (!videos) return [];
+        if (!videos || videos.length === 0) return [];
         
         const result: Video[] = [];
-        const collectionsSeen = new Set();
+        const collectionsSeen = new Set<string>();
         const categoriesToGroup = ['SERIES', 'MOVIES', 'MUSIC', 'SPORTS']; 
-        const categoriesSeen = new Set();
+        const categoriesSeen = new Set<string>();
+
+        // Pre-calculate counts for grouping
+        const categoryCounts: Record<string, number> = {};
+        videos.forEach(v => {
+            if (v) {
+                const cat = (v.category || '').toUpperCase();
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+            }
+        });
+
+        // Solo agrupamos por categoría en la vista general (TODOS) y sin búsqueda
+        const shouldGroupCategories = selectedCategory === 'TODOS' && !searchQuery;
 
         videos.forEach(item => {
             if (!item) return;
             
+            const itemCat = (item.category || '').toUpperCase();
+
             // 1. Group Images by Collection (Album)
-            if (item.collection && item.category === 'IMAGES') {
+            if (item.collection && itemCat === 'IMAGES') {
                 if (!collectionsSeen.has(item.collection)) {
                     collectionsSeen.add(item.collection);
                     const albumItems = videos.filter(v => v && v.collection === item.collection);
@@ -461,16 +475,14 @@ export default function Home() {
                 return;
             }
 
-            // 2. Group by Category (Series, etc.) - Only if in "TODOS" view and not searching
-            if (selectedCategory === 'TODOS' && !searchQuery && categoriesToGroup.includes(item.category || '')) {
-                if (!categoriesSeen.has(item.category)) {
-                    categoriesSeen.add(item.category);
-                    const categoryItems = videos.filter(v => v && v.category === item.category);
-                    const latest = categoryItems[0]; 
+            // 2. Group by Category (Series, etc.)
+            if (shouldGroupCategories && categoriesToGroup.includes(itemCat)) {
+                if (!categoriesSeen.has(itemCat)) {
+                    categoriesSeen.add(itemCat);
                     result.push({
-                        ...latest,
+                        ...item,
                         isCategoryCard: true,
-                        categoryCount: categoryItems.length,
+                        categoryCount: categoryCounts[itemCat],
                     } as any);
                 }
                 return;

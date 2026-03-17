@@ -378,13 +378,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         )}
 
         {video.isCategoryCard && (
-            <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-2">
-                 <div className="bg-pink-600 text-white px-3 py-1 rounded-xl shadow-xl flex items-center gap-2 border border-white/20">
-                     <Layers size={14} className="animate-pulse" />
-                     <span className="text-[10px] font-black uppercase tracking-widest">{video.category}</span>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] group-hover:bg-black/20 transition-colors">
+                 <div className="bg-pink-600 text-white px-4 py-2 rounded-2xl shadow-2xl flex flex-col items-center gap-1 border border-white/20 transform group-hover:scale-110 transition-transform duration-500">
+                     <Layers size={24} className="animate-pulse" />
+                     <span className="text-[12px] font-black uppercase tracking-widest">{video.category}</span>
                  </div>
-                 <div className="bg-black/80 backdrop-blur-md text-white px-2 py-1 rounded-lg text-[9px] font-black border border-white/10">
+                 <div className="mt-3 bg-black/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-black border border-white/10 shadow-lg">
                      {video.categoryCount} CONTENIDOS
+                 </div>
+                 <div className="absolute bottom-3 left-3 right-3 flex justify-center">
+                     <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
+                         <div className="h-full bg-pink-500 w-full animate-shimmer"></div>
+                     </div>
                  </div>
             </div>
         )}
