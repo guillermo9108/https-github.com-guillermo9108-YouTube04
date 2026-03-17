@@ -66,7 +66,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     const canEdit = isAdmin || isOwner;
 
   const isAudio = Boolean(video.is_audio);
-  const isImage = useMemo(() => video.videoUrl.match(/\.(jpg|jpeg|png)$/i), [video.videoUrl]);
+  const isImage = useMemo(() => video.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i), [video.videoUrl]);
   
   const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
@@ -288,16 +288,19 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   };
 
   const displayThumb = useMemo(() => {
-      if (!shouldLoadImg) return null; // No retornamos nada hasta ser visibles
+      if (!shouldLoadImg) return null; 
       if (localThumb) return localThumb;
       
+      // Si es una imagen y no tiene miniatura, usar la URL de streaming
+      if (isImage && !video.thumbnailUrl) return db.getStreamerUrl(video.id);
+
       // Si hay error en la imagen o no hay miniatura, intentar usar el default de configuración
       if (imgError || !video.thumbnailUrl) {
           return defaultThumb || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg");
       }
 
       return video.thumbnailUrl;
-  }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, isAudio, defaultThumb]);
+  }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, video.videoUrl, isAudio, isImage, defaultThumb]);
 
   return (
     <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
@@ -472,7 +475,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   </button>
                   <div className="w-full h-full rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-white/10">
                       <img 
-                          src={video.videoUrl} 
+                          src={db.getStreamerUrl(video.id)} 
                           alt={video.title} 
                           className="w-full h-full object-contain max-h-[80vh]" 
                           referrerPolicy="no-referrer"

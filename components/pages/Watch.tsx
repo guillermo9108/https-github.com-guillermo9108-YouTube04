@@ -125,13 +125,13 @@ export default function Watch() {
             }
 
             if (p === navigationContext.p || navigationContext.f) {
-                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
                 setRelatedVideos(nonImages);
-                setSeriesQueue(finalResults.filter(v => !v.videoUrl.match(/\.(jpg|jpeg|png)$/i)));
+                setSeriesQueue(finalResults.filter(v => !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i)));
             } else {
-                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
                 setRelatedVideos(prev => [...prev, ...nonImages]);
-                setSeriesQueue(prev => [...prev, ...finalResults.filter(v => !v.videoUrl.match(/\.(jpg|jpeg|png)$/i))]);
+                setSeriesQueue(prev => [...prev, ...finalResults.filter(v => !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i))]);
             }
             setHasMoreRelated(hasMore);
             setRelatedPage(p);
@@ -147,7 +147,7 @@ export default function Watch() {
                 const v = await db.getVideo(id);
                 if (!v) { setLoading(false); return; }
 
-                const isImage = v.videoUrl.match(/\.(jpg|jpeg|png)$/i);
+                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
             if (isImage) {
                 setLoading(false);
                 // Redirect to channel or home if it's an image, as they should be viewed in modal

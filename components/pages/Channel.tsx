@@ -70,13 +70,23 @@ export default function Channel() {
     useEffect(() => {
         let filtered = [...allContent];
         if (filter === 'VIDEOS') {
-            filtered = allContent.filter(v => !v.is_audio && v.duration >= 300 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+            filtered = allContent.filter(v => {
+                const isAudio = Boolean(v.is_audio);
+                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+                const duration = Number(v.duration || 0);
+                return !isAudio && !isImage && duration >= 300;
+            });
         } else if (filter === 'SHORTS') {
-            filtered = allContent.filter(v => !v.is_audio && v.duration < 300 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+            filtered = allContent.filter(v => {
+                const isAudio = Boolean(v.is_audio);
+                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+                const duration = Number(v.duration || 0);
+                return !isAudio && !isImage && duration < 300;
+            });
         } else if (filter === 'AUDIOS') {
-            filtered = allContent.filter(v => v.is_audio);
+            filtered = allContent.filter(v => Boolean(v.is_audio));
         } else if (filter === 'IMAGES') {
-            filtered = allContent.filter(v => v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+            filtered = allContent.filter(v => v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
         }
         setFilteredContent(filtered);
         setVisibleCount(12); // Reset visible count on filter change
