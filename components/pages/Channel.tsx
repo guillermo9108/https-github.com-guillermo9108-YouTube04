@@ -68,15 +68,23 @@ export default function Channel() {
 
     // 2. Snappy Frontend Filtering
     useEffect(() => {
-        let filtered = [...allContent];
-        
+        // Pre-calculate counts for all categories in this channel
+        const categoryCounts: Record<string, number> = {};
+        allContent.forEach(v => {
+            if (v) {
+                const cat = (v.category || '').toUpperCase();
+                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+            }
+        });
+
         // Group by collection if it's an image album
         const grouped: Video[] = [];
         const collectionsSeen = new Set();
         
         allContent.forEach(item => {
             if (!item) return;
-            if (item.collection && item.category === 'IMAGES') {
+            const itemCat = (item.category || '').toUpperCase();
+            if (item.collection && itemCat === 'IMAGES') {
                 if (!collectionsSeen.has(item.collection)) {
                     collectionsSeen.add(item.collection);
                     // Find all items in this collection
@@ -85,15 +93,20 @@ export default function Channel() {
                     const albumItem = {
                         ...item,
                         isAlbum: true,
-                        albumItems: albumItems
+                        albumItems: albumItems,
+                        categoryCount: categoryCounts[itemCat]
                     };
                     grouped.push(albumItem as any);
                 }
             } else {
-                grouped.push(item);
+                grouped.push({
+                    ...item,
+                    categoryCount: categoryCounts[itemCat]
+                });
             }
         });
 
+        let filtered = grouped;
         if (filter === 'VIDEOS') {
             filtered = grouped.filter(v => {
                 const isAudio = Number(v.is_audio) === 1;
@@ -304,6 +317,7 @@ export default function Channel() {
                                      video={video} 
                                      isUnlocked={isUnlocked(video.id, video.creatorId)}
                                      isWatched={false} 
+                                     onCategoryClick={() => navigate(`/#cat=${video.category}`)}
                                  />
                                  {(currentUser?.id === channelUser.id || currentUser?.role === 'ADMIN') && (
                                      <button 

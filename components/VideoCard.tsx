@@ -377,33 +377,29 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             </div>
         )}
 
-        {video.isCategoryCard && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] group-hover:bg-black/20 transition-colors">
-                 <div className="bg-pink-600 text-white px-4 py-2 rounded-2xl shadow-2xl flex flex-col items-center gap-1 border border-white/20 transform group-hover:scale-110 transition-transform duration-500">
-                     <Layers size={24} className="animate-pulse" />
-                     <span className="text-[12px] font-black uppercase tracking-widest">{video.category}</span>
-                 </div>
-                 <div className="mt-3 bg-black/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-black border border-white/10 shadow-lg">
-                     {video.categoryCount} CONTENIDOS
-                 </div>
-                 <div className="absolute bottom-3 left-3 right-3 flex justify-center">
-                     <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
-                         <div className="h-full bg-pink-500 w-full animate-shimmer"></div>
-                     </div>
-                 </div>
-            </div>
-        )}
-
         {isNew && !isWatched && !isAudio && (
             <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
         )}
 
-        <button 
-            onClick={handleWatchLater}
-            className={`absolute top-2 right-2 p-2 rounded-xl backdrop-blur-md border border-white/10 transition-all duration-300 opacity-0 group-hover:opacity-100 z-10 ${inWatchLater ? 'bg-indigo-600 text-white' : 'bg-black/40 text-slate-300 hover:text-white'}`}
-        >
-            <Clock size={16} fill={inWatchLater ? "currentColor" : "none"} />
-        </button>
+        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
+            {video.categoryCount && video.category && video.category !== 'TODOS' && (
+                <button 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCategoryClick?.(); }}
+                    className="p-2 rounded-xl backdrop-blur-md border border-white/10 bg-black/40 text-slate-300 hover:text-white hover:bg-pink-600 transition-all flex items-center gap-1.5"
+                    title={`Ver más de ${video.category}`}
+                >
+                    <Layers size={16} />
+                    <span className="text-[10px] font-black">{video.categoryCount}</span>
+                </button>
+            )}
+            <button 
+                onClick={handleWatchLater}
+                className={`p-2 rounded-xl backdrop-blur-md border border-white/10 transition-all duration-300 ${inWatchLater ? 'bg-indigo-600 text-white' : 'bg-black/40 text-slate-300 hover:text-white'}`}
+                title={inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}
+            >
+                <Clock size={16} fill={inWatchLater ? "currentColor" : "none"} />
+            </button>
+        </div>
 
         {isWatched && (
              <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">

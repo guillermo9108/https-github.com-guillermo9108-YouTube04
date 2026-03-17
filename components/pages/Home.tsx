@@ -441,10 +441,8 @@ export default function Home() {
         
         const result: Video[] = [];
         const collectionsSeen = new Set<string>();
-        const categoriesToGroup = ['SERIES', 'MOVIES', 'MUSIC', 'SPORTS']; 
-        const categoriesSeen = new Set<string>();
 
-        // Pre-calculate counts for grouping
+        // Pre-calculate counts for all categories
         const categoryCounts: Record<string, number> = {};
         videos.forEach(v => {
             if (v) {
@@ -452,9 +450,6 @@ export default function Home() {
                 categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
             }
         });
-
-        // Solo agrupamos por categoría en la vista general (TODOS) y sin búsqueda
-        const shouldGroupCategories = selectedCategory === 'TODOS' && !searchQuery;
 
         videos.forEach(item => {
             if (!item) return;
@@ -469,30 +464,22 @@ export default function Home() {
                     result.push({
                         ...item,
                         isAlbum: true,
-                        albumItems: albumItems
+                        albumItems: albumItems,
+                        categoryCount: categoryCounts[itemCat]
                     } as any);
                 }
                 return;
             }
 
-            // 2. Group by Category (Series, etc.)
-            if (shouldGroupCategories && categoriesToGroup.includes(itemCat)) {
-                if (!categoriesSeen.has(itemCat)) {
-                    categoriesSeen.add(itemCat);
-                    result.push({
-                        ...item,
-                        isCategoryCard: true,
-                        categoryCount: categoryCounts[itemCat],
-                    } as any);
-                }
-                return;
-            }
-
-            result.push(item);
+            // All other items (Videos, Audios) are shown independently
+            result.push({
+                ...item,
+                categoryCount: categoryCounts[itemCat]
+            });
         });
 
         return result;
-    }, [videos, selectedCategory, searchQuery]);
+    }, [videos]);
 
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
@@ -726,7 +713,7 @@ export default function Home() {
                                             video={v} 
                                             isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
                                             isWatched={watchedIds.includes(v.id)} 
-                                            onCategoryClick={v.isCategoryCard ? () => handleCategoryClick(v.category) : undefined}
+                                            onCategoryClick={() => handleCategoryClick(v.category)}
                                             context={{ 
                                                 query: searchQuery, 
                                                 category: selectedCategory, 
