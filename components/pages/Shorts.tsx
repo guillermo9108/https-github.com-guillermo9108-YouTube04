@@ -250,15 +250,20 @@ export default function Shorts() {
     setLoading(true);
     
     try {
-        const res = await db.getShorts(p, 10, 'VIDEO', '', user?.id, sessionSeed);
-        if (res.videos.length > 0) {
+        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id, sessionSeed);
+        const shortsOnly = res.videos.filter(v => v.duration < 300);
+        
+        if (shortsOnly.length > 0) {
             setVideos(prev => {
-                const newBatch = res.videos;
+                const newBatch = shortsOnly;
                 if (p === 0) return diversifyBatch(newBatch, []);
                 return [...prev, ...diversifyBatch(newBatch, prev)];
             });
             setHasMore(res.hasMore);
             setPage(p);
+        } else if (res.hasMore) {
+            // If we filtered everything out but there's more, fetch next page automatically
+            fetchShorts(p + 1);
         } else {
             setHasMore(false);
         }

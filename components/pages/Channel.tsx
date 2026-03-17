@@ -70,9 +70,9 @@ export default function Channel() {
     useEffect(() => {
         let filtered = [...allContent];
         if (filter === 'VIDEOS') {
-            filtered = allContent.filter(v => !v.is_audio && v.duration >= 60 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+            filtered = allContent.filter(v => !v.is_audio && v.duration >= 300 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
         } else if (filter === 'SHORTS') {
-            filtered = allContent.filter(v => !v.is_audio && v.duration < 60 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+            filtered = allContent.filter(v => !v.is_audio && v.duration < 300 && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
         } else if (filter === 'AUDIOS') {
             filtered = allContent.filter(v => v.is_audio);
         } else if (filter === 'IMAGES') {

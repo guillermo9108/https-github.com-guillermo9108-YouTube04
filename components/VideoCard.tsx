@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -57,6 +57,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showMenu, setShowMenu] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -278,6 +279,14 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       setShowMenu(false);
   };
 
+  const handleImageClick = (e: React.MouseEvent) => {
+      if (isImage) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowImageModal(true);
+      }
+  };
+
   const displayThumb = useMemo(() => {
       if (!shouldLoadImg) return null; // No retornamos nada hasta ser visibles
       if (localThumb) return localThumb;
@@ -294,7 +303,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
       <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.03] transition-all duration-500 block ring-1 ring-white/5 hover:ring-indigo-500/40">
         <Link 
-            to={watchUrl} 
+            to={isImage ? '#' : watchUrl} 
+            onClick={isImage ? handleImageClick : undefined}
             className="absolute inset-0 z-0"
         >
             {displayThumb ? (
@@ -364,7 +374,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         </Link>
 
         <div className="flex-1 min-w-0 flex flex-col">
-            <Link to={watchUrl} title={video.title}>
+            <Link to={isImage ? '#' : watchUrl} onClick={isImage ? handleImageClick : undefined} title={video.title}>
                 <h3 className="text-sm font-black text-white leading-tight line-clamp-2 mb-1 group-hover:text-indigo-400 transition-colors uppercase tracking-tighter italic">{video.title}</h3>
             </Link>
             <div className="text-[10px] text-slate-500 flex flex-col gap-0.5">
@@ -445,6 +455,51 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                       >
                           CANCELAR
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+              <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center animate-in zoom-in duration-300">
+                  <button 
+                      onClick={() => setShowImageModal(false)}
+                      className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+                  >
+                      <X size={24} />
+                  </button>
+                  <div className="w-full h-full rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-white/10">
+                      <img 
+                          src={video.videoUrl} 
+                          alt={video.title} 
+                          className="w-full h-full object-contain max-h-[80vh]" 
+                          referrerPolicy="no-referrer"
+                      />
+                      <div className="p-6 bg-slate-900/80 backdrop-blur-md border-t border-white/5">
+                          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-1">{video.title}</h3>
+                          <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800">
+                                      {video.creatorAvatarUrl || settings?.defaultAvatar ? (
+                                          <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                      ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-xs font-black text-white/20">{video.creatorName?.[0] || '?'}</div>
+                                      )}
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">@{video.creatorName}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                  <button onClick={handleDownload} className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors">
+                                      <Download size={14} /> Descargar
+                                  </button>
+                                  <button onClick={handleShare} className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-colors">
+                                      <Share2 size={14} /> Compartir
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
                   </div>
               </div>
           </div>

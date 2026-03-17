@@ -125,11 +125,13 @@ export default function Watch() {
             }
 
             if (p === navigationContext.p || navigationContext.f) {
-                setRelatedVideos(finalResults.filter(v => v.id !== id));
-                setSeriesQueue(finalResults);
+                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+                setRelatedVideos(nonImages);
+                setSeriesQueue(finalResults.filter(v => !v.videoUrl.match(/\.(jpg|jpeg|png)$/i)));
             } else {
-                setRelatedVideos(prev => [...prev, ...finalResults.filter(v => v.id !== id)]);
-                setSeriesQueue(prev => [...prev, ...finalResults]);
+                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl.match(/\.(jpg|jpeg|png)$/i));
+                setRelatedVideos(prev => [...prev, ...nonImages]);
+                setSeriesQueue(prev => [...prev, ...finalResults.filter(v => !v.videoUrl.match(/\.(jpg|jpeg|png)$/i))]);
             }
             setHasMoreRelated(hasMore);
             setRelatedPage(p);
@@ -145,7 +147,15 @@ export default function Watch() {
                 const v = await db.getVideo(id);
                 if (!v) { setLoading(false); return; }
 
-                setVideo(v); 
+                const isImage = v.videoUrl.match(/\.(jpg|jpeg|png)$/i);
+            if (isImage) {
+                setLoading(false);
+                // Redirect to channel or home if it's an image, as they should be viewed in modal
+                window.location.hash = `/channel/${v.creatorId}`;
+                return;
+            }
+
+            setVideo(v); 
                 setLikes(Number(v.likes || 0));
                 setDislikes(Number(v.dislikes || 0));
 
