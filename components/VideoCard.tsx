@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -58,6 +58,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [currentAlbumIndex, setCurrentAlbumIndex] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -65,8 +66,13 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     const isOwner = user?.id === video.creatorId;
     const canEdit = isAdmin || isOwner;
 
-  const isAudio = Boolean(video.is_audio);
-  const isImage = useMemo(() => video.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i), [video.videoUrl]);
+  const isImage = useMemo(() => {
+    if (video.category === 'IMAGES' || video.isAlbum) return true;
+    const path = (video as any).rawPath || video.videoUrl || '';
+    return !!path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+  }, [video.videoUrl, video.category, video.isAlbum, (video as any).rawPath]);
+
+  const isAudio = Number(video.is_audio) === 1;
   
   const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
@@ -283,7 +289,22 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       if (isImage) {
           e.preventDefault();
           e.stopPropagation();
+          setCurrentAlbumIndex(0);
           setShowImageModal(true);
+      }
+  };
+
+  const nextAlbumImage = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (video.albumItems) {
+          setCurrentAlbumIndex(prev => (prev + 1) % video.albumItems!.length);
+      }
+  };
+
+  const prevAlbumImage = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (video.albumItems) {
+          setCurrentAlbumIndex(prev => (prev - 1 + video.albumItems!.length) % video.albumItems!.length);
       }
   };
 
@@ -338,6 +359,20 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         {!isImage && (
             <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
                {formatDuration(video.duration)}
+            </div>
+        )}
+
+        {isImage && (
+            <div className="absolute top-3 right-3 z-10 flex gap-2">
+                 {video.isAlbum && (
+                     <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-lg flex items-center gap-1">
+                         <Layers size={14} />
+                         <span className="text-[10px] font-black">{video.albumItems?.length}</span>
+                     </div>
+                 )}
+                 <div className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg">
+                     <ImageIcon size={14} />
+                 </div>
             </div>
         )}
 
@@ -473,15 +508,43 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   >
                       <X size={24} />
                   </button>
-                  <div className="w-full h-full rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-white/10">
+
+                  {video.isAlbum && video.albumItems && video.albumItems.length > 1 && (
+                      <>
+                          <button 
+                              onClick={prevAlbumImage}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-10"
+                          >
+                              <ChevronLeft size={32} />
+                          </button>
+                          <button 
+                              onClick={nextAlbumImage}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-10"
+                          >
+                              <ChevronRight size={32} />
+                          </button>
+                          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-2">
+                              {video.albumItems.map((_, idx) => (
+                                  <div 
+                                      key={idx} 
+                                      className={`w-2 h-2 rounded-full transition-all ${idx === currentAlbumIndex ? 'bg-indigo-500 w-6' : 'bg-white/20'}`}
+                                  />
+                              ))}
+                          </div>
+                      </>
+                  )}
+
+                  <div className="w-full h-full rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-white/10 relative">
                       <img 
-                          src={db.getStreamerUrl(video.id)} 
+                          src={db.getStreamerUrl(video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].id : video.id)} 
                           alt={video.title} 
                           className="w-full h-full object-contain max-h-[80vh]" 
                           referrerPolicy="no-referrer"
                       />
                       <div className="p-6 bg-slate-900/80 backdrop-blur-md border-t border-white/5">
-                          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-1">{video.title}</h3>
+                          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-1">
+                              {video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].title : video.title}
+                          </h3>
                           <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800">

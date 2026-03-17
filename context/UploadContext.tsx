@@ -54,10 +54,21 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
     setCurrentFileIndex(0);
     setProgress(0);
 
+    // Generate a collection ID if multiple images are uploaded together
+    const imageItems = items.filter(item => {
+        const path = item.file.name || '';
+        return item.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+    });
+    const collectionId = imageItems.length > 1 ? `album_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` : undefined;
+
     for (let i = 0; i < items.length; i++) {
         setCurrentFileIndex(i + 1);
         const item = items[i];
         
+        const path = item.file.name || '';
+        const isImg = item.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+        const itemCollection = isImg ? collectionId : undefined;
+
         lastLoaded.current = 0;
         lastTime.current = Date.now();
 
@@ -85,7 +96,8 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
                         lastLoaded.current = loaded;
                         lastTime.current = now;
                     }
-                }
+                },
+                itemCollection
             );
         } catch (error) {
             console.error(`Failed to upload ${item.title}`, error);

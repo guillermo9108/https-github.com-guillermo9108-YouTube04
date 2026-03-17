@@ -49,14 +49,27 @@ export default function MarketplaceItemView() {
         finally { setSubmittingReview(false); }
     };
 
-    const handleAddToCart = () => {
+    const [showVerificationWarning, setShowVerificationWarning] = useState(false);
+
+    const handleAddToCart = (force = false) => {
         if (!item) return;
-        if (!isVerified) {
-            const confirmRisk = window.confirm("Atención: Este vendedor no ha validado su identidad real con la administración de StreamPay. ¿Deseas proceder con la compra bajo tu propio riesgo?");
-            if (!confirmRisk) return;
+        if (!isVerified && !force) {
+            setShowVerificationWarning(true);
+            return;
         }
         addToCart(item);
         toast.success("Añadido al carrito");
+        setShowVerificationWarning(false);
+    };
+
+    const handleBuyNow = () => {
+        if (!item) return;
+        if (!isVerified) {
+            setShowVerificationWarning(true);
+            return;
+        }
+        addToCart(item);
+        navigate('/cart');
     };
 
     if (loading) return <div className="text-center p-10 text-slate-500">Cargando...</div>;
@@ -174,15 +187,60 @@ export default function MarketplaceItemView() {
                                 )}
                             </div>
 
-                            <button 
-                                onClick={handleAddToCart}
-                                disabled={isInCart || item.status !== 'ACTIVO'}
-                                className={`w-full py-5 rounded-2xl font-black flex items-center justify-center gap-3 text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${isInCart ? 'bg-slate-800 text-slate-500 cursor-default border border-white/5' : (item.status === 'ACTIVO' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' : 'bg-slate-800 text-slate-600 cursor-not-allowed')}`}
-                            >
-                                {isInCart ? <><Check size={20}/> EN TU CARRITO</> : (item.status === 'ACTIVO' ? <><ShoppingCart size={20}/> AÑADIR AL CARRITO</> : 'ARTÍCULO AGOTADO')}
-                            </button>
+                            <div className="flex flex-col gap-3">
+                                <button 
+                                    onClick={() => handleAddToCart()}
+                                    disabled={isInCart || item.status !== 'ACTIVO'}
+                                    className={`w-full py-5 rounded-2xl font-black flex items-center justify-center gap-3 text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${isInCart ? 'bg-slate-800 text-slate-500 cursor-default border border-white/5' : (item.status === 'ACTIVO' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' : 'bg-slate-800 text-slate-600 cursor-not-allowed')}`}
+                                >
+                                    {isInCart ? <><Check size={20}/> EN TU CARRITO</> : (item.status === 'ACTIVO' ? <><ShoppingCart size={20}/> AÑADIR AL CARRITO</> : 'ARTÍCULO AGOTADO')}
+                                </button>
+                                
+                                {!isInCart && item.status === 'ACTIVO' && (
+                                    <button 
+                                        onClick={handleBuyNow}
+                                        className="w-full py-4 rounded-2xl font-black flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em] bg-white text-black hover:bg-slate-200 transition-all active:scale-95"
+                                    >
+                                        COMPRAR AHORA
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
+
+                    {showVerificationWarning && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+                            <div className="bg-slate-900 border border-amber-500/30 rounded-[40px] p-8 max-w-md w-full shadow-2xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><ShieldAlert size={120} className="text-amber-500"/></div>
+                                
+                                <div className="relative z-10 text-center">
+                                    <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
+                                        <ShieldAlert size={40} className="text-amber-500"/>
+                                    </div>
+                                    <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4">Aviso de Seguridad</h3>
+                                    <p className="text-slate-400 text-sm leading-relaxed mb-8">
+                                        Este vendedor <span className="text-white font-bold">no ha validado su identidad real</span> con la administración de StreamPay. 
+                                        Recomendamos precaución al realizar compras a usuarios no verificados.
+                                    </p>
+                                    
+                                    <div className="flex flex-col gap-3">
+                                        <button 
+                                            onClick={() => handleAddToCart(true)}
+                                            className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-amber-600/20"
+                                        >
+                                            ENTIENDO EL RIESGO, CONTINUAR
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowVerificationWarning(false)}
+                                            className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black rounded-2xl text-[10px] uppercase tracking-widest transition-all"
+                                        >
+                                            CANCELAR
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="bg-slate-900/40 p-8 rounded-[40px] border border-white/5">
                         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Descripción del Vendedor</h3>

@@ -6,14 +6,27 @@
 function market_get_items($pdo) {
     $stmt = $pdo->query("SELECT m.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE status != 'ELIMINADO' ORDER BY createdAt DESC");
     $items = $stmt->fetchAll();
-    foreach ($items as &$i) { $i['images'] = json_decode($i['images'] ?: '[]', true); $i['sellerAvatarUrl'] = fix_url($i['sellerAvatarUrl']); }
+    foreach ($items as &$i) { 
+        $i['images'] = json_decode($i['images'] ?: '[]', true); 
+        if (is_array($i['images'])) {
+            foreach ($i['images'] as &$img) $img = fix_url($img);
+        }
+        $i['sellerAvatarUrl'] = fix_url($i['sellerAvatarUrl']); 
+    }
     respond(true, $items);
 }
 
 function market_get_item($pdo, $id) {
     $stmt = $pdo->prepare("SELECT m.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl, u.is_verified_seller as isVerifiedSeller FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE m.id = ?");
     $stmt->execute([$id]); $i = $stmt->fetch();
-    if ($i) { $i['images'] = json_decode($i['images'] ?: '[]', true); $i['sellerAvatarUrl'] = fix_url($i['sellerAvatarUrl']); respond(true, $i); }
+    if ($i) { 
+        $i['images'] = json_decode($i['images'] ?: '[]', true); 
+        if (is_array($i['images'])) {
+            foreach ($i['images'] as &$img) $img = fix_url($img);
+        }
+        $i['sellerAvatarUrl'] = fix_url($i['sellerAvatarUrl']); 
+        respond(true, $i); 
+    }
     respond(false, null, "Producto no encontrado");
 }
 
@@ -82,7 +95,12 @@ function market_checkout($pdo, $input) {
 
 function market_get_reviews($pdo, $itemId) {
     $stmt = $pdo->prepare("SELECT r.*, u.username, u.avatarUrl as userAvatarUrl FROM marketplace_reviews r JOIN users u ON r.userId = u.id WHERE r.itemId = ?");
-    $stmt->execute([$itemId]); respond(true, $stmt->fetchAll());
+    $stmt->execute([$itemId]); 
+    $reviews = $stmt->fetchAll();
+    foreach ($reviews as &$r) {
+        $r['userAvatarUrl'] = fix_url($r['userAvatarUrl']);
+    }
+    respond(true, $reviews);
 }
 
 function market_add_review($pdo, $input) {
@@ -96,6 +114,9 @@ function market_admin_get_items($pdo) {
     $items = $stmt->fetchAll();
     foreach ($items as &$i) {
         $i['images'] = json_decode($i['images'] ?: '[]', true);
+        if (is_array($i['images'])) {
+            foreach ($i['images'] as &$img) $img = fix_url($img);
+        }
     }
     respond(true, $items);
 }

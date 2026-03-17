@@ -252,8 +252,10 @@ export default function Shorts() {
     try {
         const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id, sessionSeed);
         const shortsOnly = res.videos.filter(v => {
-            const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
-            const isAudio = Boolean(v.is_audio);
+            if (!v) return false;
+            const path = (v as any).rawPath || v.videoUrl || '';
+            const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+            const isAudio = Number(v.is_audio) === 1;
             return !isImage && !isAudio && v.duration < 300;
         });
         

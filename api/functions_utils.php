@@ -90,8 +90,10 @@ function get_media_duration($path, $ffprobe) {
 function fix_url($url) {
     if (!$url) return null;
     if (strpos($url, 'http') === 0) return $url;
-    // Si empieza por api/, hacerlo absoluto desde la raíz para evitar problemas de rutas relativas en el front
+    // Si ya tiene el prefijo api/, asegurar que sea absoluto desde la raíz
     if (strpos($url, 'api/') === 0) return '/' . $url;
+    // Si es una ruta relativa a uploads, añadir /api/
+    if (strpos($url, 'uploads/') === 0) return '/api/' . $url;
     return $url;
 }
 
@@ -266,7 +268,14 @@ function streamVideo($id, $pdo) {
         'wav' => 'audio/wav',
         'flac' => 'audio/flac',
         'm4a' => 'audio/mp4',
-        'aac' => 'audio/aac'
+        'aac' => 'audio/aac',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'bmp' => 'image/bmp',
+        'svg' => 'image/svg+xml'
     ];
     
     if (isset($_GET['download'])) {

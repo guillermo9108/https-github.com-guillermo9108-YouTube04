@@ -15,7 +15,8 @@ export enum VideoCategory {
   SERIES = 'SERIES',
   SPORTS = 'SPORTS',
   MUSIC = 'MUSIC',
-  OTHER = 'OTHER'
+  OTHER = 'OTHER',
+  IMAGES = 'IMAGES'
 }
 
 export interface Category {
@@ -67,6 +68,8 @@ export interface Video {
   dislikes: number;
   isLocal?: boolean | number | string;
   is_audio?: boolean | number;
+  isAlbum?: boolean;
+  albumItems?: Video[];
   transcode_status?: 'NONE' | 'WAITING' | 'PROCESSING' | 'FAILED' | 'DONE';
   reason?: string;
   transcode_progress?: number;

@@ -253,12 +253,13 @@ class DBService {
         return this.request<void>(`action=update_video`, { method: 'POST', body: JSON.stringify({ id: videoId, userId, ...data }) });
     }
 
-    public async uploadVideo(title: string, desc: string, price: number, cat: string, dur: number, user: User, file: File, thumb: File | null, onProgress: (p: number, l: number, t: number) => void): Promise<void> {
+    public async uploadVideo(title: string, desc: string, price: number, cat: string, dur: number, user: User, file: File, thumb: File | null, onProgress: (p: number, l: number, t: number) => void, collection?: string): Promise<void> {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest(); const fd = new FormData();
             fd.append('action', 'upload_video'); fd.append('title', title); fd.append('description', desc); fd.append('price', String(price));
             fd.append('category', cat); fd.append('duration', String(dur)); fd.append('userId', user.id); fd.append('video', file);
             if (thumb) fd.append('thumbnail', thumb);
+            if (collection) fd.append('collection', collection);
             xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded, e.total); };
             xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(); };
             xhr.onerror = () => reject(); xhr.open('POST', '/api/index.php?action=upload_video'); xhr.send(fd);

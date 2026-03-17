@@ -19,6 +19,7 @@ function _get_user_data($pdo, $id) {
         $u['watchLater'] = json_decode($u['watchLater'] ?: '[]', true);
         $u['defaultPrices'] = json_decode($u['defaultPrices'] ?: '{}', true);
         $details = json_decode($u['shippingDetails'] ?: '{}', true);
+        if (!is_array($details)) $details = [];
         
         // Si no hay detalles de envío, intentar cargar desde verificación de vendedor
         if (empty($details['address']) || empty($details['fullName'])) {

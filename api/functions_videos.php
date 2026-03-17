@@ -618,8 +618,10 @@ function video_upload($pdo, $post, $files) {
         }
     }
 
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus]);
+    $collection = $post['collection'] ?? null;
+
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection]);
 
     require_once 'functions_interactions.php';
     // La notificación se enviará en video_organize_single cuando se procese el video
@@ -906,6 +908,7 @@ function upload_channel_images($pdo, $post, $files) {
     $count = (int)($post['count'] ?? 0);
 
     $uploadedIds = [];
+    $collectionId = $count > 1 ? 'album_' . uniqid() : null;
     for ($i = 0; $i < $count; $i++) {
         $key = "image_$i";
         if (isset($files[$key]) && $files[$key]['error'] === UPLOAD_ERR_OK) {
@@ -914,7 +917,7 @@ function upload_channel_images($pdo, $post, $files) {
             $target = 'uploads/videos/' . $filename; 
             
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
-                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $id = uniqid();
                 $stmt->execute([
                     $id,
@@ -926,7 +929,8 @@ function upload_channel_images($pdo, $post, $files) {
                     time(),
                     'IMAGES',
                     0,
-                    0
+                    0,
+                    $collectionId
                 ]);
                 $uploadedIds[] = $id;
             }

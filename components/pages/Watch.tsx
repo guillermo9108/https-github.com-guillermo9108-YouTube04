@@ -125,13 +125,34 @@ export default function Watch() {
             }
 
             if (p === navigationContext.p || navigationContext.f) {
-                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
+                const nonImages = finalResults.filter(v => {
+                    if (!v) return false;
+                    const path = (v as any).rawPath || v.videoUrl || '';
+                    const isImg = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+                    return v.id !== id && !isImg;
+                });
                 setRelatedVideos(nonImages);
-                setSeriesQueue(finalResults.filter(v => !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i)));
+                setSeriesQueue(finalResults.filter(v => {
+                    if (!v) return false;
+                    const path = (v as any).rawPath || v.videoUrl || '';
+                    return !(v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
+                }));
             } else {
-                const nonImages = finalResults.filter(v => v.id !== id && !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
+                const nonImages = finalResults.filter(v => {
+                    if (!v) return false;
+                    const path = (v as any).rawPath || v.videoUrl || '';
+                    const isImg = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+                    return v.id !== id && !isImg;
+                });
                 setRelatedVideos(prev => [...prev, ...nonImages]);
-                setSeriesQueue(prev => [...prev, ...finalResults.filter(v => !v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i))]);
+                setSeriesQueue(prev => {
+                    const newNonImages = finalResults.filter(v => {
+                        if (!v) return false;
+                        const path = (v as any).rawPath || v.videoUrl || '';
+                        return !(v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
+                    });
+                    return [...prev, ...newNonImages];
+                });
             }
             setHasMoreRelated(hasMore);
             setRelatedPage(p);
@@ -147,13 +168,14 @@ export default function Watch() {
                 const v = await db.getVideo(id);
                 if (!v) { setLoading(false); return; }
 
-                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
-            if (isImage) {
-                setLoading(false);
-                // Redirect to channel or home if it's an image, as they should be viewed in modal
-                window.location.hash = `/channel/${v.creatorId}`;
-                return;
-            }
+                const path = (v as any).rawPath || v.videoUrl || '';
+                const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+                if (isImage) {
+                    setLoading(false);
+                    // Redirect to channel or home if it's an image, as they should be viewed in modal
+                    window.location.hash = `/channel/${v.creatorId}`;
+                    return;
+                }
 
             setVideo(v); 
                 setLikes(Number(v.likes || 0));

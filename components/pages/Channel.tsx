@@ -69,24 +69,56 @@ export default function Channel() {
     // 2. Snappy Frontend Filtering
     useEffect(() => {
         let filtered = [...allContent];
+        
+        // Group by collection if it's an image album
+        const grouped: Video[] = [];
+        const collectionsSeen = new Set();
+        
+        allContent.forEach(item => {
+            if (!item) return;
+            if (item.collection && item.category === 'IMAGES') {
+                if (!collectionsSeen.has(item.collection)) {
+                    collectionsSeen.add(item.collection);
+                    // Find all items in this collection
+                    const albumItems = allContent.filter(v => v.collection === item.collection);
+                    // Create a virtual "Album" item
+                    const albumItem = {
+                        ...item,
+                        isAlbum: true,
+                        albumItems: albumItems
+                    };
+                    grouped.push(albumItem as any);
+                }
+            } else {
+                grouped.push(item);
+            }
+        });
+
         if (filter === 'VIDEOS') {
-            filtered = allContent.filter(v => {
-                const isAudio = Boolean(v.is_audio);
-                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+            filtered = grouped.filter(v => {
+                const isAudio = Number(v.is_audio) === 1;
+                const path = (v as any).rawPath || v.videoUrl || '';
+                const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
                 const duration = Number(v.duration || 0);
                 return !isAudio && !isImage && duration >= 300;
             });
         } else if (filter === 'SHORTS') {
-            filtered = allContent.filter(v => {
-                const isAudio = Boolean(v.is_audio);
-                const isImage = v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+            filtered = grouped.filter(v => {
+                const isAudio = Number(v.is_audio) === 1;
+                const path = (v as any).rawPath || v.videoUrl || '';
+                const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
                 const duration = Number(v.duration || 0);
                 return !isAudio && !isImage && duration < 300;
             });
         } else if (filter === 'AUDIOS') {
-            filtered = allContent.filter(v => Boolean(v.is_audio));
+            filtered = grouped.filter(v => Number(v.is_audio) === 1);
         } else if (filter === 'IMAGES') {
-            filtered = allContent.filter(v => v.videoUrl?.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i));
+            filtered = grouped.filter(v => {
+                const path = (v as any).rawPath || v.videoUrl || '';
+                return v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+            });
+        } else {
+            filtered = grouped;
         }
         setFilteredContent(filtered);
         setVisibleCount(12); // Reset visible count on filter change
