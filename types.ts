@@ -70,6 +70,8 @@ export interface Video {
   is_audio?: boolean | number;
   isAlbum?: boolean;
   albumItems?: Video[];
+  isCategoryCard?: boolean;
+  categoryCount?: number;
   transcode_status?: 'NONE' | 'WAITING' | 'PROCESSING' | 'FAILED' | 'DONE';
   reason?: string;
   transcode_progress?: number;

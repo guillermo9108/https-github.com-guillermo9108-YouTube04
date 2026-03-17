@@ -436,6 +436,52 @@ export default function Home() {
         return [...formattedRt, ...notifs].sort((a, b) => b.timestamp - a.timestamp);
     }, [rtNotifications, notifs, user?.id]);
 
+    const processedVideos = useMemo(() => {
+        if (!videos) return [];
+        
+        const result: Video[] = [];
+        const collectionsSeen = new Set();
+        const categoriesToGroup = ['SERIES', 'MOVIES', 'MUSIC', 'SPORTS']; 
+        const categoriesSeen = new Set();
+
+        videos.forEach(item => {
+            if (!item) return;
+            
+            // 1. Group Images by Collection (Album)
+            if (item.collection && item.category === 'IMAGES') {
+                if (!collectionsSeen.has(item.collection)) {
+                    collectionsSeen.add(item.collection);
+                    const albumItems = videos.filter(v => v && v.collection === item.collection);
+                    result.push({
+                        ...item,
+                        isAlbum: true,
+                        albumItems: albumItems
+                    } as any);
+                }
+                return;
+            }
+
+            // 2. Group by Category (Series, etc.) - Only if in "TODOS" view and not searching
+            if (selectedCategory === 'TODOS' && !searchQuery && categoriesToGroup.includes(item.category || '')) {
+                if (!categoriesSeen.has(item.category)) {
+                    categoriesSeen.add(item.category);
+                    const categoryItems = videos.filter(v => v && v.category === item.category);
+                    const latest = categoryItems[0]; 
+                    result.push({
+                        ...latest,
+                        isCategoryCard: true,
+                        categoryCount: categoryItems.length,
+                    } as any);
+                }
+                return;
+            }
+
+            result.push(item);
+        });
+
+        return result;
+    }, [videos, selectedCategory, searchQuery]);
+
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
     const getSuggestionIcon = (type: string) => {
@@ -662,12 +708,13 @@ export default function Home() {
                             )}
                             {videos.length > 0 ? ( 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-12">
-                                    {videos.map(v => ( 
+                                    {processedVideos.map(v => ( 
                                         <VideoCard 
                                             key={v.id} 
                                             video={v} 
                                             isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
                                             isWatched={watchedIds.includes(v.id)} 
+                                            onCategoryClick={v.isCategoryCard ? () => handleCategoryClick(v.category) : undefined}
                                             context={{ 
                                                 query: searchQuery, 
                                                 category: selectedCategory, 

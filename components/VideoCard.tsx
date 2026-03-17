@@ -16,6 +16,7 @@ interface VideoCardProps {
   video: Video;
   isUnlocked: boolean;
   isWatched?: boolean;
+  onCategoryClick?: () => void;
   context?: { query?: string, category?: string, folder?: string, page?: number, sort_order?: string };
 }
 
@@ -41,7 +42,7 @@ const formatDuration = (seconds: number) => {
     return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, context }) => {
+const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, context }) => {
   const { user, refreshUser } = useAuth();
   const { settings } = useSettings();
   const toast = useToast();
@@ -327,8 +328,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
       <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.03] transition-all duration-500 block ring-1 ring-white/5 hover:ring-indigo-500/40">
         <Link 
-            to={isImage ? '#' : watchUrl} 
-            onClick={isImage ? handleImageClick : undefined}
+            to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
+            onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
             className="absolute inset-0 z-0"
         >
             {displayThumb ? (
@@ -372,6 +373,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                  )}
                  <div className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg">
                      <ImageIcon size={14} />
+                 </div>
+            </div>
+        )}
+
+        {video.isCategoryCard && (
+            <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-2">
+                 <div className="bg-pink-600 text-white px-3 py-1 rounded-xl shadow-xl flex items-center gap-2 border border-white/20">
+                     <Layers size={14} className="animate-pulse" />
+                     <span className="text-[10px] font-black uppercase tracking-widest">{video.category}</span>
+                 </div>
+                 <div className="bg-black/80 backdrop-blur-md text-white px-2 py-1 rounded-lg text-[9px] font-black border border-white/10">
+                     {video.categoryCount} CONTENIDOS
                  </div>
             </div>
         )}

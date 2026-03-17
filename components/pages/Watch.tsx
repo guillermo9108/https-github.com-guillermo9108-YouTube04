@@ -48,6 +48,9 @@ export default function Watch() {
     const [interaction, setInteraction] = useState<UserInteraction | null>(null);
     const [rotation, setRotation] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+    const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
+    const controlsTimerRef = useRef<any>(null);
     const videoContainerRef = useRef<HTMLDivElement>(null);
     const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
     const [seriesQueue, setSeriesQueue] = useState<Video[]>([]); 
@@ -314,9 +317,40 @@ export default function Watch() {
             videoContainerRef.current.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable full-screen mode: ${err.message}`);
             });
+            setVideoFit('cover'); // Auto-adjust to fill screen in fullscreen
         } else {
             document.exitFullscreen();
+            setVideoFit('contain');
         }
+    };
+
+    const resetControlsTimer = () => {
+        setShowControls(true);
+        if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = setTimeout(() => {
+            if (isFullscreen || (videoRef.current && !videoRef.current.paused)) {
+                setShowControls(false);
+            }
+        }, 3000);
+    };
+
+    const handleMouseMove = () => {
+        resetControlsTimer();
+    };
+
+    const togglePlay = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (!videoRef.current) return;
+        if (videoRef.current.paused) videoRef.current.play();
+        else videoRef.current.pause();
+        resetControlsTimer();
+    };
+
+    const seek = (seconds: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!videoRef.current) return;
+        videoRef.current.currentTime += seconds;
+        resetControlsTimer();
     };
 
     useEffect(() => {
@@ -400,6 +434,8 @@ export default function Watch() {
             <div className="w-full bg-black sticky top-0 z-[45] shadow-2xl border-b border-white/5 overflow-hidden">
                 <div 
                     ref={videoContainerRef}
+                    onMouseMove={handleMouseMove}
+                    onClick={togglePlay}
                     className={`relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group ${isFullscreen ? 'h-screen max-w-none aspect-auto' : ''}`}
                 >
                     {isUnlocked ? (
@@ -410,35 +446,85 @@ export default function Watch() {
                             <video 
                                 ref={videoRef} 
                                 src={streamUrl} 
-                                controls 
+                                controls={!isFullscreen} // Hide native controls in fullscreen to use custom ones
                                 autoPlay 
                                 poster={posterUrl} 
-                                className="w-full h-full object-contain transition-transform duration-300" 
+                                className={`w-full h-full transition-transform duration-300 ${videoFit === 'cover' ? 'object-cover' : 'object-contain'}`} 
                                 style={{ transform: `rotate(${rotation}deg)` }}
                                 onEnded={handleVideoEnded} 
                                 crossOrigin="anonymous" 
-                                onPlay={() => setThrottled(true)} 
-                                onPause={() => setThrottled(false)}
+                                onPlay={() => { setThrottled(true); resetControlsTimer(); }} 
+                                onPause={() => { setThrottled(false); setShowControls(true); }}
                                 onTimeUpdate={handleTimeUpdate}
                             />
 
                             {/* Floating Controls Overlay - Visible on Hover or Fullscreen */}
-                            <div className={`absolute inset-0 z-20 transition-opacity flex flex-col justify-between p-4 ${isFullscreen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                <div className="flex justify-end gap-2">
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setRotation(prev => (prev + 90) % 360); }}
-                                        className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
-                                        title="Girar Video"
-                                    >
-                                        <RotateCw size={20} />
+                            <div className={`absolute inset-0 z-20 transition-opacity flex flex-col justify-between p-4 bg-gradient-to-t from-black/60 via-transparent to-black/40 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col">
+                                        <h3 className="text-white font-black text-sm uppercase tracking-tighter drop-shadow-lg">{video?.title}</h3>
+                                        <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">@{video?.creatorName}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setVideoFit(prev => prev === 'contain' ? 'cover' : 'contain'); }}
+                                            className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
+                                            title="Ajustar Pantalla"
+                                        >
+                                            <Maximize size={20} className={videoFit === 'cover' ? 'text-indigo-400' : ''} />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setRotation(prev => (prev + 90) % 360); }}
+                                            className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
+                                            title="Girar Video"
+                                        >
+                                            <RotateCw size={20} />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                            className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
+                                            title={isFullscreen ? "Salir de Pantalla Completa" : "Pantalla Completa"}
+                                        >
+                                            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Center Play/Pause and Seek for Fullscreen/Mobile */}
+                                <div className="flex items-center justify-center gap-12">
+                                    <button onClick={(e) => seek(-10, e)} className="p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90">
+                                        <RotateCw size={32} className="transform -rotate-180" />
+                                        <span className="absolute text-[10px] font-black">10</span>
                                     </button>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-                                        className="p-3 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-indigo-600 transition-all shadow-xl border border-white/10 pointer-events-auto"
-                                        title={isFullscreen ? "Salir de Pantalla Completa" : "Pantalla Completa"}
-                                    >
-                                        {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                                    <button onClick={togglePlay} className="p-8 bg-indigo-600/80 backdrop-blur-md rounded-full text-white hover:bg-indigo-500 transition-all shadow-2xl pointer-events-auto active:scale-90">
+                                        {videoRef.current?.paused ? <Play size={48} fill="currentColor" /> : <div className="flex gap-2"><div className="w-3 h-12 bg-white rounded-full"></div><div className="w-3 h-12 bg-white rounded-full"></div></div>}
                                     </button>
+                                    <button onClick={(e) => seek(10, e)} className="p-4 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-white/20 transition-all pointer-events-auto active:scale-90">
+                                        <RotateCw size={32} />
+                                        <span className="absolute text-[10px] font-black">10</span>
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    {/* Progress Bar for Fullscreen */}
+                                    {isFullscreen && videoRef.current && (
+                                        <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden pointer-events-auto cursor-pointer relative group/progress" onClick={(e) => {
+                                            e.stopPropagation();
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const pos = (e.clientX - rect.left) / rect.width;
+                                            if (videoRef.current) videoRef.current.currentTime = pos * videoRef.current.duration;
+                                        }}>
+                                            <div 
+                                                className="h-full bg-indigo-500 transition-all" 
+                                                style={{ width: `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center">
+                                        <div className="text-[10px] font-black text-white uppercase tracking-widest bg-black/40 px-3 py-1 rounded-full backdrop-blur-md border border-white/5">
+                                            {videoRef.current ? `${Math.floor(videoRef.current.currentTime / 60)}:${Math.floor(videoRef.current.currentTime % 60).toString().padStart(2, '0')}` : '0:00'} / {Math.floor((video?.duration || 0) / 60)}:{Math.floor((video?.duration || 0) % 60).toString().padStart(2, '0')}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
