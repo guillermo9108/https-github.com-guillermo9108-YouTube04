@@ -189,6 +189,26 @@ function interact_get_notifications($pdo, $uid) {
     respond(true, $notifs);
 }
 
+function interact_get_unread_notifications($pdo, $uid) {
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE userId = ? AND isRead = 0 ORDER BY timestamp DESC LIMIT 10");
+    $stmt->execute([$uid]);
+    $notifs = $stmt->fetchAll();
+    foreach ($notifs as &$n) {
+        $n['avatarUrl'] = fix_url($n['avatarUrl']);
+        if ($n['metadata']) {
+            $decoded = json_decode($n['metadata'], true);
+            $n['metadata'] = $decoded ?: $n['metadata'];
+        }
+    }
+    respond(true, $notifs);
+}
+
+function interact_get_unread_count($pdo, $uid) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE userId = ? AND isRead = 0");
+    $stmt->execute([$uid]);
+    respond(true, ['count' => (int)$stmt->fetchColumn()]);
+}
+
 function interact_mark_notification_read($pdo, $input) {
     $pdo->prepare("UPDATE notifications SET isRead = 1 WHERE id = ?")->execute([$input['id']]);
     respond(true);

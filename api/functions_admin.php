@@ -854,7 +854,8 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
     // Determinar perfil según extensión de entrada
     $ext = strtolower(pathinfo($inputPath, PATHINFO_EXTENSION));
-    $isAudioInput = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']);
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudioInput = in_array($ext, $audioExts);
     
     $stmt = $pdo->prepare("SELECT * FROM transcode_profiles WHERE extension = ?");
     $stmt->execute([$ext]);
@@ -878,8 +879,19 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
     // Determinar extensión de salida
     $outputExt = $profile['extension'];
+    
+    // Forzar extensión correcta si detectamos encoders específicos en los argumentos
     if (strpos($profile['command_args'], 'libmp3lame') !== false) $outputExt = 'mp3';
     if (strpos($profile['command_args'], 'libx264') !== false) $outputExt = 'mp4';
+    
+    // Salvaguarda: Si la entrada es audio, la salida DEBE ser audio (mp3 por defecto si no se especificó otra cosa)
+    if ($isAudioInput && !in_array($outputExt, $audioExts)) {
+        $outputExt = 'mp3';
+        if (strpos($profile['command_args'], 'libx264') !== false) {
+            // Si por error se asignó un perfil de video a un audio, resetear a audio
+            $profile['command_args'] = '-c:a libmp3lame -b:a 192k';
+        }
+    }
     
     $outputPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t.' . $outputExt;
     
@@ -905,7 +917,7 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
         
         // Actualizar base de datos
-        $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE' WHERE id = ?")
+        $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', locked_at = 0 WHERE id = ?")
             ->execute([$newUrl, $videoId]);
         
         // Opcional: Eliminar el original para ahorrar espacio si se desea
@@ -917,7 +929,7 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         // Fallo
         $errorMsg = implode(" | ", array_slice($output, -3));
         write_log("Transcode: Falló $videoId. Error: $errorMsg", 'ERROR');
-        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
+        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED', locked_at = 0 WHERE id = ?")->execute([$videoId]);
         return false;
     }
 }

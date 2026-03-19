@@ -46,12 +46,17 @@ if ($count >= 2) {
 }
 
 // 3. Buscar siguiente video en cola WAITING
-$stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' ORDER BY createdAt ASC LIMIT 1");
+$now = time();
+$stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND locked_at < ? ORDER BY createdAt ASC LIMIT 1");
+$stmt->execute([$now - 300]); // No bloqueado en los últimos 5 minutos
 $video = $stmt->fetch();
 
 if (!$video) {
     die("[INFO] Cola vacía. No hay nada que convertir hoy.\n");
 }
+
+// Bloquear inmediatamente
+$pdo->prepare("UPDATE videos SET locked_at = ? WHERE id = ?")->execute([$now, $video['id']]);
 
 echo "[START] Procesando: '{$video['title']}' (ID: {$video['id']})\n";
 

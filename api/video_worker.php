@@ -56,7 +56,7 @@ if (strpos($testOutput, 'ffprobe version') === false) {
 }
 echo "-------------------------------\n";
 
-$batchSize = 10;
+$batchSize = 5; // Reducido para mayor agilidad en ciclos cortos
 $processed = 0;
 $failed = 0;
 
@@ -96,7 +96,8 @@ for ($i = 0; $i < $batchSize; $i++) {
 
     // B. Generación de Miniatura
     $ext = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
-    $isAudio = (bool)$video['is_audio'] || in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac']);
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudio = (bool)$video['is_audio'] || in_array($ext, $audioExts);
     $thumbUrl = '';
     $ffCode = 0;
 
@@ -114,7 +115,7 @@ for ($i = 0; $i < $batchSize; $i++) {
         $cmdFfmpeg = "$ffmpeg -y -ss $time -i " . escapeshellarg($realPath) . " -frames:v 1 -q:v 4 " . escapeshellarg($fullThumbPath) . " 2>&1";
         exec($cmdFfmpeg, $ffOutput, $ffCode);
         
-        if ($ffCode === 0 && file_exists($fullThumbPath)) {
+        if ($ffCode === 0 && file_exists($fullThumbPath) && filesize($fullThumbPath) > 0) {
             $thumbUrl = 'api/' . $thumbFile;
         } else {
             echo "[WARN] Falló captura de video. Usando miniatura genérica.\n";
@@ -125,8 +126,8 @@ for ($i = 0; $i < $batchSize; $i++) {
 
     if ($ffCode === 0) {
         echo "[SUCCESS] Procesado: {$finalDuration}s.\n";
-        $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, category = 'PROCESSING', locked_at = 0, processing_attempts = 0 WHERE id = ?")
-            ->execute([$finalDuration, $thumbUrl, $video['id']]);
+        $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, category = 'PROCESSING', is_audio = ?, locked_at = 0, processing_attempts = 0 WHERE id = ?")
+            ->execute([$finalDuration, $thumbUrl, $isAudio ? 1 : 0, $video['id']]);
         
         // Organizar inmediatamente tras el éxito
         $sets = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();

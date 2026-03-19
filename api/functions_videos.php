@@ -611,8 +611,10 @@ function video_upload($pdo, $post, $files) {
     if ($price <= 0) $price = 1.00;
 
     $transcodeStatus = 'NONE';
+    $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
+    $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']) ? 1 : 0;
+
     if ($autoTranscode === 1) {
-        $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
         if ($ext !== 'mp4' && $ext !== 'mp3') {
             $transcodeStatus = 'WAITING';
         }
@@ -620,8 +622,8 @@ function video_upload($pdo, $post, $files) {
 
     $collection = $post['collection'] ?? null;
 
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection]);
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection, $isAudio]);
 
     require_once 'functions_interactions.php';
     // La notificación se enviará en video_organize_single cuando se procese el video

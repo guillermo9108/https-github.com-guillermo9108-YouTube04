@@ -43,6 +43,22 @@ export default function Layout() {
   const location = useLocation();
   const { user } = useAuth();
   const { settings } = useSettings();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const checkNotifs = async () => {
+        try {
+            const res = await db.getUnreadCount(user.id);
+            setUnreadCount(res.count);
+        } catch(e) {}
+    };
+
+    checkNotifs();
+    const interval = setInterval(checkNotifs, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Reset scroll automatically when changing sections
   useEffect(() => {
@@ -84,7 +100,14 @@ export default function Layout() {
         <Link to="/shorts" className={isActive('/shorts')}><Smartphone size={22}/></Link>
         <Link to="/upload" className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform"><Upload size={24}/></Link>
         <Link to="/marketplace" className={isActive('/marketplace')}><ShoppingBag size={22}/></Link>
-        <Link to="/profile" className={isActive('/profile')}><Avatar size={24}/></Link>
+        <Link to="/profile" className={`${isActive('/profile')} relative`}>
+            <Avatar size={24}/>
+            {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[7px] font-black text-white">
+                    {unreadCount > 9 ? '+' : unreadCount}
+                </span>
+            )}
+        </Link>
       </nav>
     </div>
   );

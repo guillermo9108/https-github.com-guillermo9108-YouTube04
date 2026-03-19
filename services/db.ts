@@ -143,12 +143,12 @@ class DBService {
     public enableDemoMode(): void { localStorage.setItem('sp_demo_mode', 'true'); }
 
     public async login(username: string, password: string): Promise<User> {
-        return this.request<User>(`action=login`, { method: 'POST', body: JSON.stringify({ username, password, deviceId: navigator.userAgent.substring(0, 50) }) });
+        return this.request<User>(`action=login`, { method: 'POST', body: JSON.stringify({ username, password, deviceId: navigator.userAgent.substring(0, 255) }) });
     }
 
     public async register(username: string, password: string, avatar?: File | null): Promise<User> {
         const fd = new FormData();
-        fd.append('username', username); fd.append('password', password); fd.append('deviceId', navigator.userAgent.substring(0, 50));
+        fd.append('username', username); fd.append('password', password); fd.append('deviceId', navigator.userAgent.substring(0, 255));
         if (avatar) fd.append('avatar', avatar);
         return this.request<User>(`action=register`, { method: 'POST', body: fd });
     }
@@ -344,6 +344,8 @@ class DBService {
     }
     public setHomeDirty() { this.homeDirty = true; }
     public async getNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}`); }
+    public async getUnreadNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_unread_notifications&userId=${userId}`); }
+    public async getUnreadCount(userId: string): Promise<{count: number}> { return this.request<{count: number}>(`action=get_unread_count&userId=${userId}`); }
     public async markNotificationRead(id: string): Promise<void> { return this.request<void>(`action=mark_notification_read`, { method: 'POST', body: JSON.stringify({ id }) }); }
     public async markAllNotificationsRead(userId: string): Promise<void> { return this.request<void>(`action=mark_all_notifications_read`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async listFtpFiles(path: string): Promise<FtpFile[]> { return this.request<FtpFile[]>(`action=list_ftp_files&path=${encodeURIComponent(path)}`); }

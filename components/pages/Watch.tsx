@@ -6,7 +6,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { useParams, Link, useNavigate } from '../Router';
 import { 
     Loader2, Heart, ThumbsDown, MessageCircle, Lock, 
-    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download, RotateCw, Maximize, Minimize
+    ChevronRight, Home, Play, Info, ExternalLink, AlertTriangle, Send, CheckCircle2, Clock, Share2, X, Search, UserCheck, PlusCircle, ArrowRightCircle, Wallet, ShoppingCart, Music, ChevronDown, Bell, BellOff, ListFilter, Download, Maximize, Minimize
 } from 'lucide-react';
 import VideoCard from '../VideoCard';
 import { useToast } from '../../context/ToastContext';
@@ -41,12 +41,20 @@ export default function Watch() {
         };
     }, [id, window.location.hash]);
 
+    const isAdmin = useMemo(() => user?.role?.trim().toUpperCase() === 'ADMIN', [user?.role]);
+    const isApp = useMemo(() => {
+        const di = user?.deviceInfo || '';
+        const ldi = user?.lastDeviceId || '';
+        return di.includes('com.streampay.app') || ldi.includes('com.streampay.app') || 
+               di.includes('StreamPayAPK') || ldi.includes('StreamPayAPK') ||
+               di.includes('StreamPay');
+    }, [user?.deviceInfo, user?.lastDeviceId]);
+
     const [video, setVideo] = useState<Video | null>(null);
     const [loading, setLoading] = useState(true);
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [interaction, setInteraction] = useState<UserInteraction | null>(null);
-    const [rotation, setRotation] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
     const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -192,7 +200,6 @@ export default function Watch() {
                         db.getInteraction(user.id, v.id),
                         db.checkSubscription(user.id, v.creatorId)
                     ]);
-                    const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
                     const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
                     setIsUnlocked(Boolean(access || isAdmin || isVipActive || user.id === v.creatorId));
                     setInteraction(interact);
@@ -404,6 +411,29 @@ export default function Watch() {
         return `${base}&download=1&filename=${filename}.${ext}`;
     }, [video?.id, user?.sessionToken, video?.title, video?.is_audio]);
 
+    const handleDownload = (e: React.MouseEvent) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        
+        if (!isApp && !isAdmin) {
+            toast.error("La descarga solo está disponible en la App oficial");
+            return;
+        }
+
+        if (!video) return;
+
+        try {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = "";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Iniciando descarga...");
+        } catch (err) {
+            toast.error("Error al iniciar descarga");
+        }
+    };
+
     const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${navigationContext.f.split('/').pop()}` : null);
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
@@ -432,7 +462,6 @@ export default function Watch() {
                                 autoPlay 
                                 poster={posterUrl} 
                                 className={`w-full h-full transition-transform duration-300 ${videoFit === 'cover' ? 'object-cover' : 'object-contain'}`} 
-                                style={{ transform: `rotate(${rotation}deg)` }}
                                 onEnded={handleVideoEnded} 
                                 crossOrigin="anonymous" 
                                 onPlay={() => { setThrottled(true); }} 
@@ -499,10 +528,6 @@ export default function Watch() {
                                 </button>
                             </div>
 
-                            <button onClick={() => setRotation(prev => (prev + 90) % 360)} className="flex items-center justify-center bg-slate-900 border border-white/5 p-3.5 rounded-2xl text-slate-300 hover:text-white transition-all active:scale-95 shrink-0" title="Girar Pantalla">
-                                <RotateCw size={18}/>
-                            </button>
-
                             <button onClick={() => setShowShareModal(true)} className="flex items-center justify-center bg-slate-900 border border-white/5 p-3.5 rounded-2xl text-slate-300 hover:text-white transition-all active:scale-95 shrink-0" title="Compartir">
                                 <Share2 size={18}/>
                             </button>
@@ -512,15 +537,15 @@ export default function Watch() {
                                 <span className="text-[10px] font-black uppercase tracking-widest">{comments.length}</span>
                             </button>
 
-                            {(user?.deviceInfo?.includes('com.streampay.app') || user?.lastDeviceId?.includes('com.streampay.app') || user?.deviceInfo?.includes('StreamPayAPK') || user?.lastDeviceId?.includes('StreamPayAPK')) && isUnlocked && (
-                                <a 
-                                    href={downloadUrl}
-                                    download=""
+                            {isUnlocked && (
+                                <button 
+                                    onClick={handleDownload}
                                     className="flex items-center gap-2 bg-emerald-600 border border-white/5 px-5 py-3 rounded-2xl text-white hover:bg-emerald-500 transition-all active:scale-95 shrink-0"
+                                    title="Descargar"
                                 >
                                     <Download size={18}/>
                                     <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
-                                </a>
+                                </button>
                             )}
                         </div>
                     </div>
