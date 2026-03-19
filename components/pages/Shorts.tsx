@@ -19,7 +19,6 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   const videoRef = useRef<HTMLVideoElement>(null);
   const clickTimerRef = useRef<number | null>(null);
   
-  const [isUnlocked, setIsUnlocked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
   const [paused, setPaused] = useState(false);
   
@@ -31,25 +30,6 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   const [likeCount, setLikeCount] = useState(Number(video.likes || 0));
   const [dislikeCount, setDislikeCount] = useState(Number(video.dislikes || 0));
   const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Validación de Acceso Inteligente
-  useEffect(() => {
-    if (!user) return;
-    
-    const checkAccess = async () => {
-        const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
-        const isCreator = user.id === video.creatorId;
-        const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
-
-        if (isAdmin || isCreator || isVipActive) {
-            setIsUnlocked(true);
-        } else {
-            const purchased = await db.hasPurchased(user.id, video.id);
-            setIsUnlocked(purchased);
-        }
-    };
-    checkAccess();
-  }, [user, video.id, video.creatorId, video.creatorRole]);
 
   useEffect(() => {
     setLikeCount(Number(video.likes || 0));
@@ -64,7 +44,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
 
   useEffect(() => {
     const el = videoRef.current; if (!el) return;
-    if (isActive && isUnlocked) {
+    if (isActive) {
         el.currentTime = 0; 
         setPaused(false);
         el.muted = false; 
@@ -83,7 +63,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
             }
         } catch (e) {}
     }
-  }, [isActive, isUnlocked, video.id, isNear]);
+  }, [isActive, video.id, isNear]);
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -139,29 +119,15 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   return (
     <div className="relative w-full h-[100dvh] md:h-full snap-start snap-always shrink-0 flex items-center justify-center bg-black overflow-hidden">
       <div className="absolute inset-0 z-0 bg-black" onClick={handleScreenTouch}>
-        {isUnlocked ? (
-          <>
-            {videoSrc && (
-                <video
-                    ref={videoRef} src={videoSrc} poster={video.thumbnailUrl}
-                    className="w-full h-full object-cover" loop playsInline preload="metadata" crossOrigin="anonymous"
-                    onTimeUpdate={handleTimeUpdate}
-                />
-            )}
-            {paused && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-white/50"><Pause size={64} fill="currentColor" /></div>}
-            {showHeart && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><Heart size={120} className="text-red-500 fill-red-500 drop-shadow-2xl" /></div>}
-          </>
-        ) : (
-           <div className="w-full h-full relative">
-              <img src={video.thumbnailUrl} className="w-full h-full object-cover blur-sm brightness-50" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-20 p-6 text-center">
-                 <div className="bg-black/40 backdrop-blur-xl p-8 rounded-[40px] border border-white/10 max-w-sm w-full">
-                    <div className="text-4xl font-black text-amber-400 mb-2">{video.price} $</div>
-                    <button onClick={() => db.purchaseVideo(user!.id, video.id).then(()=>setIsUnlocked(true))} className="w-full bg-white text-black font-black py-4 rounded-full shadow-xl uppercase tracking-widest text-xs">Desbloquear Short</button>
-                 </div>
-              </div>
-           </div>
+        {videoSrc && (
+            <video
+                ref={videoRef} src={videoSrc} poster={video.thumbnailUrl}
+                className="w-full h-full object-cover" loop playsInline preload="metadata" crossOrigin="anonymous"
+                onTimeUpdate={handleTimeUpdate}
+            />
         )}
+        {paused && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-white/50"><Pause size={64} fill="currentColor" /></div>}
+        {showHeart && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><Heart size={120} className="text-red-500 fill-red-500 drop-shadow-2xl" /></div>}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-10" />
       
@@ -261,14 +227,24 @@ export default function Shorts() {
 
   if (!isVip) {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-8 text-center">
-            <div className="w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center mb-6">
-                <Crown className="text-indigo-500" size={40} />
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
+            <div className="bg-slate-900 border border-white/10 rounded-[40px] w-full max-w-sm p-8 text-center shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/30">
+                    <Crown className="text-indigo-500" size={40} />
+                </div>
+                <h2 className="text-2xl font-black text-white uppercase italic mb-3 tracking-tighter">Acceso VIP Requerido</h2>
+                <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+                    La sección de Shorts es exclusiva para miembros VIP. Suscríbete para obtener acceso total a todo el contenido corto de la plataforma.
+                </p>
+                <div className="flex flex-col gap-3">
+                    <Link to="/vip" className="bg-indigo-600 text-white w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 active:scale-95">
+                        Ver Planes VIP
+                    </Link>
+                    <Link to="/" className="w-full py-3 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all">
+                        Volver al Inicio
+                    </Link>
+                </div>
             </div>
-            <h2 className="text-2xl font-black text-white uppercase italic mb-2">Acceso VIP Requerido</h2>
-            <p className="text-slate-400 max-w-xs mb-8">La sección de Shorts es exclusiva para miembros VIP. Suscríbete para obtener acceso total a todo el contenido corto.</p>
-            <Link to="/vip" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all">Ver Planes VIP</Link>
-            <Link to="/" className="mt-4 text-slate-500 text-xs font-bold uppercase hover:text-white transition-all">Volver al Inicio</Link>
         </div>
     );
   }

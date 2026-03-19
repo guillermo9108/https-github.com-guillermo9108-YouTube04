@@ -159,7 +159,7 @@ function video_get_all($pdo) {
     // Filtro de Media Type
     $mediaWhere = "";
     if ($mediaType === 'VIDEO' && !$isShorts) { 
-        $mediaWhere = "v.is_audio = 0 AND (v.duration >= 300 OR v.duration IS NULL)"; 
+        $mediaWhere = "v.is_audio = 0 AND v.category != 'IMAGES'"; 
     } elseif ($mediaType === 'AUDIO') { 
         $mediaWhere = "v.is_audio = 1"; 
     }
@@ -567,9 +567,9 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         }
     }
 
-    // Si no encontramos nada por DB o queremos asegurar carpetas vacías (opcional), 
-    // podríamos mantener el fallback de filesystem, pero solo si no hay resultados o búsqueda activa.
-    if (empty($folderMap) || !empty($search)) {
+    // Si no encontramos nada por DB y hay una búsqueda activa, 
+    // podríamos mantener el fallback de filesystem para encontrar carpetas por nombre.
+    if (!empty($search)) {
         foreach ($roots as $root) {
             $fullPath = $root;
             if (!empty($currentRelPath)) {
