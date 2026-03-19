@@ -141,7 +141,11 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
         
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('sp_current_user_id', u.id);
-        if (u.sessionToken) storage.setItem('sp_session_token', u.sessionToken);
+        // Always save session token to localStorage for APK background polling
+        if (u.sessionToken) {
+            localStorage.setItem('sp_session_token', u.sessionToken);
+            if (!rememberMe) sessionStorage.setItem('sp_session_token', u.sessionToken);
+        }
     } finally {
         setIsLoading(false);
     }
@@ -157,7 +161,11 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
         
         const storage = rememberMe ? localStorage : sessionStorage;
         storage.setItem('sp_current_user_id', u.id);
-        if (u.sessionToken) storage.setItem('sp_session_token', u.sessionToken);
+        // Always save session token to localStorage for APK background polling
+        if (u.sessionToken) {
+            localStorage.setItem('sp_session_token', u.sessionToken);
+            if (!rememberMe) sessionStorage.setItem('sp_session_token', u.sessionToken);
+        }
     } finally {
         setIsLoading(false);
     }
