@@ -130,11 +130,19 @@ class DBService {
     }
 
     public async verifyDbConnection(config: any): Promise<boolean> {
-        return fetch('api/install.php?action=verify_db', { method: 'POST', body: JSON.stringify(config) }).then(r => r.json()).then(res => res.success);
+        return fetch('api/install.php?action=verify_db', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config) 
+        }).then(r => r.json()).then(res => res.success);
     }
 
     public async initializeSystem(dbConfig: any, adminConfig: any): Promise<void> {
-        return fetch('api/install.php?action=install', { method: 'POST', body: JSON.stringify({ dbConfig, adminUser: adminConfig }) }).then(async r => {
+        return fetch('api/install.php?action=install', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dbConfig, adminUser: adminConfig }) 
+        }).then(async r => {
             const res = await r.json();
             if(!res.success) throw new Error(res.error);
         });
