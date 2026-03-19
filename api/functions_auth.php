@@ -64,20 +64,20 @@ function auth_register($pdo, $input) {
         $pdo->prepare("INSERT INTO users (id, username, password_hash, role, balance) VALUES (?, ?, ?, 'USER', 0)")
             ->execute([$id, $u, $p]);
         
+        // Procesar avatar si se envió
+        if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            auth_upload_avatar($pdo, $id, $_FILES['avatar']);
+        }
+
         // Auto-login after register
         $sid = bin2hex(random_bytes(32));
         $userAgent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255);
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $id]);
             
-        respond(true, [
-            'id' => $id, 
-            'username' => $u, 
-            'role' => 'USER', 
-            'balance' => 0, 
-            'sessionToken' => $sid,
-            'shippingDetails' => (object)[]
-        ]);
+        $data = _get_user_data($pdo, $id);
+        $data['sessionToken'] = $sid;
+        respond(true, $data);
     } catch (Exception $e) { respond(false, null, "El usuario ya existe"); }
 }
 

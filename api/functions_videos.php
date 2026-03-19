@@ -134,6 +134,10 @@ function video_get_all($pdo) {
         $where[] = "(v.duration < 300 OR v.duration = 0 OR v.duration IS NULL)"; 
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
         $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
+    } else {
+        // Excluir shorts de la vista normal (ALL/VIDEO), a menos que sean música
+        // Se aplica a carpetas y categorías también según lo solicitado
+        $where[] = "(v.is_audio = 1 OR v.duration >= 300 OR v.duration IS NULL OR v.duration = 0 OR v.category LIKE '%music%' OR v.videoUrl LIKE '%music%')";
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
