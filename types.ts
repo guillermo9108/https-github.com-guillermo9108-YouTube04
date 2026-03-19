@@ -90,7 +90,7 @@ export interface Comment {
 export interface UserInteraction {
   liked: boolean;
   disliked: boolean;
-  watched: boolean;
+  isWatched: boolean;
   newLikeCount?: number;
   newDislikeCount?: number;
 }

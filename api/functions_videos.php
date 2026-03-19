@@ -131,7 +131,7 @@ function video_get_all($pdo) {
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
 
     if ($isShorts) { 
-        $where[] = "(v.duration < 180 OR v.duration = 0)"; 
+        $where[] = "(v.duration < 300 OR v.duration = 0)"; 
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
     }
     
@@ -158,7 +158,7 @@ function video_get_all($pdo) {
     // Filtro de Media Type
     $mediaWhere = "";
     if ($mediaType === 'VIDEO') { 
-        $mediaWhere = "v.is_audio = 0"; 
+        $mediaWhere = "v.is_audio = 0 AND (v.duration >= 300 OR v.duration IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
         $mediaWhere = "v.is_audio = 1"; 
     }
@@ -185,23 +185,63 @@ function video_get_all($pdo) {
     if ($isShorts) {
         $now = time();
         if (!empty($userId)) {
-            // Algoritmo de Ranking Dinámico (Estilo Facebook/Reddit)
-            // Prioriza: Suscripciones + (Popularidad / Tiempo^1.5) + Aleatoriedad controlada
+            // Priority: 
+            // 0: Not watched & Not disliked
+            // 1: Watched
+            // 2: Disliked
             $orderBy = "
+                (CASE 
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    ELSE 0 
+                END) ASC,
                 (CASE WHEN (SELECT 1 FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId LIMIT 1) THEN 100 ELSE 0 END + 
                 ((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5)) DESC, 
                 $randClause";
-            $orderParams[] = $userId;
+            $orderParams = [$userId, $userId, $userId];
         } else {
             // Para invitados: Popularidad con decaimiento temporal
             $orderBy = "((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5) DESC, $randClause";
         }
     } elseif ($effectiveSort === 'RANDOM') {
-        $orderBy = $randClause;
+        if (!empty($userId)) {
+            $orderBy = "
+                (CASE 
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    ELSE 0 
+                END) ASC,
+                $randClause";
+            $orderParams = [$userId, $userId];
+        } else {
+            $orderBy = $randClause;
+        }
     } elseif ($effectiveSort === 'ALPHA') {
-        $orderBy = "v.title ASC";
+        if (!empty($userId)) {
+            $orderBy = "
+                (CASE 
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    ELSE 0 
+                END) ASC,
+                v.title ASC";
+            $orderParams = [$userId, $userId];
+        } else {
+            $orderBy = "v.title ASC";
+        }
     } else {
-        $orderBy = "v.createdAt DESC";
+        if (!empty($userId)) {
+            $orderBy = "
+                (CASE 
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    ELSE 0 
+                END) ASC,
+                v.createdAt DESC";
+            $orderParams = [$userId, $userId];
+        } else {
+            $orderBy = "v.createdAt DESC";
+        }
     }
 
     $finalParams = array_merge($params, $orderParams);

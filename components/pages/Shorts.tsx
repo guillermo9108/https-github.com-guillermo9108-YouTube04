@@ -86,6 +86,18 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
     }
   }, [isActive, isUnlocked, video.id, isNear]);
 
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const el = e.currentTarget;
+    if (el.duration > 0) {
+      const progress = el.currentTime / el.duration;
+      if (progress >= 0.95 && !interaction?.isWatched && user) {
+        db.markWatched(user.id, video.id).then(() => {
+          setInteraction(prev => prev ? { ...prev, isWatched: true } : { isWatched: true, liked: false, disliked: false });
+        });
+      }
+    }
+  };
+
   const handleRate = async (rating: 'like' | 'dislike') => {
     if (!user) return;
     try {
@@ -134,6 +146,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
                 <video
                     ref={videoRef} src={videoSrc} poster={video.thumbnailUrl}
                     className="w-full h-full object-cover" loop playsInline preload="metadata" crossOrigin="anonymous"
+                    onTimeUpdate={handleTimeUpdate}
                 />
             )}
             {paused && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-white/50"><Pause size={64} fill="currentColor" /></div>}

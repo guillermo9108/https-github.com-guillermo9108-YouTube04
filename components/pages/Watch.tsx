@@ -279,8 +279,20 @@ export default function Watch() {
 
     const handleTimeUpdate = async () => {
         const el = videoRef.current;
-        if (!el || !video || extractionAttempted || !isUnlocked) return;
+        if (!el || !video || !isUnlocked) return;
 
+        // 1. Seguimiento de Visualización (95%)
+        if (el.duration > 0) {
+            const progress = el.currentTime / el.duration;
+            if (progress >= 0.95 && !interaction?.isWatched && user) {
+                db.markWatched(user.id, video.id).then(() => {
+                    setInteraction(prev => prev ? { ...prev, isWatched: true } : { isWatched: true, liked: false, disliked: false });
+                });
+            }
+        }
+
+        // 2. Extracción de Miniatura (Lazy)
+        if (extractionAttempted) return;
         const isDefault = video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
         if (!isDefault) return;
 

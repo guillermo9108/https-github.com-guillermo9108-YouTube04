@@ -110,11 +110,14 @@ function interact_rate($pdo, $input) {
     $dislikes = $pdo->query("SELECT COUNT(*) FROM interactions WHERE videoId = '$vid' AND disliked = 1")->fetchColumn();
     $pdo->prepare("UPDATE videos SET likes = ?, dislikes = ? WHERE id = ?")->execute([$likes, $dislikes, $vid]);
     
+    $isWatched = (bool)$pdo->query("SELECT isWatched FROM interactions WHERE userId = '$uid' AND videoId = '$vid'")->fetchColumn();
+    
     respond(true, [
         'newLikeCount' => $likes, 
         'newDislikeCount' => $dislikes,
         'liked' => $resLiked,
-        'disliked' => $resDisliked
+        'disliked' => $resDisliked,
+        'isWatched' => $isWatched
     ]);
 }
 
