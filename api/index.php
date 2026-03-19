@@ -39,10 +39,30 @@ register_shutdown_function(function() {
 });
 
 $configFile = 'db_config.json';
-if (!file_exists($configFile)) {
-    if (ob_get_level()) ob_clean();
+
+// Permitir verificar instalación sin tener el config
+if (isset($_GET['action']) && $_GET['action'] === 'check_installation') {
+    $installed = file_exists($configFile);
+    while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'error' => 'Sistema no instalado']);
+    echo json_encode([
+        'success' => true, 
+        'data' => [
+            'installed' => $installed,
+            'status' => $installed ? 'installed' : 'not_installed'
+        ]
+    ]);
+    exit;
+}
+
+if (!file_exists($configFile)) {
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true, 
+        'data' => ['status' => 'not_installed'],
+        'error' => 'Sistema no instalado'
+    ]);
     exit;
 }
 

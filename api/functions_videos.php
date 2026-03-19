@@ -131,8 +131,9 @@ function video_get_all($pdo) {
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
 
     if ($isShorts) { 
-        $where[] = "(v.duration < 300 OR v.duration = 0)"; 
+        $where[] = "(v.duration < 300 OR v.duration = 0 OR v.duration IS NULL)"; 
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
+        $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
@@ -157,7 +158,7 @@ function video_get_all($pdo) {
 
     // Filtro de Media Type
     $mediaWhere = "";
-    if ($mediaType === 'VIDEO') { 
+    if ($mediaType === 'VIDEO' && !$isShorts) { 
         $mediaWhere = "v.is_audio = 0 AND (v.duration >= 300 OR v.duration IS NULL)"; 
     } elseif ($mediaType === 'AUDIO') { 
         $mediaWhere = "v.is_audio = 1"; 
@@ -763,13 +764,15 @@ function getPriceForCategory($category, $settings, $parent_category = null) {
             }
         }
     }
-    return 1.0; // Default price to avoid free access by accident
+    return 1.0; // Default price 1.0 to avoid free access by accident
 }
 
 function video_scan_local($pdo, $input) {
     $scanPath = rtrim($input['path'], '/\\'); 
     if (!is_dir($scanPath)) respond(false, null, "Ruta inválida");
     $adminId = $pdo->query("SELECT id FROM users WHERE role='ADMIN' LIMIT 1")->fetchColumn();
+    $stmtS = $pdo->query("SELECT * FROM system_settings WHERE id = 1");
+    $settings = $stmtS->fetch();
     $exts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'mp3', 'wav', 'flac', 'm4a'];
 
     try {
@@ -808,8 +811,7 @@ function video_scan_local($pdo, $input) {
                 
                 // Lógica de Auto-Encolado para el Transcodificador
                 $transcodeStatus = 'NONE';
-                $stmtS = $pdo->query("SELECT autoTranscode FROM system_settings WHERE id = 1");
-                $autoTranscode = (int)$stmtS->fetchColumn();
+                $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
                 
                 if ($autoTranscode === 1) {
                     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -819,9 +821,11 @@ function video_scan_local($pdo, $input) {
                     }
                 }
 
+                $price = getPriceForCategory($categoryName, $settings);
+                
                 // Default price 1.0 to avoid free access by accident
-                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, 1.00, ?)")
-                    ->execute([$id, $title, $path, $adminId, time(), $isAudio, $transcodeStatus]);
+                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, ?, ?)")
+                    ->execute([$id, $title, $path, $adminId, time(), $isAudio, $price, $transcodeStatus]);
                 $new++;
             }
         } catch (Exception $e) {

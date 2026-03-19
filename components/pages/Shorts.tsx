@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Heart, MessageCircle, Share2, ThumbsDown, Send, X, Loader2, ArrowLeft, Pause, Search, UserCheck } from 'lucide-react';
+import { Heart, MessageCircle, Share2, ThumbsDown, Send, X, Loader2, ArrowLeft, Pause, Search, UserCheck, VideoOff, Crown } from 'lucide-react';
 import { db } from '../../services/db';
 import { Video, Comment, UserInteraction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -40,9 +40,8 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
         const isAdmin = user.role?.trim().toUpperCase() === 'ADMIN';
         const isCreator = user.id === video.creatorId;
         const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
-        const hasVipAccess = isVipActive && video.creatorRole === 'ADMIN';
 
-        if (isAdmin || isCreator || hasVipAccess) {
+        if (isAdmin || isCreator || isVipActive) {
             setIsUnlocked(true);
         } else {
             const purchased = await db.hasPurchased(user.id, video.id);
@@ -243,6 +242,8 @@ export default function Shorts() {
   const { user } = useAuth();
   const toast = useToast();
   
+  const isVip = user?.role === 'ADMIN' || (user?.vipExpiry && user.vipExpiry > Date.now() / 1000);
+
   const [videos, setVideos] = useState<Video[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [page, setPage] = useState(0);
@@ -258,19 +259,37 @@ export default function Shorts() {
   const [shareSuggestions, setShareSuggestions] = useState<any[]>([]);
   const shareTimeout = useRef<any>(null);
 
+  if (!isVip) {
+    return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-8 text-center">
+            <div className="w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center mb-6">
+                <Crown className="text-indigo-500" size={40} />
+            </div>
+            <h2 className="text-2xl font-black text-white uppercase italic mb-2">Acceso VIP Requerido</h2>
+            <p className="text-slate-400 max-w-xs mb-8">La sección de Shorts es exclusiva para miembros VIP. Suscríbete para obtener acceso total a todo el contenido corto.</p>
+            <Link to="/vip" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-xs hover:bg-indigo-500 transition-all">Ver Planes VIP</Link>
+            <Link to="/" className="mt-4 text-slate-500 text-xs font-bold uppercase hover:text-white transition-all">Volver al Inicio</Link>
+        </div>
+    );
+  }
+
   const fetchShorts = async (p: number) => {
     if (loading || (!hasMore && p !== 0)) return;
     setLoading(true);
     
     try {
-        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id, sessionSeed);
+        console.log('Fetching shorts for page:', p);
+        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed);
+        console.log('Shorts response:', res);
         const shortsOnly = res.videos.filter(v => {
             if (!v) return false;
             const path = (v as any).rawPath || v.videoUrl || '';
             const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
             const isAudio = Number(v.is_audio) === 1;
-            return !isImage && !isAudio && v.duration < 300;
+            const duration = Number(v.duration || 0);
+            return !isImage && !isAudio && (duration < 300 || duration === 0);
         });
+        console.log('Filtered shorts:', shortsOnly.length);
         
         if (shortsOnly.length > 0) {
             setVideos(prev => {
@@ -282,7 +301,9 @@ export default function Shorts() {
             setPage(p);
         } else if (res.hasMore) {
             // If we filtered everything out but there's more, fetch next page automatically
+            setLoading(false);
             fetchShorts(p + 1);
+            return;
         } else {
             setHasMore(false);
         }
@@ -362,8 +383,18 @@ export default function Shorts() {
     <div ref={containerRef} className="w-full h-full overflow-y-scroll snap-y snap-mandatory bg-black scrollbar-hide relative">
       <div className="fixed top-4 left-4 z-50"><Link to="/" className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"><ArrowLeft size={24} /></Link></div>
       
-      {videos.length === 0 && loading ? (
+      {loading && videos.length === 0 ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-4"><Loader2 className="animate-spin text-indigo-500" size={32}/><p className="font-black uppercase text-[10px] tracking-widest italic opacity-50">Sintonizando...</p></div>
+      ) : videos.length === 0 ? (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-6 p-8 text-center bg-slate-950/50 backdrop-blur-xl">
+              <div className="w-24 h-24 bg-slate-900 border border-white/5 rounded-[40px] flex items-center justify-center shadow-2xl">
+                  <VideoOff size={40} className="text-slate-700" />
+              </div>
+              <div className="space-y-2">
+                  <h2 className="text-xl font-black text-white uppercase tracking-tighter italic">No hay Shorts</h2>
+                  <p className="text-sm text-slate-400 max-w-[200px] font-medium leading-relaxed">Vuelve más tarde para ver nuevos contenidos cortos.</p>
+              </div>
+          </div>
       ) : videos.map((video, idx) => (
         <div key={video.id} data-index={idx} className="w-full h-full snap-start">
              <ShortItem 
