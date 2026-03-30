@@ -103,13 +103,13 @@ export default function Cart() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto px-3 md:px-4 pt-4 md:pt-6 pb-12 animate-in fade-in">
-            <h1 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center gap-2">
+        <div className="max-w-6xl mx-auto px-1.5 md:px-4 pt-4 md:pt-6 pb-12 animate-in fade-in">
+            <h1 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center gap-2 px-1.5">
                 <ShoppingBag className="text-indigo-400"/> Tu Carrito 
                 <span className="text-sm font-normal text-slate-500 ml-2">({totals.itemCount} artículos)</span>
             </h1>
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
                 {/* Left Column: Items */}
                 <div className="lg:col-span-2 space-y-4">
                     <div className="bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
@@ -118,7 +118,7 @@ export default function Cart() {
                             const hasDiscount = original > item.price;
 
                             return (
-                                <div key={item.id} className={`flex gap-3 md:gap-4 p-3 md:p-4 ${index !== cart.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                                <div key={item.id} className={`flex gap-2 md:gap-4 p-2 md:p-4 ${index !== cart.length - 1 ? 'border-b border-slate-800' : ''}`}>
                                     {/* Image (Smaller on mobile) */}
                                     <div className="w-20 h-20 md:w-24 md:h-28 bg-black rounded-lg md:rounded-xl overflow-hidden shrink-0 border border-slate-800 relative group">
                                         {item.images && item.images[0] && <img src={item.images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />}
@@ -130,44 +130,44 @@ export default function Cart() {
                                     </div>
 
                                     {/* Details */}
-                                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 md:py-1">
-                                        <div className="flex justify-between items-start gap-2 md:gap-4">
+                                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0">
+                                        <div className="flex justify-between items-start gap-1 md:gap-4">
                                             <div>
-                                                <h4 className="font-bold text-white text-sm md:text-base leading-tight line-clamp-2">{item.title}</h4>
-                                                <p className="text-[10px] md:text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                                <h4 className="font-bold text-white text-xs md:text-base leading-tight line-clamp-2">{item.title}</h4>
+                                                <p className="text-[9px] md:text-xs text-slate-400 mt-1 flex items-center gap-1">
                                                     <span className="bg-slate-800 px-1.5 py-0.5 rounded uppercase">{item.condition}</span>
                                                 </p>
                                                 {hasDiscount && (
-                                                    <p className="text-[10px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
-                                                        <Tag size={10}/> Ahorras {(original - item.price).toFixed(2)} $ por unidad
+                                                    <p className="text-[9px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
+                                                        <Tag size={10}/> Ahorras {(original - item.price).toFixed(2)} $
                                                     </p>
                                                 )}
                                             </div>
-                                            <button onClick={() => removeFromCart(item.id)} className="text-slate-500 hover:text-red-400 p-1.5 transition-colors bg-slate-800/50 rounded-full shrink-0">
-                                                <Trash2 size={16}/>
+                                            <button onClick={() => removeFromCart(item.id)} className="text-slate-500 hover:text-red-400 p-1 transition-colors bg-slate-800/50 rounded-full shrink-0">
+                                                <Trash2 size={14}/>
                                             </button>
                                         </div>
 
-                                        <div className="flex justify-between items-end mt-2 md:mt-4">
+                                        <div className="flex justify-between items-end mt-1 md:mt-4">
                                             <div>
                                                 {hasDiscount && (
-                                                    <div className="text-[10px] md:text-xs text-slate-500 line-through mb-0.5">{original} $</div>
+                                                    <div className="text-[9px] md:text-xs text-slate-500 line-through mb-0.5">{original} $</div>
                                                 )}
-                                                <div className={`font-mono font-bold text-lg md:text-xl ${hasDiscount ? 'text-red-400' : 'text-amber-400'}`}>
+                                                <div className={`font-mono font-bold text-base md:text-xl ${hasDiscount ? 'text-red-400' : 'text-amber-400'}`}>
                                                     {item.price} $
                                                 </div>
                                                 {hasDiscount && item.quantity > 1 && (
-                                                    <div className="text-[9px] font-bold text-emerald-500/80 bg-emerald-500/5 px-1.5 py-0.5 rounded mt-1 border border-emerald-500/10 inline-block">
-                                                        Ahorro total: {((original - item.price) * item.quantity).toFixed(2)} $
+                                                    <div className="text-[8px] font-bold text-emerald-500/80 bg-emerald-500/5 px-1.5 py-0.5 rounded mt-1 border border-emerald-500/10 inline-block">
+                                                        Ahorro: {((original - item.price) * item.quantity).toFixed(2)} $
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Quantity Controls (Optimized for touch) */}
-                                            <div className="flex items-center gap-1 md:gap-3 bg-slate-800 rounded-lg p-0.5 md:p-1 border border-slate-700">
-                                                <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 md:w-7 md:h-7 flex items-center justify-center hover:bg-slate-700 rounded text-slate-300 transition-colors active:bg-slate-600"><Minus size={14}/></button>
-                                                <span className="text-sm font-bold text-white w-6 md:w-4 text-center">{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 md:w-7 md:h-7 flex items-center justify-center hover:bg-slate-700 rounded text-slate-300 transition-colors active:bg-slate-600"><Plus size={14}/></button>
+                                            <div className="flex items-center gap-1 md:gap-3 bg-slate-800 rounded-lg p-0.5 border border-slate-700">
+                                                <button onClick={() => updateQuantity(item.id, -1)} className="w-7 h-7 md:w-7 md:h-7 flex items-center justify-center hover:bg-slate-700 rounded text-slate-300 transition-colors active:bg-slate-600"><Minus size={12}/></button>
+                                                <span className="text-xs font-bold text-white w-6 md:w-4 text-center">{item.quantity}</span>
+                                                <button onClick={() => updateQuantity(item.id, 1)} className="w-7 h-7 md:w-7 md:h-7 flex items-center justify-center hover:bg-slate-700 rounded text-slate-300 transition-colors active:bg-slate-600"><Plus size={12}/></button>
                                             </div>
                                         </div>
                                     </div>
@@ -198,22 +198,22 @@ export default function Cart() {
                     </div>
 
                     {/* Order Summary (Desktop) */}
-                    <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
-                        <h3 className="font-bold text-white mb-4 text-lg">Resumen del Pedido</h3>
+                    <div className="bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-800 shadow-xl">
+                        <h3 className="font-bold text-white mb-4 text-base md:text-lg">Resumen del Pedido</h3>
                         
                         <div className="space-y-3 mb-6">
-                            <div className="flex justify-between text-slate-400 text-sm">
+                            <div className="flex justify-between text-slate-400 text-xs md:text-sm">
                                 <span>Subtotal</span>
                                 <span>{totals.subtotal.toFixed(2)} $</span>
                             </div>
                             
                             {savings > 0 && (
                                 <div className="flex flex-col gap-2 bg-emerald-900/10 p-3 rounded-xl border border-emerald-500/20">
-                                    <div className="flex justify-between text-emerald-400 text-sm font-bold">
+                                    <div className="flex justify-between text-emerald-400 text-xs md:text-sm font-bold">
                                         <span className="flex items-center gap-1"><Tag size={14}/> Descuento Aplicado</span>
                                         <span>-{savings.toFixed(2)} $</span>
                                     </div>
-                                    <div className="text-[10px] text-emerald-500/70 font-medium text-center uppercase tracking-wider">
+                                    <div className="text-[9px] md:text-[10px] text-emerald-500/70 font-medium text-center uppercase tracking-wider">
                                         ¡Estás ahorrando un {savingsPercent}% en esta compra!
                                     </div>
                                 </div>
@@ -222,8 +222,8 @@ export default function Cart() {
                             <div className="border-t border-slate-800 my-4"></div>
 
                             <div className="flex justify-between items-end">
-                                <span className="text-white font-bold">Total a Pagar</span>
-                                <span className="text-3xl font-black text-amber-400 tracking-tight">{totals.total.toFixed(2)} <span className="text-sm text-amber-600">$</span></span>
+                                <span className="text-white font-bold text-sm md:text-base">Total a Pagar</span>
+                                <span className="text-2xl md:text-3xl font-black text-amber-400 tracking-tight">{totals.total.toFixed(2)} <span className="text-sm text-amber-600">$</span></span>
                             </div>
                         </div>
 
@@ -243,7 +243,7 @@ export default function Cart() {
                         <button 
                             onClick={handleCheckout}
                             disabled={loading || (user ? Number(user.balance) < totals.total : true)}
-                            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-900/20"
+                            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-900/20"
                         >
                             {loading ? <Loader2 className="animate-spin"/> : <CheckCircle size={20}/>}
                             Confirmar Compra
