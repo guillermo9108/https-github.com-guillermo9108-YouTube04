@@ -199,7 +199,7 @@ export default function Marketplace() {
                             {/* Tags Overlay */}
                             <div className="absolute top-0 left-0 p-1.5 flex flex-col gap-1 items-start">
                                 {item.discountPercent && item.discountPercent > 0 ? (
-                                    <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-sm shadow-sm">
+                                    <span className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-md shadow-xl shadow-red-900/40 border border-red-500/30 animate-pulse">
                                         -{item.discountPercent}%
                                     </span>
                                 ) : null}

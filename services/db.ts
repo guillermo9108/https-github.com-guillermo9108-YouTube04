@@ -106,6 +106,13 @@ class DBService {
         }
     }
 
+    public async togglePriceAlert(userId: string, itemId: string): Promise<{active: boolean}> {
+        return this.request<{active: boolean}>(`action=toggle_price_alert`, { method: 'POST', body: JSON.stringify({ userId, itemId }) });
+    }
+    public async checkPriceAlert(userId: string, itemId: string): Promise<{active: boolean}> {
+        return this.request<{active: boolean}>(`action=check_price_alert&userId=${userId}&itemId=${itemId}`);
+    }
+
     public async getSystemSettings(): Promise<SystemSettings> { 
         try {
             const s = await this.request<SystemSettings>('action=get_system_settings');

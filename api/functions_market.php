@@ -39,8 +39,8 @@ function market_create_listing($pdo, $post, $files) {
             $imgs[] = 'api/uploads/market/' . $name;
         }
     }
-    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, stock, images, sellerId, category, itemCondition, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], time()]);
+    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, stock, images, sellerId, category, itemCondition, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], time()]);
     
     // NOTIFICACIÓN: Avisar a seguidores del vendedor
     require_once 'functions_interactions.php';
@@ -51,10 +51,70 @@ function market_create_listing($pdo, $post, $files) {
 
 function market_edit_listing($pdo, $input) {
     $id = $input['id']; $data = $input['data'];
+    
+    // Obtener precio actual y original
+    $stmt = $pdo->prepare("SELECT price, originalPrice, title FROM marketplace_items WHERE id = ?");
+    $stmt->execute([$id]); $old = $stmt->fetch();
+    
     $allowed = ['title', 'description', 'price', 'stock', 'status']; $fields = []; $params = [];
-    foreach ($data as $k => $v) { if (in_array($k, $allowed)) { $fields[] = "$k = ?"; $params[] = $v; } }
-    $params[] = $id; $pdo->prepare("UPDATE marketplace_items SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+    $newPrice = isset($data['price']) ? floatval($data['price']) : floatval($old['price']);
+    $origPrice = floatval($old['originalPrice'] ?: $old['price']);
+    
+    // Si el nuevo precio es menor que el original, calculamos descuento
+    $discount = 0;
+    if ($newPrice < $origPrice) {
+        $discount = round((($origPrice - $newPrice) / $origPrice) * 100);
+    } else if ($newPrice > $origPrice) {
+        // Si el usuario sube el precio por encima del original, el nuevo precio se vuelve el original
+        $origPrice = $newPrice;
+        $discount = 0;
+    }
+    
+    $data['discountPercent'] = $discount;
+    $data['originalPrice'] = $origPrice;
+    $allowed[] = 'discountPercent';
+    $allowed[] = 'originalPrice';
+
+    foreach ($data as $k => $v) { 
+        if (in_array($k, $allowed)) { 
+            $fields[] = "$k = ?"; 
+            $params[] = $v; 
+        } 
+    }
+    $params[] = $id; 
+    $pdo->prepare("UPDATE marketplace_items SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
+    
+    // NOTIFICACIÓN: Si el precio bajó, avisar a interesados
+    if ($newPrice < floatval($old['price'])) {
+        $stmtA = $pdo->prepare("SELECT userId FROM price_alerts WHERE itemId = ?");
+        $stmtA->execute([$id]); $users = $stmtA->fetchAll(PDO::FETCH_COLUMN);
+        require_once 'functions_interactions.php';
+        foreach ($users as $uid) {
+            send_direct_notification($pdo, $uid, 'SYSTEM', "¡Bajó de precio! {$old['title']} ahora cuesta \${$newPrice}", "/marketplace/{$id}");
+        }
+    }
+    
     respond(true);
+}
+
+function market_toggle_price_alert($pdo, $input) {
+    $uid = $input['userId']; $iid = $input['itemId'];
+    $check = $pdo->prepare("SELECT COUNT(*) FROM price_alerts WHERE userId = ? AND itemId = ?");
+    $check->execute([$uid, $iid]);
+    if ($check->fetchColumn() > 0) {
+        $pdo->prepare("DELETE FROM price_alerts WHERE userId = ? AND itemId = ?")->execute([$uid, $iid]);
+        $active = false;
+    } else {
+        $pdo->prepare("INSERT INTO price_alerts (userId, itemId, createdAt) VALUES (?, ?, ?)")->execute([$uid, $iid, time()]);
+        $active = true;
+    }
+    respond(true, ['active' => $active]);
+}
+
+function market_check_price_alert($pdo, $uid, $iid) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM price_alerts WHERE userId = ? AND itemId = ?");
+    $stmt->execute([$uid, $iid]);
+    respond(true, ['active' => $stmt->fetchColumn() > 0]);
 }
 
 function market_admin_delete_listing($pdo, $input) {

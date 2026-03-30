@@ -109,6 +109,14 @@ function getAppSchema() {
             ],
             'pk' => 'PRIMARY KEY (subscriberId, creatorId)'
         ],
+        'price_alerts' => [
+            'cols' => [
+                'userId' => 'VARCHAR(50)',
+                'itemId' => 'VARCHAR(50)',
+                'createdAt' => 'BIGINT'
+            ],
+            'pk' => 'PRIMARY KEY (userId, itemId)'
+        ],
         'comments' => [
             'cols' => [
                 'id' => 'VARCHAR(50) PRIMARY KEY',

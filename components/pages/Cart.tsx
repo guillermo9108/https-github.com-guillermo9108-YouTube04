@@ -137,6 +137,11 @@ export default function Cart() {
                                                 <p className="text-[10px] md:text-xs text-slate-400 mt-1 flex items-center gap-1">
                                                     <span className="bg-slate-800 px-1.5 py-0.5 rounded uppercase">{item.condition}</span>
                                                 </p>
+                                                {hasDiscount && (
+                                                    <p className="text-[10px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
+                                                        <Tag size={10}/> Ahorras {(original - item.price).toFixed(2)} $ por unidad
+                                                    </p>
+                                                )}
                                             </div>
                                             <button onClick={() => removeFromCart(item.id)} className="text-slate-500 hover:text-red-400 p-1.5 transition-colors bg-slate-800/50 rounded-full shrink-0">
                                                 <Trash2 size={16}/>
@@ -151,6 +156,11 @@ export default function Cart() {
                                                 <div className={`font-mono font-bold text-lg md:text-xl ${hasDiscount ? 'text-red-400' : 'text-amber-400'}`}>
                                                     {item.price} $
                                                 </div>
+                                                {hasDiscount && item.quantity > 1 && (
+                                                    <div className="text-[9px] font-bold text-emerald-500/80 bg-emerald-500/5 px-1.5 py-0.5 rounded mt-1 border border-emerald-500/10 inline-block">
+                                                        Ahorro total: {((original - item.price) * item.quantity).toFixed(2)} $
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Quantity Controls (Optimized for touch) */}
@@ -198,9 +208,14 @@ export default function Cart() {
                             </div>
                             
                             {savings > 0 && (
-                                <div className="flex justify-between text-emerald-400 text-sm font-medium bg-emerald-900/10 p-2 rounded-lg border border-emerald-500/20">
-                                    <span className="flex items-center gap-1"><Tag size={14}/> Descuento ({savingsPercent}%)</span>
-                                    <span>-{savings.toFixed(2)} $</span>
+                                <div className="flex flex-col gap-2 bg-emerald-900/10 p-3 rounded-xl border border-emerald-500/20">
+                                    <div className="flex justify-between text-emerald-400 text-sm font-bold">
+                                        <span className="flex items-center gap-1"><Tag size={14}/> Descuento Aplicado</span>
+                                        <span>-{savings.toFixed(2)} $</span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-500/70 font-medium text-center uppercase tracking-wider">
+                                        ¡Estás ahorrando un {savingsPercent}% en esta compra!
+                                    </div>
                                 </div>
                             )}
 

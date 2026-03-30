@@ -6,7 +6,7 @@ import { MarketplaceItem, MarketplaceReview, CartItem } from '../../types';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 // Added Loader2 and MessageSquare to imports to fix missing name errors
-import { ShoppingBag, ChevronLeft, User, Tag, ShieldCheck, ShoppingCart, Star, Edit3, Send, AlertTriangle, Check, ShieldAlert, Fingerprint, Loader2, MessageSquare } from 'lucide-react';
+import { ShoppingBag, ChevronLeft, User, Tag, ShieldCheck, ShoppingCart, Star, Edit3, Send, AlertTriangle, Check, ShieldAlert, Fingerprint, Loader2, MessageSquare, Bell, BellOff, UserPlus, UserMinus } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
 export default function MarketplaceItemView() {
@@ -20,6 +20,10 @@ export default function MarketplaceItemView() {
     const [reviews, setReviews] = useState<MarketplaceReview[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeImg, setActiveImg] = useState(0);
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [hasPriceAlert, setHasPriceAlert] = useState(false);
+    const [submittingSub, setSubmittingSub] = useState(false);
+    const [submittingAlert, setSubmittingAlert] = useState(false);
 
     // Review Form
     const [rating, setRating] = useState(5);
@@ -29,12 +33,56 @@ export default function MarketplaceItemView() {
     useEffect(() => {
         if(id) {
             db.getMarketplaceItem(id).then((data: MarketplaceItem | null) => {
-                if (data) setItem(data);
+                if (data) {
+                    setItem(data);
+                    if (user) {
+                        db.checkSubscription(user.id, data.sellerId).then(setIsSubscribed);
+                        db.checkPriceAlert(user.id, id).then(res => setHasPriceAlert(res.active));
+                    }
+                }
                 setLoading(false);
             });
             db.getReviews(id).then(setReviews);
         }
-    }, [id]);
+    }, [id, user?.id]);
+
+    const handleToggleSubscribe = async () => {
+        if (!user) {
+            toast.error("Debes iniciar sesión para suscribirte");
+            return;
+        }
+        if (!item) return;
+
+        setSubmittingSub(true);
+        try {
+            const result = await db.toggleSubscribe(user.id, item.sellerId);
+            setIsSubscribed(result.isSubscribed);
+            toast.success(result.isSubscribed ? "Suscrito al vendedor" : "Suscripción cancelada");
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setSubmittingSub(false);
+        }
+    };
+
+    const handleTogglePriceAlert = async () => {
+        if (!user) {
+            toast.error("Debes iniciar sesión para activar alertas");
+            return;
+        }
+        if (!id) return;
+
+        setSubmittingAlert(true);
+        try {
+            const result = await db.togglePriceAlert(user.id, id);
+            setHasPriceAlert(result.active);
+            toast.success(result.active ? "Alerta de precio activada" : "Alerta de precio desactivada");
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setSubmittingAlert(false);
+        }
+    };
 
     const handleAddReview = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -142,14 +190,24 @@ export default function MarketplaceItemView() {
 
                             <div className="mb-10">
                                 {item.discountPercent && item.discountPercent > 0 ? (
-                                    <div className="flex items-baseline gap-3">
-                                        <span className="text-slate-600 line-through text-xl font-bold">{item.originalPrice} $</span>
-                                        <span className="text-5xl font-black text-red-500 tracking-tighter">{item.price} <span className="text-2xl">$</span></span>
+                                    <div className="space-y-2">
+                                        <div className="flex items-baseline gap-3">
+                                            <span className="text-slate-600 line-through text-xl font-bold">{item.originalPrice} $</span>
+                                            <span className="text-5xl font-black text-red-500 tracking-tighter">{item.price} <span className="text-2xl">$</span></span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-red-900/20">
+                                                {item.discountPercent}% OFF
+                                            </span>
+                                            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+                                                ¡Ahorras {(Number(item.originalPrice) - Number(item.price)).toFixed(2)} $!
+                                            </span>
+                                        </div>
                                     </div>
                                 ) : (
                                     <span className="text-5xl font-black text-emerald-400 tracking-tighter">{item.price} <span className="text-2xl">$</span></span>
                                 )}
-                                <div className="text-[10px] text-slate-500 mt-3 flex flex-wrap gap-2">
+                                <div className="text-[10px] text-slate-500 mt-4 flex flex-wrap gap-2">
                                     <span className="bg-slate-950 border border-white/5 px-3 py-1 rounded-full font-black uppercase tracking-widest">{item.category}</span>
                                     <span className="bg-slate-950 border border-white/5 px-3 py-1 rounded-full font-black uppercase tracking-widest">{item.condition}</span>
                                     {item.stock !== undefined && item.stock < 5 && item.stock > 0 && <span className="bg-red-600 text-white px-3 py-1 rounded-full font-black uppercase tracking-widest animate-pulse">¡STOCK CRÍTICO: {item.stock}!</span>}
@@ -195,6 +253,34 @@ export default function MarketplaceItemView() {
                                 >
                                     {isInCart ? <><Check size={20}/> EN TU CARRITO</> : (item.status === 'ACTIVO' ? <><ShoppingCart size={20}/> AÑADIR AL CARRITO</> : 'ARTÍCULO AGOTADO')}
                                 </button>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={handleTogglePriceAlert}
+                                        disabled={submittingAlert}
+                                        className={`flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                                            hasPriceAlert 
+                                            ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' 
+                                            : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        {submittingAlert ? <Loader2 className="animate-spin" size={16}/> : (hasPriceAlert ? <BellOff size={16}/> : <Bell size={16}/>)}
+                                        {hasPriceAlert ? 'Quitar Alerta' : 'Avisar Rebaja'}
+                                    </button>
+
+                                    <button 
+                                        onClick={handleToggleSubscribe}
+                                        disabled={submittingSub}
+                                        className={`flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                                            isSubscribed 
+                                            ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-400' 
+                                            : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        {submittingSub ? <Loader2 className="animate-spin" size={16}/> : (isSubscribed ? <UserMinus size={16}/> : <UserPlus size={16}/>)}
+                                        {isSubscribed ? 'Siguiendo' : 'Seguir Vendedor'}
+                                    </button>
+                                </div>
                                 
                                 {!isInCart && item.status === 'ACTIVO' && (
                                     <button 

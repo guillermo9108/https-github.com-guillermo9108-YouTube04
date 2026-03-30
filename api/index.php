@@ -220,6 +220,8 @@ try {
         case 'get_reviews': market_get_reviews($pdo, $_GET['itemId'] ?? ''); break;
         case 'get_my_sales': market_get_my_sales($pdo, $_GET['userId'] ?? ''); break;
         case 'add_review': market_add_review($pdo, $input); break;
+        case 'toggle_price_alert': market_toggle_price_alert($pdo, $input); break;
+        case 'check_price_alert': market_check_price_alert($pdo, $_GET['userId'] ?? '', $_GET['itemId'] ?? ''); break;
         case 'get_system_settings': admin_get_settings($pdo); break;
         case 'update_system_settings': admin_update_settings($pdo, $input); break;
         case 'admin_upload_default_thumb': admin_upload_default_thumb($pdo, $_POST, $_FILES); break;
