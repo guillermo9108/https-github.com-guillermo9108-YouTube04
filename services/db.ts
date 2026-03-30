@@ -248,6 +248,10 @@ class DBService {
         return this.request<void>(`action=mark_watched`, { method: 'POST', body: JSON.stringify({ userId, videoId }) });
     }
 
+    public async markSkipped(userId: string, videoId: string): Promise<void> {
+        return this.request<void>(`action=mark_skipped`, { method: 'POST', body: JSON.stringify({ userId, videoId }) });
+    }
+
     public async getComments(videoId: string): Promise<Comment[]> { return this.request<Comment[]>(`action=get_comments&id=${videoId}`); }
 
     public async addComment(userId: string, videoId: string, text: string): Promise<Comment> {

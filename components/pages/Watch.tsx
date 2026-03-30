@@ -286,7 +286,7 @@ export default function Watch() {
             const progress = el.currentTime / el.duration;
             if (progress >= 0.95 && !interaction?.isWatched && user) {
                 db.markWatched(user.id, video.id).then(() => {
-                    setInteraction(prev => prev ? { ...prev, isWatched: true } : { isWatched: true, liked: false, disliked: false });
+                    setInteraction(prev => prev ? { ...prev, isWatched: true, isSkipped: false } : { isWatched: true, liked: false, disliked: false, isSkipped: false });
                 });
             }
         }

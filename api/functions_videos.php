@@ -196,14 +196,15 @@ function video_get_all($pdo) {
             // 2: Disliked
             $orderBy = "
                 (CASE 
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 3
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isSkipped = 1 LIMIT 1) THEN 1
                     ELSE 0 
                 END) ASC,
                 (CASE WHEN (SELECT 1 FROM subscriptions s WHERE s.subscriberId = ? AND s.creatorId = v.creatorId LIMIT 1) THEN 100 ELSE 0 END + 
                 ((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5)) DESC, 
                 $randClause";
-            $orderParams = [$userId, $userId, $userId];
+            $orderParams = [$userId, $userId, $userId, $userId];
         } else {
             // Para invitados: Popularidad con decaimiento temporal
             $orderBy = "((v.likes * 10) + v.views + 10) / POW((($now - v.createdAt) / 3600) + 2, 1.5) DESC, $randClause";
@@ -212,12 +213,13 @@ function video_get_all($pdo) {
         if (!empty($userId)) {
             $orderBy = "
                 (CASE 
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 3
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isSkipped = 1 LIMIT 1) THEN 1
                     ELSE 0 
                 END) ASC,
                 $randClause";
-            $orderParams = [$userId, $userId];
+            $orderParams = [$userId, $userId, $userId];
         } else {
             $orderBy = $randClause;
         }
@@ -225,12 +227,13 @@ function video_get_all($pdo) {
         if (!empty($userId)) {
             $orderBy = "
                 (CASE 
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 3
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isSkipped = 1 LIMIT 1) THEN 1
                     ELSE 0 
                 END) ASC,
                 v.title ASC";
-            $orderParams = [$userId, $userId];
+            $orderParams = [$userId, $userId, $userId];
         } else {
             $orderBy = "v.title ASC";
         }
@@ -238,12 +241,13 @@ function video_get_all($pdo) {
         if (!empty($userId)) {
             $orderBy = "
                 (CASE 
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 2
-                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 1
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 3
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isSkipped = 1 LIMIT 1) THEN 1
                     ELSE 0 
                 END) ASC,
                 v.createdAt DESC";
-            $orderParams = [$userId, $userId];
+            $orderParams = [$userId, $userId, $userId];
         } else {
             $orderBy = "v.createdAt DESC";
         }

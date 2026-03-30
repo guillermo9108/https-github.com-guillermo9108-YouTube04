@@ -111,13 +111,15 @@ function interact_rate($pdo, $input) {
     $pdo->prepare("UPDATE videos SET likes = ?, dislikes = ? WHERE id = ?")->execute([$likes, $dislikes, $vid]);
     
     $isWatched = (bool)$pdo->query("SELECT isWatched FROM interactions WHERE userId = '$uid' AND videoId = '$vid'")->fetchColumn();
+    $isSkipped = (bool)$pdo->query("SELECT isSkipped FROM interactions WHERE userId = '$uid' AND videoId = '$vid'")->fetchColumn();
     
     respond(true, [
         'newLikeCount' => $likes, 
         'newDislikeCount' => $dislikes,
         'liked' => $resLiked,
         'disliked' => $resDisliked,
-        'isWatched' => $isWatched
+        'isWatched' => $isWatched,
+        'isSkipped' => $isSkipped
     ]);
 }
 
@@ -127,20 +129,36 @@ function interact_get($pdo, $userId, $videoId) {
     if ($res) {
         $liked = $res['liked'] !== null && (int)$res['liked'] === 1;
         $disliked = $res['disliked'] !== null && (int)$res['disliked'] === 1;
-        respond(true, ['liked' => $liked, 'disliked' => $disliked, 'isWatched' => (bool)$res['isWatched']]);
+        respond(true, [
+            'liked' => $liked, 
+            'disliked' => $disliked, 
+            'isWatched' => (bool)$res['isWatched'],
+            'isSkipped' => (bool)($res['isSkipped'] ?? false)
+        ]);
     } else {
-        respond(true, ['liked' => false, 'disliked' => false, 'isWatched' => false]);
+        respond(true, ['liked' => false, 'disliked' => false, 'isWatched' => false, 'isSkipped' => false]);
     }
 }
 
 function interact_get_activity($pdo, $userId) {
     $watched = $pdo->prepare("SELECT videoId FROM interactions WHERE userId = ? AND isWatched = 1"); $watched->execute([$userId]);
     $liked = $pdo->prepare("SELECT videoId FROM interactions WHERE userId = ? AND liked = 1"); $liked->execute([$userId]);
-    respond(true, ['watched' => $watched->fetchAll(PDO::FETCH_COLUMN), 'liked' => $liked->fetchAll(PDO::FETCH_COLUMN)]);
+    $skipped = $pdo->prepare("SELECT videoId FROM interactions WHERE userId = ? AND isSkipped = 1"); $skipped->execute([$userId]);
+    respond(true, [
+        'watched' => $watched->fetchAll(PDO::FETCH_COLUMN), 
+        'liked' => $liked->fetchAll(PDO::FETCH_COLUMN),
+        'skipped' => $skipped->fetchAll(PDO::FETCH_COLUMN)
+    ]);
 }
 
 function interact_mark_watched($pdo, $input) {
-    $pdo->prepare("INSERT INTO interactions (userId, videoId, isWatched) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE isWatched = 1")->execute([$input['userId'], $input['videoId']]);
+    $pdo->prepare("INSERT INTO interactions (userId, videoId, isWatched, isSkipped) VALUES (?, ?, 1, 0) ON DUPLICATE KEY UPDATE isWatched = 1, isSkipped = 0")->execute([$input['userId'], $input['videoId']]);
+    respond(true);
+}
+
+function interact_mark_skipped($pdo, $input) {
+    // Solo marcar como saltado si NO ha sido visto antes
+    $pdo->prepare("INSERT INTO interactions (userId, videoId, isSkipped) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE isSkipped = CASE WHEN isWatched = 1 THEN 0 ELSE 1 END")->execute([$input['userId'], $input['videoId']]);
     respond(true);
 }
 

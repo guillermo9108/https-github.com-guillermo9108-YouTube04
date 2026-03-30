@@ -75,6 +75,7 @@ function auth_register($pdo, $input) {
         $pdo->prepare("UPDATE users SET currentSessionId = ?, lastActive = ?, lastDeviceId = ? WHERE id = ?")
             ->execute([$sid, time(), $userAgent, $id]);
             
+        // Refetch data to include avatarUrl
         $data = _get_user_data($pdo, $id);
         $data['sessionToken'] = $sid;
         respond(true, $data);
@@ -173,9 +174,12 @@ function auth_upload_avatar($pdo, $userId, $file) {
     if ($file['error'] !== UPLOAD_ERR_OK) return null;
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $name = "avatar_{$userId}." . $ext;
-    if (!is_dir('uploads/avatars/')) mkdir('uploads/avatars/', 0777, true);
-    move_uploaded_file($file['tmp_name'], 'uploads/avatars/' . $name);
-    $url = 'api/uploads/avatars/' . $name;
-    $pdo->prepare("UPDATE users SET avatarUrl = ? WHERE id = ?")->execute([$url, $userId]);
-    return $url;
+    $uploadDir = __DIR__ . '/uploads/avatars/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    if (move_uploaded_file($file['tmp_name'], $uploadDir . $name)) {
+        $url = 'api/uploads/avatars/' . $name;
+        $pdo->prepare("UPDATE users SET avatarUrl = ? WHERE id = ?")->execute([$url, $userId]);
+        return $url;
+    }
+    return null;
 }

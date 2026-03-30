@@ -91,6 +91,7 @@ export interface UserInteraction {
   liked: boolean;
   disliked: boolean;
   isWatched: boolean;
+  isSkipped: boolean;
   newLikeCount?: number;
   newDislikeCount?: number;
 }

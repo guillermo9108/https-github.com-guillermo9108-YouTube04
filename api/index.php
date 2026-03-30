@@ -195,6 +195,7 @@ try {
             break;
         case 'get_interaction': interact_get($pdo, $_GET['userId'] ?? '', $_GET['videoId'] ?? ''); break;
         case 'mark_watched': interact_mark_watched($pdo, $input); break;
+        case 'mark_skipped': interact_mark_skipped($pdo, $input); break;
         case 'get_user_activity': interact_get_activity($pdo, $_GET['userId'] ?? ''); break;
         case 'get_comments': interact_get_comments($pdo, $_GET['id'] ?? ''); break;
         case 'add_comment': interact_add_comment($pdo, $input); break;

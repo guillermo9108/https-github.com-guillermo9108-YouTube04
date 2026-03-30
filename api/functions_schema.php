@@ -234,7 +234,8 @@ function getAppSchema() {
                 'videoId' => 'VARCHAR(50)',
                 'liked' => 'TINYINT(1) DEFAULT 0',
                 'disliked' => 'TINYINT(1) DEFAULT 0',
-                'isWatched' => 'TINYINT(1) DEFAULT 0'
+                'isWatched' => 'TINYINT(1) DEFAULT 0',
+                'isSkipped' => 'TINYINT(1) DEFAULT 0'
             ],
             'pk' => 'PRIMARY KEY (userId, videoId)'
         ],

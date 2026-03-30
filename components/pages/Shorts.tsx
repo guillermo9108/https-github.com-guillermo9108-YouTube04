@@ -56,6 +56,10 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
     } else { 
         try {
             el.pause(); 
+            // Si el video deja de estar activo y no fue marcado como visto, lo marcamos como "pasado/saltado"
+            if (user && !interaction?.isWatched) {
+                db.markSkipped(user.id, video.id);
+            }
             // IMPORTANTE: Limpiar el src para cerrar la conexión del worker PHP
             if (!isNear) {
                 el.removeAttribute('src');
@@ -63,7 +67,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
             }
         } catch (e) {}
     }
-  }, [isActive, video.id, isNear]);
+  }, [isActive, video.id, isNear, user, interaction?.isWatched]);
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -71,7 +75,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
       const progress = el.currentTime / el.duration;
       if (progress >= 0.95 && !interaction?.isWatched && user) {
         db.markWatched(user.id, video.id).then(() => {
-          setInteraction(prev => prev ? { ...prev, isWatched: true } : { isWatched: true, liked: false, disliked: false });
+          setInteraction(prev => prev ? { ...prev, isWatched: true, isSkipped: false } : { isWatched: true, liked: false, disliked: false, isSkipped: false });
         });
       }
     }

@@ -292,6 +292,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           e.stopPropagation();
           setCurrentAlbumIndex(0);
           setShowImageModal(true);
+          if (user) {
+              db.markWatched(user.id, video.id).catch(console.error);
+          }
       }
   };
 
