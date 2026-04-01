@@ -258,7 +258,7 @@ export default function SellerDashboard() {
           )}
 
           {activeTab === 'PENDING' && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {pendingOrders.length === 0 ? (
                 <div className="bg-slate-900/50 border border-white/5 rounded-[32px] p-12 text-center flex flex-col items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-600">
@@ -271,42 +271,62 @@ export default function SellerDashboard() {
                 </div>
               ) : (
                 pendingOrders.map((order: any) => (
-                  <div key={order.orderItemId} className="bg-slate-900/50 border border-white/5 rounded-[32px] overflow-hidden">
+                  <div key={order.id} className="bg-slate-900/50 border border-white/5 rounded-[32px] overflow-hidden">
                     <div className="p-4 bg-amber-500/10 border-b border-white/5 flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <Clock size={16} className="text-amber-500" />
-                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pendiente de Pago Directo</span>
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pedido Directo #{order.id.slice(-6)}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt * 1000).toLocaleDateString()}</span>
                     </div>
-                    <div className="p-6 flex flex-col md:flex-row gap-6">
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 shrink-0 border border-white/5">
-                        <img src={order.imageUrl} alt={order.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <div className="p-6 space-y-6">
+                      <div className="flex items-center gap-3 pb-4 border-b border-white/5">
+                        <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Comprador</p>
+                          <p className="text-sm font-black text-white">@{order.buyerName}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 space-y-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-lg font-black tracking-tighter leading-tight">{order.title}</h4>
-                            <div className="flex items-center gap-2 mt-1">
-                              <User size={12} className="text-slate-500" />
-                              <span className="text-xs font-bold text-indigo-400">Comprador: @{order.buyerName}</span>
+
+                      <div className="space-y-4">
+                        {order.items.map((item: any) => (
+                          <div key={item.id} className="flex items-center gap-4 p-3 bg-slate-950/30 rounded-2xl border border-white/5">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-white/5">
+                              <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-black tracking-tight text-white truncate">{item.title}</h4>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">
+                                Cant: {item.quantity} • ${Number(item.price).toFixed(2)} c/u
+                              </p>
+                              <div className="mt-2">
+                                {item.status === 'PAID' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest">
+                                    <CheckCircle size={10} /> Pagado
+                                  </span>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleMarkPaid(item.id)}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-2 text-[9px] uppercase tracking-widest"
+                                  >
+                                    <CheckCircle size={12} />
+                                    Confirmar Pago
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-white">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-black tracking-tighter">${Number(order.price).toFixed(2)}</p>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase">Cant: {order.quantity}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2">
-                          <button 
-                            onClick={() => handleMarkPaid(order.orderItemId)}
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest"
-                          >
-                            <CheckCircle size={16} />
-                            Marcar como Pagado
-                          </button>
-                        </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Total del Pedido</p>
+                        <p className="text-xl font-black text-indigo-400 tracking-tighter">${Number(order.totalAmount).toFixed(2)}</p>
                       </div>
                     </div>
                   </div>
@@ -341,7 +361,13 @@ export default function SellerDashboard() {
                       {order.items.map((item: any) => (
                         <div key={item.id} className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-white/5">
-                            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            {item.thumbnail ? (
+                              <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                <ShoppingBag size={20} />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h5 className="text-sm font-bold text-white truncate">{item.title}</h5>

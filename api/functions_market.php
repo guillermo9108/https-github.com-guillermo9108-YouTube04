@@ -121,9 +121,14 @@ function market_get_seller_stats($pdo, $sellerId) {
     $stmtH->execute([$sellerId]);
     $history = $stmtH->fetchAll();
     foreach ($history as &$h) {
-        $stmtItems = $pdo->prepare("SELECT oi.*, mi.title FROM marketplace_order_items oi JOIN marketplace_items mi ON oi.itemId = mi.id WHERE oi.orderId = ?");
+        $stmtItems = $pdo->prepare("SELECT oi.*, mi.title, mi.images FROM marketplace_order_items oi JOIN marketplace_items mi ON oi.itemId = mi.id WHERE oi.orderId = ?");
         $stmtItems->execute([$h['id']]);
         $h['items'] = $stmtItems->fetchAll();
+        foreach ($h['items'] as &$item) {
+            $imgs = json_decode($item['images'] ?: '[]', true);
+            $item['thumbnail'] = count($imgs) > 0 ? fix_url($imgs[0]) : null;
+            unset($item['images']);
+        }
     }
     respond(true, ['summary' => $summary, 'history' => $history]);
 }
@@ -296,7 +301,7 @@ function market_checkout($pdo, $input) {
             // NOTIFICACIÓN
             require_once 'functions_interactions.php';
             $msg = ($paymentMethod === 'PLATFORM') ? "Vendiste artículos a @{$buyerName}." : "@{$buyerName} quiere comprar en persona. Revisa tus pedidos pendientes.";
-            send_direct_notification($pdo, $sellerId, 'SALE', $msg, "/profile");
+            send_direct_notification($pdo, $sellerId, 'SALE', $msg, "/seller-dashboard");
         }
         
         if ($paymentMethod === 'PLATFORM') {

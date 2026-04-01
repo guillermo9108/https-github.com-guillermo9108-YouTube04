@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from '../Router';
+import { useParams, useNavigate, Link } from '../Router';
 import { db } from '../../services/db';
 import { MarketplaceItem, MarketplaceReview, CartItem } from '../../types';
 import { useCart } from '../../context/CartContext';
@@ -351,6 +351,19 @@ export default function MarketplaceItemView() {
                     </div>
                 </div>
             </div>
+
+            {/* Floating Cart Button */}
+            <Link 
+                to="/cart" 
+                className="fixed bottom-24 right-6 z-50 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-2xl shadow-indigo-500/40 transition-all active:scale-90 border-2 border-white/10 group"
+            >
+                <ShoppingCart size={24} className="group-hover:scale-110 transition-transform" />
+                {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 border-2 border-black rounded-full flex items-center justify-center text-[10px] font-black">
+                        {cart.length}
+                    </span>
+                )}
+            </Link>
 
             {/* Reviews Section */}
             <div className="mt-16 px-4">

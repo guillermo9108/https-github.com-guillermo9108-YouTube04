@@ -4,7 +4,8 @@ import { db } from '../../services/db';
 import { MarketplaceItem } from '../../types';
 import { Link, useNavigate } from '../Router';
 import { useCart } from '../../context/CartContext';
-import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal } from 'lucide-react';
+import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Marketplace() {
     const navigate = useNavigate();
@@ -14,6 +15,8 @@ export default function Marketplace() {
     const [showFilters, setShowFilters] = useState(false);
     const [selectedSection, setSelectedSection] = useState<'TODOS' | 'FLASH' | 'BEST' | 'RECENT' | 'POPULAR' | 'CHEAP'>('TODOS');
     const [visibleCount, setVisibleCount] = useState(20);
+    const [pendingCount, setPendingCount] = useState(0);
+    const { user } = useAuth();
 
     // Filters
     const [search, setSearch] = useState('');
@@ -28,7 +31,13 @@ export default function Marketplace() {
             setItems(data);
             setLoading(false);
         });
-    }, []);
+
+        if (user) {
+            db.getSellerOrders(user.id).then(orders => {
+                setPendingCount(orders.length);
+            });
+        }
+    }, [user]);
 
     // Derived Categories & Tags
     const baseCategories = ['TODOS', ...Array.from(new Set(items.map(i => i.category || 'OTRO')))];
@@ -71,27 +80,25 @@ export default function Marketplace() {
     return (
         <div className="pb-20 max-w-7xl mx-auto px-2 md:px-6 pt-4">
             
-            {/* Header with Cart & Search */}
+            {/* Header with Search */}
             <div className="sticky top-0 z-30 bg-black/95 backdrop-blur-md pb-4 pt-2 -mx-2 px-2 md:-mx-6 md:px-6 border-b border-slate-800/50 mb-4">
                 <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 font-serif tracking-wide">
-                            <ShoppingBag className="text-indigo-400" size={24}/> 
-                            Marketplace
-                        </h1>
+                    <div className="flex items-center gap-3">
+                        <Link to="/sell" className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20">
+                            + Vender Artículo
+                        </Link>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Link to="/sell" className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-full font-bold text-xs md:text-sm border border-slate-700 transition-all">
-                            + Vender
-                        </Link>
-                        <Link to="/cart" className="relative p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all shadow-lg shadow-indigo-500/20">
-                            <ShoppingCart size={20} />
-                            {cart.length > 0 && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 border-2 border-black rounded-full flex items-center justify-center text-[10px] font-bold">
-                                    {cart.length}
-                                </span>
-                            )}
-                        </Link>
+                        {user && (
+                            <Link to="/seller-dashboard" className="relative p-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-full transition-all border border-slate-800">
+                                <Bell size={20} className={pendingCount > 0 ? "text-amber-400 animate-pulse" : "text-slate-400"} />
+                                {pendingCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 border-2 border-black rounded-full flex items-center justify-center text-[10px] font-black text-black">
+                                        {pendingCount}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -329,6 +336,19 @@ export default function Marketplace() {
                 ))}
             </div>
             
+            {/* Floating Cart Button */}
+            <Link 
+                to="/cart" 
+                className="fixed bottom-24 right-6 z-50 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-2xl shadow-indigo-500/40 transition-all active:scale-90 border-2 border-white/10 group"
+            >
+                <ShoppingCart size={24} className="group-hover:scale-110 transition-transform" />
+                {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 border-2 border-black rounded-full flex items-center justify-center text-[10px] font-black">
+                        {cart.length}
+                    </span>
+                )}
+            </Link>
+
             {/* Pagination / Load More */}
             {filteredItems.length > visibleCount && (
                 <div className="flex justify-center mt-10">
