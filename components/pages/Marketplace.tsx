@@ -290,12 +290,14 @@ export default function Marketplace() {
 
                             {/* Stock Status */}
                             {item.stock === 0 || item.status === 'AGOTADO' ? (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden bg-black/20 backdrop-blur-[1px]">
-                                    <div className="bg-red-600 text-white text-[12px] md:text-[14px] font-black py-1 px-12 transform -rotate-45 shadow-2xl border-y-2 border-white/30 uppercase tracking-widest whitespace-nowrap">
-                                        Agotado
-                                    </div>
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden bg-black/40 backdrop-blur-[1px]">
+                                    <img 
+                                        src="https://www.pngkit.com/png/full/245-2458849_stamp-agotado-png.png" 
+                                        className="w-4/5 h-auto object-contain transform -rotate-12 drop-shadow-2xl"
+                                        alt="Agotado"
+                                    />
                                 </div>
-                            ) : item.stock && item.stock <= 5 ? (
+                            ) : item.stock && item.stock > 0 && item.stock <= 5 ? (
                                 <div className="absolute bottom-0 left-0 right-0 p-1.5 pointer-events-none">
                                     <div className="bg-red-600/90 backdrop-blur-md text-white text-[9px] font-black py-1 text-center rounded-md border border-red-400/30 uppercase tracking-tighter animate-pulse">
                                         ¡Casi Agotado! ({item.stock})
