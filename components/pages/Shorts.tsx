@@ -219,6 +219,8 @@ export default function Shorts() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isUnseenMode, setIsUnseenMode] = useState(true);
+  const loadedVideoIds = useRef<Set<string>>(new Set());
   const sessionSeed = useMemo(() => Math.random().toString(36).substring(7), []);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,28 +255,33 @@ export default function Shorts() {
     );
   }
 
-  const fetchShorts = async (p: number) => {
-    if (loading || (!hasMore && p !== 0)) return;
+  const fetchShorts = async (p: number, forceAll: boolean = false) => {
+    if (loading || (!hasMore && p !== 0 && !forceAll)) return;
     setLoading(true);
     
+    const currentMode = forceAll ? false : isUnseenMode;
+    
     try {
-        console.log('Fetching shorts for page:', p);
-        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed);
+        console.log('Fetching shorts for page:', p, 'Mode:', currentMode ? 'UNSEEN' : 'ALL');
+        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed, currentMode);
         console.log('Shorts response:', res);
+        
         const shortsOnly = res.videos.filter(v => {
-            if (!v) return false;
+            if (!v || loadedVideoIds.current.has(v.id)) return false;
             const path = (v as any).rawPath || v.videoUrl || '';
             const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
             const isAudio = Number(v.is_audio) === 1;
             const duration = Number(v.duration || 0);
             return !isImage && !isAudio && (duration < 300 || duration === 0);
         });
+        
         console.log('Filtered shorts:', shortsOnly.length);
         
         if (shortsOnly.length > 0) {
+            shortsOnly.forEach(v => loadedVideoIds.current.add(v.id));
             setVideos(prev => {
                 const newBatch = shortsOnly;
-                if (p === 0) return diversifyBatch(newBatch, []);
+                if (p === 0 && !prev.length) return diversifyBatch(newBatch, []);
                 return [...prev, ...diversifyBatch(newBatch, prev)];
             });
             setHasMore(res.hasMore);
@@ -282,7 +289,14 @@ export default function Shorts() {
         } else if (res.hasMore) {
             // If we filtered everything out but there's more, fetch next page automatically
             setLoading(false);
-            fetchShorts(p + 1);
+            fetchShorts(p + 1, forceAll);
+            return;
+        } else if (currentMode) {
+            // No more unseen videos, switch to ALL mode
+            console.log('No more unseen videos, switching to ALL mode');
+            setIsUnseenMode(false);
+            setLoading(false);
+            fetchShorts(0, true);
             return;
         } else {
             setHasMore(false);

@@ -126,9 +126,15 @@ function video_get_all($pdo) {
     $userId = trim($_GET['userId'] ?? '');
     $isShorts = !empty($_GET['shorts']); 
     $seed = trim($_GET['seed'] ?? '');
+    $onlyUnseen = !empty($_GET['only_unseen']);
 
     $params = []; 
     $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
+
+    if ($onlyUnseen && !empty($userId)) {
+        $where[] = "NOT EXISTS (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND (i.isWatched = 1 OR i.isSkipped = 1))";
+        $params[] = $userId;
+    }
 
     if ($isShorts) { 
         $where[] = "(v.duration < 300 OR v.duration = 0 OR v.duration IS NULL)"; 

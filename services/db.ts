@@ -80,9 +80,9 @@ class DBService {
         return this.request<VideoPagedResponse>(query);
     }
 
-    public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = ''): Promise<VideoPagedResponse> {
+    public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = '', onlyUnseen: boolean = false): Promise<VideoPagedResponse> {
         const offset = page * limit;
-        const query = `action=get_videos&limit=${limit}&offset=${offset}&shorts=1&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}&seed=${encodeURIComponent(seed)}`;
+        const query = `action=get_videos&limit=${limit}&offset=${offset}&shorts=1&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}&seed=${encodeURIComponent(seed)}${onlyUnseen ? '&only_unseen=1' : ''}`;
         return this.request<VideoPagedResponse>(query);
     }
 

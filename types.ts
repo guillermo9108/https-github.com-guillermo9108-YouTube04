@@ -207,6 +207,11 @@ export interface MarketplaceItem {
     sellerAvatarUrl?: string;
     isVerifiedSeller?: boolean | number;
     is_featured?: boolean | number;
+    salesCount?: number;
+    popularity?: number;
+    isFlashSale?: boolean;
+    tags?: string[];
+    customAttributes?: Record<string, string>;
 }
 
 export interface MarketplaceReview {

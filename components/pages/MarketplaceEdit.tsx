@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { db } from '../../services/db';
 import { useNavigate, useParams } from '../Router';
-import { Save, Tag, Percent, Archive, ArrowLeft, AlertCircle, ShoppingBag } from 'lucide-react';
+import { Save, Tag, Percent, Archive, ArrowLeft, AlertCircle, ShoppingBag, Plus, X, Trash2, CheckCircle2, Loader2, Info, Sparkles, Zap, Minus, Package } from 'lucide-react';
 import { MarketplaceItem } from '../../types';
 
 export default function MarketplaceEdit() {
@@ -20,6 +20,29 @@ export default function MarketplaceEdit() {
     const [discount, setDiscount] = useState<number | string>(0);
     const [title, setTitle] = useState('');
     const [desc, setDesc] = useState('');
+    const [isFlashSale, setIsFlashSale] = useState(false);
+    const [tagInput, setTagInput] = useState('');
+    const [tags, setTags] = useState<string[]>([]);
+    const [existingTags, setExistingTags] = useState<string[]>([]);
+
+    useEffect(() => {
+        db.getMarketplaceItems().then(items => {
+            const allTags = Array.from(new Set(items.flatMap(i => i.tags || [])));
+            setExistingTags(allTags);
+        });
+    }, []);
+
+    const addTag = (tag: string) => {
+        const cleanTag = tag.trim().toUpperCase();
+        if (cleanTag && !tags.includes(cleanTag)) {
+            setTags([...tags, cleanTag]);
+        }
+        setTagInput('');
+    };
+
+    const removeTag = (tag: string) => {
+        setTags(tags.filter(t => t !== tag));
+    };
 
     useEffect(() => {
         if (id) {
@@ -33,6 +56,8 @@ export default function MarketplaceEdit() {
                     setDiscount(data.discountPercent ?? 0);
                     setTitle(data.title);
                     setDesc(data.description);
+                    setIsFlashSale(!!data.isFlashSale);
+                    setTags(data.tags || []);
                 }
                 setLoading(false);
             });
@@ -55,6 +80,8 @@ export default function MarketplaceEdit() {
                 originalPrice: numBase,
                 discountPercent: numDisc,
                 stock: Number(stock),
+                isFlashSale: isFlashSale,
+                tags: tags,
             });
             toast.success("Artículo actualizado correctamente");
             navigate(`/marketplace/${id}`);
@@ -167,6 +194,79 @@ export default function MarketplaceEdit() {
                         onChange={(e) => setDesc(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl p-4 text-sm text-slate-300 focus:border-indigo-500 outline-none leading-relaxed"
                     />
+                </div>
+
+                {/* Tags & Flash Sale */}
+                <div className="space-y-6 pt-4 border-t border-slate-800">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                            <Tag size={14} className="text-indigo-400"/> Etiquetas / Filtros
+                        </label>
+                        <div className="flex gap-2 mb-3">
+                            <input 
+                                type="text" 
+                                value={tagInput} 
+                                onChange={e => setTagInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag(tagInput))}
+                                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white text-xs font-bold outline-none focus:border-indigo-500"
+                                placeholder="Nueva etiqueta..."
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => addTag(tagInput)}
+                                className="bg-slate-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                            >
+                                Añadir
+                            </button>
+                        </div>
+                        
+                        {/* Selected Tags */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {tags.map(t => (
+                                <span key={t} className="bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-2">
+                                    {t} <button type="button" onClick={() => removeTag(t)}><X size={10}/></button>
+                                </span>
+                            ))}
+                        </div>
+
+                        {/* Existing Tags Suggestions */}
+                        {existingTags.length > 0 && (
+                            <div>
+                                <p className="text-[9px] font-bold text-slate-600 uppercase mb-2">Sugerencias:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {existingTags.filter(t => !tags.includes(t)).slice(0, 10).map(t => (
+                                        <button 
+                                            key={t} 
+                                            type="button" 
+                                            onClick={() => addTag(t)}
+                                            className="bg-slate-950 border border-slate-800 text-slate-500 text-[9px] font-bold px-2 py-1 rounded-md hover:border-slate-600 hover:text-slate-300 transition-all"
+                                        >
+                                            + {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                                <Tag size={20}/>
+                            </div>
+                            <div>
+                                <h4 className="text-white font-bold text-xs">Venta Flash</h4>
+                                <p className="text-slate-500 text-[9px]">Destaca tu artículo en la sección de ofertas rápidas.</p>
+                            </div>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => setIsFlashSale(!isFlashSale)}
+                            className={`w-12 h-6 rounded-full transition-all relative ${isFlashSale ? 'bg-amber-500' : 'bg-slate-800'}`}
+                        >
+                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isFlashSale ? 'left-7' : 'left-1'}`} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="pt-4 sticky bottom-4 z-20">

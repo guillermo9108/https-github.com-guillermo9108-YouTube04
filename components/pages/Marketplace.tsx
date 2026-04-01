@@ -12,14 +12,16 @@ export default function Marketplace() {
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showFilters, setShowFilters] = useState(false);
+    const [selectedSection, setSelectedSection] = useState<'TODOS' | 'FLASH' | 'BEST' | 'RECENT' | 'POPULAR' | 'CHEAP'>('TODOS');
+    const [visibleCount, setVisibleCount] = useState(20);
 
     // Filters
     const [search, setSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('TODOS');
     const [sortOrder, setSortOrder] = useState<'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC'>('NEWEST');
-    // FIX: Increased default max price to 100,000
     const [priceRange, setPriceRange] = useState({ min: 0, max: 100000 });
     const [condition, setCondition] = useState('TODOS');
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
     useEffect(() => {
         db.getMarketplaceItems().then((data: MarketplaceItem[]) => {
@@ -28,21 +30,38 @@ export default function Marketplace() {
         });
     }, []);
 
-    // Derived Categories
+    // Derived Categories & Tags
     const categories = ['TODOS', ...Array.from(new Set(items.map(i => i.category || 'OTRO')))];
+    const allTags = Array.from(new Set(items.flatMap(i => i.tags || [])));
 
     const filteredItems = items.filter(item => {
         const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase());
         const matchesCategory = selectedCategory === 'TODOS' || item.category === selectedCategory;
         const matchesCondition = condition === 'TODOS' || item.condition === condition;
-        // Ensure type safety comparison for price
         const matchesPrice = Number(item.price) >= priceRange.min && Number(item.price) <= priceRange.max;
-        return matchesSearch && matchesCategory && matchesCondition && matchesPrice;
+        
+        // Section Filters
+        let matchesSection = true;
+        if (selectedSection === 'FLASH') matchesSection = !!item.isFlashSale;
+        if (selectedSection === 'BEST') matchesSection = (item.salesCount || 0) > 10;
+        if (selectedSection === 'POPULAR') matchesSection = (item.popularity || 0) > 50;
+        if (selectedSection === 'CHEAP') matchesSection = Number(item.price) < 50;
+        if (selectedSection === 'RECENT') {
+            const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            matchesSection = item.createdAt > oneWeekAgo;
+        }
+
+        // Tag Filters
+        const matchesTags = selectedTags.length === 0 || selectedTags.every(tag => item.tags?.includes(tag));
+
+        return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesSection && matchesTags;
     }).sort((a: MarketplaceItem, b: MarketplaceItem) => {
         if (sortOrder === 'PRICE_ASC') return a.price - b.price;
         if (sortOrder === 'PRICE_DESC') return b.price - a.price;
         return b.createdAt - a.createdAt; // NEWEST
     });
+
+    const displayedItems = filteredItems.slice(0, visibleCount);
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={32}/></div>;
 
@@ -91,6 +110,31 @@ export default function Marketplace() {
                         <SlidersHorizontal size={18}/>
                         <span className="hidden md:inline text-xs font-bold">Filtros</span>
                     </button>
+                </div>
+
+                {/* Section Tabs */}
+                <div className="flex gap-4 overflow-x-auto py-2 border-b border-slate-800/30 scrollbar-hide mb-2">
+                    {[
+                        { id: 'TODOS', label: 'Todo', icon: <ShoppingBag size={14}/> },
+                        { id: 'FLASH', label: 'Ventas Flash', icon: <Tag size={14} className="text-red-500"/> },
+                        { id: 'BEST', label: 'Lo más vendido', icon: <Star size={14} className="text-amber-400"/> },
+                        { id: 'RECENT', label: 'Recientes', icon: <Loader2 size={14} className="text-blue-400"/> },
+                        { id: 'POPULAR', label: 'Popular', icon: <Filter size={14} className="text-purple-400"/> },
+                        { id: 'CHEAP', label: 'Económicos', icon: <ArrowDownUp size={14} className="text-green-400"/> },
+                    ].map(section => (
+                        <button
+                            key={section.id}
+                            onClick={() => {setSelectedSection(section.id as any); setVisibleCount(20);}}
+                            className={`flex items-center gap-2 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                                selectedSection === section.id 
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
+                        >
+                            {section.icon}
+                            {section.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Category Pills */}
@@ -152,6 +196,32 @@ export default function Marketplace() {
                             </div>
 
                             <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Etiquetas Personalizadas</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {allTags.map(tag => (
+                                        <button 
+                                            key={tag}
+                                            onClick={() => {
+                                                if (selectedTags.includes(tag)) {
+                                                    setSelectedTags(selectedTags.filter(t => t !== tag));
+                                                } else {
+                                                    setSelectedTags([...selectedTags, tag]);
+                                                }
+                                            }}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                                                selectedTags.includes(tag) 
+                                                ? 'bg-purple-600 border-purple-600 text-white' 
+                                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-600'
+                                            }`}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                    {allTags.length === 0 && <p className="text-[10px] text-slate-600 italic">No hay etiquetas disponibles</p>}
+                                </div>
+                            </div>
+
+                            <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Condición</label>
                                 <div className="flex flex-wrap gap-2">
                                     {['TODOS', 'NUEVO', 'USADO', 'REACONDICIONADO'].map(c => (
@@ -182,13 +252,13 @@ export default function Marketplace() {
 
             {/* Results Grid - High Density / Shein Style */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6">
-                {filteredItems.map(item => (
+                {displayedItems.map(item => (
                     <Link key={item.id} to={`/marketplace/${item.id}`} className="group flex flex-col">
                         <div className="relative aspect-[3/4] bg-slate-800 rounded-lg overflow-hidden mb-2">
                             {item.images && item.images.length > 0 ? (
                                 <img 
                                     src={item.images[0]} 
-                                    className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${item.status === 'AGOTADO' ? 'grayscale opacity-50' : ''}`} 
+                                    className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${item.status === 'AGOTADO' || (item.stock === 0) ? 'grayscale opacity-50' : ''}`} 
                                     loading="lazy"
                                     referrerPolicy="no-referrer"
                                 />
@@ -203,6 +273,11 @@ export default function Marketplace() {
                                         -{item.discountPercent}%
                                     </span>
                                 ) : null}
+                                {item.isFlashSale && (
+                                    <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-sm flex items-center gap-1">
+                                        ⚡ FLASH
+                                    </span>
+                                )}
                                 {item.condition === 'NUEVO' && (
                                     <span className="bg-black/70 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm">
                                         NUEVO
@@ -210,11 +285,18 @@ export default function Marketplace() {
                                 )}
                             </div>
 
-                            {item.status === 'AGOTADO' && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                                    <span className="bg-white/90 text-black text-xs font-black px-3 py-1 transform -rotate-12 border-2 border-black">AGOTADO</span>
-                                </div>
-                            )}
+                            {/* Stock Status */}
+                            <div className="absolute bottom-0 left-0 right-0 p-1.5 pointer-events-none">
+                                {item.stock === 0 || item.status === 'AGOTADO' ? (
+                                    <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-black py-1 text-center rounded-md border border-white/10 uppercase tracking-tighter">
+                                        Agotado
+                                    </div>
+                                ) : item.stock && item.stock <= 5 ? (
+                                    <div className="bg-red-600/90 backdrop-blur-md text-white text-[9px] font-black py-1 text-center rounded-md border border-red-400/30 uppercase tracking-tighter animate-pulse">
+                                        ¡Casi Agotado! ({item.stock})
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
 
                         <div className="flex flex-col gap-0.5 px-1">
@@ -239,6 +321,18 @@ export default function Marketplace() {
                     </Link>
                 ))}
             </div>
+            
+            {/* Pagination / Load More */}
+            {filteredItems.length > visibleCount && (
+                <div className="flex justify-center mt-10">
+                    <button 
+                        onClick={() => setVisibleCount(prev => prev + 20)}
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-3 rounded-xl font-bold text-sm transition-all border border-slate-700"
+                    >
+                        Cargar más artículos
+                    </button>
+                </div>
+            )}
             
             {filteredItems.length === 0 && (
                 <div className="text-center py-20 text-slate-500 flex flex-col items-center">
