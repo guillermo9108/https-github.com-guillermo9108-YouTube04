@@ -219,6 +219,7 @@ try {
         case 'market_get_seller_orders': market_get_seller_orders($pdo, $_GET['sellerId'] ?? ''); break;
         case 'market_get_buyer_orders': market_get_buyer_orders($pdo, $_GET['buyerId'] ?? ''); break;
         case 'market_mark_item_paid': market_mark_item_paid($pdo, $input); break;
+        case 'market_reject_order': market_reject_order($pdo, $input); break;
         case 'market_get_seller_stats': market_get_seller_stats($pdo, $_GET['sellerId'] ?? ''); break;
         case 'admin_delete_listing': market_admin_delete_listing($pdo, $input); break;
         case 'get_reviews': market_get_reviews($pdo, $_GET['itemId'] ?? ''); break;

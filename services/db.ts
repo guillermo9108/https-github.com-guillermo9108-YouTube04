@@ -301,6 +301,9 @@ class DBService {
     public async getSellerOrders(sellerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_seller_orders&sellerId=${sellerId}`); }
     public async getBuyerOrders(buyerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_buyer_orders&buyerId=${buyerId}`); }
     public async markItemPaid(orderItemId: string, sellerId: string): Promise<void> { return this.request<void>(`action=market_mark_item_paid`, { method: 'POST', body: JSON.stringify({ orderItemId, sellerId }) }); }
+    public async rejectOrder(orderId: string, sellerId: string, reason: string): Promise<void> {
+        return this.request<void>(`action=market_reject_order`, { method: 'POST', body: JSON.stringify({ orderId, sellerId, reason }) });
+    }
     public async getSellerStats(sellerId: string): Promise<any> { return this.request<any>(`action=market_get_seller_stats&sellerId=${sellerId}`); }
     public async getReviews(itemId: string): Promise<MarketplaceReview[]> { return this.request<MarketplaceReview[]>(`action=get_reviews&itemId=${itemId}`); }
     public async addReview(itemId: string, userId: string, rating: number, comment: string): Promise<void> { return this.request<void>(`action=add_review`, { method: 'POST', body: JSON.stringify({ itemId, userId, rating, comment }) }); }

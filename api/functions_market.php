@@ -112,6 +112,39 @@ function market_mark_item_paid($pdo, $input) {
     } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
 }
 
+function market_reject_order($pdo, $input) {
+    $orderId = $input['orderId'];
+    $sellerId = $input['sellerId'];
+    $reason = $input['reason'] ?? 'No especificado';
+
+    // Ensure column exists
+    try {
+        $pdo->exec("ALTER TABLE marketplace_orders ADD COLUMN rejectionReason TEXT NULL");
+    } catch (Exception $e) {}
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT sellerId, buyerId, status FROM marketplace_orders WHERE id = ?");
+        $stmt->execute([$orderId]);
+        $order = $stmt->fetch();
+
+        if (!$order || $order['sellerId'] !== $sellerId) throw new Exception("No autorizado");
+        if ($order['status'] !== 'PENDING') throw new Exception("Solo se pueden rechazar pedidos pendientes");
+
+        $pdo->prepare("UPDATE marketplace_orders SET status = 'REJECTED', rejectionReason = ?, updatedAt = ? WHERE id = ?")
+            ->execute([$reason, time(), $orderId]);
+        
+        $pdo->prepare("UPDATE marketplace_order_items SET status = 'REJECTED' WHERE orderId = ?")->execute([$orderId]);
+
+        // NOTIFICACIÓN al comprador
+        require_once 'functions_interactions.php';
+        send_direct_notification($pdo, $order['buyerId'], 'SYSTEM', "Tu pedido ha sido rechazado. Motivo: $reason", "/cart");
+
+        $pdo->commit();
+        respond(true);
+    } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
+}
+
 function market_get_seller_stats($pdo, $sellerId) {
     $stmt = $pdo->prepare("SELECT paymentMethod, COUNT(*) as orderCount, SUM(totalAmount) as totalRevenue FROM marketplace_orders WHERE sellerId = ? AND status = 'PAID' GROUP BY paymentMethod");
     $stmt->execute([$sellerId]);
