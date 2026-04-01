@@ -291,11 +291,11 @@ export default function Marketplace() {
                             {/* Stock Status */}
                             {item.stock === 0 || item.status === 'AGOTADO' ? (
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden bg-black/40 backdrop-blur-[1px]">
-                                    <img 
-                                        src="https://www.pngkit.com/png/full/245-2458849_stamp-agotado-png.png" 
-                                        className="w-4/5 h-auto object-contain transform -rotate-12 drop-shadow-2xl"
-                                        alt="Agotado"
-                                    />
+                                    <div className="flex flex-col items-center justify-center transform -rotate-12 border-y-4 border-red-600 py-1 px-6 bg-white/5 shadow-2xl">
+                                        <span className="text-red-600 font-black text-2xl md:text-3xl uppercase tracking-tighter italic leading-none">
+                                            AGOTADO
+                                        </span>
+                                    </div>
                                 </div>
                             ) : item.stock && item.stock > 0 && item.stock <= 5 ? (
                                 <div className="absolute bottom-0 left-0 right-0 p-1.5 pointer-events-none">

@@ -105,6 +105,29 @@ function getAppSchema() {
                 'timestamp' => 'BIGINT'
             ]
         ],
+        'marketplace_orders' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'buyerId' => 'VARCHAR(50)',
+                'sellerId' => 'VARCHAR(50)',
+                'totalAmount' => 'DECIMAL(10, 2)',
+                'paymentMethod' => "ENUM('PLATFORM', 'DIRECT') DEFAULT 'PLATFORM'",
+                'status' => "ENUM('PENDING', 'PAID', 'CANCELLED') DEFAULT 'PENDING'",
+                'shippingDetails' => 'JSON',
+                'createdAt' => 'BIGINT',
+                'updatedAt' => 'BIGINT'
+            ]
+        ],
+        'marketplace_order_items' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'orderId' => 'VARCHAR(50)',
+                'itemId' => 'VARCHAR(50)',
+                'quantity' => 'INT',
+                'price' => 'DECIMAL(10, 2)',
+                'status' => "ENUM('PENDING', 'PAID') DEFAULT 'PENDING'"
+            ]
+        ],
         'subscriptions' => [
             'cols' => [
                 'subscriberId' => 'VARCHAR(50)',

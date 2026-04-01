@@ -295,7 +295,13 @@ class DBService {
     public async createListing(formData: FormData): Promise<void> { return this.request<void>(`action=create_listing`, { method: 'POST', body: formData }); }
     public async editListing(id: string, userId: string, data: any): Promise<void> { return this.request<void>(`action=edit_listing`, { method: 'POST', body: JSON.stringify({ id, userId, data }) }); }
     public async adminDeleteListing(itemId: string): Promise<void> { return this.request<void>(`action=admin_delete_listing`, { method: 'POST', body: JSON.stringify({ id: itemId }) }); }
-    public async checkoutCart(userId: string, cart: any[], shippingDetails: any): Promise<void> { return this.request<void>(`action=checkout_cart`, { method: 'POST', body: JSON.stringify({ userId, cart, shippingDetails }) }); }
+    public async checkoutCart(userId: string, cart: any[], shippingDetails: any, paymentMethod: 'PLATFORM' | 'DIRECT' = 'PLATFORM'): Promise<void> { 
+        return this.request<void>(`action=checkout_cart`, { method: 'POST', body: JSON.stringify({ userId, cart, shippingDetails, paymentMethod }) }); 
+    }
+    public async getSellerOrders(sellerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_seller_orders&sellerId=${sellerId}`); }
+    public async getBuyerOrders(buyerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_buyer_orders&buyerId=${buyerId}`); }
+    public async markItemPaid(orderItemId: string, sellerId: string): Promise<void> { return this.request<void>(`action=market_mark_item_paid`, { method: 'POST', body: JSON.stringify({ orderItemId, sellerId }) }); }
+    public async getSellerStats(sellerId: string): Promise<any> { return this.request<any>(`action=market_get_seller_stats&sellerId=${sellerId}`); }
     public async getReviews(itemId: string): Promise<MarketplaceReview[]> { return this.request<MarketplaceReview[]>(`action=get_reviews&itemId=${itemId}`); }
     public async addReview(itemId: string, userId: string, rating: number, comment: string): Promise<void> { return this.request<void>(`action=add_review`, { method: 'POST', body: JSON.stringify({ itemId, userId, rating, comment }) }); }
 

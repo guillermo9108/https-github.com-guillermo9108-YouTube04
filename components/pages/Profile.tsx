@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { db } from '../../services/db';
 import { Transaction, Notification as AppNotification } from '../../types';
-import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, ChevronRight, User as UserIcon, RefreshCw, Smartphone, Loader2, Settings, Save, Zap, Heart, Truck, Camera, Lock, Eye, EyeOff, UserCheck, Bell, MessageSquare, Trash2, CheckCircle2, Crown, Calendar, Clock as ClockIcon, ShieldCheck, AlertTriangle, Fingerprint, MapPin, Smartphone as PhoneIcon, X } from 'lucide-react';
+import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, ChevronRight, User as UserIcon, RefreshCw, Smartphone, Loader2, Settings, Save, Zap, Heart, Truck, Camera, Lock, Eye, EyeOff, UserCheck, Bell, MessageSquare, Trash2, CheckCircle2, Crown, Calendar, Clock as ClockIcon, ShieldCheck, AlertTriangle, Fingerprint, MapPin, Smartphone as PhoneIcon, X, BarChart3, TrendingUp } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from '../Router';
 
@@ -200,6 +200,25 @@ export default function Profile() {
                   </button>
               </div>
           </div>
+      </div>
+
+      {/* Seller Dashboard Access */}
+      <div className="bg-slate-900 border border-indigo-500/20 rounded-[32px] p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 group hover:border-indigo-500/40 transition-all">
+          <div className="flex items-center gap-4 text-center md:text-left">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+                  <BarChart3 size={24}/>
+              </div>
+              <div>
+                  <h4 className="text-white font-black text-sm uppercase tracking-widest">Panel de Ventas</h4>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-tight">Gestiona tus pedidos y visualiza tus estadísticas de ingresos.</p>
+              </div>
+          </div>
+          <button 
+              onClick={() => navigate('/seller-dashboard')}
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-[0.1em] rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
+          >
+              <TrendingUp size={14}/> Ver Estadísticas
+          </button>
       </div>
 
       {/* Seller Verification Banner */}

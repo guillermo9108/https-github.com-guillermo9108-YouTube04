@@ -151,11 +151,11 @@ export default function MarketplaceItemView() {
 
                         {item.status === 'AGOTADO' || item.stock === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] z-20 overflow-hidden pointer-events-none">
-                                <img 
-                                    src="https://www.pngkit.com/png/full/245-2458849_stamp-agotado-png.png" 
-                                    className="w-3/4 h-auto object-contain transform -rotate-12 drop-shadow-2xl"
-                                    alt="Agotado"
-                                />
+                                <div className="flex flex-col items-center justify-center transform -rotate-12 border-y-[6px] border-red-600 py-2 px-10 bg-white/5 shadow-2xl">
+                                    <span className="text-red-600 font-black text-4xl md:text-6xl uppercase tracking-tighter italic leading-none">
+                                        AGOTADO
+                                    </span>
+                                </div>
                             </div>
                         ) : null}
                     </div>

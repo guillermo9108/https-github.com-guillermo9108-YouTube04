@@ -13,6 +13,7 @@ export default function Cart() {
     const navigate = useNavigate();
     const toast = useToast();
     const [loading, setLoading] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'PLATFORM' | 'DIRECT'>('PLATFORM');
     
     // Shipping Form
     const [shipping, setShipping] = useState({
@@ -60,8 +61,8 @@ export default function Cart() {
         if (!user) return;
         if (cart.length === 0) return;
         
-        // Re-verificación de saldo antes de procesar
-        if (Number(user.balance) < totals.total) {
+        // Re-verificación de saldo antes de procesar (solo si es PLATFORM)
+        if (paymentMethod === 'PLATFORM' && Number(user.balance) < totals.total) {
             toast.error("Tu saldo ha cambiado. Fondos insuficientes.");
             refreshUser();
             return;
@@ -75,10 +76,14 @@ export default function Cart() {
 
         setLoading(true);
         try {
-            await db.checkoutCart(user.id, cart, shipping);
+            await db.checkoutCart(user.id, cart, shipping, paymentMethod);
             clearCart();
             refreshUser();
-            toast.success("¡Pedido realizado con éxito!");
+            if (paymentMethod === 'DIRECT') {
+                toast.success("¡Solicitud de compra directa enviada! El vendedor la procesará en persona.");
+            } else {
+                toast.success("¡Pedido realizado con éxito!");
+            }
             navigate('/profile');
         } catch (e: any) {
             toast.error("Error: " + e.message);
@@ -180,6 +185,37 @@ export default function Cart() {
                 {/* Right Column: Checkout Panel */}
                 <div className="space-y-4 md:space-y-6">
                     
+                    {/* Payment Method Selector */}
+                    <div className="bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-800">
+                        <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wide text-slate-500"><Wallet size={16}/> Método de Pago</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            <button 
+                                onClick={() => setPaymentMethod('PLATFORM')}
+                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === 'PLATFORM' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                            >
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'PLATFORM' ? 'border-white' : 'border-slate-700'}`}>
+                                    {paymentMethod === 'PLATFORM' && <div className="w-2.5 h-2.5 bg-white rounded-full"/>}
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm font-bold">Saldo de la Plataforma</div>
+                                    <div className="text-[10px] opacity-70">Pago instantáneo y seguro</div>
+                                </div>
+                            </button>
+                            <button 
+                                onClick={() => setPaymentMethod('DIRECT')}
+                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${paymentMethod === 'DIRECT' ? 'bg-amber-600/20 border-amber-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                            >
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'DIRECT' ? 'border-white' : 'border-slate-700'}`}>
+                                    {paymentMethod === 'DIRECT' && <div className="w-2.5 h-2.5 bg-white rounded-full"/>}
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm font-bold">Pago Directo en Persona</div>
+                                    <div className="text-[10px] opacity-70">Sincronización en tiempo real con el vendedor</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Shipping Form - High priority, so placing it visibly */}
                     <div id="shipping-form" className="bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-800 scroll-mt-24">
                         <h3 className="font-bold text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wide text-slate-500"><Truck size={16}/> Datos de Envío</h3>
@@ -227,26 +263,31 @@ export default function Cart() {
                             </div>
                         </div>
 
-                        {user && Number(user.balance) < totals.total ? (
+                        {user && paymentMethod === 'PLATFORM' && Number(user.balance) < totals.total ? (
                             <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl text-center space-y-2 mb-4">
                                 <div className="text-red-400 font-bold flex items-center justify-center gap-2"><AlertCircle size={18}/> Saldo Insuficiente</div>
                                 <div className="text-slate-400 text-xs">Tienes <strong>{Number(user.balance).toFixed(2)} $</strong> disponibles.</div>
                                 <button onClick={() => navigate('/profile')} className="text-xs text-indigo-400 hover:text-white underline mt-1">Recargar Saldo</button>
                             </div>
-                        ) : (
+                        ) : paymentMethod === 'PLATFORM' ? (
                             <div className="bg-slate-950 rounded-xl p-3 border border-slate-800 mb-4 flex items-center justify-between">
                                 <div className="text-xs text-slate-400">Saldo Disponible</div>
                                 <div className="text-sm font-bold text-white flex items-center gap-1"><Wallet size={14} className="text-indigo-400"/> {Number(user?.balance || 0).toFixed(2)} $</div>
+                            </div>
+                        ) : (
+                            <div className="bg-amber-900/10 border border-amber-500/20 p-4 rounded-xl text-center space-y-2 mb-4">
+                                <div className="text-amber-400 font-bold flex items-center justify-center gap-2"><CheckCircle size={18}/> Pago en Persona</div>
+                                <div className="text-slate-400 text-[10px]">Pagarás directamente al vendedor al recibir los productos.</div>
                             </div>
                         )}
 
                         <button 
                             onClick={handleCheckout}
-                            disabled={loading || (user ? Number(user.balance) < totals.total : true)}
-                            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-900/20"
+                            disabled={loading || (paymentMethod === 'PLATFORM' && user ? Number(user.balance) < totals.total : false)}
+                            className={`w-full ${paymentMethod === 'DIRECT' ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'} disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 md:py-4 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg`}
                         >
                             {loading ? <Loader2 className="animate-spin"/> : <CheckCircle size={20}/>}
-                            Confirmar Compra
+                            {paymentMethod === 'DIRECT' ? 'Solicitar Compra Directa' : 'Confirmar Compra'}
                         </button>
                     </div>
                 </div>

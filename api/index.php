@@ -216,6 +216,10 @@ try {
         case 'create_listing': market_create_listing($pdo, $_POST, $_FILES); break;
         case 'edit_listing': market_edit_listing($pdo, $input); break;
         case 'checkout_cart': market_checkout($pdo, $input); break;
+        case 'market_get_seller_orders': market_get_seller_orders($pdo, $_GET['sellerId'] ?? ''); break;
+        case 'market_get_buyer_orders': market_get_buyer_orders($pdo, $_GET['buyerId'] ?? ''); break;
+        case 'market_mark_item_paid': market_mark_item_paid($pdo, $input); break;
+        case 'market_get_seller_stats': market_get_seller_stats($pdo, $_GET['sellerId'] ?? ''); break;
         case 'admin_delete_listing': market_admin_delete_listing($pdo, $input); break;
         case 'get_reviews': market_get_reviews($pdo, $_GET['itemId'] ?? ''); break;
         case 'get_my_sales': market_get_my_sales($pdo, $_GET['userId'] ?? ''); break;
