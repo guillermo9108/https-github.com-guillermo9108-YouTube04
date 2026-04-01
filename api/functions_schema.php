@@ -88,6 +88,10 @@ function getAppSchema() {
                 'itemCondition' => 'VARCHAR(50)',
                 'status' => "ENUM('ACTIVO', 'AGOTADO', 'ELIMINADO') DEFAULT 'ACTIVO'",
                 'is_featured' => 'TINYINT(1) DEFAULT 0',
+                'isFlashSale' => 'TINYINT(1) DEFAULT 0',
+                'tags' => 'JSON',
+                'popularity' => 'INT DEFAULT 0',
+                'salesCount' => 'INT DEFAULT 0',
                 'createdAt' => 'BIGINT'
             ]
         ],

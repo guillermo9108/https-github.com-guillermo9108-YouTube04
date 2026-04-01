@@ -4,10 +4,11 @@
  */
 
 function market_get_items($pdo) {
-    $stmt = $pdo->query("SELECT m.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE status != 'ELIMINADO' ORDER BY createdAt DESC");
+    $stmt = $pdo->query("SELECT m.*, m.itemCondition as `condition`, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE status != 'ELIMINADO' ORDER BY createdAt DESC");
     $items = $stmt->fetchAll();
     foreach ($items as &$i) { 
         $i['images'] = json_decode($i['images'] ?: '[]', true); 
+        $i['tags'] = json_decode($i['tags'] ?: '[]', true); 
         if (is_array($i['images'])) {
             foreach ($i['images'] as &$img) $img = fix_url($img);
         }
@@ -17,10 +18,12 @@ function market_get_items($pdo) {
 }
 
 function market_get_item($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT m.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl, u.is_verified_seller as isVerifiedSeller FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE m.id = ?");
+    $stmt = $pdo->prepare("SELECT m.*, m.itemCondition as `condition`, u.username as sellerName, u.avatarUrl as sellerAvatarUrl, u.is_verified_seller as isVerifiedSeller FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE m.id = ?");
     $stmt->execute([$id]); $i = $stmt->fetch();
     if ($i) { 
+        $pdo->prepare("UPDATE marketplace_items SET popularity = popularity + 1 WHERE id = ?")->execute([$id]);
         $i['images'] = json_decode($i['images'] ?: '[]', true); 
+        $i['tags'] = json_decode($i['tags'] ?: '[]', true); 
         if (is_array($i['images'])) {
             foreach ($i['images'] as &$img) $img = fix_url($img);
         }
@@ -39,8 +42,9 @@ function market_create_listing($pdo, $post, $files) {
             $imgs[] = 'api/uploads/market/' . $name;
         }
     }
-    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, stock, images, sellerId, category, itemCondition, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], time()]);
+    $isFlashSale = (isset($post['isFlashSale']) && ($post['isFlashSale'] === 'true' || $post['isFlashSale'] === '1')) ? 1 : 0;
+    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, stock, images, sellerId, category, itemCondition, isFlashSale, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], $isFlashSale, $post['tags'] ?? '[]', time()]);
     
     // NOTIFICACIÓN: Avisar a seguidores del vendedor
     require_once 'functions_interactions.php';
@@ -56,7 +60,7 @@ function market_edit_listing($pdo, $input) {
     $stmt = $pdo->prepare("SELECT price, originalPrice, title FROM marketplace_items WHERE id = ?");
     $stmt->execute([$id]); $old = $stmt->fetch();
     
-    $allowed = ['title', 'description', 'price', 'stock', 'status']; $fields = []; $params = [];
+    $allowed = ['title', 'description', 'price', 'stock', 'status', 'isFlashSale', 'tags']; $fields = []; $params = [];
     $newPrice = isset($data['price']) ? floatval($data['price']) : floatval($old['price']);
     $origPrice = floatval($old['originalPrice'] ?: $old['price']);
     
@@ -72,6 +76,9 @@ function market_edit_listing($pdo, $input) {
     
     $data['discountPercent'] = $discount;
     $data['originalPrice'] = $origPrice;
+    if (isset($data['tags']) && is_array($data['tags'])) {
+        $data['tags'] = json_encode($data['tags']);
+    }
     $allowed[] = 'discountPercent';
     $allowed[] = 'originalPrice';
 
@@ -140,7 +147,8 @@ function market_checkout($pdo, $input) {
             // Pago al vendedor
             $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$part, $real['sellerId']]);
             if ($adminId) $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$fee, $adminId]);
-            $pdo->prepare("UPDATE marketplace_items SET stock = stock - ? WHERE id = ?")->execute([$qty, $item['id']]);
+            $pdo->prepare("UPDATE marketplace_items SET stock = stock - ?, salesCount = salesCount + ? WHERE id = ?")->execute([$qty, $qty, $item['id']]);
+            $pdo->prepare("UPDATE marketplace_items SET status = 'AGOTADO' WHERE id = ? AND stock <= 0")->execute([$item['id']]);
             
             // NOTIFICACIÓN: Avisar al vendedor sobre la venta
             require_once 'functions_interactions.php';

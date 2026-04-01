@@ -43,12 +43,12 @@ export default function Marketplace() {
         // Section Filters
         let matchesSection = true;
         if (selectedSection === 'FLASH') matchesSection = !!item.isFlashSale;
-        if (selectedSection === 'BEST') matchesSection = (item.salesCount || 0) > 10;
-        if (selectedSection === 'POPULAR') matchesSection = (item.popularity || 0) > 50;
+        if (selectedSection === 'BEST') matchesSection = (item.salesCount || 0) > 0;
+        if (selectedSection === 'POPULAR') matchesSection = (item.popularity || 0) > 0;
         if (selectedSection === 'CHEAP') matchesSection = Number(item.price) < 50;
         if (selectedSection === 'RECENT') {
             const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            matchesSection = item.createdAt > oneWeekAgo;
+            matchesSection = (item.createdAt * 1000) > oneWeekAgo;
         }
 
         // Tag Filters
@@ -286,17 +286,19 @@ export default function Marketplace() {
                             </div>
 
                             {/* Stock Status */}
-                            <div className="absolute bottom-0 left-0 right-0 p-1.5 pointer-events-none">
-                                {item.stock === 0 || item.status === 'AGOTADO' ? (
-                                    <div className="bg-black/80 backdrop-blur-md text-white text-[10px] font-black py-1 text-center rounded-md border border-white/10 uppercase tracking-tighter">
+                            {item.stock === 0 || item.status === 'AGOTADO' ? (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden">
+                                    <div className="bg-red-600 text-white text-[12px] md:text-[14px] font-black py-1 px-12 transform -rotate-45 shadow-2xl border-y-2 border-white/30 uppercase tracking-widest whitespace-nowrap">
                                         Agotado
                                     </div>
-                                ) : item.stock && item.stock <= 5 ? (
+                                </div>
+                            ) : item.stock && item.stock <= 5 ? (
+                                <div className="absolute bottom-0 left-0 right-0 p-1.5 pointer-events-none">
                                     <div className="bg-red-600/90 backdrop-blur-md text-white text-[9px] font-black py-1 text-center rounded-md border border-red-400/30 uppercase tracking-tighter animate-pulse">
                                         ¡Casi Agotado! ({item.stock})
                                     </div>
-                                ) : null}
-                            </div>
+                                </div>
+                            ) : null}
                         </div>
 
                         <div className="flex flex-col gap-0.5 px-1">

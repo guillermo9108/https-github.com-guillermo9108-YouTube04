@@ -149,11 +149,13 @@ export default function MarketplaceItemView() {
                             </div>
                         )}
 
-                        {item.status === 'AGOTADO' && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
-                                <span className="bg-white text-black px-6 py-2 md:px-8 md:py-3 font-black text-xl md:text-2xl border-4 border-black transform -rotate-12 shadow-2xl">AGOTADO</span>
+                        {item.status === 'AGOTADO' || item.stock === 0 ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] z-20 overflow-hidden">
+                                <div className="bg-red-600 text-white px-12 py-3 md:px-20 md:py-4 font-black text-2xl md:text-4xl border-y-4 border-white/30 transform -rotate-45 shadow-2xl uppercase tracking-[0.2em] whitespace-nowrap">
+                                    Agotado
+                                </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                     {item.images && item.images.length > 1 && (
                         <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-hide px-1">
