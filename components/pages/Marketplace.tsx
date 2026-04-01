@@ -31,12 +31,15 @@ export default function Marketplace() {
     }, []);
 
     // Derived Categories & Tags
-    const categories = ['TODOS', ...Array.from(new Set(items.map(i => i.category || 'OTRO')))];
+    const baseCategories = ['TODOS', ...Array.from(new Set(items.map(i => i.category || 'OTRO')))];
     const allTags = Array.from(new Set(items.flatMap(i => i.tags || [])));
+    const categories = Array.from(new Set([...baseCategories, ...allTags]));
 
     const filteredItems = items.filter(item => {
         const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase());
-        const matchesCategory = selectedCategory === 'TODOS' || item.category === selectedCategory;
+        const matchesCategory = selectedCategory === 'TODOS' || 
+                               item.category === selectedCategory || 
+                               (item.tags && item.tags.includes(selectedCategory));
         const matchesCondition = condition === 'TODOS' || item.condition === condition;
         const matchesPrice = Number(item.price) >= priceRange.min && Number(item.price) <= priceRange.max;
         
@@ -287,7 +290,7 @@ export default function Marketplace() {
 
                             {/* Stock Status */}
                             {item.stock === 0 || item.status === 'AGOTADO' ? (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden">
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden bg-black/20 backdrop-blur-[1px]">
                                     <div className="bg-red-600 text-white text-[12px] md:text-[14px] font-black py-1 px-12 transform -rotate-45 shadow-2xl border-y-2 border-white/30 uppercase tracking-widest whitespace-nowrap">
                                         Agotado
                                     </div>
@@ -303,7 +306,7 @@ export default function Marketplace() {
 
                         <div className="flex flex-col gap-0.5 px-1">
                             <div className="flex items-baseline gap-2">
-                                <span className={`font-bold text-sm md:text-base ${item.discountPercent ? 'text-red-500' : 'text-white'}`}>
+                                <span className={`font-bold text-sm md:text-base ${item.discountPercent ? 'text-red-500' : 'text-white'} ${(item.stock === 0 || item.status === 'AGOTADO') ? 'line-through opacity-50' : ''}`}>
                                     {item.price} $
                                 </span>
                                 {item.discountPercent && item.discountPercent > 0 && (
@@ -312,7 +315,7 @@ export default function Marketplace() {
                                     </span>
                                 )}
                             </div>
-                            <h3 className="text-xs text-slate-300 line-clamp-2 leading-tight min-h-[2.5em]">
+                            <h3 className={`text-xs text-slate-300 line-clamp-2 leading-tight min-h-[2.5em] ${(item.stock === 0 || item.status === 'AGOTADO') ? 'line-through opacity-50' : ''}`}>
                                 {item.title}
                             </h3>
                             <div className="flex items-center gap-1 mt-1">

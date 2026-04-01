@@ -175,7 +175,7 @@ export default function MarketplaceItemView() {
                         
                         <div className="relative z-10">
                             <div className="flex justify-between items-start mb-4">
-                                <h1 className="text-2xl md:text-3xl font-black text-white leading-tight uppercase italic tracking-tighter">{item.title}</h1>
+                                <h1 className={`text-2xl md:text-3xl font-black text-white leading-tight uppercase italic tracking-tighter ${(item.status === 'AGOTADO' || item.stock === 0) ? 'line-through opacity-50' : ''}`}>{item.title}</h1>
                                 {isSeller && (
                                     <button onClick={() => navigate(`/marketplace/edit/${item.id}`)} className="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-2 text-[10px] font-black px-3 py-1.5 md:px-4 md:py-2 rounded-xl transition-all shadow-lg active:scale-95 shrink-0">
                                         <Edit3 size={14}/> EDITAR
@@ -195,7 +195,7 @@ export default function MarketplaceItemView() {
                                     <div className="space-y-2">
                                         <div className="flex items-baseline gap-3">
                                             <span className="text-slate-600 line-through text-lg md:text-xl font-bold">{item.originalPrice} $</span>
-                                            <span className="text-4xl md:text-5xl font-black text-red-500 tracking-tighter">{item.price} <span className="text-xl md:text-2xl">$</span></span>
+                                            <span className={`text-4xl md:text-5xl font-black text-red-500 tracking-tighter ${(item.status === 'AGOTADO' || item.stock === 0) ? 'line-through opacity-50' : ''}`}>{item.price} <span className="text-xl md:text-2xl">$</span></span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="bg-red-600 text-white text-[9px] md:text-[10px] font-black px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase tracking-widest shadow-lg shadow-red-900/20">
@@ -207,7 +207,7 @@ export default function MarketplaceItemView() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <span className="text-4xl md:text-5xl font-black text-emerald-400 tracking-tighter">{item.price} <span className="text-xl md:text-2xl">$</span></span>
+                                    <span className={`text-4xl md:text-5xl font-black text-emerald-400 tracking-tighter ${(item.status === 'AGOTADO' || item.stock === 0) ? 'line-through opacity-50' : ''}`}>{item.price} <span className="text-xl md:text-2xl">$</span></span>
                                 )}
                                 <div className="text-[9px] md:text-[10px] text-slate-500 mt-4 flex flex-wrap gap-2">
                                     <span className="bg-slate-950 border border-white/5 px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest">{item.category}</span>
