@@ -80,7 +80,7 @@ export default function MarketplaceEdit() {
                 originalPrice: numBase,
                 discountPercent: numDisc,
                 stock: Number(stock),
-                isFlashSale: isFlashSale,
+                isFlashSale: isFlashSale ? 1 : 0,
                 tags: tags,
             });
             toast.success("Artículo actualizado correctamente");

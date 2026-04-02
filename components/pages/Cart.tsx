@@ -42,14 +42,20 @@ export default function Cart() {
                 ...user.shippingDetails
             }));
         }
-        if (user) {
-            fetchHistory();
-        }
     }, [user]);
+
+    useEffect(() => {
+        if (user && activeTab === 'HISTORY') {
+            fetchHistory();
+            const interval = setInterval(fetchHistory, 10000); // Poll every 10 seconds
+            return () => clearInterval(interval);
+        }
+    }, [user, activeTab]);
 
     const fetchHistory = async () => {
         if (!user) return;
-        setLoadingHistory(true);
+        // Only show loader on initial fetch
+        if (orderHistory.length === 0) setLoadingHistory(true);
         try {
             const history = await db.getBuyerOrders(user.id);
             setOrderHistory(history);
@@ -347,44 +353,94 @@ export default function Cart() {
                             </div>
                         </div>
                     ) : (
-                        orderHistory.map((order: any) => (
-                            <div 
-                                key={order.id} 
-                                onClick={() => setSelectedOrder(order)}
-                                className="bg-slate-900/50 border border-white/5 rounded-[32px] overflow-hidden cursor-pointer hover:border-indigo-500/30 transition-all group"
-                            >
-                                <div className="p-4 bg-slate-950/50 border-b border-white/5 flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <Package size={14} className="text-indigo-400" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Pedido #{order.id.slice(-6)}</span>
-                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border ${
-                                            order.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                            order.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                        }`}>
-                                            {order.status === 'PAID' ? 'COMPLETADO' : order.status === 'REJECTED' ? 'RECHAZADO' : 'PENDIENTE'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt * 1000).toLocaleDateString()}</span>
-                                        <ChevronRight size={14} className="text-slate-700 group-hover:text-indigo-400 transition-colors" />
-                                    </div>
-                                </div>
-                                <div className="p-6 flex items-center justify-between">
-                                    <div className="flex gap-3 overflow-x-auto scrollbar-hide">
-                                        {order.items.map((item: any) => (
-                                            <div key={item.id} className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-white/5 shrink-0">
-                                                <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="space-y-8">
+                            {/* Pending Section */}
+                            {orderHistory.some(o => o.status === 'PENDING') && (
+                                <div className="space-y-4">
+                                    <h3 className="text-sm font-black text-amber-500 uppercase tracking-widest flex items-center gap-2 px-2">
+                                        <Clock size={16} /> Compras en Proceso
+                                    </h3>
+                                    {orderHistory.filter(o => o.status === 'PENDING').map((order: any) => (
+                                        <div 
+                                            key={order.id} 
+                                            onClick={() => setSelectedOrder(order)}
+                                            className="bg-slate-900/50 border border-amber-500/20 rounded-[32px] overflow-hidden cursor-pointer hover:border-amber-500/40 transition-all group"
+                                        >
+                                            <div className="p-4 bg-amber-500/5 border-b border-white/5 flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <Package size={14} className="text-amber-500" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-200">Pedido #{order.id.slice(-6)}</span>
+                                                    <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                                        ESPERANDO VENDEDOR
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt * 1000).toLocaleDateString()}</span>
+                                                    <ChevronRight size={14} className="text-slate-700 group-hover:text-amber-400 transition-colors" />
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase">Total</p>
-                                        <p className="text-xl font-black text-white tracking-tighter">${Number(order.totalAmount).toFixed(2)}</p>
-                                    </div>
+                                            <div className="p-6 flex items-center justify-between">
+                                                <div className="flex gap-3 overflow-x-auto scrollbar-hide">
+                                                    {order.items.map((item: any) => (
+                                                        <div key={item.id} className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-white/5 shrink-0">
+                                                            <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">Total</p>
+                                                    <p className="text-xl font-black text-white tracking-tighter">${Number(order.totalAmount).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
+                            )}
+
+                            {/* Completed Section */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-2">
+                                    <History size={16} /> Historial de Compras
+                                </h3>
+                                {orderHistory.filter(o => o.status !== 'PENDING').map((order: any) => (
+                                    <div 
+                                        key={order.id} 
+                                        onClick={() => setSelectedOrder(order)}
+                                        className="bg-slate-900/50 border border-white/5 rounded-[32px] overflow-hidden cursor-pointer hover:border-indigo-500/30 transition-all group"
+                                    >
+                                        <div className="p-4 bg-slate-950/50 border-b border-white/5 flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <Package size={14} className="text-indigo-400" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Pedido #{order.id.slice(-6)}</span>
+                                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border ${
+                                                    order.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                    'bg-red-500/10 text-red-400 border-red-500/20'
+                                                }`}>
+                                                    {order.status === 'PAID' ? 'COMPLETADO' : 'RECHAZADO'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt * 1000).toLocaleDateString()}</span>
+                                                <ChevronRight size={14} className="text-slate-700 group-hover:text-indigo-400 transition-colors" />
+                                            </div>
+                                        </div>
+                                        <div className="p-6 flex items-center justify-between">
+                                            <div className="flex gap-3 overflow-x-auto scrollbar-hide">
+                                                {order.items.map((item: any) => (
+                                                    <div key={item.id} className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 border border-white/5 shrink-0">
+                                                        <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase">Total</p>
+                                                <p className="text-xl font-black text-white tracking-tighter">${Number(order.totalAmount).toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))
+                        </div>
                     )}
                 </div>
             )}
@@ -483,14 +539,29 @@ export default function Cart() {
                                     </div>
                                 )}
 
-                                <div className="bg-indigo-600/10 border border-indigo-500/20 p-6 rounded-3xl flex justify-between items-center">
-                                    <div>
-                                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Total Pagado</p>
-                                        <p className="text-xs text-indigo-400 font-bold uppercase">{selectedOrder.paymentMethod === 'PLATFORM' ? 'Saldo Plataforma' : 'Pago Directo'}</p>
+                                <div className="bg-indigo-600/10 border border-indigo-500/20 p-6 rounded-3xl space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Total del Pedido</p>
+                                            <p className="text-xs text-indigo-400 font-bold uppercase">{selectedOrder.paymentMethod === 'PLATFORM' ? 'Saldo Plataforma' : 'Pago Directo'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-3xl font-black text-white tracking-tighter">${Number(selectedOrder.totalAmount).toFixed(2)}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-3xl font-black text-white tracking-tighter">${Number(selectedOrder.totalAmount).toFixed(2)}</p>
-                                    </div>
+
+                                    {selectedOrder.status === 'PAID' && selectedOrder.paymentMethod === 'DIRECT' && selectedOrder.paidAmount > 0 && (
+                                        <div className="pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase">Entregado</p>
+                                                <p className="text-sm font-black text-emerald-400">${Number(selectedOrder.paidAmount).toFixed(2)}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase">Cambio</p>
+                                                <p className="text-sm font-black text-amber-400">${Number(selectedOrder.changeAmount).toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

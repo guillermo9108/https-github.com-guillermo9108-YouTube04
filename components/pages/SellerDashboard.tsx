@@ -64,10 +64,14 @@ export default function SellerDashboard() {
     }
   };
 
-  const handleMarkPaid = async (orderItemId: string) => {
+  const handleMarkPaid = async (orderItemId: string, total: number, orderId: string) => {
     if (!user) return;
+    const paidStr = amountPaid[orderId] || '0';
+    const paidNum = parseFloat(paidStr);
+    const change = calculateChange(total, paidStr);
+
     try {
-      await db.markItemPaid(orderItemId, user.id);
+      await db.markItemPaid(orderItemId, user.id, paidNum, change || 0);
       toast.success("Artículo marcado como pagado");
       fetchData(); // Refresh data
     } catch (error: any) {
@@ -355,7 +359,7 @@ export default function SellerDashboard() {
                                   </span>
                                 ) : (
                                   <button 
-                                    onClick={() => handleMarkPaid(item.id)}
+                                    onClick={() => handleMarkPaid(item.id, Number(order.totalAmount), order.id)}
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-2 text-[9px] uppercase tracking-widest"
                                   >
                                     <CheckCircle size={12} />
@@ -625,14 +629,29 @@ export default function SellerDashboard() {
                 )}
 
                 {/* Summary */}
-                <div className="bg-indigo-600/10 border border-indigo-500/20 p-6 rounded-3xl flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Total Final</p>
-                    <p className="text-xs text-indigo-400 font-bold uppercase">{selectedOrderDetails.paymentMethod === 'PLATFORM' ? 'Pagado vía Plataforma' : 'Pago Directo'}</p>
+                <div className="bg-indigo-600/10 border border-indigo-500/20 p-6 rounded-3xl space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Total Final</p>
+                      <p className="text-xs text-indigo-400 font-bold uppercase">{selectedOrderDetails.paymentMethod === 'PLATFORM' ? 'Pagado vía Plataforma' : 'Pago Directo'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-black text-white tracking-tighter">${Number(selectedOrderDetails.totalAmount).toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-black text-white tracking-tighter">${Number(selectedOrderDetails.totalAmount).toFixed(2)}</p>
-                  </div>
+
+                  {selectedOrderDetails.status === 'PAID' && selectedOrderDetails.paymentMethod === 'DIRECT' && selectedOrderDetails.paidAmount > 0 && (
+                    <div className="pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Recibido</p>
+                        <p className="text-sm font-black text-emerald-400">${Number(selectedOrderDetails.paidAmount).toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">Cambio Entregado</p>
+                        <p className="text-sm font-black text-amber-400">${Number(selectedOrderDetails.changeAmount).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

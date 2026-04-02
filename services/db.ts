@@ -300,7 +300,12 @@ class DBService {
     }
     public async getSellerOrders(sellerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_seller_orders&sellerId=${sellerId}`); }
     public async getBuyerOrders(buyerId: string): Promise<any[]> { return this.request<any[]>(`action=market_get_buyer_orders&buyerId=${buyerId}`); }
-    public async markItemPaid(orderItemId: string, sellerId: string): Promise<void> { return this.request<void>(`action=market_mark_item_paid`, { method: 'POST', body: JSON.stringify({ orderItemId, sellerId }) }); }
+    public async markItemPaid(orderItemId: string, sellerId: string, paidAmount?: number, changeAmount?: number): Promise<void> { 
+        return this.request<void>(`action=market_mark_item_paid`, { 
+            method: 'POST', 
+            body: JSON.stringify({ orderItemId, sellerId, paidAmount, changeAmount }) 
+        }); 
+    }
     public async rejectOrder(orderId: string, sellerId: string, reason: string): Promise<void> {
         return this.request<void>(`action=market_reject_order`, { method: 'POST', body: JSON.stringify({ orderId, sellerId, reason }) });
     }
