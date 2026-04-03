@@ -165,7 +165,8 @@ try {
         case 'get_videos_by_creator': video_get_by_creator($pdo, $_GET['userId'] ?? ''); break;
         case 'get_folder_videos': video_get_folder_videos($pdo, $_GET['videoId'] ?? ''); break;
         case 'get_related_videos': video_get_related($pdo, $_GET['videoId'] ?? ''); break;
-        case 'get_unprocessed_videos': video_get_unprocessed($pdo); break;
+        case 'get_unprocessed_videos': video_get_unprocessed($pdo, $_GET); break;
+        case 'unlock_video': video_unlock($pdo, $input); break;
         case 'upload_video': video_upload($pdo, $_POST, $_FILES); break;
         case 'update_video_metadata': video_update_metadata($pdo, $_POST, $_FILES); break;
         case 'update_video': video_update($pdo, $input); break;

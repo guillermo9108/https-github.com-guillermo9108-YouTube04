@@ -493,14 +493,34 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
 /**
  * FIXED: Uso de bindValue para evitar comillas en LIMIT
  */
-function video_get_unprocessed($pdo) {
-    $limit = intval($_GET['limit'] ?? 50);
-    $timeLimit = time() - 300;
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = 'PENDING' AND processing_attempts < 3 AND locked_at < :time ORDER BY createdAt ASC LIMIT :limit");
+function video_get_unprocessed($pdo, $params = []) {
+    $limit = intval($params['limit'] ?? 1);
+    $now = time();
+    $timeLimit = $now - 300; // 5 minutos de bloqueo
+    
+    // Generar un ID de bloqueo único para esta petición
+    $lockId = uniqid('lock_', true);
+    
+    // Intentar bloquear los videos disponibles
+    // Se ordena por videoUrl para mantener el orden alfabético por carpeta
+    $stmt = $pdo->prepare("UPDATE videos 
+                           SET locked_at = :now, lock_id = :lockId 
+                           WHERE category = 'PENDING' 
+                           AND processing_attempts < 3 
+                           AND (locked_at < :time OR locked_at IS NULL)
+                           ORDER BY videoUrl ASC 
+                           LIMIT :limit");
+    $stmt->bindValue(':now', $now, PDO::PARAM_INT);
+    $stmt->bindValue(':lockId', $lockId, PDO::PARAM_STR);
     $stmt->bindValue(':time', $timeLimit, PDO::PARAM_INT);
     $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
     $stmt->execute();
+    
+    // Recuperar los videos que acabamos de bloquear
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE lock_id = :lockId");
+    $stmt->execute([':lockId' => $lockId]);
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
     video_process_rows($videos); 
     respond(true, $videos);
 }
@@ -687,14 +707,20 @@ function video_upload($pdo, $post, $files) {
     respond(true);
 }
 
+function video_unlock($pdo, $input) {
+    $id = $input['id'];
+    $pdo->prepare("UPDATE videos SET locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]);
+    respond(true);
+}
+
 function video_update_metadata($pdo, $post, $files) {
     $id = $post['id']; 
     $success = ($post['success'] ?? '1') === '1';
     if (!$success) {
-        $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0 WHERE id = ?")->execute([$id]); 
+        $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
         respond(true); 
     }
-    $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0"]; 
+    $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0", "lock_id = NULL"]; 
     $params = [intval($post['duration'])];
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "t_{$id}.jpg"; 

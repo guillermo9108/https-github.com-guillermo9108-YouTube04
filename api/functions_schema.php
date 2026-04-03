@@ -47,13 +47,15 @@ function getAppSchema() {
                 'transcode_status' => "ENUM('NONE', 'WAITING', 'PROCESSING', 'DONE', 'FAILED') DEFAULT 'NONE'",
                 'transcode_progress' => 'INT DEFAULT 0',
                 'reason' => 'TEXT DEFAULT NULL',
-                'locked_at' => 'BIGINT DEFAULT 0'
+                'locked_at' => 'BIGINT DEFAULT 0',
+                'lock_id' => 'VARCHAR(50) DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',
                 'idx_parent_category' => 'parent_category',
                 'idx_created_at' => 'createdAt',
-                'idx_creator_id' => 'creatorId'
+                'idx_creator_id' => 'creatorId',
+                'idx_locked_at' => 'locked_at'
             ]
         ],
         'requests' => [

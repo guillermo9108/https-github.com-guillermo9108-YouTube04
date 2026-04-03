@@ -69,6 +69,7 @@ export const GridProvider = ({ children }: { children?: React.ReactNode }) => {
     };
 
     const skipTask = () => {
+        if (activeTask) db.unlockVideo(activeTask.id).catch(() => {});
         setActiveTask(null);
         processingRef.current = false;
         nextFetchTimeRef.current = Date.now() + 5000; 
@@ -78,6 +79,7 @@ export const GridProvider = ({ children }: { children?: React.ReactNode }) => {
     const setThrottled = (val: boolean) => {
         setIsThrottled(val);
         if (val) {
+            if (activeTask) db.unlockVideo(activeTask.id).catch(() => {});
             // Si entramos en throttle, limpiamos la tarea activa para liberar recursos inmediatos
             setActiveTask(null);
             processingRef.current = false;

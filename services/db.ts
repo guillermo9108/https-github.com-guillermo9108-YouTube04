@@ -198,7 +198,7 @@ class DBService {
     }
 
     public async getUnprocessedVideos(limit: number = 50, mode: string = 'normal'): Promise<Video[]> { return this.request<Video[]>(`action=get_unprocessed_videos&limit=${limit}&mode=${mode}`); }
-
+    public async unlockVideo(id: string): Promise<void> { return this.request<void>(`action=unlock_video`, { method: 'POST', body: JSON.stringify({ id }) }); }
     public async getUserActivity(userId: string): Promise<{watched: string[], liked: string[]}> { return this.request<{watched: string[], liked: string[]}>(`action=get_user_activity&userId=${userId}`); }
 
     public async toggleWatchLater(userId: string, videoId: string): Promise<string[]> {
