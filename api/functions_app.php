@@ -56,6 +56,7 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
 
     $latest['isAPK'] = $isAPK;
     $latest['deviceIdentity'] = parse_user_agent($ua);
+    $latest['foundVersions'] = $versions;
 
     respond(true, $latest);
 }

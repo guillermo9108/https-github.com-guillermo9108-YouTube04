@@ -136,12 +136,12 @@ class DBService {
         return fetch('api/install.php?action=check').then(r => r.json()).then(res => ({ status: res.data?.installed ? 'installed' : 'not_installed' })).catch(() => ({ status: 'installed' })); 
     }
 
-    public async getLatestVersion(userId?: string, clientVersion?: string): Promise<{version: string, filename: string, url: string | null, isAPK: boolean, deviceIdentity: string}> {
+    public async getLatestVersion(userId?: string, clientVersion?: string): Promise<{version: string, filename: string, url: string | null, isAPK: boolean, deviceIdentity: string, foundVersions?: any[]}> {
         const params = new URLSearchParams();
         params.append('action', 'get_latest_version');
         if (userId) params.append('userId', userId);
         if (clientVersion) params.append('clientVersion', clientVersion);
-        return this.request<{version: string, filename: string, url: string | null, isAPK: boolean, deviceIdentity: string}>(params.toString());
+        return this.request<{version: string, filename: string, url: string | null, isAPK: boolean, deviceIdentity: string, foundVersions?: any[]}>(params.toString());
     }
 
     public async verifyDbConnection(config: any): Promise<boolean> {

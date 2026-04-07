@@ -19,11 +19,18 @@ export default function AdminConfig() {
     
     const [activeSection, setActiveSection] = useState<string | null>('GENERAL');
     const [newLibPath, setNewLibPath] = useState('');
+    const [foundApks, setFoundApks] = useState<any[]>([]);
 
     const loadSettings = async () => {
         setLoading(true);
         try {
             const s: any = await db.getSystemSettings();
+            
+            // Cargar APKs encontradas para sugerencias
+            try {
+                const apkRes = await db.getLatestVersion();
+                if (apkRes.foundVersions) setFoundApks(apkRes.foundVersions);
+            } catch (e) { console.warn("Error fetching APKs", e); }
             
             let rawVip = s.vipPlans;
             let plans: VipPlan[] = [];
@@ -217,6 +224,20 @@ export default function AdminConfig() {
                                     <span className="text-[8px] text-slate-500 font-black uppercase">Versión Global</span>
                                 </div>
                             </div>
+                            {foundApks.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    <span className="text-[8px] text-slate-500 font-black uppercase self-center mr-1">Sugerencias:</span>
+                                    {foundApks.map(apk => (
+                                        <button
+                                            key={apk.version}
+                                            onClick={() => updateValue('latestApkVersion', apk.version)}
+                                            className="text-[9px] font-black bg-slate-800 hover:bg-amber-600 text-white px-2 py-1 rounded-lg transition-colors border border-white/5"
+                                        >
+                                            v{apk.version}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">* Si la versión del usuario es menor a esta, se le pedirá actualizar.</p>
                         </div>
                     </div>

@@ -36,7 +36,7 @@ function admin_update_settings($pdo, $input) {
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
-        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar'
+        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion'
     ];
     
     $fields = []; $params = [];
