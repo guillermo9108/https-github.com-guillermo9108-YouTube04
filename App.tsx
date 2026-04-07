@@ -304,6 +304,7 @@ export default function App() {
                                 <Route path="/admin/analytics" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/config" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/maintenance" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
+                                <Route path="/admin/server" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                             </Route>
 
                             <Route path="*" element={<Navigate to="/" />} />

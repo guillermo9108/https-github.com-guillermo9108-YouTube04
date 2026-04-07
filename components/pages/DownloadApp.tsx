@@ -87,7 +87,7 @@ export default function DownloadApp() {
 
                             <div className="grid gap-3">
                                 <a 
-                                    href={latest?.url || "/StreamPay 0.0.1.apk"} 
+                                    href={latest?.url || "streampay_v0.0.1.apk"} 
                                     download
                                     className="flex items-center justify-center gap-3 bg-white text-black font-black py-4 rounded-2xl hover:bg-indigo-50 transition-all active:scale-95"
                                 >

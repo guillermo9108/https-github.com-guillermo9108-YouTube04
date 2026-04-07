@@ -164,6 +164,7 @@ export interface SystemSettings {
   vapidPublicKey?: string;
   vapidPrivateKey?: string;
   latestApkVersion?: string;
+  batteryConfig?: any;
 }
 
 export interface Transaction {

@@ -14,21 +14,29 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
     }
 
     // 2. Escanear archivos para encontrar el más reciente (raíz, public, api)
-    $files = array_merge(
-        glob($root . '/StreamPay*.apk'),
-        glob($root . '/public/StreamPay*.apk'),
-        glob($root . '/api/StreamPay*.apk')
+    // Usamos glob con *.apk y filtramos manualmente para ser insensibles a mayúsculas
+    $rawFiles = array_merge(
+        glob($root . '/*.apk'),
+        glob($root . '/public/*.apk'),
+        glob($root . '/api/*.apk')
     );
 
     $versions = [];
-    foreach ($files as $file) {
+    foreach ($rawFiles as $file) {
         $filename = basename($file);
-        // Regex flexible para detectar versiones (ej: StreamPay_v1.0.5.apk, StreamPay 1.0.5.apk)
-        if (preg_match('/StreamPay.*v?([\d\.]+)\.apk/i', $filename, $matches)) {
+        // Regex flexible para detectar versiones (ej: StreamPay_v1.0.5.apk, streampay_v0.0.1.apk)
+        if (preg_match('/streampay.*v?([\d\.]+)\.apk/i', $filename, $matches)) {
+            $url = $filename;
+            if (strpos($file, $root . '/api/') === 0) {
+                $url = "api/" . $filename;
+            } elseif (strpos($file, $root . '/public/') === 0) {
+                $url = "public/" . $filename;
+            }
+            
             $versions[] = [
                 'version' => $matches[1],
                 'filename' => $filename,
-                'url' => (strpos($file, $root . '/api/') === 0) ? "api/$filename" : "/$filename"
+                'url' => $url
             ];
         }
     }
@@ -44,9 +52,19 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
         }
     }
 
-    // 4. Registrar versión del usuario si se proporciona o se detecta en el UA
+    // 4. Detectar si es APK basado en UserAgent y X-Requested-With
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? $_SERVER['HTTP_X_APP_PACKAGE'] ?? '';
+    $isAPK = (strpos(strtolower($ua), 'streampayapk') !== false) || 
+             (!empty($requestedWith) && !in_array($requestedWith, ['com.android.browser', 'com.android.chrome', 'org.mozilla.firefox', 'com.google.android.apps.maps']));
+
+    // 5. Registrar versión del usuario si se proporciona o se detecta en el UA
     if ($pdo && $userId) {
+        // Obtener versión actual de la DB para ver si es NULL
+        $stmt = $pdo->prepare("SELECT apkVersion FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $currentApkVersion = $stmt->fetchColumn();
+
         $versionToSave = $clientVersion;
         
         // Si no viene en los parámetros, intentar extraer del UA
@@ -56,17 +74,18 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
             }
         }
 
+        // PROPUESTA: Si es NULL en DB y estamos en la APK, inicializar con la última del servidor
+        if ($currentApkVersion === null && $isAPK) {
+            if (empty($versionToSave)) {
+                $versionToSave = $latest['version'];
+            }
+        }
+
         if (!empty($versionToSave)) {
             $stmt = $pdo->prepare("UPDATE users SET apkVersion = ? WHERE id = ?");
             $stmt->execute([$versionToSave, $userId]);
         }
     }
-
-    // 5. Detectar si es APK basado en UserAgent y X-Requested-With
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? $_SERVER['HTTP_X_APP_PACKAGE'] ?? '';
-    $isAPK = (strpos(strtolower($ua), 'streampayapk') !== false) || 
-             (!empty($requestedWith) && !in_array($requestedWith, ['com.android.browser', 'com.android.chrome', 'org.mozilla.firefox', 'com.google.android.apps.maps']));
 
     $latest['isAPK'] = $isAPK;
     $latest['deviceIdentity'] = parse_user_agent($ua);

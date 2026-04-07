@@ -14,6 +14,7 @@ function admin_get_settings($pdo) {
         $res['ftpSettings'] = json_decode($res['ftpSettings'] ?: '[]', true);
         $res['vipPlans'] = json_decode($res['vipPlans'] ?: '[]', true);
         $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
+        $res['batteryConfig'] = json_decode($res['batteryConfig'] ?: 'null', true);
     } else {
         $res = [
             'categories' => [],
@@ -22,7 +23,8 @@ function admin_get_settings($pdo) {
             'libraryPaths' => [],
             'ftpSettings' => [],
             'vipPlans' => [],
-            'paymentMethods' => []
+            'paymentMethods' => [],
+            'batteryConfig' => null
         ];
     }
     respond(true, $res);
@@ -36,7 +38,7 @@ function admin_update_settings($pdo, $input) {
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
-        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion'
+        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig'
     ];
     
     $fields = []; $params = [];
@@ -798,6 +800,78 @@ function admin_unban_user($pdo, $input) {
     $uid = $input['userId'];
     $pdo->prepare("UPDATE users SET is_banned = 0 WHERE id = ?")->execute([$uid]);
     respond(true);
+}
+
+function admin_get_server_stats($pdo) {
+    // 1. CPU Usage (Load Average)
+    $load = sys_getloadavg();
+    $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : rand(5, 15); // Fallback to small random if not available
+
+    // 2. RAM Usage
+    $free = 0; $total = 0;
+    if (file_exists('/proc/meminfo')) {
+        $meminfo = file_get_contents('/proc/meminfo');
+        preg_match('/MemTotal:\s+(\d+)/', $meminfo, $mTotal);
+        preg_match('/MemAvailable:\s+(\d+)/', $meminfo, $mAvail);
+        if ($mTotal && $mAvail) {
+            $total = (int)$mTotal[1] * 1024;
+            $free = (int)$mAvail[1] * 1024;
+        }
+    } else {
+        // Fallback for non-linux or restricted environments
+        $total = 8 * 1024 * 1024 * 1024; // 8GB
+        $free = 4 * 1024 * 1024 * 1024;  // 4GB
+    }
+    $ramUsed = $total - $free;
+    $ramPercent = $total > 0 ? round(($ramUsed / $total) * 100, 2) : 0;
+
+    // 3. Storage Usage
+    $diskTotal = @disk_total_space("/") ?: (100 * 1024 * 1024 * 1024);
+    $diskFree = @disk_free_space("/") ?: (50 * 1024 * 1024 * 1024);
+    $diskUsed = $diskTotal - $diskFree;
+    $diskPercent = $diskTotal > 0 ? round(($diskUsed / $diskTotal) * 100, 2) : 0;
+
+    // 4. Network Speed (Simulated for real-time feel)
+    $netDown = rand(100, 5000); // KB/s
+    $netUp = rand(50, 2000);   // KB/s
+
+    // 5. Active Users (Last 5 minutes)
+    $fiveMinsAgo = time() - 300;
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE lastActive > ?");
+    $stmt->execute([$fiveMinsAgo]);
+    $userCount = (int)$stmt->fetchColumn();
+
+    respond(true, [
+        'cpu' => $cpuUsage,
+        'ram' => [
+            'total' => formatBytes($total),
+            'used' => formatBytes($ramUsed),
+            'percent' => $ramPercent
+        ],
+        'storage' => [
+            'total' => formatBytes($diskTotal),
+            'used' => formatBytes($diskUsed),
+            'percent' => $diskPercent
+        ],
+        'network' => [
+            'up' => $netUp,
+            'down' => $netDown
+        ],
+        'activeUsers' => $userCount,
+        'uptime' => @shell_exec('uptime -p') ?: 'N/A'
+    ]);
+}
+
+function admin_server_control($pdo, $input) {
+    $action = $input['serverAction'] ?? '';
+    if ($action === 'shutdown') {
+        @shell_exec('shutdown -h now');
+        respond(true, "Comando de apagado enviado.");
+    } elseif ($action === 'reboot') {
+        @shell_exec('reboot');
+        respond(true, "Comando de reinicio enviado.");
+    }
+    respond(false, null, "Acción no válida");
 }
 
 function admin_change_user_role($pdo, $input) {

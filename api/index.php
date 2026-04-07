@@ -246,6 +246,8 @@ try {
         case 'admin_repair_db': admin_repair_db($pdo, $input); break;
         case 'admin_cleanup_files': admin_cleanup_files($pdo); break;
         case 'admin_get_local_stats': admin_get_local_stats($pdo); break;
+        case 'admin_get_server_stats': admin_get_server_stats($pdo); break;
+        case 'admin_server_control': admin_server_control($pdo, $input); break;
         case 'admin_get_logs': admin_get_logs(); break;
         case 'admin_clear_logs': admin_clear_logs(); break;
         case 'get_real_stats': get_real_stats($pdo); break;

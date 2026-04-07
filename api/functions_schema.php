@@ -240,7 +240,8 @@ function getAppSchema() {
                 'defaultAvatar' => 'VARCHAR(255) DEFAULT NULL',
                 'vapidPublicKey' => 'TEXT DEFAULT NULL',
                 'vapidPrivateKey' => 'TEXT DEFAULT NULL',
-                'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'"
+                'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'",
+                'batteryConfig' => 'JSON DEFAULT NULL'
             ]
         ],
         'transactions' => [

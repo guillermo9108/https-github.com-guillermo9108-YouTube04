@@ -1,7 +1,7 @@
 
 import React from 'react';
 // Added ShieldCheck to imports to fix error on line 71
-import { User as UserIcon, Wallet, Store, Settings, Database, Wrench, TrendingUp, Network, DownloadCloud, HardDrive, Cpu, Package, Home as HomeIcon, XCircle, ShieldCheck } from 'lucide-react';
+import { User as UserIcon, Wallet, Store, Settings, Database, Wrench, TrendingUp, Network, DownloadCloud, HardDrive, Cpu, Package, Home as HomeIcon, XCircle, ShieldCheck, Activity } from 'lucide-react';
 import { useLocation, Link } from '../../Router';
 
 import AdminUsers from './AdminUsers';
@@ -17,7 +17,9 @@ import AdminLocalFiles from './AdminLocalFiles';
 import AdminTranscoder from './AdminTranscoder';
 import AdminPortability from './AdminPortability';
 
-type TabID = 'USERS' | 'FINANCE' | 'MARKET' | 'CONFIG' | 'LIBRARY' | 'FILES' | 'FTP' | 'MAINTENANCE' | 'ANALYTICS' | 'REQUESTS' | 'TRANSCODER' | 'PORTABILITY';
+import AdminServerStats from './AdminServerStats';
+
+type TabID = 'USERS' | 'FINANCE' | 'MARKET' | 'CONFIG' | 'LIBRARY' | 'FILES' | 'FTP' | 'MAINTENANCE' | 'ANALYTICS' | 'REQUESTS' | 'TRANSCODER' | 'PORTABILITY' | 'SERVER';
 
 export default function Admin() {
   const location = useLocation();
@@ -36,6 +38,7 @@ export default function Admin() {
     '/admin/analytics': 'ANALYTICS',
     '/admin/config': 'CONFIG',
     '/admin/maintenance': 'MAINTENANCE',
+    '/admin/server': 'SERVER',
     '/admin': 'USERS' // Default
   };
 
@@ -54,6 +57,7 @@ export default function Admin() {
        { id: 'ANALYTICS', icon: TrendingUp, label: 'Stats', path: '/admin/analytics' },
        { id: 'CONFIG', icon: Settings, label: 'Config', path: '/admin/config' },
        { id: 'MAINTENANCE', icon: Wrench, label: 'Tools', path: '/admin/maintenance' },
+       { id: 'SERVER', icon: Activity, label: 'Server', path: '/admin/server' },
   ];
 
   return (
@@ -95,6 +99,7 @@ export default function Admin() {
           {activeTab === 'FILES' && <AdminLocalFiles />}
           {activeTab === 'FTP' && <AdminFtp />}
           {activeTab === 'MAINTENANCE' && <AdminMaintenance />}
+          {activeTab === 'SERVER' && <AdminServerStats />}
           {activeTab === 'ANALYTICS' && <AdminAnalytics />}
       </div>
     </div>

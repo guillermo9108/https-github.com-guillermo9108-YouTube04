@@ -347,6 +347,8 @@ class DBService {
     public async transferBalance(userId: string, targetUsername: string, amount: number): Promise<void> { return this.request<void>(`action=transfer_balance`, { method: 'POST', body: JSON.stringify({ userId, targetUsername, amount }) }); }
     public async adminAddBalance(adminId: string, targetId: string, amount: number, reason: string = ''): Promise<void> { return this.request<void>(`action=admin_add_balance`, { method: 'POST', body: JSON.stringify({ adminId, userId: targetId, amount, reason }) }); }
     public async getGlobalTransactions(): Promise<any> { return this.request<any>('action=get_global_transactions'); }
+    public async adminGetServerStats(): Promise<any> { return this.request<any>('action=admin_get_server_stats'); }
+    public async adminServerControl(action: 'shutdown' | 'reboot'): Promise<any> { return this.request<any>('action=admin_server_control', { method: 'POST', body: JSON.stringify({ serverAction: action }) }); }
 
     public async getAllUsers(): Promise<User[]> { return this.request<User[]>('action=get_all_users'); }
     public async searchUsers(userId: string, query: string): Promise<User[]> { return this.request<User[]>(`action=search_users`, { method: 'POST', body: JSON.stringify({ userId, q: query }) }); }
