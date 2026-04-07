@@ -27,15 +27,25 @@ export default function DownloadApp() {
     }, []);
 
     const handleOpenApp = () => {
-        // Intent URL to open the app if installed
         const currentOrigin = window.location.origin;
         const packageName = "com.streampay.app";
         const scheme = "streampay";
         
-        // Standard Android Intent
+        // Intentar abrir directamente con el esquema personalizado primero
+        const directUrl = `${scheme}://open?url=${encodeURIComponent(currentOrigin)}`;
+        
+        // Intent URL como respaldo robusto
         const intentUrl = `intent://open?url=${encodeURIComponent(currentOrigin)}#Intent;scheme=${scheme};package=${packageName};S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
         
-        window.location.href = intentUrl;
+        // Intentar el esquema directo
+        window.location.href = directUrl;
+        
+        // Si después de 500ms no ha pasado nada (seguimos en la misma página), probar el Intent
+        setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                window.location.href = intentUrl;
+            }
+        }, 500);
     };
 
     return (

@@ -370,7 +370,12 @@ function parse_user_agent($ua) {
     // Detección de APK / WebView (común en apps Android)
     $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? $_SERVER['HTTP_X_APP_PACKAGE'] ?? '';
     if (!empty($requestedWith) && !in_array($requestedWith, ['com.android.browser', 'com.android.chrome', 'org.mozilla.firefox', 'com.google.android.apps.maps'])) {
-        $browser = "App ($requestedWith)";
+        // Si ya detectamos StreamPay con versión, no lo sobreescribimos totalmente
+        if (strpos($browser, 'StreamPay') === false) {
+            $browser = "App ($requestedWith)";
+        } else {
+            $browser .= " ($requestedWith)";
+        }
     } elseif (preg_match('/wv|webview|crosswalk/i', $ua)) {
         $browser = "App (WebView)";
     }

@@ -166,7 +166,9 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         const checkVersion = async () => {
-            if (hasChecked.current) return;
+            // No bloqueamos si no hay usuario, pero si hay usuario queremos que se registre su versión
+            // Si ya chequeamos y no hay usuario, y ahora hay usuario, re-chequeamos
+            if (hasChecked.current && !user?.id) return;
             
             try {
                 // Intentar extraer versión del UserAgent si es posible
@@ -176,7 +178,11 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
                 setIsAPK(latest.isAPK);
-                hasChecked.current = true;
+                
+                // Si ya tenemos el ID del usuario y el servidor respondió, marcamos como chequeado
+                if (user?.id || !latest.isAPK) {
+                    hasChecked.current = true;
+                }
                 
                 const currentHash = window.location.hash;
                 
