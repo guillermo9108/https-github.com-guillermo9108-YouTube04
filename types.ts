@@ -45,6 +45,7 @@ export interface User {
   vipExpiry?: number;
   is_verified_seller?: boolean | number;
   is_banned?: boolean | number;
+  apkVersion?: string;
 }
 
 export interface Video {
@@ -148,6 +149,7 @@ export interface SystemSettings {
   ftpSettings?: FtpSettings;
   vapidPublicKey?: string;
   vapidPrivateKey?: string;
+  latestApkVersion?: string;
 }
 
 export interface Transaction {

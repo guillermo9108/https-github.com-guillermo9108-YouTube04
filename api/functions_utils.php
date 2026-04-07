@@ -354,9 +354,15 @@ function parse_user_agent($ua) {
     elseif (preg_match('/linux/i', $ua)) $os = "Linux";
 
     $browser = "Navegador";
-    if (preg_match('/StreamPayAPK/i', $ua)) $browser = "App (StreamPay)";
-    elseif (preg_match('/chrome/i', $ua) && !preg_match('/edge|opr|opera/i', $ua)) $browser = "Chrome";
-    elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) $browser = "Safari";
+    if (preg_match('/StreamPayAPK\/([\d\.]+)/i', $ua, $m)) {
+        $browser = "App (StreamPay v" . $m[1] . ")";
+    } elseif (preg_match('/StreamPayAPK/i', $ua)) {
+        $browser = "App (StreamPay)";
+    } elseif (preg_match('/chrome/i', $ua) && !preg_match('/edge|opr|opera/i', $ua)) {
+        $browser = "Chrome";
+    } elseif (preg_match('/safari/i', $ua) && !preg_match('/chrome/i', $ua)) {
+        $browser = "Safari";
+    }
     elseif (preg_match('/firefox/i', $ua)) $browser = "Firefox";
     elseif (preg_match('/edge/i', $ua)) $browser = "Edge";
     elseif (preg_match('/opera|opr/i', $ua)) $browser = "Opera";

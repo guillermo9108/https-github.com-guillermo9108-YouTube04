@@ -9,21 +9,33 @@ export default function DownloadApp() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const isAPK = navigator.userAgent.toLowerCase().includes('streampayapk');
-        if (isAPK) {
-            window.location.hash = '#/';
-            return;
-        }
-        db.getLatestVersion().then(setLatest).finally(() => setLoading(false));
+        const check = async () => {
+            try {
+                const latest = await db.getLatestVersion();
+                if (latest.isAPK) {
+                    window.location.hash = '#/';
+                    return;
+                }
+                setLatest(latest);
+            } catch (e) {
+                console.warn("Error checking version", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        check();
     }, []);
 
     const handleOpenApp = () => {
         // Intent URL to open the app if installed
-        // We pass the current origin to the app if it supports it
         const currentOrigin = window.location.origin;
-        window.location.href = `streampay://open?url=${encodeURIComponent(currentOrigin)}`;
+        const packageName = "com.streampay.app";
+        const scheme = "streampay";
         
-        // No longer using automatic fallback download to avoid double action
+        // Standard Android Intent
+        const intentUrl = `intent://open?url=${encodeURIComponent(currentOrigin)}#Intent;scheme=${scheme};package=${packageName};S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
+        
+        window.location.href = intentUrl;
     };
 
     return (

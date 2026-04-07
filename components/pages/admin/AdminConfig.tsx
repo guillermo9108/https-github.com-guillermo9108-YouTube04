@@ -201,6 +201,25 @@ export default function AdminConfig() {
                             <input type="password" value={settings?.tropipayClientSecret} onChange={e => updateValue('tropipayClientSecret', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-[10px] focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
+
+                    <div className="pt-2 border-t border-white/5">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-amber-400 uppercase flex items-center gap-1 ml-1"><Smartphone size={10}/> Versión Actual APK (Update Force)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={settings?.latestApkVersion || ''} 
+                                    onChange={e => updateValue('latestApkVersion', e.target.value)} 
+                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-amber-500 outline-none" 
+                                    placeholder="Ej: 0.0.2"
+                                />
+                                <div className="bg-slate-800/50 rounded-xl px-4 flex items-center border border-slate-700">
+                                    <span className="text-[8px] text-slate-500 font-black uppercase">Versión Global</span>
+                                </div>
+                            </div>
+                            <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">* Si la versión del usuario es menor a esta, se le pedirá actualizar.</p>
+                        </div>
+                    </div>
                 </div>
             )}
 

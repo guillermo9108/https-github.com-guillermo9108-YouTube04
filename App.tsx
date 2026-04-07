@@ -1,5 +1,5 @@
 
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 // Page Imports
 import Login from './components/pages/Login';
 import Home from './components/pages/Home';
@@ -112,34 +112,41 @@ const SetupGuard = ({ children }: { children?: React.ReactNode }) => {
 
 const UpdateModal = ({ version, url, onClose }: { version: string, url: string, onClose: () => void }) => {
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
             <motion.div 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] max-w-sm w-full text-center space-y-6 shadow-2xl shadow-indigo-500/20"
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="bg-slate-900 border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full text-center space-y-6 shadow-2xl shadow-indigo-500/20 relative overflow-hidden"
             >
-                <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/40">
+                {/* Decorative background */}
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-600/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl" />
+
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-500/40 relative z-10">
                     <Download size={40} className="text-white" />
                 </div>
-                <div className="space-y-2">
-                    <h2 className="text-2xl font-black italic uppercase tracking-tight">Actualización <span className="text-indigo-500">Disponible</span></h2>
+                
+                <div className="space-y-2 relative z-10">
+                    <h2 className="text-2xl font-black italic uppercase tracking-tight text-white">Actualización <span className="text-indigo-400">Disponible</span></h2>
                     <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                        Hay una nueva versión de StreamPay ({version}) con mejoras y correcciones importantes.
+                        Hay una nueva versión de StreamPay (<span className="text-white font-bold">{version}</span>) con mejoras y correcciones importantes.
                     </p>
                 </div>
-                <div className="grid gap-3 pt-2">
+
+                <div className="grid gap-3 pt-2 relative z-10">
                     <a 
                         href={url} 
-                        download
-                        className="bg-white text-black font-black py-4 rounded-2xl hover:bg-indigo-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40"
                     >
-                        DESCARGAR V{version}
+                        ACTUALIZAR AHORA
                     </a>
                     <button 
                         onClick={onClose}
-                        className="text-slate-500 hover:text-white text-xs font-black uppercase tracking-widest transition-colors py-2"
+                        className="text-slate-500 hover:text-slate-300 text-[10px] font-black uppercase tracking-widest transition-colors py-2"
                     >
-                        Recordar más tarde
+                        Omitir por ahora
                     </button>
                 </div>
             </motion.div>
@@ -148,40 +155,69 @@ const UpdateModal = ({ version, url, onClose }: { version: string, url: string, 
 };
 
 const AppGuard = ({ children }: { children: React.ReactNode }) => {
+    const { user } = useAuth();
     const [updateInfo, setUpdateInfo] = useState<{version: string, url: string} | null>(null);
     const [showUpdate, setShowUpdate] = useState(false);
+    const [isAPK, setIsAPK] = useState(false);
+    const [isMobile, setIsMobile] = useState(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+    const hasChecked = useRef(false);
     
-    // Detección más robusta de la APK (ignorando mayúsculas/minúsculas)
-    const userAgent = navigator.userAgent || '';
-    const isAPK = userAgent.toLowerCase().includes('streampayapk');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(userAgent);
-    const currentVersion = "0.0.1"; // Versión actual de la web/app
+    const currentVersion = "0.0.1"; // Versión base de la web
 
     useEffect(() => {
-        const currentHash = window.location.hash;
-        
-        // Si es la APK y está en la página de descarga, redirigir al inicio
-        if (isAPK && currentHash.includes('/download')) {
-            window.location.hash = '#/';
-            return;
-        }
+        const checkVersion = async () => {
+            if (hasChecked.current) return;
+            
+            try {
+                // Intentar extraer versión del UserAgent si es posible
+                const ua = navigator.userAgent || '';
+                const uaMatch = ua.match(/StreamPayAPK\/([\d\.]+)/i);
+                const clientVersion = uaMatch ? uaMatch[1] : currentVersion;
 
-        // Redirigir a descarga si es móvil y NO es la APK
-        if (isMobile && !isAPK && !currentHash.includes('/download')) {
-            window.location.hash = '#/download';
-            return;
-        }
-
-        // Solo verificar actualizaciones si estamos en la APK
-        if (isAPK) {
-            db.getLatestVersion().then(latest => {
-                if (latest && latest.version && latest.url && latest.version !== currentVersion) {
-                    setUpdateInfo({ version: latest.version, url: latest.url });
-                    setShowUpdate(true);
+                const latest = await db.getLatestVersion(user?.id, clientVersion);
+                setIsAPK(latest.isAPK);
+                hasChecked.current = true;
+                
+                const currentHash = window.location.hash;
+                
+                // Redirigir a descarga si es móvil y NO es la APK
+                if (isMobile && !latest.isAPK && !currentHash.includes('/download')) {
+                    window.location.hash = '#/download';
+                    return;
                 }
-            });
-        }
-    }, [isAPK, isMobile]);
+
+                // Si es la APK y está en descarga, volver al inicio
+                if (latest.isAPK && currentHash.includes('/download')) {
+                    window.location.hash = '#/';
+                }
+
+                // Verificar actualización: Solo si es APK y la versión del servidor es mayor
+                if (latest.isAPK && latest.version && latest.url) {
+                    // Comparar versiones de forma segura
+                    const vCompare = (v1: string, v2: string) => {
+                        const parts1 = v1.split('.').map(Number);
+                        const parts2 = v2.split('.').map(Number);
+                        for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+                            const p1 = parts1[i] || 0;
+                            const p2 = parts2[i] || 0;
+                            if (p1 > p2) return 1;
+                            if (p1 < p2) return -1;
+                        }
+                        return 0;
+                    };
+
+                    if (vCompare(latest.version, clientVersion) > 0) {
+                        setUpdateInfo({ version: latest.version, url: latest.url });
+                        setShowUpdate(true);
+                    }
+                }
+            } catch (e) {
+                console.warn("Error checking app version", e);
+            }
+        };
+
+        checkVersion();
+    }, [user?.id, isMobile]);
 
     return (
         <>

@@ -467,7 +467,7 @@ export default function WebViewScreen() {
         onFileDownload={({ nativeEvent }) => {
           handleDownload(nativeEvent.downloadUrl, '');
         }}
-        userAgent="Mozilla/5.0 (Linux; Android 12; StreamPayAPK) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        userAgent="Mozilla/5.0 (Linux; Android 12; StreamPayAPK/0.0.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
       />
 
       {!isFullscreen && (

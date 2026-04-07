@@ -19,7 +19,8 @@ function getAppSchema() {
                 'shippingDetails' => 'JSON DEFAULT NULL',
                 'vipExpiry' => 'BIGINT DEFAULT 0',
                 'is_verified_seller' => 'TINYINT(1) DEFAULT 0',
-                'is_banned' => 'TINYINT(1) DEFAULT 0'
+                'is_banned' => 'TINYINT(1) DEFAULT 0',
+                'apkVersion' => 'VARCHAR(20) DEFAULT NULL'
             ]
         ],
         'videos' => [
@@ -238,7 +239,8 @@ function getAppSchema() {
                 'defaultAudioThumb' => 'VARCHAR(255) DEFAULT NULL',
                 'defaultAvatar' => 'VARCHAR(255) DEFAULT NULL',
                 'vapidPublicKey' => 'TEXT DEFAULT NULL',
-                'vapidPrivateKey' => 'TEXT DEFAULT NULL'
+                'vapidPrivateKey' => 'TEXT DEFAULT NULL',
+                'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'"
             ]
         ],
         'transactions' => [
