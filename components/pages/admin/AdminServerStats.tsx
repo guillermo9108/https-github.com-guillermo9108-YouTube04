@@ -49,14 +49,19 @@ export default function AdminServerStats() {
     lastUpdate: Date.now(),
     chargePower: 65
   });
-  const [editingBattery, setEditingBattery] = useState(false);
+  const [isEditingVoltage, setIsEditingVoltage] = useState(false);
+  const isEditingVoltageRef = React.useRef(false);
+
+  useEffect(() => {
+    isEditingVoltageRef.current = isEditingVoltage;
+  }, [isEditingVoltage]);
   const { addToast, success: toastSuccess, error: toastError } = useToast();
 
   const fetchStats = async () => {
     try {
       const data = await db.adminGetServerStats();
       setStats(data);
-      if (data.battery) {
+      if (data.battery && !isEditingVoltageRef.current) {
         setBattery(prev => ({ ...prev, ...data.battery }));
       }
     } catch (error) {
@@ -92,6 +97,8 @@ export default function AdminServerStats() {
     if (!stats) return;
 
     const simInterval = setInterval(() => {
+      if (isEditingVoltageRef.current) return; // Pausar simulación si el admin está ajustando manualmente
+
       setBattery(prev => {
         const now = Date.now();
         const elapsedHours = (now - prev.lastUpdate) / (1000 * 60 * 60);
@@ -130,7 +137,6 @@ export default function AdminServerStats() {
     try {
       await db.updateSystemSettings({ batteryConfig: battery });
       toastSuccess("Configuración de batería guardada");
-      setEditingBattery(false);
     } catch (error) {
       toastError("Error al guardar configuración");
     }
@@ -266,12 +272,6 @@ export default function AdminServerStats() {
             <Battery className={isLowBattery ? 'text-red-500 animate-pulse' : 'text-indigo-400'} /> 
             Simulador de Batería (Xpenology UPS)
           </h3>
-          <button 
-            onClick={() => setEditingBattery(!editingBattery)}
-            className="p-2 hover:bg-white/5 rounded-lg text-slate-400 transition-colors"
-          >
-            <Settings size={20} />
-          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -333,7 +333,7 @@ export default function AdminServerStats() {
           </div>
 
           {/* Configuración del Simulador */}
-          <div className={`space-y-4 transition-all ${editingBattery ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+          <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Voltaje Actual (V)</label>
               <input 
@@ -342,14 +342,16 @@ export default function AdminServerStats() {
                 min="12"
                 max="16.8"
                 value={battery.voltage}
+                onFocus={() => setIsEditingVoltage(true)}
+                onBlur={() => setIsEditingVoltage(false)}
                 onChange={e => {
-                  const v = parseFloat(e.target.value);
+                  const v = parseFloat(e.target.value) || 0;
                   const maxWh = 300 * (battery.cellHealth / 100);
-                  const percentage = (v - 12) / 4.8;
+                  const percentage = Math.max(0, Math.min(1, (v - 12) / 4.8));
                   const newWh = maxWh * percentage;
                   setBattery({...battery, voltage: v, currentWh: newWh});
                 }}
-                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 outline-none transition-all"
               />
             </div>
 
