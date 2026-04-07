@@ -171,11 +171,16 @@ function auth_search_users($pdo, $input) {
 
 // Helper para procesar avatares (se llama desde el controlador si hay archivos)
 function auth_upload_avatar($pdo, $userId, $file) {
-    if ($file['error'] !== UPLOAD_ERR_OK) return null;
+        if ($file['error'] !== UPLOAD_ERR_OK) return null;
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    $name = "avatar_{$userId}." . $ext;
+    $name = "avatar_{$userId}_" . time() . "." . $ext; // Add timestamp to bypass cache
     $uploadDir = __DIR__ . '/uploads/avatars/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    
+    // Cleanup old avatars
+    $oldFiles = glob($uploadDir . "avatar_{$userId}_*");
+    if ($oldFiles) foreach($oldFiles as $f) @unlink($f);
+
     if (move_uploaded_file($file['tmp_name'], $uploadDir . $name)) {
         $url = 'api/uploads/avatars/' . $name;
         $pdo->prepare("UPDATE users SET avatarUrl = ? WHERE id = ?")->execute([$url, $userId]);

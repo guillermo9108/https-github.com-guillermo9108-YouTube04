@@ -607,6 +607,10 @@ export default function Watch() {
                             const isNextInQueue = seriesQueue.findIndex(sq => sq.id === video?.id) + 1 === idx;
                             const isCurrent = v.id === id;
                             
+                            const isAudioItem = Boolean(v.is_audio);
+                            const itemDefaultThumb = isAudioItem ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
+                            const itemPosterUrl = v.thumbnailUrl || itemDefaultThumb || (isAudioItem ? '/api/uploads/thumbnails/defaultaudio.jpg' : '/api/uploads/thumbnails/default.jpg');
+
                             const params = new URLSearchParams();
                             if (navigationContext.q) params.set('q', navigationContext.q);
                             if (navigationContext.f) params.set('f', navigationContext.f);
@@ -622,7 +626,7 @@ export default function Watch() {
                                     className={`group flex gap-3 p-2 hover:bg-white/5 rounded-2xl transition-all relative ${isCurrent ? 'bg-indigo-500/10 border border-indigo-500/20' : isNextInQueue ? 'bg-white/5' : ''}`}
                                 >
                                     <div className="w-32 aspect-video bg-slate-900 rounded-xl overflow-hidden relative border border-white/5 shrink-0">
-                                        <img src={v.thumbnailUrl} className={`w-full h-full object-cover group-hover:scale-110 transition-transform ${isCurrent ? 'opacity-40' : ''}`} loading="lazy" referrerPolicy="no-referrer" />
+                                        <img src={itemPosterUrl} className={`w-full h-full object-cover group-hover:scale-110 transition-transform ${isCurrent ? 'opacity-40' : ''}`} loading="lazy" referrerPolicy="no-referrer" />
                                         
                                         {isCurrent && (
                                             <div className="absolute inset-0 flex items-center justify-center">

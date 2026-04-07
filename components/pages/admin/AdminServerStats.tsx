@@ -3,9 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Cpu, HardDrive, Activity, Users, Battery, Zap, Power, 
   RefreshCw, ArrowUp, ArrowDown, AlertTriangle, BatteryCharging,
-  Settings, Save
+  Settings, Save, History, Calculator, TrendingUp
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine 
+} from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../../../services/db';
 import { useToast } from '../../../context/ToastContext';
 
@@ -38,6 +41,14 @@ interface BatteryConfig {
   cellsParallel: number;
   cellCapacityMah: number;
   pSys?: number;
+  lastChargeTime?: number;
+}
+
+interface BatteryHistoryPoint {
+  t: number;
+  v: number;
+  c: number;
+  cpu: number;
 }
 
 export default function AdminServerStats() {
@@ -54,8 +65,18 @@ export default function AdminServerStats() {
     chargePower: 45,
     cellsSeries: 4,
     cellsParallel: 4,
-    cellCapacityMah: 5000
+    cellCapacityMah: 5000,
+    lastChargeTime: Date.now()
   });
+  const [history, setHistory] = useState<BatteryHistoryPoint[]>([]);
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [calibData, setCalibData] = useState({
+    vStart: 14.5,
+    vEnd: 13.9,
+    tStart: "13:00",
+    tEnd: "15:00"
+  });
+  const [calibResult, setCalibResult] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const isEditingRef = React.useRef(false);
 
@@ -70,6 +91,9 @@ export default function AdminServerStats() {
       setStats(data);
       if (data.battery && !isEditingRef.current) {
         setBattery(prev => ({ ...prev, ...data.battery }));
+      }
+      if (data.batteryHistory) {
+        setHistory(data.batteryHistory);
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -190,6 +214,43 @@ export default function AdminServerStats() {
     } catch (error) {
       toastError("Error al ejecutar comando");
     }
+  };
+
+  const handleCalibrate = () => {
+    // Lógica de calibración basada en el historial manual del admin
+    const [h1, m1] = calibData.tStart.split(':').map(Number);
+    const [h2, m2] = calibData.tEnd.split(':').map(Number);
+    const durationHours = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+    
+    if (durationHours <= 0) {
+      toastError("La duración debe ser positiva");
+      return;
+    }
+
+    const vDrop = calibData.vStart - calibData.vEnd;
+    const dropRate = vDrop / durationHours; // V/h real observado
+
+    // Calcular lo que el simulador esperaría
+    const avgCpu = 25; // Asumimos un promedio de carga
+    const pSys = battery.minWatts + (battery.maxWatts - battery.minWatts) * (avgCpu / 100);
+    const nominalVoltage = battery.cellsSeries * 3.7;
+    const totalAh = (battery.cellCapacityMah * battery.cellsParallel) / 1000;
+    const soh = battery.cellHealth / 100;
+    const maxWh = nominalVoltage * totalAh * soh;
+    
+    // El simulador dice que en 1h cae 4.8V / (maxWh / pSys)
+    const simDropRate = 4.8 / (maxWh / pSys);
+
+    const diff = dropRate / simDropRate;
+    
+    setCalibResult({
+      observedRate: dropRate.toFixed(3),
+      simulatedRate: simDropRate.toFixed(3),
+      suggestion: diff > 1.1 ? "Aumentar Rango de Consumo (W) o reducir Salud de Celdas (%)" : 
+                  diff < 0.9 ? "Reducir Rango de Consumo (W) o aumentar Salud de Celdas (%)" : 
+                  "El simulador está bien calibrado",
+      factor: diff.toFixed(2)
+    });
   };
 
   if (loading || !stats) {
@@ -336,9 +397,15 @@ export default function AdminServerStats() {
                 <div className="text-xl font-black text-white">{battery.voltage}V</div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Consumo P_sys</div>
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Última Carga</div>
                 <div className="text-xl font-black text-white">
-                  {battery.pSys || 0}W
+                  {battery.lastChargeTime ? (() => {
+                    const diff = Math.floor((Date.now() - battery.lastChargeTime) / 60000);
+                    if (diff < 60) return `${diff}m`;
+                    const h = Math.floor(diff / 60);
+                    const m = diff % 60;
+                    return `${h}h ${m}m`;
+                  })() : '---'}
                 </div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
@@ -346,12 +413,151 @@ export default function AdminServerStats() {
                 <div className="text-xl font-black text-white">{Math.round(battery.currentWh)}Wh</div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Estado</div>
-                <div className={`text-xl font-black ${battery.isCharging ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {battery.isCharging ? 'Cargando' : 'Descargando'}
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Consumo P_sys</div>
+                <div className="text-xl font-black text-white">
+                  {battery.pSys || 0}W
                 </div>
               </div>
             </div>
+
+            {/* Gráfica de Historial */}
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+                  <TrendingUp size={16} className="text-indigo-400" /> Historial 24h (Voltaje)
+                </h4>
+                <button 
+                  onClick={() => setShowCalibration(!showCalibration)}
+                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                >
+                  <Calculator size={14} /> Calibrar Simulador
+                </button>
+              </div>
+              
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={history.map(p => ({ ...p, time: new Date(p.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }))}>
+                    <defs>
+                      <linearGradient id="colorV" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#475569" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      interval={Math.floor(history.length / 6)}
+                    />
+                    <YAxis 
+                      domain={[11.5, 17]} 
+                      stroke="#475569" 
+                      fontSize={10} 
+                      tickLine={false} 
+                      axisLine={false}
+                      tickFormatter={(v) => `${v}V`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                      itemStyle={{ color: '#fff', fontSize: '12px' }}
+                      labelStyle={{ color: '#64748b', fontSize: '10px', marginBottom: '4px' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="v" 
+                      stroke="#6366f1" 
+                      strokeWidth={2}
+                      fillOpacity={1} 
+                      fill="url(#colorV)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <AnimatePresence>
+              {showCalibration && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-indigo-500/5 border border-indigo-500/20 p-6 rounded-2xl space-y-4">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+                      <Calculator size={16} className="text-indigo-400" /> Herramienta de Calibración
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Ingresa los datos observados manualmente (ej. con un voltímetro) para ajustar la precisión del simulador.
+                    </p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">V. Inicial</label>
+                        <input 
+                          type="number" step="0.1" value={calibData.vStart}
+                          onChange={e => setCalibData({...calibData, vStart: parseFloat(e.target.value)})}
+                          className="w-full bg-slate-800 border border-white/5 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">V. Final</label>
+                        <input 
+                          type="number" step="0.1" value={calibData.vEnd}
+                          onChange={e => setCalibData({...calibData, vEnd: parseFloat(e.target.value)})}
+                          className="w-full bg-slate-800 border border-white/5 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Hora Inicio</label>
+                        <input 
+                          type="time" value={calibData.tStart}
+                          onChange={e => setCalibData({...calibData, tStart: e.target.value})}
+                          className="w-full bg-slate-800 border border-white/5 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Hora Fin</label>
+                        <input 
+                          type="time" value={calibData.tEnd}
+                          onChange={e => setCalibData({...calibData, tEnd: e.target.value})}
+                          className="w-full bg-slate-800 border border-white/5 rounded-lg px-3 py-1.5 text-white text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={handleCalibrate}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all"
+                    >
+                      Calcular Sugerencias
+                    </button>
+
+                    {calibResult && (
+                      <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold">Tasa Real vs Sim</span>
+                          <span className="text-xs font-mono text-white">{calibResult.observedRate}V/h vs {calibResult.simulatedRate}V/h</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold">Desviación</span>
+                          <span className={`text-xs font-bold ${Math.abs(1 - calibResult.factor) > 0.1 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {Math.round(calibResult.factor * 100)}%
+                          </span>
+                        </div>
+                        <div className="pt-2 border-t border-white/5">
+                          <div className="text-[10px] text-indigo-400 uppercase font-black mb-1">Sugerencia:</div>
+                          <p className="text-xs text-white leading-relaxed">{calibResult.suggestion}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {isLowBattery && (
               <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 text-red-400 animate-pulse">

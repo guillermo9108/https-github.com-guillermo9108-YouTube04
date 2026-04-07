@@ -18,9 +18,11 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const clickTimerRef = useRef<number | null>(null);
+  const loadTimeoutRef = useRef<number | null>(null);
   
   const [showHeart, setShowHeart] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   
   const [interaction, setInteraction] = useState<UserInteraction | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -43,8 +45,37 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   }, [user, video.id, isNear, video.likes, video.dislikes]);
 
   useEffect(() => {
-    const el = videoRef.current; if (!el) return;
+    const el = videoRef.current;
     if (isActive) {
+        // Delay video loading to optimize fast scrolling
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = window.setTimeout(() => {
+            setShouldLoadVideo(true);
+        }, 400); // 400ms delay before starting video download
+    } else {
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+        setShouldLoadVideo(false);
+        if (el) {
+            try {
+                el.pause(); 
+                if (user && !interaction?.isWatched) {
+                    db.markSkipped(user.id, video.id);
+                }
+                if (!isNear) {
+                    el.removeAttribute('src');
+                    el.load();
+                }
+            } catch (e) {}
+        }
+    }
+    return () => {
+        if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
+  }, [isActive, video.id, isNear, user, interaction?.isWatched]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (isActive && shouldLoadVideo && el) {
         el.currentTime = 0; 
         setPaused(false);
         el.muted = false; 
@@ -53,21 +84,8 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
             el.play().catch(() => {});
         });
         db.incrementView(video.id);
-    } else { 
-        try {
-            el.pause(); 
-            // Si el video deja de estar activo y no fue marcado como visto, lo marcamos como "pasado/saltado"
-            if (user && !interaction?.isWatched) {
-                db.markSkipped(user.id, video.id);
-            }
-            // IMPORTANTE: Limpiar el src para cerrar la conexión del worker PHP
-            if (!isNear) {
-                el.removeAttribute('src');
-                el.load();
-            }
-        } catch (e) {}
     }
-  }, [isActive, video.id, isNear, user, interaction?.isWatched]);
+  }, [isActive, shouldLoadVideo]);
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const el = e.currentTarget;
@@ -113,10 +131,10 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   };
 
   const videoSrc = useMemo(() => {
-    if (!isNear) return ""; 
+    if (!isNear || !shouldLoadVideo) return ""; 
     // Redirigir al puerto 3001 del streamer en Node.js
     return db.getStreamerUrl(video.id, user?.sessionToken);
-  }, [video.id, isNear, user?.sessionToken]);
+  }, [video.id, isNear, user?.sessionToken, shouldLoadVideo]);
 
   if (!isNear) return <div className="w-full h-full snap-start bg-black shrink-0 flex items-center justify-center"><Loader2 className="animate-spin text-slate-800" /></div>;
 

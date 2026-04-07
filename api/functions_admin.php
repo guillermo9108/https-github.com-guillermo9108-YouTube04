@@ -15,6 +15,7 @@ function admin_get_settings($pdo) {
         $res['vipPlans'] = json_decode($res['vipPlans'] ?: '[]', true);
         $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
         $res['batteryConfig'] = json_decode($res['batteryConfig'] ?: 'null', true);
+        $res['batteryHistory'] = json_decode($res['batteryHistory'] ?: '[]', true);
     } else {
         $res = [
             'categories' => [],
@@ -24,7 +25,8 @@ function admin_get_settings($pdo) {
             'ftpSettings' => [],
             'vipPlans' => [],
             'paymentMethods' => [],
-            'batteryConfig' => null
+            'batteryConfig' => null,
+            'batteryHistory' => []
         ];
     }
     respond(true, $res);
@@ -38,7 +40,7 @@ function admin_update_settings($pdo, $input) {
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
-        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig'
+        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory'
     ];
     
     $fields = []; $params = [];
@@ -803,9 +805,10 @@ function admin_unban_user($pdo, $input) {
 }
 
 function update_battery_simulation($pdo) {
-    $stmt = $pdo->query("SELECT batteryConfig FROM system_settings WHERE id = 1");
+    $stmt = $pdo->query("SELECT batteryConfig, batteryHistory FROM system_settings WHERE id = 1");
     $settings = $stmt->fetch();
     $battery = json_decode($settings['batteryConfig'] ?: 'null', true);
+    $history = json_decode($settings['batteryHistory'] ?: '[]', true);
     
     if (!$battery) return null;
 
@@ -836,6 +839,7 @@ function update_battery_simulation($pdo) {
         $v = $battery['voltage'] ?? 14.8;
         
         if ($battery['isCharging']) {
+            $battery['lastChargeTime'] = $now;
             // AC Conectado
             $chargerLimit = $battery['chargePower'] ?? 45;
             $pDisp = $chargerLimit - $pSys;
@@ -845,7 +849,6 @@ function update_battery_simulation($pdo) {
             if ($v < 16.0) {
                 $pReal = min($pDisp, $pChargeMax);
             } elseif ($v < 16.8) {
-                // Curva CV: Reducción lineal de 16.0V a 16.8V
                 $factor = (16.8 - $v) / (16.8 - 16.0);
                 $pReal = min($pDisp, $pChargeMax) * $factor;
             }
@@ -859,14 +862,11 @@ function update_battery_simulation($pdo) {
         if ($currentWh > $maxWh) $currentWh = $maxWh;
         if ($currentWh < 0) $currentWh = 0;
         
-        // 4. Actualización de Voltaje (V)
-        // Mapeo lineal simple para el simulador: 12V (0%) a 16.8V (100%)
         $percentage = ($currentWh / $maxWh) * 100;
         $newVoltage = 12 + (4.8 * ($percentage / 100));
         
-        // Simular Caída de Voltaje (Sag) si está descargando
         if (!$battery['isCharging']) {
-            $sag = (1 - $soh) * ($pSys / 50); // 50W como referencia de carga alta
+            $sag = (1 - $soh) * ($pSys / 50);
             $newVoltage -= $sag;
         }
         
@@ -875,8 +875,15 @@ function update_battery_simulation($pdo) {
         $battery['lastUpdate'] = $now;
         $battery['pSys'] = round($pSys, 2);
         
-        $pdo->prepare("UPDATE system_settings SET batteryConfig = ? WHERE id = 1")
-            ->execute([json_encode($battery)]);
+        // Update History (every 5 mins or if significant change)
+        $lastHistory = end($history);
+        if (!$lastHistory || ($now - $lastHistory['t']) >= 300) {
+            $history[] = ['t' => $now, 'v' => $battery['voltage'], 'c' => $battery['isCharging'] ? 1 : 0, 'cpu' => $cpuUsage];
+            if (count($history) > 288) array_shift($history); // Keep 24h at 5min intervals
+        }
+
+        $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")
+            ->execute([json_encode($battery), json_encode($history)]);
     }
     return $battery;
 }

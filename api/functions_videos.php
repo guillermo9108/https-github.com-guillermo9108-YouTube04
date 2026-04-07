@@ -550,12 +550,15 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         $sql = "SELECT 
                     SUBSTRING_INDEX(SUBSTRING(REPLACE(videoUrl, '\\\\', '/'), ? + 1), '/', 1) as folderName,
                     COUNT(*) as videoCount,
-                    MAX(thumbnailUrl) as thumb
+                    (SELECT thumbnailUrl FROM videos v2 
+                     WHERE REPLACE(v2.videoUrl, '\\\\', '/') LIKE CONCAT(?, SUBSTRING_INDEX(SUBSTRING(REPLACE(videos.videoUrl, '\\\\', '/'), ? + 1), '/', 1), '/%')
+                     AND v2.thumbnailUrl IS NOT NULL AND v2.thumbnailUrl NOT LIKE '%default%'
+                     ORDER BY v2.createdAt DESC LIMIT 1) as thumb
                 FROM videos 
                 WHERE REPLACE(videoUrl, '\\\\', '/') LIKE ?
                 AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
         
-        $params = [$prefixLen, $prefix . '%/%'];
+        $params = [$prefixLen, $prefix, $prefixLen, $prefix . '%/%'];
 
         if ($mediaType === 'VIDEO') {
             $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";
