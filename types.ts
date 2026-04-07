@@ -3,6 +3,20 @@
  * Global Type Definitions for StreamPay
  */
 
+declare global {
+  interface Window {
+    StreamPayAPK?: {
+      version: string;
+      packageName: string;
+      isNative: boolean;
+    };
+    __streamPayInjected?: boolean;
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void;
+    };
+  }
+}
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   USER = 'USER'

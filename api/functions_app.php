@@ -42,10 +42,22 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
         }
     }
 
-    // 4. Registrar versión del usuario si se proporciona
-    if ($pdo && $userId && $clientVersion) {
-        $stmt = $pdo->prepare("UPDATE users SET apkVersion = ? WHERE id = ?");
-        $stmt->execute([$clientVersion, $userId]);
+    // 4. Registrar versión del usuario si se proporciona o se detecta en el UA
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if ($pdo && $userId) {
+        $versionToSave = $clientVersion;
+        
+        // Si no viene en los parámetros, intentar extraer del UA
+        if (empty($versionToSave)) {
+            if (preg_match('/StreamPayAPK\/([\d\.]+)/i', $ua, $m)) {
+                $versionToSave = $m[1];
+            }
+        }
+
+        if (!empty($versionToSave)) {
+            $stmt = $pdo->prepare("UPDATE users SET apkVersion = ? WHERE id = ?");
+            $stmt->execute([$versionToSave, $userId]);
+        }
     }
 
     // 5. Detectar si es APK basado en UserAgent y X-Requested-With

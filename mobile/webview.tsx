@@ -403,6 +403,13 @@ export default function WebViewScreen() {
 
   const injectedJavaScript = `
     (function() {
+      // Inyectar información de la APK para que la web la detecte sin errores
+      window.StreamPayAPK = {
+        version: "${Application.nativeApplicationVersion || '4.2.0'}",
+        packageName: "${Application.applicationId || 'com.streampay.app'}",
+        isNative: true
+      };
+
       if (window.__streamPayInjected) return;
       window.__streamPayInjected = true;
       

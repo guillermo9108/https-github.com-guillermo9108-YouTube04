@@ -171,13 +171,12 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
             if (hasChecked.current && !user?.id) return;
             
             try {
-                // Intentar extraer versión del UserAgent si es posible
+                // Intentar extraer versión del UserAgent o del objeto inyectado por la APK
                 const ua = navigator.userAgent || '';
                 const uaMatch = ua.match(/StreamPayAPK\/([\d\.]+)/i);
                 
-                // Si es la APK pero no detectamos versión en el UA, usamos undefined para no sobreescribir la DB con basura
-                // El servidor usará la versión que ya tenga el usuario si enviamos undefined
-                const clientVersion = uaMatch ? uaMatch[1] : undefined;
+                // Prioridad: 1. Objeto inyectado, 2. UserAgent, 3. undefined
+                const clientVersion = window.StreamPayAPK?.version || (uaMatch ? uaMatch[1] : undefined);
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
                 setIsAPK(latest.isAPK);
@@ -215,7 +214,8 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                         return 0;
                     };
 
-                    if (vCompare(latest.version, clientVersion || currentVersion) > 0) {
+                    const localVersion = window.StreamPayAPK?.version || clientVersion || currentVersion;
+                    if (vCompare(latest.version, localVersion) > 0) {
                         setUpdateInfo({ version: latest.version, url: latest.url });
                         setShowUpdate(true);
                     }
