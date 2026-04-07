@@ -233,6 +233,14 @@ export default function AdminMaintenance() {
                             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                                 <div>
                                     <div className="flex justify-between mb-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Vistas Máximas</label>
+                                        <span className="text-[10px] font-bold text-indigo-400">{config.maxViews}</span>
+                                    </div>
+                                    <input type="range" min="0" max="100" value={config.maxViews} onChange={e => setConfig({...config, maxViews: parseInt(e.target.value)})} className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-full appearance-none" />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between mb-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase">Antigüedad</label>
                                         <span className="text-[10px] font-bold text-indigo-400">{config.minDays} días</span>
                                     </div>

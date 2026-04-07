@@ -276,27 +276,40 @@ function admin_cleanup_files($pdo) {
         if (is_array($decoded)) $usedFiles = array_merge($usedFiles, $decoded);
     }
     
-    // Normalize used files to local paths
+    // Normalizar archivos usados a rutas locales relativas (ej: uploads/thumbnails/x.jpg)
     $localUsed = [];
     foreach ($usedFiles as $u) {
-        if (strpos($u, 'api/') === 0) $localUsed[] = substr($u, 4);
-        elseif (strpos($u, '/') === 0 && strpos($u, '/api/') === 0) $localUsed[] = substr($u, 5);
+        if (!$u) continue;
+        $path = $u;
+        // Quitar prefijos comunes para normalizar
+        $path = ltrim($path, '/');
+        if (strpos($path, 'api/') === 0) $path = substr($path, 4);
+        
+        if (!empty($path)) {
+            $localUsed[] = $path;
+            $localUsed[] = './' . $path; // Por si glob devuelve ./
+        }
     }
     
-    $dirs = ['uploads/thumbnails/', 'uploads/avatars/', 'uploads/market/'];
+    $dirs = ['uploads/thumbnails/', 'uploads/avatars/', 'uploads/market/', 'uploads/videos/', 'uploads/proofs/'];
     $deleted = 0;
     foreach ($dirs as $dir) {
         if (!is_dir($dir)) continue;
         $files = glob($dir . '*');
+        if (!$files) continue;
         foreach ($files as $f) {
-            if (is_file($f) && !in_array($f, $localUsed)) {
-                unlink($f);
-                $deleted++;
+            if (is_file($f)) {
+                // Normalizar la ruta del archivo encontrado por glob
+                $normF = ltrim($f, './');
+                if (!in_array($normF, $localUsed)) {
+                    @unlink($f);
+                    $deleted++;
+                }
             }
         }
     }
     
-    respond(true, "Limpieza completada. Archivos eliminados: $deleted");
+    respond(true, ['videos' => $deleted, 'message' => "Limpieza completada. Archivos eliminados: $deleted"]);
 }
 
 function admin_upload_default_thumb($pdo, $post, $files) {
@@ -528,29 +541,40 @@ function formatBytes($bytes, $precision = 2) {
 function admin_smart_cleaner_preview($pdo, $input) {
     $cat = $input['category'] ?? 'ALL';
     $minDays = intval($input['minDays'] ?? 30);
-    $maxViews = intval($input['maxViews'] ?? 2);
-    $minLikes = intval($input['minLikes'] ?? 0);
-    $maxDislikes = intval($input['maxDislikes'] ?? 10);
-    $maxGbLimit = floatval($input['maxGbLimit'] ?? 50);
+    $maxViews = intval($input['maxViews'] ?? 5);
+    // Hacer likes y dislikes opcionales para no ser tan restrictivos por defecto
+    $minLikes = isset($input['minLikes']) ? intval($input['minLikes']) : null;
+    $maxDislikes = isset($input['maxDislikes']) ? intval($input['maxDislikes']) : null;
+    $maxGbLimit = floatval($input['maxGbLimit'] ?? 10);
     $maxDeleteLimit = intval($input['maxDeleteLimit'] ?? 100);
     
     $threshold = time() - ($minDays * 86400);
     
-    // Protección: Excluir videos comprados
-    $sql = "SELECT id, title, views, videoUrl FROM videos 
-            WHERE isLocal = 1 
-            AND views <= ? 
-            AND likes <= ? 
-            AND dislikes >= ? 
-            AND createdAt < ?
-            AND id NOT IN (SELECT videoId FROM transactions WHERE type = 'PURCHASE' AND videoId IS NOT NULL)";
+    // Construcción dinámica de la consulta
+    $where = ["isLocal = 1", "views <= ?", "createdAt < ?"];
+    $params = [$maxViews, $threshold];
     
-    $params = [$maxViews, $minLikes, $maxDislikes, $threshold];
+    if ($minLikes !== null) {
+        $where[] = "likes <= ?";
+        $params[] = $minLikes;
+    }
+    if ($maxDislikes !== null) {
+        $where[] = "dislikes >= ?";
+        $params[] = $maxDislikes;
+    }
     
     if ($cat !== 'ALL') {
-        $sql .= " AND category = ?";
+        $where[] = "category = ?";
         $params[] = $cat;
     }
+    
+    $whereSql = implode(' AND ', $where);
+    
+    // Protección: Excluir videos comprados
+    $sql = "SELECT id, title, views, videoUrl, thumbnailUrl FROM videos 
+            WHERE $whereSql 
+            AND id NOT IN (SELECT videoId FROM transactions WHERE type = 'PURCHASE' AND videoId IS NOT NULL)
+            ORDER BY views ASC, createdAt ASC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -576,7 +600,8 @@ function admin_smart_cleaner_preview($pdo, $input) {
             'id' => $v['id'],
             'title' => $v['title'],
             'views' => $v['views'],
-            'size_fmt' => formatBytes($size)
+            'size_fmt' => formatBytes($size),
+            'reason' => 'Baja relevancia'
         ];
         $count++;
     }

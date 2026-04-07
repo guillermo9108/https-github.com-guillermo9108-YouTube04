@@ -13,20 +13,22 @@ function app_get_latest_version($pdo = null, $userId = null, $clientVersion = nu
         $dbVersion = $stmt->fetchColumn() ?: '0.0.0';
     }
 
-    // 2. Escanear archivos para encontrar el más reciente
+    // 2. Escanear archivos para encontrar el más reciente (raíz, public, api)
     $files = array_merge(
-        glob($root . '/StreamPay *.apk'),
-        glob($root . '/public/StreamPay *.apk')
+        glob($root . '/StreamPay*.apk'),
+        glob($root . '/public/StreamPay*.apk'),
+        glob($root . '/api/StreamPay*.apk')
     );
 
     $versions = [];
     foreach ($files as $file) {
         $filename = basename($file);
-        if (preg_match('/StreamPay (\d+\.\d+\.\d+)\.apk/i', $filename, $matches)) {
+        // Regex flexible para detectar versiones (ej: StreamPay_v1.0.5.apk, StreamPay 1.0.5.apk)
+        if (preg_match('/StreamPay.*v?([\d\.]+)\.apk/i', $filename, $matches)) {
             $versions[] = [
                 'version' => $matches[1],
                 'filename' => $filename,
-                'url' => '/' . $filename 
+                'url' => (strpos($file, $root . '/api/') === 0) ? "api/$filename" : "/$filename"
             ];
         }
     }

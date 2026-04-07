@@ -176,7 +176,13 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                 const uaMatch = ua.match(/StreamPayAPK\/([\d\.]+)/i);
                 
                 // Prioridad: 1. Objeto inyectado, 2. UserAgent, 3. undefined
-                const clientVersion = window.StreamPayAPK?.version || (uaMatch ? uaMatch[1] : undefined);
+                let clientVersion = window.StreamPayAPK?.version || (uaMatch ? uaMatch[1] : undefined);
+                
+                // Si no se detectó pero estamos en lo que parece ser la APK, intentar esperar un poco
+                if (!clientVersion && (ua.includes('StreamPayAPK') || (window as any).ReactNativeWebView)) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    clientVersion = window.StreamPayAPK?.version || (uaMatch ? uaMatch[1] : undefined);
+                }
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
                 setIsAPK(latest.isAPK);
