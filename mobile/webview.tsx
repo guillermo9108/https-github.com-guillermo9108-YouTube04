@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system';
+import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
@@ -49,6 +50,7 @@ export default function WebViewScreen() {
   const webViewRef = useRef<WebView>(null);
   const router = useRouter();
   const [serverUrl, setServerUrl] = useState('');
+  const [userAgent, setUserAgent] = useState(`Mozilla/5.0 (Linux; Android 12; StreamPayAPK/${Application.nativeApplicationVersion || '4.2.0'}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36`);
   const [canGoBack, setCanGoBack] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -491,7 +493,7 @@ export default function WebViewScreen() {
         onFileDownload={({ nativeEvent }) => {
           handleDownload(nativeEvent.downloadUrl, '');
         }}
-        userAgent="Mozilla/5.0 (Linux; Android 12; StreamPayAPK/0.0.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        userAgent={userAgent}
       />
 
       {!isFullscreen && (

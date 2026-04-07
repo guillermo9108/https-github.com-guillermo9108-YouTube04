@@ -31,21 +31,21 @@ export default function DownloadApp() {
         const packageName = "com.streampay.app";
         const scheme = "streampay";
         
-        // Intentar abrir directamente con el esquema personalizado primero
+        // Intentar abrir directamente con el esquema personalizado
         const directUrl = `${scheme}://open?url=${encodeURIComponent(currentOrigin)}`;
         
-        // Intent URL como respaldo robusto
+        // Intent URL como respaldo robusto para Android
         const intentUrl = `intent://open?url=${encodeURIComponent(currentOrigin)}#Intent;scheme=${scheme};package=${packageName};S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
         
-        // Intentar el esquema directo
-        window.location.href = directUrl;
+        // Intentar el esquema directo primero
+        window.location.assign(directUrl);
         
-        // Si después de 500ms no ha pasado nada (seguimos en la misma página), probar el Intent
+        // Si después de 800ms seguimos aquí, probar el Intent
         setTimeout(() => {
             if (document.visibilityState === 'visible') {
-                window.location.href = intentUrl;
+                window.location.assign(intentUrl);
             }
-        }, 500);
+        }, 800);
     };
 
     return (

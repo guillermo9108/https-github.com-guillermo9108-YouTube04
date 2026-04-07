@@ -162,7 +162,7 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
     const [isMobile, setIsMobile] = useState(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
     const hasChecked = useRef(false);
     
-    const currentVersion = "0.0.1"; // Versión base de la web
+    const currentVersion = "4.2.0"; // Versión base de la APK (según screenshot del usuario)
 
     useEffect(() => {
         const checkVersion = async () => {
@@ -174,7 +174,10 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                 // Intentar extraer versión del UserAgent si es posible
                 const ua = navigator.userAgent || '';
                 const uaMatch = ua.match(/StreamPayAPK\/([\d\.]+)/i);
-                const clientVersion = uaMatch ? uaMatch[1] : currentVersion;
+                
+                // Si es la APK pero no detectamos versión en el UA, usamos null para no sobreescribir la DB con basura
+                // El servidor usará la versión que ya tenga el usuario si enviamos null
+                const clientVersion = uaMatch ? uaMatch[1] : (ua.includes('StreamPayAPK') ? null : null);
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
                 setIsAPK(latest.isAPK);
