@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once 'functions_utils.php';
+require_once 'functions_app.php';
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     if (!(error_reporting() & $errno)) return false;
@@ -203,6 +204,7 @@ try {
         case 'get_notifications': interact_get_notifications($pdo, $_GET['userId'] ?? ''); break;
         case 'get_unread_notifications': interact_get_unread_notifications($pdo, $_GET['userId'] ?? ''); break;
         case 'get_unread_count': interact_get_unread_count($pdo, $_GET['userId'] ?? ''); break;
+        case 'get_latest_version': app_get_latest_version(); break;
         case 'mark_notification_read': interact_mark_notification_read($pdo, $input); break;
         case 'mark_all_notifications_read': interact_mark_all_notifications_read($pdo, $input); break;
         case 'get_user_transactions': interact_get_transactions($pdo, $_GET['userId'] ?? ''); break;
