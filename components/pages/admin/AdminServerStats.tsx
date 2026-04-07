@@ -11,11 +11,6 @@ import { useToast } from '../../../context/ToastContext';
 
 interface ServerStats {
   cpu: number;
-  ram: {
-    total: string;
-    used: string;
-    percent: number;
-  };
   storage: {
     total: string;
     used: string;
@@ -27,6 +22,7 @@ interface ServerStats {
   };
   activeUsers: number;
   uptime: string;
+  battery: BatteryConfig | null;
 }
 
 interface BatteryConfig {
@@ -60,6 +56,9 @@ export default function AdminServerStats() {
     try {
       const data = await db.adminGetServerStats();
       setStats(data);
+      if (data.battery) {
+        setBattery(prev => ({ ...prev, ...data.battery }));
+      }
     } catch (error) {
       console.error("Error fetching stats:", error);
     } finally {
@@ -88,7 +87,7 @@ export default function AdminServerStats() {
     return () => clearInterval(interval);
   }, []);
 
-  // Simulación de batería en el cliente para suavidad
+  // Simulación de batería en el cliente para suavidad entre peticiones al servidor
   useEffect(() => {
     if (!stats) return;
 
@@ -107,7 +106,6 @@ export default function AdminServerStats() {
           newWh -= currentWatts * elapsedHours;
         }
 
-        // Límites de capacidad (4s4p 21700 ~ 300Wh nominal * salud)
         const maxWh = 300 * (prev.cellHealth / 100);
         if (newWh > maxWh) newWh = maxWh;
         if (newWh < 0) newWh = 0;
@@ -126,7 +124,7 @@ export default function AdminServerStats() {
     }, 1000);
 
     return () => clearInterval(simInterval);
-  }, [stats]);
+  }, [stats?.cpu]);
 
   const saveBatteryConfig = async () => {
     try {
@@ -188,7 +186,7 @@ export default function AdminServerStats() {
       </div>
 
       {/* Grid de Estadísticas Reales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard 
           icon={<Cpu className="text-blue-400" />} 
           label="Procesador" 
@@ -198,18 +196,10 @@ export default function AdminServerStats() {
           color="blue"
         />
         <StatCard 
-          icon={<Zap className="text-purple-400" />} 
-          label="Memoria RAM" 
-          value={stats.ram.used} 
-          subValue={`de ${stats.ram.total}`}
-          progress={stats.ram.percent}
-          color="purple"
-        />
-        <StatCard 
           icon={<HardDrive className="text-emerald-400" />} 
-          label="Almacenamiento" 
+          label="Almacenamiento Total" 
           value={stats.storage.used} 
-          subValue={`de ${stats.storage.total}`}
+          subValue={`de ${stats.storage.total} (Rutas Admin)`}
           progress={stats.storage.percent}
           color="emerald"
         />
@@ -246,8 +236,26 @@ export default function AdminServerStats() {
           </div>
         </div>
         <div className="bg-slate-900/50 border border-white/5 p-6 rounded-2xl flex flex-col justify-center">
-          <div className="text-slate-400 font-bold uppercase text-xs mb-1">Tiempo de Actividad</div>
-          <div className="text-3xl font-black text-white">{stats.uptime}</div>
+          <div className="flex justify-between items-end">
+            <div>
+              <div className="text-slate-400 font-bold uppercase text-xs mb-1">Tiempo de Actividad</div>
+              <div className="text-3xl font-black text-white">{stats.uptime}</div>
+            </div>
+            {!battery.isCharging && (
+              <div className="text-right">
+                <div className="text-slate-400 font-bold uppercase text-[10px] mb-1">Autonomía Est.</div>
+                <div className="text-xl font-black text-amber-500">
+                  {(() => {
+                    const currentWatts = battery.minWatts + (battery.maxWatts - battery.minWatts) * (stats.cpu / 100);
+                    const hours = battery.currentWh / currentWatts;
+                    const h = Math.floor(hours);
+                    const m = Math.floor((hours - h) * 60);
+                    return `${h}h ${m}m`;
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -326,6 +334,25 @@ export default function AdminServerStats() {
 
           {/* Configuración del Simulador */}
           <div className={`space-y-4 transition-all ${editingBattery ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 uppercase">Voltaje Actual (V)</label>
+              <input 
+                type="number" 
+                step="0.01"
+                min="12"
+                max="16.8"
+                value={battery.voltage}
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  const maxWh = 300 * (battery.cellHealth / 100);
+                  const percentage = (v - 12) / 4.8;
+                  const newWh = maxWh * percentage;
+                  setBattery({...battery, voltage: v, currentWh: newWh});
+                }}
+                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-400 uppercase">Rango de Consumo (W)</label>
               <div className="flex gap-2">

@@ -802,40 +802,88 @@ function admin_unban_user($pdo, $input) {
     respond(true);
 }
 
+function update_battery_simulation($pdo) {
+    $stmt = $pdo->query("SELECT batteryConfig FROM system_settings WHERE id = 1");
+    $settings = $stmt->fetch();
+    $battery = json_decode($settings['batteryConfig'] ?: 'null', true);
+    
+    if (!$battery) return null;
+
+    $now = time();
+    $lastUpdate = $battery['lastUpdate'] ?? $now;
+    $elapsedHours = ($now - $lastUpdate) / 3600;
+    
+    if ($elapsedHours > 0) {
+        $load = sys_getloadavg();
+        $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
+        
+        $currentWatts = $battery['minWatts'] + ($battery['maxWatts'] - $battery['minWatts']) * ($cpuUsage / 100);
+        $newWh = $battery['currentWh'] ?? 200;
+        
+        if ($battery['isCharging']) {
+            $newWh += ($battery['chargePower'] ?? 65) * $elapsedHours;
+        } else {
+            $newWh -= $currentWatts * $elapsedHours;
+        }
+        
+        $maxWh = 300 * (($battery['cellHealth'] ?? 85) / 100);
+        if ($newWh > maxWh) $newWh = maxWh;
+        if ($newWh < 0) $newWh = 0;
+        
+        // Calcular voltaje basado en porcentaje
+        $percentage = ($newWh / $maxWh) * 100;
+        $newVoltage = 12 + (4.8 * ($percentage / 100));
+        
+        $battery['currentWh'] = $newWh;
+        $battery['voltage'] = round($newVoltage, 2);
+        $battery['lastUpdate'] = $now;
+        
+        $pdo->prepare("UPDATE system_settings SET batteryConfig = ? WHERE id = 1")
+            ->execute([json_encode($battery)]);
+    }
+    return $battery;
+}
+
 function admin_get_server_stats($pdo) {
     // 1. CPU Usage (Load Average)
     $load = sys_getloadavg();
-    $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : rand(5, 15); // Fallback to small random if not available
+    $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : rand(5, 15);
 
-    // 2. RAM Usage
-    $free = 0; $total = 0;
-    if (file_exists('/proc/meminfo')) {
-        $meminfo = file_get_contents('/proc/meminfo');
-        preg_match('/MemTotal:\s+(\d+)/', $meminfo, $mTotal);
-        preg_match('/MemAvailable:\s+(\d+)/', $meminfo, $mAvail);
-        if ($mTotal && $mAvail) {
-            $total = (int)$mTotal[1] * 1024;
-            $free = (int)$mAvail[1] * 1024;
-        }
-    } else {
-        // Fallback for non-linux or restricted environments
-        $total = 8 * 1024 * 1024 * 1024; // 8GB
-        $free = 4 * 1024 * 1024 * 1024;  // 4GB
+    // 2. Storage Usage (Sum of all library paths)
+    $stmt = $pdo->query("SELECT libraryPaths FROM system_settings WHERE id = 1");
+    $settings = $stmt->fetch();
+    $paths = json_decode($settings['libraryPaths'] ?: '[]', true);
+    if (empty($paths)) $paths = ["/"];
+    
+    $diskTotal = 0;
+    $diskFree = 0;
+    $seenDevs = [];
+    foreach ($paths as $p) {
+        if (!is_dir($p)) continue;
+        $dev = @file_exists($p) ? @lstat($p)['dev'] : null;
+        if ($dev && in_array($dev, $seenDevs)) continue; // Avoid double counting same partition
+        if ($dev) $seenDevs[] = $dev;
+
+        $diskTotal += @disk_total_space($p) ?: 0;
+        $diskFree += @disk_free_space($p) ?: 0;
     }
-    $ramUsed = $total - $free;
-    $ramPercent = $total > 0 ? round(($ramUsed / $total) * 100, 2) : 0;
-
-    // 3. Storage Usage
-    $diskTotal = @disk_total_space("/") ?: (100 * 1024 * 1024 * 1024);
-    $diskFree = @disk_free_space("/") ?: (50 * 1024 * 1024 * 1024);
+    
+    // Fallback if no paths or errors
+    if ($diskTotal === 0) {
+        $diskTotal = 100 * 1024 * 1024 * 1024;
+        $diskFree = 50 * 1024 * 1024 * 1024;
+    }
     $diskUsed = $diskTotal - $diskFree;
     $diskPercent = $diskTotal > 0 ? round(($diskUsed / $diskTotal) * 100, 2) : 0;
 
-    // 4. Network Speed (Simulated for real-time feel)
-    $netDown = rand(100, 5000); // KB/s
-    $netUp = rand(50, 2000);   // KB/s
+    // 3. Battery Simulation (Persistent)
+    $battery = update_battery_simulation($pdo);
 
-    // 5. Active Users (Last 5 minutes)
+    // 4. Network Speed (Simulated)
+    $netDown = rand(100, 5000);
+    $netUp = rand(50, 2000);
+
+    // 5. Active Users
     $fiveMinsAgo = time() - 300;
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE lastActive > ?");
     $stmt->execute([$fiveMinsAgo]);
@@ -843,11 +891,6 @@ function admin_get_server_stats($pdo) {
 
     respond(true, [
         'cpu' => $cpuUsage,
-        'ram' => [
-            'total' => formatBytes($total),
-            'used' => formatBytes($ramUsed),
-            'percent' => $ramPercent
-        ],
         'storage' => [
             'total' => formatBytes($diskTotal),
             'used' => formatBytes($diskUsed),
@@ -858,7 +901,8 @@ function admin_get_server_stats($pdo) {
             'down' => $netDown
         ],
         'activeUsers' => $userCount,
-        'uptime' => @shell_exec('uptime -p') ?: 'N/A'
+        'uptime' => @shell_exec('uptime -p') ?: 'N/A',
+        'battery' => $battery
     ]);
 }
 
