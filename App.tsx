@@ -175,9 +175,9 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                 const ua = navigator.userAgent || '';
                 const uaMatch = ua.match(/StreamPayAPK\/([\d\.]+)/i);
                 
-                // Si es la APK pero no detectamos versión en el UA, usamos null para no sobreescribir la DB con basura
-                // El servidor usará la versión que ya tenga el usuario si enviamos null
-                const clientVersion = uaMatch ? uaMatch[1] : (ua.includes('StreamPayAPK') ? null : null);
+                // Si es la APK pero no detectamos versión en el UA, usamos undefined para no sobreescribir la DB con basura
+                // El servidor usará la versión que ya tenga el usuario si enviamos undefined
+                const clientVersion = uaMatch ? uaMatch[1] : undefined;
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
                 setIsAPK(latest.isAPK);
@@ -215,7 +215,7 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                         return 0;
                     };
 
-                    if (vCompare(latest.version, clientVersion) > 0) {
+                    if (vCompare(latest.version, clientVersion || currentVersion) > 0) {
                         setUpdateInfo({ version: latest.version, url: latest.url });
                         setShowUpdate(true);
                     }
