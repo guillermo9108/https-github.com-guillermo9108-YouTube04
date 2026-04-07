@@ -817,26 +817,64 @@ function update_battery_simulation($pdo) {
         $load = sys_getloadavg();
         $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
         
-        $currentWatts = $battery['minWatts'] + ($battery['maxWatts'] - $battery['minWatts']) * ($cpuUsage / 100);
-        $newWh = $battery['currentWh'] ?? 200;
+        // 1. Consumo Dinámico (P_sys)
+        $baseWatts = 6;
+        $cpuScaling = $cpuUsage * 0.25;
+        $multiplier = $battery['consumptionMultiplier'] ?? 1.0;
+        $pSys = ($baseWatts + $cpuScaling) * $multiplier;
+        
+        // 2. Capacidad Total (Wh)
+        $cellsSeries = $battery['cellsSeries'] ?? 4;
+        $cellsParallel = $battery['cellsParallel'] ?? 4;
+        $cellMah = $battery['cellCapacityMah'] ?? 5000;
+        $soh = ($battery['cellHealth'] ?? 89) / 100;
+        
+        $nominalVoltage = $cellsSeries * 3.7;
+        $totalAh = ($cellMah * $cellsParallel) / 1000;
+        $maxWh = $nominalVoltage * $totalAh * $soh;
+        
+        $currentWh = $battery['currentWh'] ?? ($maxWh * 0.5);
+        $v = $battery['voltage'] ?? 14.8;
         
         if ($battery['isCharging']) {
-            $newWh += ($battery['chargePower'] ?? 65) * $elapsedHours;
+            // AC Conectado
+            $chargerLimit = $battery['chargePower'] ?? 45;
+            $pDisp = $chargerLimit - $pSys;
+            $pChargeMax = $chargerLimit * $soh;
+            
+            $pReal = 0;
+            if ($v < 16.0) {
+                $pReal = min($pDisp, $pChargeMax);
+            } elseif ($v < 16.8) {
+                // Curva CV: Reducción lineal de 16.0V a 16.8V
+                $factor = (16.8 - $v) / (16.8 - 16.0);
+                $pReal = min($pDisp, $pChargeMax) * $factor;
+            }
+            
+            $currentWh += $pReal * $elapsedHours;
         } else {
-            $newWh -= $currentWatts * $elapsedHours;
+            // Descarga
+            $currentWh -= $pSys * $elapsedHours;
         }
         
-        $maxWh = 300 * (($battery['cellHealth'] ?? 85) / 100);
-        if ($newWh > maxWh) $newWh = maxWh;
-        if ($newWh < 0) $newWh = 0;
+        if ($currentWh > $maxWh) $currentWh = $maxWh;
+        if ($currentWh < 0) $currentWh = 0;
         
-        // Calcular voltaje basado en porcentaje
-        $percentage = ($newWh / $maxWh) * 100;
+        // 4. Actualización de Voltaje (V)
+        // Mapeo lineal simple para el simulador: 12V (0%) a 16.8V (100%)
+        $percentage = ($currentWh / $maxWh) * 100;
         $newVoltage = 12 + (4.8 * ($percentage / 100));
         
-        $battery['currentWh'] = $newWh;
+        // Simular Caída de Voltaje (Sag) si está descargando
+        if (!$battery['isCharging']) {
+            $sag = (1 - $soh) * ($pSys / 50); // 50W como referencia de carga alta
+            $newVoltage -= $sag;
+        }
+        
+        $battery['currentWh'] = $currentWh;
         $battery['voltage'] = round($newVoltage, 2);
         $battery['lastUpdate'] = $now;
+        $battery['pSys'] = round($pSys, 2);
         
         $pdo->prepare("UPDATE system_settings SET batteryConfig = ? WHERE id = 1")
             ->execute([json_encode($battery)]);

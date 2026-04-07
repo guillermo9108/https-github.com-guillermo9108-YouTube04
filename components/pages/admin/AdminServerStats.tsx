@@ -27,13 +27,16 @@ interface ServerStats {
 
 interface BatteryConfig {
   voltage: number;
-  minWatts: number;
-  maxWatts: number;
+  consumptionMultiplier: number;
   isCharging: boolean;
   cellHealth: number;
   currentWh: number;
   lastUpdate: number;
   chargePower: number;
+  cellsSeries: number;
+  cellsParallel: number;
+  cellCapacityMah: number;
+  pSys?: number;
 }
 
 export default function AdminServerStats() {
@@ -41,27 +44,29 @@ export default function AdminServerStats() {
   const [loading, setLoading] = useState(true);
   const [battery, setBattery] = useState<BatteryConfig>({
     voltage: 14.8,
-    minWatts: 200,
-    maxWatts: 300,
+    consumptionMultiplier: 1.0,
     isCharging: false,
-    cellHealth: 85,
-    currentWh: 200,
+    cellHealth: 89,
+    currentWh: 150,
     lastUpdate: Date.now(),
-    chargePower: 65
+    chargePower: 45,
+    cellsSeries: 4,
+    cellsParallel: 4,
+    cellCapacityMah: 5000
   });
-  const [isEditingVoltage, setIsEditingVoltage] = useState(false);
-  const isEditingVoltageRef = React.useRef(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const isEditingRef = React.useRef(false);
 
   useEffect(() => {
-    isEditingVoltageRef.current = isEditingVoltage;
-  }, [isEditingVoltage]);
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
   const { addToast, success: toastSuccess, error: toastError } = useToast();
 
   const fetchStats = async () => {
     try {
       const data = await db.adminGetServerStats();
       setStats(data);
-      if (data.battery && !isEditingVoltageRef.current) {
+      if (data.battery && !isEditingRef.current) {
         setBattery(prev => ({ ...prev, ...data.battery }));
       }
     } catch (error) {
@@ -97,35 +102,65 @@ export default function AdminServerStats() {
     if (!stats) return;
 
     const simInterval = setInterval(() => {
-      if (isEditingVoltageRef.current) return; // Pausar simulación si el admin está ajustando manualmente
+      if (isEditingRef.current) return; // Pausar simulación si el admin está ajustando manualmente
 
       setBattery(prev => {
         const now = Date.now();
         const elapsedHours = (now - prev.lastUpdate) / (1000 * 60 * 60);
         
-        // Cálculo de consumo actual basado en CPU
-        const currentWatts = prev.minWatts + (prev.maxWatts - prev.minWatts) * (stats.cpu / 100);
+        // 1. Consumo Dinámico (P_sys)
+        const baseWatts = 6;
+        const cpuScaling = stats.cpu * 0.25;
+        const pSys = (baseWatts + cpuScaling) * prev.consumptionMultiplier;
+        
+        // 2. Capacidad Total (Wh)
+        const soh = prev.cellHealth / 100;
+        const nominalVoltage = prev.cellsSeries * 3.7;
+        const totalAh = (prev.cellCapacityMah * prev.cellsParallel) / 1000;
+        const maxWh = nominalVoltage * totalAh * soh;
         
         let newWh = prev.currentWh;
+        let v = prev.voltage;
+
         if (prev.isCharging) {
-          newWh += prev.chargePower * elapsedHours;
+          // AC Conectado
+          const chargerLimit = prev.chargePower || 45;
+          const pDisp = chargerLimit - pSys;
+          const pChargeMax = chargerLimit * soh;
+          
+          let pReal = 0;
+          if (v < 16.0) {
+            pReal = Math.min(pDisp, pChargeMax);
+          } else if (v < 16.8) {
+            const factor = (16.8 - v) / (16.8 - 16.0);
+            pReal = Math.min(pDisp, pChargeMax) * factor;
+          }
+          
+          newWh += pReal * elapsedHours;
         } else {
-          newWh -= currentWatts * elapsedHours;
+          // Descarga
+          newWh -= pSys * elapsedHours;
         }
 
-        const maxWh = 300 * (prev.cellHealth / 100);
         if (newWh > maxWh) newWh = maxWh;
         if (newWh < 0) newWh = 0;
 
-        // Voltaje simulado (12V a 16.8V)
+        // 4. Actualización de Voltaje (V)
         const percentage = (newWh / maxWh) * 100;
-        const newVoltage = 12 + (4.8 * (percentage / 100));
+        let newVoltage = 12 + (4.8 * (percentage / 100));
+
+        // Simular Caída de Voltaje (Sag)
+        if (!prev.isCharging) {
+          const sag = (1 - soh) * (pSys / 50);
+          newVoltage -= sag;
+        }
 
         return {
           ...prev,
           currentWh: newWh,
           voltage: parseFloat(newVoltage.toFixed(2)),
-          lastUpdate: now
+          lastUpdate: now,
+          pSys: parseFloat(pSys.toFixed(2))
         };
       });
     }, 1000);
@@ -252,8 +287,10 @@ export default function AdminServerStats() {
                 <div className="text-slate-400 font-bold uppercase text-[10px] mb-1">Autonomía Est.</div>
                 <div className="text-xl font-black text-amber-500">
                   {(() => {
-                    const currentWatts = battery.minWatts + (battery.maxWatts - battery.minWatts) * (stats.cpu / 100);
-                    const hours = battery.currentWh / currentWatts;
+                    const baseWatts = 6;
+                    const cpuScaling = stats.cpu * 0.25;
+                    const pSys = (baseWatts + cpuScaling) * battery.consumptionMultiplier;
+                    const hours = battery.currentWh / pSys;
                     const h = Math.floor(hours);
                     const m = Math.floor((hours - h) * 60);
                     return `${h}h ${m}m`;
@@ -301,9 +338,9 @@ export default function AdminServerStats() {
                 <div className="text-xl font-black text-white">{battery.voltage}V</div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Consumo Est.</div>
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Consumo P_sys</div>
                 <div className="text-xl font-black text-white">
-                  {Math.round(battery.minWatts + (battery.maxWatts - battery.minWatts) * (stats.cpu / 100))}W
+                  {battery.pSys || 0}W
                 </div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
@@ -334,53 +371,88 @@ export default function AdminServerStats() {
 
           {/* Configuración del Simulador */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Voltaje Actual (V)</label>
-              <input 
-                type="number" 
-                step="0.01"
-                min="12"
-                max="16.8"
-                value={battery.voltage}
-                onFocus={() => setIsEditingVoltage(true)}
-                onBlur={() => setIsEditingVoltage(false)}
-                onChange={e => {
-                  const v = parseFloat(e.target.value) || 0;
-                  const maxWh = 300 * (battery.cellHealth / 100);
-                  const percentage = Math.max(0, Math.min(1, (v - 12) / 4.8));
-                  const newWh = maxWh * percentage;
-                  setBattery({...battery, voltage: v, currentWh: newWh});
-                }}
-                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 outline-none transition-all"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Voltaje Actual (V)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  min="12"
+                  max="16.8"
+                  value={battery.voltage}
+                  onFocus={() => setIsEditing(true)}
+                  onBlur={() => setIsEditing(false)}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value) || 0;
+                    const soh = battery.cellHealth / 100;
+                    const nominalVoltage = battery.cellsSeries * 3.7;
+                    const totalAh = (battery.cellCapacityMah * battery.cellsParallel) / 1000;
+                    const maxWh = nominalVoltage * totalAh * soh;
+                    const percentage = Math.max(0, Math.min(1, (v - 12) / 4.8));
+                    const newWh = maxWh * percentage;
+                    setBattery({...battery, voltage: v, currentWh: newWh});
+                  }}
+                  className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Multiplicador Consumo</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={battery.consumptionMultiplier}
+                  onFocus={() => setIsEditing(true)}
+                  onBlur={() => setIsEditing(false)}
+                  onChange={e => setBattery({...battery, consumptionMultiplier: parseFloat(e.target.value) || 1.0})}
+                  className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Rango de Consumo (W)</label>
-              <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Config (S)</label>
                 <input 
                   type="number" 
-                  value={battery.minWatts}
-                  onChange={e => setBattery({...battery, minWatts: parseInt(e.target.value)})}
+                  value={battery.cellsSeries}
+                  onFocus={() => setIsEditing(true)}
+                  onBlur={() => setIsEditing(false)}
+                  onChange={e => setBattery({...battery, cellsSeries: parseInt(e.target.value) || 4})}
                   className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                  placeholder="Min"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Config (P)</label>
                 <input 
                   type="number" 
-                  value={battery.maxWatts}
-                  onChange={e => setBattery({...battery, maxWatts: parseInt(e.target.value)})}
+                  value={battery.cellsParallel}
+                  onFocus={() => setIsEditing(true)}
+                  onBlur={() => setIsEditing(false)}
+                  onChange={e => setBattery({...battery, cellsParallel: parseInt(e.target.value) || 4})}
                   className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                  placeholder="Max"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase">Capacidad Celda (mAh)</label>
+                <input 
+                  type="number" 
+                  value={battery.cellCapacityMah}
+                  onFocus={() => setIsEditing(true)}
+                  onBlur={() => setIsEditing(false)}
+                  onChange={e => setBattery({...battery, cellCapacityMah: parseInt(e.target.value) || 5000})}
+                  className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Potencia de Carga (W)</label>
+              <label className="text-xs font-bold text-slate-400 uppercase">Límite Cargador (W)</label>
               <input 
                 type="number" 
                 value={battery.chargePower}
-                onChange={e => setBattery({...battery, chargePower: parseInt(e.target.value)})}
+                onFocus={() => setIsEditing(true)}
+                onBlur={() => setIsEditing(false)}
+                onChange={e => setBattery({...battery, chargePower: parseInt(e.target.value) || 45})}
                 className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
               />
             </div>
@@ -392,6 +464,8 @@ export default function AdminServerStats() {
                 min="1" 
                 max="100"
                 value={battery.cellHealth}
+                onFocus={() => setIsEditing(true)}
+                onBlur={() => setIsEditing(false)}
                 onChange={e => setBattery({...battery, cellHealth: parseInt(e.target.value)})}
                 className="w-full accent-indigo-500"
               />
