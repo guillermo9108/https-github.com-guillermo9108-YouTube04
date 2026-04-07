@@ -150,14 +150,26 @@ const UpdateModal = ({ version, url, onClose }: { version: string, url: string, 
 const AppGuard = ({ children }: { children: React.ReactNode }) => {
     const [updateInfo, setUpdateInfo] = useState<{version: string, url: string} | null>(null);
     const [showUpdate, setShowUpdate] = useState(false);
-    const isAPK = navigator.userAgent.includes('StreamPayAPK');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    
+    // Detección más robusta de la APK (ignorando mayúsculas/minúsculas)
+    const userAgent = navigator.userAgent || '';
+    const isAPK = userAgent.toLowerCase().includes('streampayapk');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(userAgent);
     const currentVersion = "0.0.1"; // Versión actual de la web/app
 
     useEffect(() => {
-        // Redirigir a descarga si es móvil y no es la APK
-        if (isMobile && !isAPK && !window.location.hash.includes('/download')) {
+        const currentHash = window.location.hash;
+        
+        // Si es la APK y está en la página de descarga, redirigir al inicio
+        if (isAPK && currentHash.includes('/download')) {
+            window.location.hash = '#/';
+            return;
+        }
+
+        // Redirigir a descarga si es móvil y NO es la APK
+        if (isMobile && !isAPK && !currentHash.includes('/download')) {
             window.location.hash = '#/download';
+            return;
         }
 
         // Solo verificar actualizaciones si estamos en la APK

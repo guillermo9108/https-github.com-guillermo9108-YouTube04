@@ -9,21 +9,21 @@ export default function DownloadApp() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const isAPK = navigator.userAgent.toLowerCase().includes('streampayapk');
+        if (isAPK) {
+            window.location.hash = '#/';
+            return;
+        }
         db.getLatestVersion().then(setLatest).finally(() => setLoading(false));
     }, []);
 
     const handleOpenApp = () => {
         // Intent URL to open the app if installed
-        // Assuming the package name is com.streampay.app or similar
-        // The user can configure the deep link scheme
-        window.location.href = "streampay://open";
+        // We pass the current origin to the app if it supports it
+        const currentOrigin = window.location.origin;
+        window.location.href = `streampay://open?url=${encodeURIComponent(currentOrigin)}`;
         
-        // Fallback after a short delay if app doesn't open
-        setTimeout(() => {
-            if (latest?.url) {
-                window.location.href = latest.url;
-            }
-        }, 2000);
+        // No longer using automatic fallback download to avoid double action
     };
 
     return (
