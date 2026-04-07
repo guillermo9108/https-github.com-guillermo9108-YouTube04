@@ -818,10 +818,9 @@ function update_battery_simulation($pdo) {
         $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
         
         // 1. Consumo Dinámico (P_sys)
-        $baseWatts = 6;
-        $cpuScaling = $cpuUsage * 0.25;
-        $multiplier = $battery['consumptionMultiplier'] ?? 1.0;
-        $pSys = ($baseWatts + $cpuScaling) * $multiplier;
+        $minWatts = $battery['minWatts'] ?? 200;
+        $maxWatts = $battery['maxWatts'] ?? 300;
+        $pSys = $minWatts + ($maxWatts - $minWatts) * ($cpuUsage / 100);
         
         // 2. Capacidad Total (Wh)
         $cellsSeries = $battery['cellsSeries'] ?? 4;
