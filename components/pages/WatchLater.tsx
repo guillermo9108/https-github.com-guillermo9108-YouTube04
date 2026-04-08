@@ -35,7 +35,7 @@ export default function WatchLater() {
 
     return (
         <div className="pb-24 animate-in fade-in">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-4 px-4 pt-4">
                 <div className="flex items-center gap-4">
                     <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400">
                         <ArrowLeft size={24}/>
@@ -56,7 +56,7 @@ export default function WatchLater() {
                     <Link to="/" className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all">Explorar Contenido</Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                     {videos.map(v => (
                         <VideoCard 
                             key={v.id} 

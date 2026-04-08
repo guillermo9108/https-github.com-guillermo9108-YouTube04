@@ -304,13 +304,13 @@ export default function Channel() {
         </div>
 
         {/* Videos Grid */}
-        <div className="px-4 md:px-12 relative z-10">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">Contenido</h2>
+        <div className="relative z-10">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 px-4">Contenido</h2>
             {filteredContent.length === 0 ? (
                 <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                         {filteredContent.slice(0, visibleCount).map(video => (
                              <div key={video.id} className="relative group">
                                  <VideoCard 

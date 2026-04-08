@@ -59,6 +59,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showFullTitle, setShowFullTitle] = useState(false);
   const [currentAlbumIndex, setCurrentAlbumIndex] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -442,40 +443,85 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         </div>
       </div>
 
-      {/* Text Content: Title */}
+      {/* Text Content: Title & Description */}
       <div className="px-3 pb-2">
-        <Link to={isImage ? '#' : watchUrl} onClick={isImage ? handleImageClick : undefined} title={video.title}>
-            <h3 className="text-xs font-normal text-slate-100 leading-snug line-clamp-3 hover:text-indigo-400 transition-colors">
-              {video.title}
-            </h3>
-        </Link>
+        <div className="relative">
+            <div className={`text-xs font-normal text-slate-100 leading-snug ${!showFullTitle ? 'line-clamp-3' : ''} transition-colors`}>
+              <span className="font-bold">{video.title}</span>
+              {video.description && (
+                  <span className="text-slate-300 ml-1">
+                      {video.description}
+                  </span>
+              )}
+            </div>
+            {((video.title?.length || 0) + (video.description?.length || 0)) > 100 && !showFullTitle && (
+                <button 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowFullTitle(true); }}
+                    className="text-slate-400 text-[10px] font-bold hover:text-white mt-1"
+                >
+                    Ver más
+                </button>
+            )}
+        </div>
       </div>
 
       {/* Media Content */}
-      <div className="relative w-full aspect-video bg-black overflow-hidden border-y border-white/5">
-        <Link 
-            to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
-            onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
-            className="absolute inset-0 z-0"
-        >
-            {displayThumb ? (
-                <img 
-                src={displayThumb} 
-                alt={video.title} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
-                loading="lazy" 
-                referrerPolicy="no-referrer"
-                onError={() => setImgError(true)}
-                />
-            ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
-                    <div className="relative">
-                        {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
-                        {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
-                    </div>
+      <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden border-y border-white/5`}>
+        {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
+            <div className="grid grid-cols-4 h-full gap-0.5" onClick={handleImageClick}>
+                {/* Main Image (Left) */}
+                <div className="col-span-3 h-full relative">
+                    <img 
+                        src={db.getStreamerUrl(video.albumItems[0].id)} 
+                        alt={video.albumItems[0].title}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                    />
                 </div>
-            )}
-        </Link>
+                {/* Side Column (Right) */}
+                <div className="col-span-1 flex flex-col gap-0.5 h-full">
+                    {video.albumItems.slice(1, 4).map((item, idx) => (
+                        <div key={item.id} className="flex-1 relative">
+                            <img 
+                                src={db.getStreamerUrl(item.id)} 
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                            />
+                            {idx === 2 && video.albumItems!.length > 4 && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                    <span className="text-white font-black text-lg">+{video.albumItems!.length - 4}</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        ) : (
+            <Link 
+                to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
+                onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
+                className="absolute inset-0 z-0"
+            >
+                {displayThumb ? (
+                    <img 
+                    src={displayThumb} 
+                    alt={video.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
+                    loading="lazy" 
+                    referrerPolicy="no-referrer"
+                    onError={() => setImgError(true)}
+                    />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
+                        <div className="relative">
+                            {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
+                            {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
+                        </div>
+                    </div>
+                )}
+            </Link>
+        )}
         
         {locationLabel && (
             <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-slate-300 px-2 py-0.5 rounded-lg border border-white/10 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
@@ -524,39 +570,41 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
       {/* Footer: Interactions */}
       <div className="p-1">
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <div className="flex items-center -space-x-1">
-            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
-              <ThumbsUp size={8} className="text-white fill-white" />
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center -space-x-1">
+                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+                <ThumbsUp size={8} className="text-white fill-white" />
+                </div>
+                <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+                <Heart size={8} className="text-white fill-white" />
+                </div>
             </div>
-            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
-              <Heart size={8} className="text-white fill-white" />
-            </div>
-            <span className="ml-2 text-[11px] text-slate-400 font-medium">{likeCount}</span>
+            <span className="text-[11px] text-slate-400 font-medium">Yunior Rodríguez y {likeCount} más</span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
             <span>{video.views} vistas</span>
-            <span>{video.dislikes || 0} veces compartido</span>
+            <span>{video.dislikes || 0} compartido</span>
           </div>
         </div>
         
-        <div className="h-px bg-white/5 mx-2"></div>
+        <div className="h-px bg-white/5 mx-2 mb-1"></div>
         
-        <div className="flex items-center p-1">
+        <div className="flex items-center gap-1 px-1 pb-1">
           <button 
             onClick={handleLike}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all ${liked ? 'text-blue-500 bg-blue-500/5' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-full transition-all bg-white/5 hover:bg-white/10 ${liked ? 'text-blue-500' : 'text-slate-400'}`}
           >
-            <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
-            <span className="text-xs font-bold">Me gusta</span>
+            <ThumbsUp size={16} className={liked ? 'fill-current' : ''} />
+            <span className="text-[11px] font-bold">Me gusta</span>
           </button>
-          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-            <MessageCircle size={18} />
-            <span className="text-xs font-bold">Comentar</span>
+          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+            <MessageCircle size={16} />
+            <span className="text-[11px] font-bold">Comentar</span>
           </Link>
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-            <Share2 size={18} />
-            <span className="text-xs font-bold">Compartir</span>
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+            <Share2 size={16} />
+            <span className="text-[11px] font-bold">Compartir</span>
           </button>
         </div>
       </div>

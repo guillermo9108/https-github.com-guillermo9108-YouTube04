@@ -597,8 +597,8 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="relative z-10 backdrop-blur-xl bg-black/20 border-b border-white/5 pb-2 px-4 md:px-8 shadow-sm">
-                    <div className="flex flex-col gap-2 max-w-7xl mx-auto">
+                <div className="relative z-10 backdrop-blur-xl bg-black/20 border-b border-white/5 pb-2 px-2 shadow-sm">
+                    <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 w-full">
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
                                 <button onClick={() => { handleNavigate(-1); updateUrl({ q: '', folder: [], cat: 'TODOS' }); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
@@ -643,7 +643,7 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="pt-44 px-4 md:px-8 max-w-7xl mx-auto">
+            <div className="pt-44">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
                 ) : (
@@ -706,7 +706,7 @@ export default function Home() {
                                 </div> 
                             )}
                             {videos.length > 0 ? ( 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                                     {processedVideos.map(v => ( 
                                         <VideoCard 
                                             key={v.id} 
