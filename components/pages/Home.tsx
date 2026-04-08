@@ -706,7 +706,7 @@ export default function Home() {
                                 </div> 
                             )}
                             {videos.length > 0 ? ( 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-12">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {processedVideos.map(v => ( 
                                         <VideoCard 
                                             key={v.id} 

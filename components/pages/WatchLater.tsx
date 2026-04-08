@@ -56,7 +56,7 @@ export default function WatchLater() {
                     <Link to="/" className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all">Explorar Contenido</Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {videos.map(v => (
                         <VideoCard 
                             key={v.id} 

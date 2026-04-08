@@ -310,7 +310,7 @@ export default function Channel() {
                 <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredContent.slice(0, visibleCount).map(video => (
                              <div key={video.id} className="relative group">
                                  <VideoCard 

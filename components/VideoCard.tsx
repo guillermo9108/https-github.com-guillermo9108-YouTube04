@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -327,9 +327,132 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       return video.thumbnailUrl;
   }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, video.videoUrl, isAudio, isImage, defaultThumb]);
 
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(Number(video.likes || 0));
+
+  useEffect(() => {
+    if (user && video.id) {
+        db.getInteraction(user.id, video.id).then(res => {
+            if (res) setLiked(res.liked);
+        });
+    }
+  }, [user?.id, video.id]);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+        toast.error("Inicia sesión para reaccionar");
+        return;
+    }
+    
+    const oldLiked = liked;
+    const oldLikeCount = likeCount;
+    
+    setLiked(!oldLiked);
+    setLikeCount(prev => oldLiked ? prev - 1 : prev + 1);
+    
+    try {
+        const res = await db.rateVideo(user.id, video.id, 'like');
+        if (res.newLikeCount !== undefined) setLikeCount(res.newLikeCount);
+        setLiked(res.liked);
+    } catch (err) {
+        setLiked(oldLiked);
+        setLikeCount(oldLikeCount);
+        toast.error("Error al reaccionar");
+    }
+  };
+
   return (
-    <div ref={cardRef} className={`flex flex-col gap-3 group relative ${isWatched ? 'opacity-70 hover:opacity-100 transition-opacity' : ''}`}>
-      <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 hover:scale-[1.03] transition-all duration-500 block ring-1 ring-white/5 hover:ring-indigo-500/40">
+    <div ref={cardRef} className={`flex flex-col bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden group transition-all duration-300 ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`}>
+      {/* Header: User Info */}
+      <div className="flex items-center justify-between p-2.5">
+        <div className="flex items-center gap-2">
+          <Link to={`/channel/${video.creatorId}`} className="shrink-0">
+              {video.creatorAvatarUrl || settings?.defaultAvatar ? (
+                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-9 h-9 rounded-full object-cover bg-slate-800 border border-white/10" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+              ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-black text-white shadow-inner uppercase">{video.creatorName?.[0] || '?'}</div>
+              )}
+          </Link>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1">
+              <Link to={`/channel/${video.creatorId}`} className="text-xs font-bold text-white hover:text-indigo-400 transition-colors truncate max-w-[100px]">
+                {video.creatorName || 'Usuario'}
+              </Link>
+              <CheckCircle2 size={10} className="text-indigo-500 fill-indigo-500/10" />
+              <span className="text-slate-500 text-[10px]">•</span>
+              <button className="text-indigo-400 text-[10px] font-bold hover:text-indigo-300 transition-colors">Seguir</button>
+            </div>
+            <div className="flex items-center gap-1 text-[9px] text-slate-500 font-medium">
+              <span>{formatTimeAgo(video.createdAt)}</span>
+              <span className="w-0.5 h-0.5 bg-slate-700 rounded-full"></span>
+              <ExternalLink size={8} />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-0.5">
+          <div className="relative" ref={menuRef}>
+            <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }} 
+                className={`p-1.5 rounded-full hover:bg-white/5 text-slate-400 transition-all ${showMenu ? 'bg-white/10 text-white' : ''}`}
+            >
+                <MoreVertical size={16} />
+            </button>
+            
+            {showMenu && (
+                <div className="absolute top-full right-0 mt-1 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                    <div className="p-1">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Share2 size={14} className="text-slate-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
+                        </button>
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Download size={14} className="text-slate-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
+                        </button>
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWatchLater(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                            <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
+                        </button>
+                        {canEdit && (
+                            <>
+                                <div className="h-px bg-white/5 my-1"></div>
+                                <Link to={`/edit/${video.id}`} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
+                                    <Edit3 size={14} className="text-slate-500" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Editar</span>
+                                </Link>
+                                <button 
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); setShowMenu(false); }}
+                                    className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left"
+                                >
+                                    <Trash2 size={14} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Eliminar</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+          </div>
+          <button className="p-1.5 rounded-full hover:bg-white/5 text-slate-400 transition-all">
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Text Content: Title */}
+      <div className="px-3 pb-2">
+        <Link to={isImage ? '#' : watchUrl} onClick={isImage ? handleImageClick : undefined} title={video.title}>
+            <h3 className="text-xs font-normal text-slate-100 leading-snug line-clamp-3 hover:text-indigo-400 transition-colors">
+              {video.title}
+            </h3>
+        </Link>
+      </div>
+
+      {/* Media Content */}
+      <div className="relative w-full aspect-video bg-black overflow-hidden border-y border-white/5">
         <Link 
             to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
             onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
@@ -339,7 +462,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 <img 
                 src={displayThumb} 
                 alt={video.title} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out animate-in fade-in"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
                 loading="lazy" 
                 referrerPolicy="no-referrer"
                 onError={() => setImgError(true)}
@@ -384,26 +507,6 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
         )}
 
-        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
-            {video.categoryCount && video.category && video.category !== 'TODOS' && (
-                <button 
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCategoryClick?.(); }}
-                    className="p-2 rounded-xl backdrop-blur-md border border-white/10 bg-black/40 text-slate-300 hover:text-white hover:bg-pink-600 transition-all flex items-center gap-1.5"
-                    title={`Ver más de ${video.category}`}
-                >
-                    <Layers size={16} />
-                    <span className="text-[10px] font-black">{video.categoryCount}</span>
-                </button>
-            )}
-            <button 
-                onClick={handleWatchLater}
-                className={`p-2 rounded-xl backdrop-blur-md border border-white/10 transition-all duration-300 ${inWatchLater ? 'bg-indigo-600 text-white' : 'bg-black/40 text-slate-300 hover:text-white'}`}
-                title={inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}
-            >
-                <Clock size={16} fill={inWatchLater ? "currentColor" : "none"} />
-            </button>
-        </div>
-
         {isWatched && (
              <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">
                  <div className="flex items-center gap-2 text-slate-200 bg-indigo-600/80 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
@@ -419,73 +522,42 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         )}
       </div>
 
-      <div className="flex gap-3 px-1">
-        <Link to={`/channel/${video.creatorId}`} className="shrink-0 mt-1">
-            {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-2xl object-cover bg-slate-900 border border-white/5 group-hover:border-indigo-500 transition-colors shadow-md" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
-            ) : (
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-black text-white shadow-inner uppercase">{video.creatorName?.[0] || '?'}</div>
-            )}
-        </Link>
-
-        <div className="flex-1 min-w-0 flex flex-col">
-            <Link to={isImage ? '#' : watchUrl} onClick={isImage ? handleImageClick : undefined} title={video.title}>
-                <h3 className="text-sm font-black text-white leading-tight line-clamp-2 mb-1 group-hover:text-indigo-400 transition-colors uppercase tracking-tighter italic">{video.title}</h3>
-            </Link>
-            <div className="text-[10px] text-slate-500 flex flex-col gap-0.5">
-                <Link to={`/channel/${video.creatorId}`} className="hover:text-slate-200 transition-colors flex items-center gap-1 w-fit font-bold uppercase tracking-widest text-slate-400">
-                    {video.creatorName || 'Usuario'}
-                    <CheckCircle2 size={10} className="text-indigo-500" />
-                </Link>
-                <div className="flex items-center gap-2 font-bold">
-                    <span>{video.views} vistas</span>
-                    <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                    <span>{formatTimeAgo(video.createdAt)}</span>
-                </div>
+      {/* Footer: Interactions */}
+      <div className="p-1">
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <div className="flex items-center -space-x-1">
+            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+              <ThumbsUp size={8} className="text-white fill-white" />
             </div>
+            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+              <Heart size={8} className="text-white fill-white" />
+            </div>
+            <span className="ml-2 text-[11px] text-slate-400 font-medium">{likeCount}</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
+            <span>{video.views} vistas</span>
+            <span>{video.dislikes || 0} veces compartido</span>
+          </div>
         </div>
-        <div className="relative" ref={menuRef}>
-            <button 
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }} 
-                className={`shrink-0 text-slate-600 hover:text-white self-start transition-all p-1 rounded-lg hover:bg-white/5 ${showMenu ? 'opacity-100 text-white bg-white/10' : 'opacity-0 group-hover:opacity-100'}`}
-            >
-                <MoreVertical size={20} />
-            </button>
-            
-            {showMenu && (
-                <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-bottom-right">
-                    <div className="p-1">
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Share2 size={14} className="text-slate-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
-                        </button>
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Download size={14} className="text-slate-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
-                        </button>
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWatchLater(e); }} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
-                        </button>
-                        {canEdit && (
-                            <>
-                                <div className="h-px bg-white/5 my-1"></div>
-                                <Link to={`/edit/${video.id}`} className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                                    <Edit3 size={14} className="text-slate-500" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Editar</span>
-                                </Link>
-                                <button 
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); setShowMenu(false); }}
-                                    className="w-full p-3 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left"
-                                >
-                                    <Trash2 size={14} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Eliminar</span>
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+        
+        <div className="h-px bg-white/5 mx-2"></div>
+        
+        <div className="flex items-center p-1">
+          <button 
+            onClick={handleLike}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all ${liked ? 'text-blue-500 bg-blue-500/5' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+          >
+            <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
+            <span className="text-xs font-bold">Me gusta</span>
+          </button>
+          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+            <MessageCircle size={18} />
+            <span className="text-xs font-bold">Comentar</span>
+          </Link>
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+            <Share2 size={18} />
+            <span className="text-xs font-bold">Compartir</span>
+          </button>
         </div>
       </div>
 
