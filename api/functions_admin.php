@@ -894,9 +894,10 @@ function admin_get_server_stats($pdo) {
     $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : rand(5, 15);
 
     // 2. Storage Usage (Sum of all library paths)
-    $stmt = $pdo->query("SELECT libraryPaths FROM system_settings WHERE id = 1");
+    $stmt = $pdo->query("SELECT libraryPaths, batteryHistory FROM system_settings WHERE id = 1");
     $settings = $stmt->fetch();
     $paths = json_decode($settings['libraryPaths'] ?: '[]', true);
+    $history = json_decode($settings['batteryHistory'] ?: '[]', true);
     if (empty($paths)) $paths = ["/"];
     
     $diskTotal = 0;
@@ -904,8 +905,11 @@ function admin_get_server_stats($pdo) {
     $seenDevs = [];
     foreach ($paths as $p) {
         if (!is_dir($p)) continue;
+        // Skip slow network paths if they are not responsive (simple check)
+        if (strpos($p, '/volume') === 0 && !@is_readable($p)) continue; 
+        
         $dev = @file_exists($p) ? @lstat($p)['dev'] : null;
-        if ($dev && in_array($dev, $seenDevs)) continue; // Avoid double counting same partition
+        if ($dev && in_array($dev, $seenDevs)) continue; 
         if ($dev) $seenDevs[] = $dev;
 
         $diskTotal += @disk_total_space($p) ?: 0;
@@ -945,8 +949,9 @@ function admin_get_server_stats($pdo) {
             'down' => $netDown
         ],
         'activeUsers' => $userCount,
-        'uptime' => @shell_exec('uptime -p') ?: 'N/A',
-        'battery' => $battery
+        'uptime' => (function_exists('shell_exec') && !@ini_get('safe_mode')) ? (@shell_exec('uptime -p') ?: 'N/A') : 'N/A',
+        'battery' => $battery,
+        'batteryHistory' => $history
     ]);
 }
 

@@ -27,6 +27,9 @@ class DBService {
     }
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const url = endpoint.startsWith('http') ? endpoint : `/api/index.php?${endpoint}`;
         const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
         
@@ -44,8 +47,10 @@ class DBService {
         }
 
         options.headers = headers;
+        options.signal = controller.signal;
 
         return fetch(url, options).then(async (response) => {
+            clearTimeout(timeoutId);
             const rawText = await response.text();
             
             if (response.status === 401) {
@@ -62,6 +67,10 @@ class DBService {
             }
             if (json.success === false) throw new Error(json.error || 'Error desconocido');
             return json.data as T;
+        }).catch(err => {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error("La petición ha tardado demasiado tiempo.");
+            throw err;
         });
     }
 

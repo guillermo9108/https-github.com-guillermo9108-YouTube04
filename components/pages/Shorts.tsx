@@ -51,7 +51,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         loadTimeoutRef.current = window.setTimeout(() => {
             setShouldLoadVideo(true);
-        }, 400); // 400ms delay before starting video download
+        }, 1200); // Increased delay to 1.2s for better scroll experience
     } else {
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         setShouldLoadVideo(false);
@@ -72,6 +72,14 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
   }, [isActive, video.id, isNear, user, interaction?.isWatched]);
+
+  // Preload thumbnail for "near" videos
+  useEffect(() => {
+    if (isNear && video.thumbnailUrl) {
+      const img = new Image();
+      img.src = video.thumbnailUrl;
+    }
+  }, [isNear, video.thumbnailUrl]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -141,6 +149,13 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   return (
     <div className="relative w-full h-[100dvh] md:h-full snap-start snap-always shrink-0 flex items-center justify-center bg-black overflow-hidden">
       <div className="absolute inset-0 z-0 bg-black" onClick={handleScreenTouch}>
+        {(!videoSrc || !shouldLoadVideo) && (
+            <img 
+              src={video.thumbnailUrl} 
+              className="w-full h-full object-cover opacity-60" 
+              referrerPolicy="no-referrer" 
+            />
+        )}
         {videoSrc && (
             <video
                 ref={videoRef} src={videoSrc} poster={video.thumbnailUrl}
@@ -412,7 +427,7 @@ export default function Shorts() {
              <ShortItem 
                 video={video} 
                 isActive={idx === activeIndex} 
-                isNear={Math.abs(idx - activeIndex) <= 2}
+                isNear={Math.abs(idx - activeIndex) <= 4}
                 onOpenShare={(v) => setVideoToShare(v)}
              />
         </div>

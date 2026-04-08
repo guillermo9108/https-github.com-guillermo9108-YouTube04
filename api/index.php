@@ -94,12 +94,15 @@ require_once 'functions_market.php';
 require_once 'functions_admin.php';
 require_once 'functions_portability.php';
 require_once 'functions_analytics.php';
-require_once 'functions_schema.php';
-
-// Sincronizar esquema automáticamente para asegurar que existan las nuevas columnas
-$schema = getAppSchema();
-foreach ($schema as $tableName => $def) {
-    syncTable($pdo, $tableName, $def);
+// Sincronizar esquema periódicamente para asegurar que existan las nuevas columnas sin penalizar cada petición
+$syncCache = 'schema_synced.txt';
+if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
+    require_once 'functions_schema.php';
+    $schema = getAppSchema();
+    foreach ($schema as $tableName => $def) {
+        syncTable($pdo, $tableName, $def);
+    }
+    @touch($syncCache);
 }
 
 if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';

@@ -26,6 +26,7 @@ interface ServerStats {
   activeUsers: number;
   uptime: string;
   battery: BatteryConfig | null;
+  batteryHistory?: BatteryHistoryPoint[];
 }
 
 interface BatteryConfig {
