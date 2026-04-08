@@ -32,6 +32,8 @@ interface ServerStats {
 interface BatteryConfig {
   voltage: number;
   vReal?: number;
+  vQuimico?: number;
+  thermalThrottling?: boolean;
   minWatts: number;
   maxWatts: number;
   isCharging: boolean;
@@ -143,54 +145,70 @@ export default function AdminServerStats() {
         const now = Date.now();
         const elapsedHours = (now - prev.lastUpdate) / (1000 * 60 * 60);
         
-        // 1. Consumo Dinámico (P_sys)
-        // Base (11W) + (CPU% * 0.25W) + (Disk% * 2W) + 6W (NautaHogar)
-        // Simulamos actividad de disco al 10% para el cliente
-        const pSys = 11 + (stats.cpu * 0.25) + (10 * 0.02) + 6;
-        
-        // 2. Voltaje Real (V_real) con Sag
-        const vBat = prev.voltage;
-        const vReal = vBat - (pSys * 0.012);
-        
-        // 3. Gestión de Potencia
-        const chargerPower = prev.chargePower || 45;
-        let pCharge = 0;
-        const soh = prev.cellHealth / 100;
+        // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
+        const capTotalWh = 250; 
+        const cargadorMaxW = 45;
+        const vMax = 16.8;
+        const vMin = 12.0;
 
-        let newWh = prev.currentWh;
+        // 2. Cálculo de Consumo (P_sys)
+        // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
+        const pSys = 18 + (stats.cpu * 0.25) + (10 * 0.02); // Simulado 10% disco
+        
+        // 3. Lógica de Carga (AC Conectado)
+        let pCharge = 0;
+        let currentCargadorMax = cargadorMaxW;
 
         if (prev.isCharging) {
-          if (pSys < chargerPower) {
-            pCharge = (chargerPower - pSys) * soh;
-            if (vReal > 16.2) {
-              const factor = Math.max(0, (16.8 - vReal) / (16.8 - 16.2));
-              pCharge *= factor;
-            }
+          if (prev.thermalThrottling) {
+            currentCargadorMax = 35;
           }
-          newWh += pCharge * elapsedHours;
-        } else {
-          newWh -= pSys * elapsedHours;
+          pCharge = Math.max(0, currentCargadorMax - pSys);
         }
 
-        // 4. Simulación de Capacidad (4S4P)
-        const deltaWh = (prev.isCharging ? pCharge : -pSys) * elapsedHours;
-        const deltaV = (deltaWh / 10) * 0.001;
-        let nextV = vBat + deltaV;
+        // 4. Curva No Lineal de Voltaje (Actualización de V_quimico)
+        let vQuimico = prev.vQuimico || prev.voltage || 14.8;
+        
+        const netPower = prev.isCharging ? pCharge : -pSys;
+        const deltaWh = netPower * elapsedHours;
+        
+        let newWh = (prev.currentWh || (capTotalWh * 0.5)) + deltaWh;
+        newWh = Math.max(0, Math.min(capTotalWh, newWh));
 
-        if (nextV > 16.8) nextV = 16.8;
-        if (nextV < 10.0) nextV = 10.0;
+        const baseVPerWh = (vMax - vMin) / capTotalWh;
+        let vChange = deltaWh * baseVPerWh;
 
-        // 5. Monitor de Temperatura
+        // Multiplicadores según el rango de V_quimico
+        if (vQuimico >= 14.5 && vQuimico <= 15.5) {
+          vChange *= 0.5; // Efecto Meseta
+        }
+        
+        // Fase CV - Saturación (16.2V a 16.8V)
+        if (prev.isCharging && vQuimico > 16.2) {
+          const cvFactor = Math.max(0, Math.pow((vMax - vQuimico) / (vMax - 16.2), 2));
+          vChange *= cvFactor;
+          pCharge *= cvFactor;
+        }
+
+        vQuimico += vChange;
+        vQuimico = Math.max(vMin, Math.min(vMax, vQuimico));
+
+        // 5. Voltaje de Pantalla (V_display)
+        let vDisplay = vQuimico - (pSys * 0.01);
+        if (prev.isCharging) vDisplay += 0.2;
+
+        // 6. Monitor de Temperatura
         const tempBase = 25;
         const tempLoad = (pSys / 45) * 15;
-        const tempVolt = Math.max(0, (nextV - 14.8) * 5);
+        const tempVolt = Math.max(0, (vQuimico - 14.8) * 5);
         const temp = Math.round(tempBase + tempLoad + tempVolt);
 
         return {
           ...prev,
           currentWh: newWh,
-          voltage: parseFloat(nextV.toFixed(3)),
-          vReal: parseFloat(vReal.toFixed(3)),
+          vQuimico: parseFloat(vQuimico.toFixed(3)),
+          voltage: parseFloat(vDisplay.toFixed(3)),
+          vReal: parseFloat(vQuimico.toFixed(3)),
           lastUpdate: now,
           pSys: parseFloat(pSys.toFixed(2)),
           pCharge: parseFloat(pCharge.toFixed(2)),

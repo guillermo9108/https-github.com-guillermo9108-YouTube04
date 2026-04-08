@@ -815,61 +815,101 @@ function update_battery_simulation($pdo) {
     $now = time();
     $lastUpdate = $battery['lastUpdate'] ?? $now;
     $elapsedSeconds = $now - $lastUpdate;
+    if ($elapsedSeconds <= 0) return null;
     $elapsedHours = $elapsedSeconds / 3600;
     
-    // 1. Obtener métricas reales del sistema
+    // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
+    $capTotalWh = 250; 
+    $cargadorMaxW = 45;
+    $vMax = 16.8;
+    $vMin = 12.0;
+
+    // 2. Cálculo de Consumo (P_sys)
     $load = sys_getloadavg();
-    $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
+    $cpuUsage = $load ? $load[0] * 100 / 4 : 10;
     $diskActivity = rand(0, 100); // Simulado
-
-    // 2. Consumo del Sistema (P_sys) según el nuevo prompt
-    // Base (11W) + (CPU% * 0.25W) + (Disk% * 2W) + 6W (NautaHogar)
-    $pSys = 11 + ($cpuUsage * 0.25) + ($diskActivity * 0.02) + 6;
     
-    // 3. Voltaje Real (V_real) con Sag
-    $vBat = $battery['voltage'] ?? 14.8;
-    $vReal = $vBat - ($pSys * 0.012);
+    // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
+    $pSys = 18 + ($cpuUsage * 0.25) + (($diskActivity / 100) * 2);
     
-    // 4. Gestión de Potencia (Cargador AC 45W)
-    $chargerPower = $battery['chargePower'] ?? 45;
+    // 3. Lógica de Carga (AC Conectado)
+    $isCharging = $battery['isCharging'] ?? false;
+    $highChargeStart = $battery['highChargeStart'] ?? 0;
     $pCharge = 0;
-    $soh = ($battery['cellHealth'] ?? 89) / 100;
 
-    if ($battery['isCharging']) {
-        $battery['lastChargeTime'] = $now;
-        if ($pSys < $chargerPower) {
-            $pCharge = ($chargerPower - $pSys) * $soh;
-            
-            // Fase CV (Constant Voltage)
-            if ($vReal > 16.2) {
-                $factor = max(0, (16.8 - $vReal) / (16.8 - 16.2));
-                $pCharge *= $factor;
+    if ($isCharging) {
+        $currentCargadorMax = $cargadorMaxW;
+        
+        // Thermal Throttling (Simulado)
+        // Si el cargador lleva más de 60 minutos entregando >40W, reduce Cargador_Max_W a 35W
+        if (isset($battery['pCharge']) && $battery['pCharge'] > 40) {
+            if ($highChargeStart == 0) {
+                $highChargeStart = $now;
+                $battery['highChargeStart'] = $now;
+            } else if (($now - $highChargeStart) > 3600) {
+                $currentCargadorMax = 35;
+                $battery['thermalThrottling'] = true;
             }
+        } else {
+            $battery['highChargeStart'] = 0;
+            $battery['thermalThrottling'] = false;
         }
-        $currentWh = ($battery['currentWh'] ?? 0) + ($pCharge * $elapsedHours);
+
+        $pCharge = max(0, $currentCargadorMax - $pSys);
     } else {
-        $currentWh = ($battery['currentWh'] ?? 0) - ($pSys * $elapsedHours);
+        $battery['highChargeStart'] = 0;
+        $battery['thermalThrottling'] = false;
     }
 
-    // 5. Simulación de Capacidad (4S4P)
-    // 0.001V por cada 10Wh transferidos
-    $deltaWh = ($battery['isCharging'] ? $pCharge : -$pSys) * $elapsedHours;
-    $deltaV = ($deltaWh / 10) * 0.001;
-    $vBat += $deltaV;
+    // 4. Curva No Lineal de Voltaje (Actualización de V_quimico)
+    $vQuimico = $battery['vQuimico'] ?? ($battery['voltage'] ?? 14.8);
+    
+    // Tasa de cambio de energía
+    $netPower = $isCharging ? $pCharge : -$pSys;
+    $deltaWh = $netPower * $elapsedHours;
+    
+    $currentWh = ($battery['currentWh'] ?? ($capTotalWh * 0.5)) + $deltaWh;
+    $currentWh = max(0, min($capTotalWh, $currentWh));
 
-    // Límites físicos
-    if ($vBat > 16.8) $vBat = 16.8;
-    if ($vBat < 10.0) $vBat = 10.0;
+    // Tasa estándar de cambio de voltaje (Lineal aproximado: 4.8V / 250Wh = 0.0192 V/Wh)
+    $baseVPerWh = ($vMax - $vMin) / $capTotalWh;
+    $vChange = $deltaWh * $baseVPerWh;
+
+    // Multiplicadores según el rango de V_quimico
+    if ($vQuimico >= 14.5 && $vQuimico <= 15.5) {
+        $vChange *= 0.5; // Efecto Meseta
+    }
+    
+    // Fase CV - Saturación (16.2V a 16.8V)
+    if ($isCharging && $vQuimico > 16.2) {
+        // Reduce P_charge exponencialmente
+        $cvFactor = max(0, pow(($vMax - $vQuimico) / ($vMax - 16.2), 2));
+        $vChange *= $cvFactor;
+        $pCharge *= $cvFactor;
+    }
+
+    $vQuimico += $vChange;
+    $vQuimico = max($vMin, min($vMax, $vQuimico));
+
+    // 5. Voltaje de Pantalla (V_display)
+    // V_display = V_quimico - (P_sys * 0.01V)
+    $vDisplay = $vQuimico - ($pSys * 0.01);
+    
+    // Presión de Carga: +0.2V inmediato
+    if ($isCharging) {
+        $vDisplay += 0.2;
+    }
 
     // 6. Monitor de Temperatura
     $tempBase = 25;
     $tempLoad = ($pSys / 45) * 15;
-    $tempVolt = max(0, ($vBat - 14.8) * 5);
+    $tempVolt = max(0, ($vQuimico - 14.8) * 5);
     $battery['temp'] = round($tempBase + $tempLoad + $tempVolt, 1);
 
     // Actualizar estado
-    $battery['voltage'] = round($vBat, 3);
-    $battery['vReal'] = round($vReal, 3);
+    $battery['vQuimico'] = round($vQuimico, 3);
+    $battery['voltage'] = round($vDisplay, 3); // Lo que se muestra
+    $battery['vReal'] = round($vQuimico, 3); 
     $battery['pSys'] = round($pSys, 2);
     $battery['pCharge'] = round($pCharge, 2);
     $battery['currentWh'] = round($currentWh, 2);
@@ -880,9 +920,9 @@ function update_battery_simulation($pdo) {
         $battery['calibration'] = [
             'status' => 'NORMAL',
             'suggestions' => [
-                "Ciclo Completo: Descarga hasta 11.5V y carga ininterrumpida hasta 16.8V.",
-                "Ajuste de Capacidad: Si el porcentaje salta, ajusta el valor Wh manual en configuración.",
-                "Verificación de Sag: Si el voltaje cae >0.5V al conectar carga, revisa conexiones 4S4P."
+                "Ciclo Completo: Descarga hasta 12.0V y carga ininterrumpida hasta 16.8V.",
+                "Efecto Meseta: Entre 14.5V y 15.5V el voltaje subirá más lento, es normal.",
+                "Fase CV: Al superar 16.2V la carga se ralentiza para proteger las celdas."
             ]
         ];
     }
