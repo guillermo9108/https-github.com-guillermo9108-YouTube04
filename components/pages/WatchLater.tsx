@@ -35,7 +35,7 @@ export default function WatchLater() {
 
     return (
         <div className="pb-24 animate-in fade-in">
-            <div className="flex items-center justify-between mb-4 px-4 pt-4">
+            <div className="flex items-center justify-between mb-4 px-1 pt-4">
                 <div className="flex items-center gap-4">
                     <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400">
                         <ArrowLeft size={24}/>

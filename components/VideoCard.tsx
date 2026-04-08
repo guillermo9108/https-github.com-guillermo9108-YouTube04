@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Video } from '../types';
+import { Video, User } from '../types';
 import { Link } from './Router';
 import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart } from 'lucide-react';
 import { db } from '../services/db';
@@ -59,14 +59,64 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showFullTitle, setShowFullTitle] = useState(false);
   const [currentAlbumIndex, setCurrentAlbumIndex] = useState(0);
+  const [likerName, setLikerName] = useState<string | null>(null);
+  const [sharesCount, setSharesCount] = useState(Number(video.shares || 0));
+  const [followers, setFollowers] = useState<User[]>([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
     const isOwner = user?.id === video.creatorId;
     const canEdit = isAdmin || isOwner;
+
+  // Obtener liker aleatorio
+  useEffect(() => {
+    if (video.likes > 0) {
+        db.getVideoLikers(video.id, user?.id).then(res => {
+            if (res && res.length > 0) {
+                setLikerName(res[0].username);
+            }
+        });
+    }
+  }, [video.id, video.likes, user?.id]);
+
+  // Cargar seguidores para el modal de compartir
+  const loadFollowers = async () => {
+    if (!user) return;
+    setLoadingFollowers(true);
+    try {
+        const res = await db.getUserFollowers(user.id);
+        setFollowers(res);
+    } catch (e) {
+        console.error("Failed to load followers:", e);
+    } finally {
+        setLoadingFollowers(false);
+    }
+  };
+
+  const handleShareToUser = async (targetUsername: string) => {
+    if (!user) return;
+    try {
+        await db.request('action=share_video', { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+                senderId: user.id, 
+                targetUsername, 
+                videoId: video.id 
+            }) 
+        });
+        await db.incrementShare(video.id);
+        setSharesCount(prev => prev + 1);
+        toast.success(`Video compartido con @${targetUsername}`);
+        setShowShareModal(false);
+    } catch (e: any) {
+        toast.error(e.message || "Error al compartir");
+    }
+  };
 
   const isImage = useMemo(() => {
     if (video.category === 'IMAGES' || video.isAlbum) return true;
@@ -188,23 +238,12 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   const handleShare = (e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
-      const url = `${window.location.origin}/#${watchUrl}`;
-      console.log("Sharing URL:", url);
-      if (navigator.share) {
-          navigator.share({ title: video.title, url }).catch((err) => {
-              console.error("Share failed:", err);
-              // Fallback to clipboard if share is cancelled or fails
-              if (navigator.clipboard) {
-                  navigator.clipboard.writeText(url);
-                  toast.success("Enlace copiado");
-              }
-          });
-      } else if (navigator.clipboard) {
-          navigator.clipboard.writeText(url);
-          toast.success("Enlace copiado al portapapeles");
-      } else {
-          toast.info("Copia el enlace: " + url);
+      if (!user) {
+          toast.error("Inicia sesión para compartir");
+          return;
       }
+      setShowShareModal(true);
+      loadFollowers();
       setShowMenu(false);
   };
 
@@ -365,7 +404,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   };
 
   return (
-    <div ref={cardRef} className={`flex flex-col bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden group transition-all duration-300 ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`}>
+    <div ref={cardRef} className={`flex flex-col bg-slate-900/40 border-y border-white/5 overflow-hidden group transition-all duration-300 ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`}>
       {/* Header: User Info */}
       <div className="flex items-center justify-between p-2.5">
         <div className="flex items-center gap-2">
@@ -580,11 +619,19 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 <Heart size={8} className="text-white fill-white" />
                 </div>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium">Yunior Rodríguez y {likeCount} más</span>
+            <span className="text-[11px] text-slate-400 font-medium">
+                {likerName ? (
+                    <>
+                        {likerName} {likeCount > 1 ? `y ${likeCount - 1} más` : ''}
+                    </>
+                ) : (
+                    <>{likeCount} Me gusta</>
+                )}
+            </span>
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
             <span>{video.views} vistas</span>
-            <span>{video.dislikes || 0} compartido</span>
+            <span>{sharesCount} compartido</span>
           </div>
         </div>
         
@@ -637,72 +684,136 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
       {/* Image Modal */}
       {showImageModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
-              <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center animate-in zoom-in duration-300">
-                  <button 
-                      onClick={() => setShowImageModal(false)}
-                      className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
-                  >
-                      <X size={24} />
-                  </button>
+          <div className="fixed inset-0 z-[200] flex flex-col bg-black animate-in fade-in duration-300">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent z-10">
+                  <div className="flex items-center gap-3">
+                      <button onClick={() => setShowImageModal(false)} className="p-2 text-white hover:bg-white/10 rounded-full">
+                          <ChevronLeft size={24} />
+                      </button>
+                      <div className="flex flex-col">
+                          <span className="text-sm font-bold text-white">{video.creatorName}</span>
+                          <span className="text-[10px] text-slate-400">{formatTimeAgo(video.createdAt)}</span>
+                      </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <button onClick={handleDownload} className="p-2 text-white hover:bg-white/10 rounded-full">
+                          <Download size={20} />
+                      </button>
+                      <button onClick={(e) => { e.preventDefault(); setShowImageModal(false); handleShare(e); }} className="p-2 text-white hover:bg-white/10 rounded-full">
+                          <Share2 size={20} />
+                      </button>
+                  </div>
+              </div>
 
+              {/* Content */}
+              <div className="flex-1 relative flex items-center justify-center overflow-hidden">
                   {video.isAlbum && video.albumItems && video.albumItems.length > 1 && (
                       <>
                           <button 
                               onClick={prevAlbumImage}
-                              className="absolute left-4 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-10"
+                              className="absolute left-2 top-1/2 -translate-y-1/2 p-3 bg-black/40 hover:bg-black/60 text-white rounded-full transition-all z-10"
                           >
-                              <ChevronLeft size={32} />
+                              <ChevronLeft size={24} />
                           </button>
                           <button 
                               onClick={nextAlbumImage}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all z-10"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-black/40 hover:bg-black/60 text-white rounded-full transition-all z-10"
                           >
-                              <ChevronRight size={32} />
+                              <ChevronRight size={24} />
                           </button>
-                          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-2">
-                              {video.albumItems.map((_, idx) => (
-                                  <div 
-                                      key={idx} 
-                                      className={`w-2 h-2 rounded-full transition-all ${idx === currentAlbumIndex ? 'bg-indigo-500 w-6' : 'bg-white/20'}`}
-                                  />
-                              ))}
-                          </div>
                       </>
                   )}
 
-                  <div className="w-full h-full rounded-3xl overflow-hidden bg-slate-950 shadow-2xl border border-white/10 relative">
-                      <img 
-                          src={db.getStreamerUrl(video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].id : video.id)} 
-                          alt={video.title} 
-                          className="w-full h-full object-contain max-h-[80vh]" 
-                          referrerPolicy="no-referrer"
-                      />
-                      <div className="p-6 bg-slate-900/80 backdrop-blur-md border-t border-white/5">
-                          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-1">
-                              {video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].title : video.title}
-                          </h3>
-                          <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800">
-                                      {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                                          <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                      ) : (
-                                          <div className="w-full h-full flex items-center justify-center text-xs font-black text-white/20">{video.creatorName?.[0] || '?'}</div>
-                                      )}
-                                  </div>
-                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">@{video.creatorName}</span>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                  <button onClick={handleDownload} className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors">
-                                      <Download size={14} /> Descargar
-                                  </button>
-                                  <button onClick={handleShare} className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-white transition-colors">
-                                      <Share2 size={14} /> Compartir
-                                  </button>
-                              </div>
+                  <img 
+                      src={db.getStreamerUrl(video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].id : video.id)} 
+                      alt={video.title} 
+                      className="max-w-full max-h-full object-contain" 
+                      referrerPolicy="no-referrer"
+                  />
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-gradient-to-t from-black/80 to-transparent">
+                  <p className="text-sm text-white mb-2 line-clamp-2">
+                      {video.isAlbum && video.albumItems ? video.albumItems[currentAlbumIndex].title : video.title}
+                  </p>
+                  <div className="flex items-center gap-4">
+                      <button onClick={handleLike} className={`flex items-center gap-1.5 text-sm ${liked ? 'text-blue-500' : 'text-white'}`}>
+                          <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
+                          <span>{likeCount}</span>
+                      </button>
+                      <Link to={watchUrl} className="flex items-center gap-1.5 text-sm text-white">
+                          <MessageCircle size={18} />
+                          <span>Comentar</span>
+                      </Link>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
+                  <div className="flex items-center justify-between p-4 border-b border-white/5">
+                      <h3 className="text-lg font-bold text-white">Compartir con</h3>
+                      <button onClick={() => setShowShareModal(false)} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/5">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="p-4 max-h-[60vh] overflow-y-auto">
+                      {loadingFollowers ? (
+                          <div className="flex flex-col items-center justify-center py-12 gap-3">
+                              <RefreshCw size={32} className="text-indigo-500 animate-spin" />
+                              <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Cargando seguidores...</span>
                           </div>
-                      </div>
+                      ) : followers.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-2">
+                              {followers.map(follower => (
+                                  <button 
+                                      key={follower.id}
+                                      onClick={() => handleShareToUser(follower.username)}
+                                      className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors group"
+                                  >
+                                      <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border border-white/10">
+                                          {follower.avatarUrl ? (
+                                              <img src={follower.avatarUrl} className="w-full h-full object-cover" alt={follower.username} referrerPolicy="no-referrer" />
+                                          ) : (
+                                              <div className="w-full h-full flex items-center justify-center text-sm font-black text-white/20 uppercase">{follower.username[0]}</div>
+                                          )}
+                                      </div>
+                                      <div className="flex-1 text-left">
+                                          <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">@{follower.username}</div>
+                                          <div className="text-[10px] text-slate-500 font-medium">Seguidor</div>
+                                      </div>
+                                      <div className="p-2 bg-indigo-600/10 text-indigo-400 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                          <Share2 size={16} />
+                                      </div>
+                                  </button>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <UserPlus size={48} className="text-slate-800 mb-4" />
+                              <p className="text-sm font-bold text-slate-400 mb-1">No tienes seguidores aún</p>
+                              <p className="text-[10px] text-slate-500 font-medium">Invita a tus amigos a seguirte para compartir contenido con ellos.</p>
+                          </div>
+                      )}
+                  </div>
+
+                  <div className="p-4 bg-slate-950/50 border-t border-white/5">
+                      <button 
+                        onClick={() => {
+                            const url = `${window.location.origin}/#${watchUrl}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success("Enlace copiado al portapapeles");
+                        }}
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
+                      >
+                          <Layers size={14} /> Copiar enlace del video
+                      </button>
                   </div>
               </div>
           </div>

@@ -81,6 +81,7 @@ export interface Video {
   views: number;
   likes: number;
   dislikes: number;
+  shares: number;
   isLocal?: boolean | number | string;
   is_audio?: boolean | number;
   isAlbum?: boolean;

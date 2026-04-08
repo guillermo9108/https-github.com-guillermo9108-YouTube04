@@ -260,6 +260,18 @@ class DBService {
         return this.request<void>(`action=rate_video`, { method: 'POST', body: JSON.stringify({ videoId, type: 'view' }) });
     }
 
+    public async incrementShare(videoId: string): Promise<void> {
+        return this.request<void>(`action=increment_share&id=${videoId}`);
+    }
+
+    public async getVideoLikers(videoId: string, userId?: string): Promise<{username: string, avatarUrl: string}[]> {
+        return this.request<{username: string, avatarUrl: string}[]>(`action=get_video_likers&videoId=${videoId}${userId ? `&userId=${userId}` : ''}`);
+    }
+
+    public async getUserFollowers(userId: string): Promise<User[]> {
+        return this.request<User[]>(`action=get_user_followers&userId=${userId}`);
+    }
+
     public async rateVideo(userId: string, videoId: string, type: 'like' | 'dislike'): Promise<UserInteraction> {
         return this.request<UserInteraction>(`action=rate_video`, { method: 'POST', body: JSON.stringify({ userId, videoId, type }) });
     }

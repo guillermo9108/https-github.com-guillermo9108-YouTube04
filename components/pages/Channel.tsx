@@ -222,7 +222,7 @@ export default function Channel() {
        </div>
 
        {/* Channel Header Info */}
-       <div className="relative z-10 px-4 pt-20 flex flex-col items-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="relative z-10 px-1 pt-20 flex flex-col items-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
            {/* Avatar */}
            <div className="w-32 h-32 rounded-full border-4 border-black bg-slate-800 overflow-hidden shrink-0 shadow-2xl mb-4">
                {channelUser.avatarUrl ? (
@@ -261,7 +261,7 @@ export default function Channel() {
        </div>
 
         {/* Filters Section */}
-        <div className="px-4 mb-8 relative z-10">
+        <div className="px-1 mb-8 relative z-10">
             <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
                 {[
                     { id: 'ALL', label: 'Todo', icon: Layers },
@@ -305,7 +305,7 @@ export default function Channel() {
 
         {/* Videos Grid */}
         <div className="relative z-10">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 px-4">Contenido</h2>
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-slate-800 pb-2 px-1">Contenido</h2>
             {filteredContent.length === 0 ? (
                 <div className="text-center py-20 text-slate-500">Este canal no tiene contenido disponible con este filtro.</div>
             ) : (

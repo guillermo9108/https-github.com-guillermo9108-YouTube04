@@ -508,8 +508,8 @@ export default function Home() {
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
 
             <div className={`fixed top-0 left-0 right-0 z-[60] transition-transform duration-500 ease-in-out transform ${navVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="relative z-20 backdrop-blur-2xl bg-black/40 border-b border-white/5 pt-4 pb-2 px-4 md:px-8 shadow-xl">
-                    <div className="flex gap-3 items-center max-w-7xl mx-auto">
+                <div className="relative z-20 backdrop-blur-2xl bg-black/40 border-b border-white/5 pt-4 pb-2 px-1 shadow-xl">
+                    <div className="flex gap-3 items-center max-w-7xl mx-auto px-2">
                         <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white active:scale-95 transition-transform shrink-0"><Menu size={20}/></button>
                         
                         <form className="relative flex-1 min-w-0" ref={searchContainerRef} onSubmit={handleSearchSubmit}>
@@ -643,7 +643,7 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="pt-44">
+            <div className="pt-44 px-0">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
                 ) : (

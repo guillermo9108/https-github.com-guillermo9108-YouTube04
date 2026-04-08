@@ -36,6 +36,7 @@ function getAppSchema() {
                 'createdAt' => 'BIGINT',
                 'likes' => 'INT DEFAULT 0',
                 'dislikes' => 'INT DEFAULT 0',
+                'shares' => 'INT DEFAULT 0',
                 'category' => "VARCHAR(100) DEFAULT 'GENERAL'",
                 'parent_category' => "VARCHAR(100) DEFAULT NULL",
                 'collection' => "VARCHAR(100) DEFAULT NULL",

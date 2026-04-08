@@ -767,6 +767,12 @@ function video_organize_single($pdo, $id, $settings) {
     }
 }
 
+function video_increment_share($pdo, $videoId) {
+    $stmt = $pdo->prepare("UPDATE videos SET shares = shares + 1 WHERE id = ?");
+    $stmt->execute([$videoId]);
+    respond(true);
+}
+
 function smartParseFilename($path, $currentCategory, $categories) {
     $title = pathinfo($path, PATHINFO_FILENAME);
     $dir = dirname($path);

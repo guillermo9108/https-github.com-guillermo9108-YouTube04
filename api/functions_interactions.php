@@ -255,6 +255,32 @@ function interact_share_video($pdo, $input) {
     respond(true);
 }
 
+function interact_get_video_likers($pdo, $videoId, $userId = null) {
+    if ($userId) {
+        // Primero intentar obtener alguien a quien el usuario sigue
+        $stmt = $pdo->prepare("SELECT u.username, u.avatarUrl FROM interactions i JOIN users u ON i.userId = u.id JOIN subscriptions s ON s.creatorId = u.id WHERE i.videoId = ? AND i.liked = 1 AND s.subscriberId = ? ORDER BY RAND() LIMIT 1");
+        $stmt->execute([$videoId, $userId]);
+        $followedLiker = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($followedLiker) {
+            respond(true, [$followedLiker]);
+            return;
+        }
+    }
+    
+    // Si no hay seguidos o no se pasó userId, obtener cualquier liker aleatorio
+    $stmt = $pdo->prepare("SELECT u.username, u.avatarUrl FROM interactions i JOIN users u ON i.userId = u.id WHERE i.videoId = ? AND i.liked = 1 ORDER BY RAND() LIMIT 1");
+    $stmt->execute([$videoId]);
+    $anyLiker = $stmt->fetch(PDO::FETCH_ASSOC);
+    respond(true, $anyLiker ? [$anyLiker] : []);
+}
+
+function interact_get_user_followers($pdo, $userId) {
+    $stmt = $pdo->prepare("SELECT u.id, u.username, u.avatarUrl FROM subscriptions s JOIN users u ON s.subscriberId = u.id WHERE s.creatorId = ?");
+    $stmt->execute([$userId]);
+    respond(true, $stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+
 function interact_transfer_balance($pdo, $input) {
     $sid = $input['userId']; $term = $input['targetUsername']; $amt = floatval($input['amount']); $pdo->beginTransaction();
     try {
