@@ -508,8 +508,8 @@ export default function Home() {
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
 
             <div className={`fixed top-0 left-0 right-0 z-[60] transition-transform duration-500 ease-in-out transform ${navVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="relative z-20 backdrop-blur-2xl bg-black/40 border-b border-white/5 pt-4 pb-2 px-1 shadow-xl">
-                    <div className="flex gap-3 items-center max-w-7xl mx-auto px-2">
+                <div className="relative z-20 backdrop-blur-2xl bg-black/40 border-b border-white/5 pt-4 pb-2 px-0 shadow-xl">
+                    <div className="flex gap-3 items-center w-full px-2">
                         <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white active:scale-95 transition-transform shrink-0"><Menu size={20}/></button>
                         
                         <form className="relative flex-1 min-w-0" ref={searchContainerRef} onSubmit={handleSearchSubmit}>
@@ -597,9 +597,9 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="relative z-10 backdrop-blur-xl bg-black/20 border-b border-white/5 pb-2 px-2 shadow-sm">
+                <div className="relative z-10 backdrop-blur-xl bg-black/20 border-b border-white/5 pb-2 px-0 shadow-sm">
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 w-full">
+                        <div className="flex items-center gap-2 w-full px-2">
                             <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
                                 <button onClick={() => { handleNavigate(-1); updateUrl({ q: '', folder: [], cat: 'TODOS' }); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
                                 <button onClick={() => setIsFolderModalOpen(true)} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Explorar carpetas"><Folder size={16}/></button>
@@ -630,7 +630,7 @@ export default function Home() {
                             </div>
                         </div>
                         {!searchQuery && (
-                            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 animate-in fade-in duration-300">
+                            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 px-2 animate-in fade-in duration-300">
                                 {parentFolderName && <div className="flex items-center gap-1 text-indigo-400 font-black text-[10px] uppercase tracking-tighter shrink-0 border-r border-white/10 pr-3"><Folder size={12}/> {parentFolderName}</div>}
                                 <div className="flex gap-2">
                                     {activeCategories.map(cat => (
@@ -649,8 +649,8 @@ export default function Home() {
                 ) : (
                     <div className="space-y-12 animate-in fade-in duration-1000">
                         {folders.length > 0 && !isFolderGridCollapsed && (
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 px-1"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em]">{searchQuery ? 'Carpetas coincidentes' : 'Explorar Carpetas'}</h2></div>
+                            <div className="space-y-6 px-1">
+                                <div className="flex items-center gap-3 px-0"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em]">{searchQuery ? 'Carpetas coincidentes' : 'Explorar Carpetas'}</h2></div>
                                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-6 duration-500">
                                     {folders.map(folder => (
                                         <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
@@ -681,12 +681,12 @@ export default function Home() {
                         )}
 
                         <div className="space-y-8">
-                            {!searchQuery && ( <div className="flex items-center gap-3 px-1"><div className={`w-1.5 h-1.5 rounded-full ${mediaFilter === 'AUDIO' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-4">{selectedCategory !== 'TODOS' ? `Filtrando por: ${selectedCategory}` : (parentFolderName ? `Contenido en ${parentFolderName}` : 'Novedades')}{mediaFilter !== 'ALL' && <span className="text-slate-500 text-[9px] lowercase italic">({mediaFilter.toLowerCase()}s)</span>}{userSortOrder && <span className="text-indigo-400 text-[9px] lowercase border border-indigo-500/30 px-2 py-0.5 rounded-full">orden: {sortOptions.find(o => o.id === userSortOrder)?.label.toLowerCase()}</span>}<span className="w-12 h-px bg-white/10"></span></h2></div> )}
+                            {!searchQuery && ( <div className="flex items-center gap-3 px-3"><div className={`w-1.5 h-1.5 rounded-full ${mediaFilter === 'AUDIO' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-2 flex-wrap">{selectedCategory !== 'TODOS' ? `Filtrando por: ${selectedCategory}` : (parentFolderName ? `Contenido en ${parentFolderName}` : 'Novedades')}{mediaFilter !== 'ALL' && <span className="text-slate-500 text-[9px] lowercase italic">({mediaFilter.toLowerCase()}s)</span>}{userSortOrder && <span className="text-indigo-400 text-[9px] lowercase border border-indigo-500/30 px-2 py-0.5 rounded-full whitespace-nowrap">orden: {sortOptions.find(o => o.id === userSortOrder)?.label.toLowerCase()}</span>}<span className="flex-1 h-px bg-white/10 min-w-[20px]"></span></h2></div> )}
                             {searchQuery && ( 
-                                <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center justify-between px-3">
                                     <div className="flex items-center gap-3">
                                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-                                        <h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-4">
+                                        <h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-2 flex-wrap">
                                             Resultados para: {searchQuery}
                                             <span className="w-12 h-px bg-white/10"></span>
                                         </h2>
@@ -706,7 +706,7 @@ export default function Home() {
                                 </div> 
                             )}
                             {videos.length > 0 ? ( 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 sm:gap-1">
                                     {processedVideos.map(v => ( 
                                         <VideoCard 
                                             key={v.id} 

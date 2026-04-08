@@ -31,6 +31,7 @@ interface ServerStats {
 
 interface BatteryConfig {
   voltage: number;
+  vReal?: number;
   minWatts: number;
   maxWatts: number;
   isCharging: boolean;
@@ -42,14 +43,21 @@ interface BatteryConfig {
   cellsParallel: number;
   cellCapacityMah: number;
   pSys?: number;
+  pCharge?: number;
+  temp?: number;
   lastChargeTime?: number;
+  calibration?: {
+    status: string;
+    suggestions: string[];
+  };
 }
 
 interface BatteryHistoryPoint {
   t: number;
   v: number;
   c: number;
-  cpu: number;
+  p?: number;
+  temp?: number;
 }
 
 export default function AdminServerStats() {
@@ -136,56 +144,57 @@ export default function AdminServerStats() {
         const elapsedHours = (now - prev.lastUpdate) / (1000 * 60 * 60);
         
         // 1. Consumo Dinámico (P_sys)
-        const pSys = prev.minWatts + (prev.maxWatts - prev.minWatts) * (stats.cpu / 100);
+        // Base (11W) + (CPU% * 0.25W) + (Disk% * 2W) + 6W (NautaHogar)
+        // Simulamos actividad de disco al 10% para el cliente
+        const pSys = 11 + (stats.cpu * 0.25) + (10 * 0.02) + 6;
         
-        // 2. Capacidad Total (Wh)
+        // 2. Voltaje Real (V_real) con Sag
+        const vBat = prev.voltage;
+        const vReal = vBat - (pSys * 0.012);
+        
+        // 3. Gestión de Potencia
+        const chargerPower = prev.chargePower || 45;
+        let pCharge = 0;
         const soh = prev.cellHealth / 100;
-        const nominalVoltage = prev.cellsSeries * 3.7;
-        const totalAh = (prev.cellCapacityMah * prev.cellsParallel) / 1000;
-        const maxWh = nominalVoltage * totalAh * soh;
-        
+
         let newWh = prev.currentWh;
-        let v = prev.voltage;
 
         if (prev.isCharging) {
-          // AC Conectado
-          const chargerLimit = prev.chargePower || 45;
-          const pDisp = chargerLimit - pSys;
-          const pChargeMax = chargerLimit * soh;
-          
-          let pReal = 0;
-          if (v < 16.0) {
-            pReal = Math.min(pDisp, pChargeMax);
-          } else if (v < 16.8) {
-            const factor = (16.8 - v) / (16.8 - 16.0);
-            pReal = Math.min(pDisp, pChargeMax) * factor;
+          if (pSys < chargerPower) {
+            pCharge = (chargerPower - pSys) * soh;
+            if (vReal > 16.2) {
+              const factor = Math.max(0, (16.8 - vReal) / (16.8 - 16.2));
+              pCharge *= factor;
+            }
           }
-          
-          newWh += pReal * elapsedHours;
+          newWh += pCharge * elapsedHours;
         } else {
-          // Descarga
           newWh -= pSys * elapsedHours;
         }
 
-        if (newWh > maxWh) newWh = maxWh;
-        if (newWh < 0) newWh = 0;
+        // 4. Simulación de Capacidad (4S4P)
+        const deltaWh = (prev.isCharging ? pCharge : -pSys) * elapsedHours;
+        const deltaV = (deltaWh / 10) * 0.001;
+        let nextV = vBat + deltaV;
 
-        // 4. Actualización de Voltaje (V)
-        const percentage = (newWh / maxWh) * 100;
-        let newVoltage = 12 + (4.8 * (percentage / 100));
+        if (nextV > 16.8) nextV = 16.8;
+        if (nextV < 10.0) nextV = 10.0;
 
-        // Simular Caída de Voltaje (Sag)
-        if (!prev.isCharging) {
-          const sag = (1 - soh) * (pSys / 50);
-          newVoltage -= sag;
-        }
+        // 5. Monitor de Temperatura
+        const tempBase = 25;
+        const tempLoad = (pSys / 45) * 15;
+        const tempVolt = Math.max(0, (nextV - 14.8) * 5);
+        const temp = Math.round(tempBase + tempLoad + tempVolt);
 
         return {
           ...prev,
           currentWh: newWh,
-          voltage: parseFloat(newVoltage.toFixed(2)),
+          voltage: parseFloat(nextV.toFixed(3)),
+          vReal: parseFloat(vReal.toFixed(3)),
           lastUpdate: now,
-          pSys: parseFloat(pSys.toFixed(2))
+          pSys: parseFloat(pSys.toFixed(2)),
+          pCharge: parseFloat(pCharge.toFixed(2)),
+          temp
         };
       });
     }, 1000);
@@ -244,12 +253,33 @@ export default function AdminServerStats() {
 
     const diff = dropRate / simDropRate;
     
+    let suggestion = "";
+    let options: string[] = [];
+
+    if (diff > 1.1) {
+      suggestion = "La batería se descarga más rápido de lo esperado.";
+      options = [
+        "Aumentar 'Consumo Máximo' a " + Math.round(battery.maxWatts * diff) + "W",
+        "Reducir 'Salud de Celdas' al " + Math.round(battery.cellHealth / diff) + "%",
+        "Verificar si hay fugas de corriente en el Inversor (Idle > 11W)"
+      ];
+    } else if (diff < 0.9) {
+      suggestion = "La batería dura más de lo que el simulador calcula.";
+      options = [
+        "Reducir 'Consumo Mínimo' a " + Math.round(battery.minWatts * diff) + "W",
+        "Aumentar 'Salud de Celdas' (Máximo 100%)",
+        "Ajustar 'Capacidad Celda' a un valor superior"
+      ];
+    } else {
+      suggestion = "El simulador tiene una precisión excelente (±10%).";
+      options = ["No se requieren cambios críticos en los ajustes actuales."];
+    }
+    
     setCalibResult({
       observedRate: dropRate.toFixed(3),
       simulatedRate: simDropRate.toFixed(3),
-      suggestion: diff > 1.1 ? "Aumentar Rango de Consumo (W) o reducir Salud de Celdas (%)" : 
-                  diff < 0.9 ? "Reducir Rango de Consumo (W) o aumentar Salud de Celdas (%)" : 
-                  "El simulador está bien calibrado",
+      suggestion,
+      options,
       factor: diff.toFixed(2)
     });
   };
@@ -392,21 +422,19 @@ export default function AdminServerStats() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-white/5 p-4 rounded-xl text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Voltaje</div>
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Voltaje (Bat)</div>
                 <div className="text-xl font-black text-white">{battery.voltage}V</div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
-                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Última Carga</div>
-                <div className="text-xl font-black text-white">
-                  {battery.lastChargeTime ? (() => {
-                    const diff = Math.floor((Date.now() - battery.lastChargeTime) / 60000);
-                    if (diff < 60) return `${diff}m`;
-                    const h = Math.floor(diff / 60);
-                    const m = diff % 60;
-                    return `${h}h ${m}m`;
-                  })() : '---'}
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Voltaje (Real)</div>
+                <div className="text-xl font-black text-indigo-400">{battery.vReal || battery.voltage}V</div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-xl text-center">
+                <div className="text-xs text-slate-400 font-bold uppercase mb-1">Temperatura</div>
+                <div className={`text-xl font-black ${battery.temp && battery.temp > 45 ? 'text-red-500' : 'text-white'}`}>
+                  {battery.temp || 25}°C
                 </div>
               </div>
               <div className="bg-white/5 p-4 rounded-xl text-center">
@@ -538,20 +566,47 @@ export default function AdminServerStats() {
                     </button>
 
                     {calibResult && (
-                      <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">Tasa Real vs Sim</span>
-                          <span className="text-xs font-mono text-white">{calibResult.observedRate}V/h vs {calibResult.simulatedRate}V/h</span>
+                      <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">Tasa Real vs Sim</span>
+                            <span className="text-xs font-mono text-white">{calibResult.observedRate}V/h vs {calibResult.simulatedRate}V/h</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">Desviación</span>
+                            <span className={`text-xs font-bold ${Math.abs(1 - calibResult.factor) > 0.1 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                              {Math.round(calibResult.factor * 100)}%
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">Desviación</span>
-                          <span className={`text-xs font-bold ${Math.abs(1 - calibResult.factor) > 0.1 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                            {Math.round(calibResult.factor * 100)}%
-                          </span>
-                        </div>
+
                         <div className="pt-2 border-t border-white/5">
-                          <div className="text-[10px] text-indigo-400 uppercase font-black mb-1">Sugerencia:</div>
-                          <p className="text-xs text-white leading-relaxed">{calibResult.suggestion}</p>
+                          <div className="text-[10px] text-indigo-400 uppercase font-black mb-1">Sugerencia de Calibración:</div>
+                          <p className="text-xs text-white leading-relaxed mb-2">{calibResult.suggestion}</p>
+                          
+                          <div className="space-y-2 mb-4">
+                            <div className="text-[10px] text-amber-400 uppercase font-black mb-1">Ajustes Recomendados:</div>
+                            <ul className="space-y-1">
+                              {calibResult.options.map((opt: string, i: number) => (
+                                <li key={i} className="text-[10px] text-slate-300 flex gap-2">
+                                  <span className="text-amber-500">→</span> {opt}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          
+                          {battery.calibration && (
+                            <div className="space-y-2">
+                              <div className="text-[10px] text-emerald-400 uppercase font-black mb-1">Guía de Calibración 4S4P:</div>
+                              <ul className="space-y-1">
+                                {battery.calibration.suggestions.map((s, i) => (
+                                  <li key={i} className="text-[10px] text-slate-300 flex gap-2">
+                                    <span className="text-indigo-500">•</span> {s}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

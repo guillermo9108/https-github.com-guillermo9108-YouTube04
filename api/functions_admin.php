@@ -814,77 +814,95 @@ function update_battery_simulation($pdo) {
 
     $now = time();
     $lastUpdate = $battery['lastUpdate'] ?? $now;
-    $elapsedHours = ($now - $lastUpdate) / 3600;
+    $elapsedSeconds = $now - $lastUpdate;
+    $elapsedHours = $elapsedSeconds / 3600;
     
-    if ($elapsedHours > 0) {
-        $load = sys_getloadavg();
-        $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
-        
-        // 1. Consumo Dinámico (P_sys)
-        $minWatts = $battery['minWatts'] ?? 200;
-        $maxWatts = $battery['maxWatts'] ?? 300;
-        $pSys = $minWatts + ($maxWatts - $minWatts) * ($cpuUsage / 100);
-        
-        // 2. Capacidad Total (Wh)
-        $cellsSeries = $battery['cellsSeries'] ?? 4;
-        $cellsParallel = $battery['cellsParallel'] ?? 4;
-        $cellMah = $battery['cellCapacityMah'] ?? 5000;
-        $soh = ($battery['cellHealth'] ?? 89) / 100;
-        
-        $nominalVoltage = $cellsSeries * 3.7;
-        $totalAh = ($cellMah * $cellsParallel) / 1000;
-        $maxWh = $nominalVoltage * $totalAh * $soh;
-        
-        $currentWh = $battery['currentWh'] ?? ($maxWh * 0.5);
-        $v = $battery['voltage'] ?? 14.8;
-        
-        if ($battery['isCharging']) {
-            $battery['lastChargeTime'] = $now;
-            // AC Conectado
-            $chargerLimit = $battery['chargePower'] ?? 45;
-            $pDisp = $chargerLimit - $pSys;
-            $pChargeMax = $chargerLimit * $soh;
-            
-            $pReal = 0;
-            if ($v < 16.0) {
-                $pReal = min($pDisp, $pChargeMax);
-            } elseif ($v < 16.8) {
-                $factor = (16.8 - $v) / (16.8 - 16.0);
-                $pReal = min($pDisp, $pChargeMax) * $factor;
-            }
-            
-            $currentWh += $pReal * $elapsedHours;
-        } else {
-            // Descarga
-            $currentWh -= $pSys * $elapsedHours;
-        }
-        
-        if ($currentWh > $maxWh) $currentWh = $maxWh;
-        if ($currentWh < 0) $currentWh = 0;
-        
-        $percentage = ($currentWh / $maxWh) * 100;
-        $newVoltage = 12 + (4.8 * ($percentage / 100));
-        
-        if (!$battery['isCharging']) {
-            $sag = (1 - $soh) * ($pSys / 50);
-            $newVoltage -= $sag;
-        }
-        
-        $battery['currentWh'] = $currentWh;
-        $battery['voltage'] = round($newVoltage, 2);
-        $battery['lastUpdate'] = $now;
-        $battery['pSys'] = round($pSys, 2);
-        
-        // Update History (every 5 mins or if significant change)
-        $lastHistory = end($history);
-        if (!$lastHistory || ($now - $lastHistory['t']) >= 300) {
-            $history[] = ['t' => $now, 'v' => $battery['voltage'], 'c' => $battery['isCharging'] ? 1 : 0, 'cpu' => $cpuUsage];
-            if (count($history) > 288) array_shift($history); // Keep 24h at 5min intervals
-        }
+    // 1. Obtener métricas reales del sistema
+    $load = sys_getloadavg();
+    $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : 10;
+    $diskActivity = rand(0, 100); // Simulado
 
-        $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")
-            ->execute([json_encode($battery), json_encode($history)]);
+    // 2. Consumo del Sistema (P_sys) según el nuevo prompt
+    // Base (11W) + (CPU% * 0.25W) + (Disk% * 2W) + 6W (NautaHogar)
+    $pSys = 11 + ($cpuUsage * 0.25) + ($diskActivity * 0.02) + 6;
+    
+    // 3. Voltaje Real (V_real) con Sag
+    $vBat = $battery['voltage'] ?? 14.8;
+    $vReal = $vBat - ($pSys * 0.012);
+    
+    // 4. Gestión de Potencia (Cargador AC 45W)
+    $chargerPower = $battery['chargePower'] ?? 45;
+    $pCharge = 0;
+    $soh = ($battery['cellHealth'] ?? 89) / 100;
+
+    if ($battery['isCharging']) {
+        $battery['lastChargeTime'] = $now;
+        if ($pSys < $chargerPower) {
+            $pCharge = ($chargerPower - $pSys) * $soh;
+            
+            // Fase CV (Constant Voltage)
+            if ($vReal > 16.2) {
+                $factor = max(0, (16.8 - $vReal) / (16.8 - 16.2));
+                $pCharge *= $factor;
+            }
+        }
+        $currentWh = ($battery['currentWh'] ?? 0) + ($pCharge * $elapsedHours);
+    } else {
+        $currentWh = ($battery['currentWh'] ?? 0) - ($pSys * $elapsedHours);
     }
+
+    // 5. Simulación de Capacidad (4S4P)
+    // 0.001V por cada 10Wh transferidos
+    $deltaWh = ($battery['isCharging'] ? $pCharge : -$pSys) * $elapsedHours;
+    $deltaV = ($deltaWh / 10) * 0.001;
+    $vBat += $deltaV;
+
+    // Límites físicos
+    if ($vBat > 16.8) $vBat = 16.8;
+    if ($vBat < 10.0) $vBat = 10.0;
+
+    // 6. Monitor de Temperatura
+    $tempBase = 25;
+    $tempLoad = ($pSys / 45) * 15;
+    $tempVolt = max(0, ($vBat - 14.8) * 5);
+    $battery['temp'] = round($tempBase + $tempLoad + $tempVolt, 1);
+
+    // Actualizar estado
+    $battery['voltage'] = round($vBat, 3);
+    $battery['vReal'] = round($vReal, 3);
+    $battery['pSys'] = round($pSys, 2);
+    $battery['pCharge'] = round($pCharge, 2);
+    $battery['currentWh'] = round($currentWh, 2);
+    $battery['lastUpdate'] = $now;
+
+    // Sugerencias de Calibración
+    if (!isset($battery['calibration'])) {
+        $battery['calibration'] = [
+            'status' => 'NORMAL',
+            'suggestions' => [
+                "Ciclo Completo: Descarga hasta 11.5V y carga ininterrumpida hasta 16.8V.",
+                "Ajuste de Capacidad: Si el porcentaje salta, ajusta el valor Wh manual en configuración.",
+                "Verificación de Sag: Si el voltaje cae >0.5V al conectar carga, revisa conexiones 4S4P."
+            ]
+        ];
+    }
+
+    // Update History
+    $lastHistory = end($history);
+    if (!$lastHistory || ($now - $lastHistory['t']) >= 300) {
+        $history[] = [
+            't' => $now, 
+            'v' => $battery['voltage'], 
+            'c' => $battery['isCharging'] ? 1 : 0, 
+            'p' => $battery['pSys'],
+            'temp' => $battery['temp']
+        ];
+        if (count($history) > 288) array_shift($history);
+    }
+
+    $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")
+        ->execute([json_encode($battery), json_encode($history)]);
+
     return $battery;
 }
 
