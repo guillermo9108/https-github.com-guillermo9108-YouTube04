@@ -94,6 +94,13 @@ require_once 'functions_market.php';
 require_once 'functions_admin.php';
 require_once 'functions_portability.php';
 require_once 'functions_analytics.php';
+require_once 'functions_schema.php';
+
+// Sincronizar esquema automáticamente para asegurar que existan las nuevas columnas
+$schema = getAppSchema();
+foreach ($schema as $tableName => $def) {
+    syncTable($pdo, $tableName, $def);
+}
 
 if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';
 if (file_exists('functions_payment.php')) require_once 'functions_payment.php';

@@ -241,7 +241,8 @@ function getAppSchema() {
                 'vapidPublicKey' => 'TEXT DEFAULT NULL',
                 'vapidPrivateKey' => 'TEXT DEFAULT NULL',
                 'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'",
-                'batteryConfig' => 'JSON DEFAULT NULL'
+                'batteryConfig' => 'JSON DEFAULT NULL',
+                'batteryHistory' => 'JSON DEFAULT NULL'
             ]
         ],
         'transactions' => [

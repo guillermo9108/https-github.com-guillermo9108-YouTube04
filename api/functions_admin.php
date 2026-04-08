@@ -14,8 +14,8 @@ function admin_get_settings($pdo) {
         $res['ftpSettings'] = json_decode($res['ftpSettings'] ?: '[]', true);
         $res['vipPlans'] = json_decode($res['vipPlans'] ?: '[]', true);
         $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
-        $res['batteryConfig'] = json_decode($res['batteryConfig'] ?: 'null', true);
-        $res['batteryHistory'] = json_decode($res['batteryHistory'] ?: '[]', true);
+        $res['batteryConfig'] = json_decode($res['batteryConfig'] ?? 'null', true);
+        $res['batteryHistory'] = json_decode($res['batteryHistory'] ?? '[]', true);
     } else {
         $res = [
             'categories' => [],
