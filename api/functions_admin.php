@@ -812,16 +812,41 @@ function update_battery_simulation($pdo) {
     
     if (!$battery) return null;
 
-    $now = time();
+    $now = floor(microtime(true) * 1000);
     $lastUpdate = $battery['lastUpdate'] ?? $now;
-    $elapsedSeconds = $now - $lastUpdate;
+    
+    // Convertir de segundos a milisegundos si es necesario (migración)
+    if ($lastUpdate < 10000000000) {
+        $lastUpdate *= 1000;
+    }
+    
+    $elapsedMs = $now - $lastUpdate;
+    $elapsedSeconds = $elapsedMs / 1000;
+
     if ($elapsedSeconds <= 0) {
         return [
             'config' => $battery,
             'history' => $history
         ];
     }
+
+    // Si el salto es mayor a 5 minutos, probablemente el sistema estuvo apagado.
+    // En ese caso, asumimos que el consumo del sistema (pSys) fue 0 durante el tiempo de apagado.
+    $isOutage = $elapsedSeconds > 300;
     $elapsedHours = $elapsedSeconds / 3600;
+
+    if ($isOutage) {
+        // Si no estaba cargando, asumimos que se agotó la batería y se apagó forzosamente
+        if (!($battery['isCharging'] ?? false)) {
+            $battery['currentWh'] = 0;
+            $battery['vQuimico'] = 12.0; // Voltaje mínimo
+        }
+        // Al encenderse de nuevo, asumimos que hay corriente y está cargando
+        $battery['isCharging'] = true;
+        
+        // No calculamos cambios de energía durante el tiempo que estuvo apagado (ya lo forzamos a 0 si aplica)
+        $elapsedHours = 0;
+    }
     
     // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
     $capTotalWh = 250; 
@@ -837,21 +862,29 @@ function update_battery_simulation($pdo) {
     // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
     $pSys = 18 + ($cpuUsage * 0.25) + (($diskActivity / 100) * 2);
     
+    // Si detectamos un apagón, el consumo real durante ese tiempo fue 0 (solo queda el inversor si es externo, pero asumimos 0 para el laptop)
+    $effectivePSys = $isOutage ? 0 : $pSys;
+
     // 3. Lógica de Carga (AC Conectado)
     $isCharging = $battery['isCharging'] ?? false;
     $highChargeStart = $battery['highChargeStart'] ?? 0;
+    
+    // Migración de highChargeStart
+    if ($highChargeStart > 0 && $highChargeStart < 10000000000) {
+        $highChargeStart *= 1000;
+    }
+
     $pCharge = 0;
 
     if ($isCharging) {
         $currentCargadorMax = $cargadorMaxW;
         
         // Thermal Throttling (Simulado)
-        // Si el cargador lleva más de 60 minutos entregando >40W, reduce Cargador_Max_W a 35W
         if (isset($battery['pCharge']) && $battery['pCharge'] > 40) {
             if ($highChargeStart == 0) {
                 $highChargeStart = $now;
                 $battery['highChargeStart'] = $now;
-            } else if (($now - $highChargeStart) > 3600) {
+            } else if (($now - $highChargeStart) > 3600000) { // 1 hora en ms
                 $currentCargadorMax = 35;
                 $battery['thermalThrottling'] = true;
             }
@@ -860,7 +893,7 @@ function update_battery_simulation($pdo) {
             $battery['thermalThrottling'] = false;
         }
 
-        $pCharge = max(0, $currentCargadorMax - $pSys);
+        $pCharge = max(0, $currentCargadorMax - $effectivePSys);
     } else {
         $battery['highChargeStart'] = 0;
         $battery['thermalThrottling'] = false;
@@ -870,13 +903,13 @@ function update_battery_simulation($pdo) {
     $vQuimico = $battery['vQuimico'] ?? ($battery['voltage'] ?? 14.8);
     
     // Tasa de cambio de energía
-    $netPower = $isCharging ? $pCharge : -$pSys;
+    $netPower = $isCharging ? $pCharge : -$effectivePSys;
     $deltaWh = $netPower * $elapsedHours;
     
     $currentWh = ($battery['currentWh'] ?? ($capTotalWh * 0.5)) + $deltaWh;
     $currentWh = max(0, min($capTotalWh, $currentWh));
 
-    // Tasa estándar de cambio de voltaje (Lineal aproximado: 4.8V / 250Wh = 0.0192 V/Wh)
+    // Tasa estándar de cambio de voltaje
     $baseVPerWh = ($vMax - $vMin) / $capTotalWh;
     $vChange = $deltaWh * $baseVPerWh;
 
@@ -887,7 +920,6 @@ function update_battery_simulation($pdo) {
     
     // Fase CV - Saturación (16.2V a 16.8V)
     if ($isCharging && $vQuimico > 16.2) {
-        // Reduce P_charge exponencialmente
         $cvFactor = max(0, pow(($vMax - $vQuimico) / ($vMax - 16.2), 2));
         $vChange *= $cvFactor;
         $pCharge *= $cvFactor;
@@ -897,10 +929,8 @@ function update_battery_simulation($pdo) {
     $vQuimico = max($vMin, min($vMax, $vQuimico));
 
     // 5. Voltaje de Pantalla (V_display)
-    // V_display = V_quimico - (P_sys * 0.01V)
     $vDisplay = $vQuimico - ($pSys * 0.01);
     
-    // Presión de Carga: +0.2V inmediato
     if ($isCharging) {
         $vDisplay += 0.2;
     }
@@ -913,7 +943,7 @@ function update_battery_simulation($pdo) {
 
     // Actualizar estado
     $battery['vQuimico'] = round($vQuimico, 3);
-    $battery['voltage'] = round($vDisplay, 3); // Lo que se muestra
+    $battery['voltage'] = round($vDisplay, 3);
     $battery['vReal'] = round($vQuimico, 3); 
     $battery['pSys'] = round($pSys, 2);
     $battery['pCharge'] = round($pCharge, 2);
@@ -932,14 +962,21 @@ function update_battery_simulation($pdo) {
         ];
     }
 
-    // Update History
+    // Migración de historial a milisegundos
+    foreach ($history as &$point) {
+        if (isset($point['t']) && $point['t'] < 10000000000) {
+            $point['t'] *= 1000;
+        }
+    }
+
+    // Update History (cada 5 minutos = 300,000 ms)
     $lastHistory = end($history);
-    if (!$lastHistory || ($now - $lastHistory['t']) >= 300) {
+    if (!$lastHistory || ($now - $lastHistory['t']) >= 300000) {
         $history[] = [
             't' => $now, 
             'v' => $battery['voltage'], 
-            'c' => $battery['isCharging'] ? 1 : 0, 
-            'p' => $battery['pSys'],
+            'c' => $isCharging ? 1 : 0, 
+            'p' => $pSys,
             'temp' => $battery['temp']
         ];
         if (count($history) > 288) array_shift($history);

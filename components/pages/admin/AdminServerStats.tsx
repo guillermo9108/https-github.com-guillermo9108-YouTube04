@@ -494,7 +494,7 @@ export default function AdminServerStats() {
               
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={history.map(p => ({ ...p, time: new Date(p.t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }))}>
+                  <AreaChart data={history.map(p => ({ ...p, time: new Date(p.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }))}>
                     <defs>
                       <linearGradient id="colorV" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
