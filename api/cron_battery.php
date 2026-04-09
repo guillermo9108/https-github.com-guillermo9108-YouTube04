@@ -11,10 +11,13 @@ require_once 'functions_admin.php';
 
 try {
     $pdo = get_db_connection();
-    $battery = update_battery_simulation($pdo);
+    $simResult = update_battery_simulation($pdo);
     
-    if ($battery) {
+    if ($simResult) {
+        $battery = $simResult['config'];
+        $history = $simResult['history'];
         echo "Simulación de batería actualizada: " . $battery['voltage'] . "V (" . round(($battery['voltage'] - 12) / 4.8 * 100) . "%)\n";
+        echo "Puntos en el historial: " . count($history) . "\n";
     } else {
         echo "Simulador de batería no configurado.\n";
     }

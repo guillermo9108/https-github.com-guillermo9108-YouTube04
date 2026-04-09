@@ -815,7 +815,12 @@ function update_battery_simulation($pdo) {
     $now = time();
     $lastUpdate = $battery['lastUpdate'] ?? $now;
     $elapsedSeconds = $now - $lastUpdate;
-    if ($elapsedSeconds <= 0) return null;
+    if ($elapsedSeconds <= 0) {
+        return [
+            'config' => $battery,
+            'history' => $history
+        ];
+    }
     $elapsedHours = $elapsedSeconds / 3600;
     
     // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
@@ -943,7 +948,10 @@ function update_battery_simulation($pdo) {
     $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")
         ->execute([json_encode($battery), json_encode($history)]);
 
-    return $battery;
+    return [
+        'config' => $battery,
+        'history' => $history
+    ];
 }
 
 function admin_get_server_stats($pdo) {
@@ -952,10 +960,9 @@ function admin_get_server_stats($pdo) {
     $cpuUsage = $load ? round($load[0] * 100 / 4, 2) : rand(5, 15);
 
     // 2. Storage Usage (Sum of all library paths)
-    $stmt = $pdo->query("SELECT libraryPaths, batteryHistory FROM system_settings WHERE id = 1");
+    $stmt = $pdo->query("SELECT libraryPaths FROM system_settings WHERE id = 1");
     $settings = $stmt->fetch();
     $paths = json_decode($settings['libraryPaths'] ?: '[]', true);
-    $history = json_decode($settings['batteryHistory'] ?: '[]', true);
     if (empty($paths)) $paths = ["/"];
     
     $diskTotal = 0;
@@ -983,7 +990,9 @@ function admin_get_server_stats($pdo) {
     $diskPercent = $diskTotal > 0 ? round(($diskUsed / $diskTotal) * 100, 2) : 0;
 
     // 3. Battery Simulation (Persistent)
-    $battery = update_battery_simulation($pdo);
+    $simResult = update_battery_simulation($pdo);
+    $battery = $simResult ? $simResult['config'] : null;
+    $history = $simResult ? $simResult['history'] : [];
 
     // 4. Network Speed (Simulated)
     $netDown = rand(100, 5000);
