@@ -810,7 +810,24 @@ function update_battery_simulation($pdo) {
     $battery = json_decode($settings['batteryConfig'] ?: 'null', true);
     $history = json_decode($settings['batteryHistory'] ?: '[]', true);
     
-    if (!$battery) return null;
+    if (!$battery) {
+        $battery = [
+            'voltage' => 14.8,
+            'vQuimico' => 14.8,
+            'vReal' => 14.8,
+            'minWatts' => 18,
+            'maxWatts' => 45,
+            'isCharging' => true,
+            'cellHealth' => 89,
+            'currentWh' => 125,
+            'lastUpdate' => $now,
+            'chargePower' => 45,
+            'cellsSeries' => 4,
+            'cellsParallel' => 4,
+            'cellCapacityMah' => 5000,
+            'temp' => 25
+        ];
+    }
 
     $now = floor(microtime(true) * 1000);
     $lastUpdate = $battery['lastUpdate'] ?? $now;
@@ -971,7 +988,7 @@ function update_battery_simulation($pdo) {
 
     // Update History (cada 5 minutos = 300,000 ms)
     $lastHistory = end($history);
-    if (!$lastHistory || ($now - $lastHistory['t']) >= 300000) {
+    if (empty($history) || ($now - $lastHistory['t']) >= 300000) {
         $history[] = [
             't' => $now, 
             'v' => $battery['voltage'], 
