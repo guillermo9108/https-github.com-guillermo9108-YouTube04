@@ -430,6 +430,22 @@ class DBService {
     public async getChannelContent(userId: string, filter: string = 'ALL'): Promise<any[]> {
         return this.request<any[]>(`action=get_channel_content&userId=${userId}&filter=${filter}`);
     }
+
+    public async subscribePush(data: { userId: string, subscription: any }): Promise<void> {
+        return this.request<void>(`action=subscribe_push`, { method: 'POST', body: JSON.stringify(data) });
+    }
+
+    public async unsubscribePush(data: { endpoint: string }): Promise<void> {
+        return this.request<void>(`action=unsubscribe_push`, { method: 'POST', body: JSON.stringify(data) });
+    }
+
+    public async testPush(data: { userId: string }): Promise<any> {
+        return this.request<any>(`action=test_push`, { method: 'POST', body: JSON.stringify(data) });
+    }
+
+    public async generateVapidKeys(): Promise<any> {
+        return this.request<any>(`action=generate_vapid_keys`, { method: 'POST' });
+    }
 }
 
 export const db = new DBService();

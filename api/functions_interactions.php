@@ -325,23 +325,30 @@ function interact_unsubscribe_push($pdo, $input) {
 }
 
 function send_push_notification($pdo, $userId, $title, $body, $url = '/') {
-    $stmt = $pdo->prepare("SELECT * FROM push_subscriptions WHERE userId = ?");
-    $stmt->execute([$userId]);
-    $subs = $stmt->fetchAll();
-    
-    if (empty($subs)) return;
-
-    // Obtener llaves VAPID
-    $stmtS = $pdo->query("SELECT vapidPublicKey, vapidPrivateKey FROM system_settings WHERE id = 1");
-    $settings = $stmtS->fetch();
-    
-    foreach ($subs as $sub) {
-        // Aquí se debería usar una librería como 'web-push' para PHP
-        // Por ahora, registramos el intento en el log
-        write_log("Push Notification Intent: To=$userId, Title=$title, Body=$body, Endpoint={$sub['endpoint']}");
-        
-        // Si el usuario configura FCM, se podría enviar vía cURL aquí
+    if (file_exists(__DIR__ . '/web_push.php')) {
+        require_once __DIR__ . '/web_push.php';
+        return send_web_push($pdo, $userId, $title, $body, $url);
     }
+    return ['sent' => 0, 'failed' => 0];
+}
+
+function interact_test_push($pdo, $input) {
+    $uid = $input['userId'];
+    if (file_exists(__DIR__ . '/web_push.php')) {
+        require_once __DIR__ . '/web_push.php';
+        $res = send_web_push($pdo, $uid, "Prueba de StreamPay", "¡Hola! Las notificaciones push están funcionando correctamente.", "/profile");
+        respond(true, $res);
+    }
+    respond(false, null, "Módulo de Push no disponible");
+}
+
+function interact_generate_vapid_keys($pdo) {
+    if (file_exists(__DIR__ . '/web_push.php')) {
+        require_once __DIR__ . '/web_push.php';
+        $keys = generate_vapid_keys($pdo);
+        respond(true, $keys);
+    }
+    respond(false, null, "Módulo de Push no disponible");
 }
 
 function interact_request_content($pdo, $input) {

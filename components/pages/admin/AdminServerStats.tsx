@@ -80,6 +80,7 @@ export default function AdminServerStats() {
     lastChargeTime: Date.now()
   });
   const [history, setHistory] = useState<BatteryHistoryPoint[]>([]);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
   const [showCalibration, setShowCalibration] = useState(false);
   const [calibData, setCalibData] = useState({
     vStart: 14.5,
@@ -116,6 +117,7 @@ export default function AdminServerStats() {
   const fetchSettings = async () => {
     try {
       const settings = await db.getSystemSettings();
+      setSystemSettings(settings);
       if (settings && settings.batteryConfig) {
         const config = typeof settings.batteryConfig === 'string' 
           ? JSON.parse(settings.batteryConfig) 
@@ -386,27 +388,36 @@ export default function AdminServerStats() {
             </div>
           </div>
         </div>
+        
         <div className="bg-slate-900/50 border border-white/5 p-6 rounded-2xl flex flex-col justify-center">
-          <div className="flex justify-between items-end">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Zap size={20} className="text-amber-400" /> Web Push (VAPID)
+          </h3>
+          <div className="flex items-center justify-between">
             <div>
-              <div className="text-slate-400 font-bold uppercase text-xs mb-1">Tiempo de Actividad</div>
-              <div className="text-3xl font-black text-white">{stats.uptime}</div>
-            </div>
-            {!battery.isCharging && (
-              <div className="text-right">
-                <div className="text-slate-400 font-bold uppercase text-[10px] mb-1">Autonomía Est.</div>
-                <div className="text-xl font-black text-amber-500">
-                  {(() => {
-                    const pSys = battery.minWatts + (battery.maxWatts - battery.minWatts) * (stats.cpu / 100);
-                    const hours = battery.currentWh / pSys;
-                    const h = Math.floor(hours);
-                    const m = Math.floor((hours - h) * 60);
-                    return `${h}h ${m}m`;
-                  })()}
-                </div>
+              <p className="text-xs text-slate-400 font-bold uppercase mb-1">Estatus de Claves</p>
+              <div className={`text-sm font-black ${systemSettings?.vapidPublicKey ? 'text-emerald-500' : 'text-red-500'}`}>
+                {systemSettings?.vapidPublicKey ? 'Configuradas' : 'No configuradas'}
               </div>
-            )}
+            </div>
+            <button 
+              onClick={async () => {
+                try {
+                  await db.generateVapidKeys();
+                  toastSuccess("Claves VAPID generadas con éxito");
+                  fetchSettings(); // Refresh settings
+                } catch (e: any) {
+                  toastError("Error al generar claves: " + e.message);
+                }
+              }}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+            >
+              Generar Claves
+            </button>
           </div>
+          <p className="mt-4 text-[10px] text-slate-500 font-bold uppercase leading-tight">
+            Necesario para enviar notificaciones push reales a los navegadores y APK.
+          </p>
         </div>
       </div>
 

@@ -8,6 +8,8 @@ import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, Che
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from '../Router';
 
+import PushNotificationSettings from '../../components/settings/PushNotificationSettings';
+
 export default function Profile() {
   const { user, logout, refreshUser } = useAuth();
   const { settings: systemSettings } = useSettings();
@@ -412,34 +414,7 @@ export default function Profile() {
 
           {activeSubTab === 'SETTINGS' && (
               <div className="space-y-6">
-                  <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 shadow-xl">
-                      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Bell size={20} className="text-indigo-400"/> Notificaciones Móviles</h3>
-                      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                          <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                                  <Smartphone size={24}/>
-                              </div>
-                              <div>
-                                  <h4 className="text-white font-black text-sm uppercase tracking-widest">Alertas en Tiempo Real</h4>
-                                  <p className="text-slate-500 text-[10px] font-bold uppercase">Recibe avisos aunque no estés en la app.</p>
-                              </div>
-                          </div>
-                          <button 
-                              onClick={async () => {
-                                  try {
-                                      const { subscribeUserToPush } = await import('../../utils/push');
-                                      await subscribeUserToPush(user.id);
-                                      toast.success("Notificaciones activadas correctamente");
-                                  } catch (e: any) {
-                                      toast.error("Error al activar notificaciones: " + e.message);
-                                  }
-                              }}
-                              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-[0.1em] rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
-                          >
-                              <Zap size={14}/> Activar Notificaciones
-                          </button>
-                      </div>
-                  </div>
+                  <PushNotificationSettings />
 
                   {/* Perfil & Avatar */}
                   <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 shadow-xl">

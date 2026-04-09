@@ -136,6 +136,10 @@ try {
         case 'submit_seller_verification': interact_submit_seller_verification($pdo, $input); break;
         case 'get_seller_verification_requests': admin_get_seller_verification_requests($pdo); break;
         case 'admin_handle_seller_verification': admin_handle_seller_verification($pdo, $input); break;
+        case 'subscribe_push': interact_subscribe_push($pdo, $input); break;
+        case 'unsubscribe_push': interact_unsubscribe_push($pdo, $input); break;
+        case 'test_push': interact_test_push($pdo, $input); break;
+        case 'generate_vapid_keys': interact_generate_vapid_keys($pdo); break;
         case 'admin_ban_user': admin_ban_user($pdo, $input); break;
         case 'admin_unban_user': admin_unban_user($pdo, $input); break;
         case 'admin_change_user_role': admin_change_user_role($pdo, $input); break;

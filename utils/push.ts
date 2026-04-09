@@ -1,12 +1,92 @@
-
 import { db } from '../services/db';
 
-const VAPID_PUBLIC_KEY = 'BEl62i_E_07p9H77Yy7Jv9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8P9p8'; // Placeholder, user should provide real one
+export const isPushSupported = (): boolean => {
+  return 'serviceWorker' in navigator && 'PushManager' in window;
+};
 
+export const getNotificationPermission = (): NotificationPermission => {
+  return Notification.permission;
+};
+
+export const subscribeUserToPush = async (userId: string): Promise<boolean> => {
+  if (!isPushSupported()) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    
+    // Solicitar permiso
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return false;
+
+    // Obtener clave VAPID pública del servidor
+    const settings = await db.getSystemSettings();
+    const vapidPublicKey = settings.vapidPublicKey;
+
+    if (!vapidPublicKey) {
+      console.error("VAPID Public Key not found in settings");
+      return false;
+    }
+
+    // Suscribirse al Push Manager
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+    });
+
+    // Enviar suscripción al backend
+    await db.subscribePush({
+      userId,
+      subscription: subscription.toJSON()
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error subscribing to push:", error);
+    return false;
+  }
+};
+
+export const unsubscribeFromPush = async (): Promise<boolean> => {
+  if (!isPushSupported()) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    
+    if (subscription) {
+      await subscription.unsubscribe();
+      await db.unsubscribePush({ endpoint: subscription.endpoint });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error unsubscribing from push:", error);
+    return false;
+  }
+};
+
+export const isSubscribedToPush = async (): Promise<boolean> => {
+  if (!isPushSupported()) return false;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  return !!subscription;
+};
+
+export const sendTestNotification = async (userId: string): Promise<boolean> => {
+  try {
+    await db.testPush({ userId });
+    return true;
+  } catch (error) {
+    console.error("Error sending test push:", error);
+    return false;
+  }
+};
+
+// Helper para convertir la clave VAPID
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
-    .replace(/-/g, '+')
+    .replace(/\-/g, '+')
     .replace(/_/g, '/');
 
   const rawData = window.atob(base64);
@@ -16,53 +96,4 @@ function urlBase64ToUint8Array(base64String: string) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
-}
-
-export async function subscribeUserToPush(userId: string) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push notifications not supported');
-    return;
-  }
-
-  try {
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    console.log('Service Worker registered');
-
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      throw new Error('Permission not granted for notifications');
-    }
-
-    // Get VAPID key from settings if possible, otherwise use placeholder
-    let publicKey = VAPID_PUBLIC_KEY;
-    try {
-        const settings = await db.getSystemSettings();
-        if (settings.vapidPublicKey) publicKey = settings.vapidPublicKey;
-    } catch(e) {}
-
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey)
-    });
-
-    const subData = JSON.parse(JSON.stringify(subscription));
-    await db.request('action=subscribe_push', {
-        method: 'POST',
-        body: JSON.stringify({
-            userId,
-            subscription: {
-                endpoint: subData.endpoint,
-                keys: {
-                    p256dh: subData.keys.p256dh,
-                    auth: subData.keys.auth
-                }
-            }
-        })
-    });
-
-    return true;
-  } catch (error) {
-    console.error('Failed to subscribe to push notifications:', error);
-    throw error;
-  }
 }
