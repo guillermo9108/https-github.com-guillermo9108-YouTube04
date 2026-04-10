@@ -1,6 +1,6 @@
 {
-  "name": "Apk StreamPay OFICIAL 0.0.16.8",
-  "description": "StreamPay - Plataforma de streaming de video y marketplace con gestión de APK, actualizaciones automáticas y descarga directa.",
+  "name": "StreamPay OFICIAL 4.2.1 - Facebook Lite Style",
+  "description": "StreamPay - Plataforma de streaming de video y marketplace con interfaz estilo Facebook Lite. Incluye páginas dedicadas para búsqueda, notificaciones, configuración, categorías y explorador de carpetas.",
   "requestFramePermissions": [
     "camera",
     "microphone"
