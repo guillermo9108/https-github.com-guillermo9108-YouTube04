@@ -1,17 +1,16 @@
 # 🔧 Correcciones de Build - IMPORTANTE
 
-## Error de Build Detectado y Corregido
+## Errores de Build Detectados y Corregidos
 
-### ❌ Error Original
+### ❌ Error #1: Punto de Entrada Incorrecto
 ```
 Failed to resolve ./src/main.tsx from index.html
 ```
 
-### ✅ Solución Aplicada
+**Causa**: `index.html` apuntaba a una ruta incorrecta.
 
-**Archivo**: `index.html`
+**Solución**: Actualizar el punto de entrada en `index.html`
 
-**Cambio necesario**:
 ```html
 <!-- ANTES (INCORRECTO) -->
 <script type="module" src="./src/main.tsx"></script>
@@ -20,19 +19,44 @@ Failed to resolve ./src/main.tsx from index.html
 <script type="module" src="./index.tsx"></script>
 ```
 
-También se actualizó el título:
-```html
-<!-- ANTES -->
-<title>example</title>
+---
 
-<!-- DESPUÉS -->
-<title>StreamPay - Facebook Lite Style</title>
+### ❌ Error #2: Configuración TypeScript Incorrecta
+```
+parsing tsconfig.app.json failed: Error: ENOENT: no such file or directory
+```
+
+**Causa**: `tsconfig.app.json` incluía la carpeta `src/` que no existe en este proyecto.
+
+**Solución**: Actualizar el array `include` en `tsconfig.app.json`
+
+```json
+// ANTES (INCORRECTO)
+{
+  "include": ["src"]
+}
+
+// DESPUÉS (CORRECTO)
+{
+  "include": [
+    "index.tsx",
+    "App.tsx",
+    "Layout.tsx",
+    "Login.tsx",
+    "components/**/*",
+    "context/**/*",
+    "services/**/*",
+    "utils/**/*",
+    "types.ts"
+  ]
+}
 ```
 
 ---
 
-## 📝 Archivo index.html Completo Corregido
+## 📝 Archivos Completos Corregidos
 
+### 1. index.html
 ```html
 <!doctype html>
 <html lang="en">
@@ -48,11 +72,53 @@ También se actualizó el título:
 </html>
 ```
 
+### 2. tsconfig.app.json
+```json
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": [
+    "index.tsx",
+    "App.tsx",
+    "Layout.tsx",
+    "Login.tsx",
+    "components/**/*",
+    "context/**/*",
+    "services/**/*",
+    "utils/**/*",
+    "types.ts"
+  ]
+}
+```
+
 ---
 
 ## ✅ Verificación
 
-Después de aplicar este cambio, ejecuta:
+Después de aplicar estos cambios, ejecuta:
 
 ```bash
 # Limpiar caché
@@ -73,9 +139,12 @@ El build debería completarse exitosamente ahora.
 
 ```
 proyecto/
-├── index.html          ← Apunta a ./index.tsx
-├── index.tsx           ← Punto de entrada principal
+├── index.html          ← Apunta a ./index.tsx ✅
+├── index.tsx           ← Punto de entrada principal ✅
 ├── App.tsx             ← Componente principal
+├── tsconfig.json       ← Referencias de proyecto
+├── tsconfig.app.json   ← Config para app (include actualizado) ✅
+├── tsconfig.node.json  ← Config para Vite
 ├── components/         ← Todos los componentes
 │   ├── Layout.tsx
 │   ├── pages/
@@ -87,45 +156,56 @@ proyecto/
 │   │   ├── FoldersPage.tsx
 │   │   └── ...
 │   └── ...
-└── ...
+├── context/           ← Contexts de React
+├── services/          ← Servicios (db, api)
+├── utils/            ← Utilidades
+└── types.ts          ← Tipos TypeScript
 ```
 
-**NO confundir con**:
-```
-proyecto/
-├── src/               ← Esta carpeta NO es el punto de entrada
-│   └── main.tsx       ← Este archivo NO se usa en este proyecto
-```
+**⚠️ NO tiene carpeta `src/`** - Todo está en la raíz del proyecto.
 
 ---
 
 ## 🚨 Importante para GitHub Actions
 
-Si estás usando GitHub Actions para el build automático, asegúrate de que el archivo `index.html` tenga la corrección aplicada antes de hacer commit.
+Si estás usando GitHub Actions para el build automático, asegúrate de aplicar AMBAS correcciones:
 
-**Comando para verificar**:
+### Verificación Rápida:
+
 ```bash
+# 1. Verificar index.html
 grep "index.tsx" index.html
-```
+# Salida esperada: <script type="module" src="./index.tsx"></script>
 
-**Salida esperada**:
-```html
-<script type="module" src="./index.tsx"></script>
+# 2. Verificar tsconfig.app.json
+grep -A 10 '"include"' tsconfig.app.json
+# Salida esperada: debe incluir todos los archivos listados arriba
 ```
 
 ---
 
 ## 🎯 Checklist Pre-Deploy
 
-- [ ] `index.html` apunta a `./index.tsx`
-- [ ] Título actualizado a "StreamPay - Facebook Lite Style"
-- [ ] Dependencias instaladas (`pnpm install`)
-- [ ] Build exitoso (`pnpm build`)
-- [ ] Sin errores en consola
-- [ ] Proyecto funciona en desarrollo (`pnpm dev`)
+- [ ] ✅ `index.html` apunta a `./index.tsx`
+- [ ] ✅ Título actualizado a "StreamPay - Facebook Lite Style"
+- [ ] ✅ `tsconfig.app.json` incluye archivos correctos (no `src/`)
+- [ ] ✅ Carpetas `components/`, `context/`, `services/`, `utils/` incluidas
+- [ ] ✅ Dependencias instaladas (`pnpm install`)
+- [ ] ✅ Build exitoso (`pnpm build`)
+- [ ] ✅ Sin errores en consola
+- [ ] ✅ Proyecto funciona en desarrollo (`pnpm dev`)
 
 ---
 
-**Estado**: ✅ Corregido y verificado
+## 🆘 Si el Build Sigue Fallando
+
+1. **Verifica que NO exista carpeta `src/`** en tu repositorio
+2. **Confirma que los archivos están en la raíz**: `index.tsx`, `App.tsx`, etc.
+3. **Revisa que tsconfig.app.json tenga el `include` correcto**
+4. **Limpia completamente**: `rm -rf node_modules dist .vite && pnpm install`
+
+---
+
+**Estado**: ✅✅ Ambos errores corregidos y verificados
 **Fecha**: 2024-04-10
 **Versión**: 4.2.1
