@@ -101,9 +101,9 @@ export default function Layout() {
             <Link to="/marketplace" className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
               <ShoppingBag size={20} className="text-[#e4e6eb]" />
             </Link>
-            <button className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
+            <Link to="/menu" className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
               <Menu size={20} className="text-[#e4e6eb]" />
-            </button>
+            </Link>
           </div>
         </div>
 

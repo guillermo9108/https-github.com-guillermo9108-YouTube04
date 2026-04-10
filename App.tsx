@@ -13,6 +13,7 @@ import Requests from './components/pages/Requests';
 import Channel from './components/pages/Channel';
 import Marketplace from './components/pages/Marketplace';
 import MarketplaceItem from './components/pages/MarketplaceItem';
+import MenuPage from './components/pages/MenuPage';
 import MarketplaceCreate from './components/pages/MarketplaceCreate';
 import MarketplaceEdit from './components/pages/MarketplaceEdit';
 import SellerDashboard from './components/pages/SellerDashboard';
@@ -279,6 +280,7 @@ export default function App() {
                                 <Route path="/channel/:userId" element={<SetupGuard><ProtectedRoute><Channel /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/upload" element={<SetupGuard><ProtectedRoute><Upload /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/profile" element={<SetupGuard><ProtectedRoute><Profile /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/menu" element={<SetupGuard><ProtectedRoute><MenuPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch-later" element={<SetupGuard><ProtectedRoute><WatchLater /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/requests" element={<SetupGuard><ProtectedRoute><Requests /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace" element={<SetupGuard><ProtectedRoute><Marketplace /></ProtectedRoute></SetupGuard>} />
