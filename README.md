@@ -1,71 +1,100 @@
+# SeaVerse React Template
 
-# StreamPay - Plataforma Integral de Video y E-commerce Pay-Per-View
+AI-driven React application template. Users describe what they want, AI implements it with modern tooling.
 
-## 📄 Documento de Venta (Executive Summary)
+## Essence
 
-### 1. Arquitectura y Escalabilidad (El por qué del valor)
+- Modern React stack (React 19 + TypeScript + Vite)
+- Component-based architecture with routing
+- Type-safe development with full IDE support
+- Tailwind CSS for rapid styling
 
-**Modelo de Negocio Integrado**  
-StreamPay no es solo una plataforma de video; es un ecosistema económico completo que combina tres sistemas en uno:
-1.  **Marketplace de Video (Estilo YouTube/Netflix):** Los creadores suben contenido premium que los usuarios desbloquean mediante micro-pagos.
-2.  **E-commerce P2P:** Una tienda integrada donde los usuarios pueden vender bienes físicos, similar a un marketplace de segunda mano.
-3.  **Sistema de Finanzas Internas:** Gestión de una moneda virtual ("Saldo") que facilita transacciones instantáneas y sin fricción entre usuarios.
+## File Structure
 
-**Módulos Clave de Alto Valor**
-*   **Módulo de Comisiones Automatizado:** El sistema retiene automáticamente un porcentaje configurable (por defecto 20%) sobre cada venta de video o producto físico, generando ingresos pasivos constantes para el administrador.
-*   **Módulo de Saldo Virtual Seguro:** Gestión centralizada de cuentas de usuario con un historial inmutable de transacciones (Depósitos, Compras, Ventas, Transferencias).
-*   **Integración FFmpeg (Future-Proof):** El código base incluye la lógica para integración con FFmpeg para generación de miniaturas y transcodificación. *Nota: Esta funcionalidad está configurada para operar en modo ligero por defecto para compatibilidad con servidores NAS/Hosting compartido, pero está lista para activarse al migrar a servidores dedicados (VPS/GPU).*
+```
+project/
+├── src/
+│   ├── pages/          # Page components
+│   ├── App.tsx         # Root component with routing
+│   ├── main.tsx        # Entry point
+│   └── index.css       # Global styles + Tailwind
+├── package.json        # Dependencies
+├── vite.config.ts      # Vite config (API proxy pre-configured)
+├── tsconfig.json       # TypeScript config
+└── eslint.config.js    # ESLint config
+```
 
-**Tecnologías Usadas**
-*   **Frontend:** React 18, TypeScript, Vite, Tailwind CSS (PWA Nativa).
-*   **Backend:** PHP 8.0+ (Optimizado para alto rendimiento sin frameworks pesados).
-*   **Base de Datos:** MariaDB / MySQL.
-*   **Almacenamiento:** Sistema de archivos local o FTP remoto.
+## Architecture
 
----
+**Component-based structure:**
 
-### 2. Seguridad y Contabilidad (El por qué de la seguridad)
+| Section | Location | Purpose |
+|---------|----------|---------|
+| Pages | `src/pages/*.tsx` | Route components |
+| Routing | `src/utils/router.ts` | Route definitions |
+| Styles | `src/index.css` | Global styles, Tailwind directives |
+| App Shell | `src/App.tsx` | Root component, router setup |
 
-**Flujo de Dinero Claro**  
-El sistema maneja un ciclo económico cerrado para maximizar la seguridad y el control:
-1.  **Entrada (CUP/Fiat):** El dinero real entra al sistema a través de Pasarelas de Pago (Tropipay) o Recargas Manuales aprobadas por el Administrador.
-2.  **Conversión:** El dinero se convierte 1:1 (o con tasa configurable) a "Saldo" virtual en la cuenta del usuario.
-3.  **Circulación:** El Saldo se mueve de Comprador a Vendedor (menos la comisión de la plataforma).
-4.  **Salida/Consumo:** El Saldo se "quema" al adquirir servicios VIP o se acumula en las cuentas de los creadores.
+**API Proxy (pre-configured in vite.config.ts):**
 
-**Prevención de Fraude Básico**
-*   **Integridad de Sesión:** Tokens de sesión únicos validados contra la base de datos en cada petición crítica.
-*   **Validación de Transacciones:** Uso de transacciones atómicas en base de datos (ACID) para asegurar que el saldo nunca se pierda ni se duplique durante una compra (si falla el crédito al vendedor, no se debita al comprador).
-*   **Roles Estrictos:** Separación lógica completa entre usuarios estándar y administradores.
+| Route | Target | Type |
+|-------|--------|------|
+| `/api/*` | Backend server | HTTP |
+| `/ws/*` | Backend server | WebSocket |
 
-**Requisitos Mínimos y Limitaciones de Hosting (NAS/Shared)**  
-La aplicación está diseñada para ser extremadamente ligera, permitiendo su ejecución en servidores locales (Self-Hosted) o NAS. Sin embargo, para garantizar la estabilidad en hardware modesto:
-*   **Transcodificación:** Se recomienda mantener desactivada la transcodificación en tiempo real.
-*   **Restricciones Sugeridas:**
-    *   **Resolución Máxima:** 720p / 1080p (según ancho de banda de subida).
-    *   **Duración Máxima:** 10-15 minutos por video para evitar timeouts de PHP en subidas lentas.
-    *   **Configuración PHP:** `upload_max_filesize` y `post_max_size` deben ajustarse (ej. 512M) en el `php.ini`.
+## Tech Stack
 
----
+- **React 19** - Latest React with compiler
+- **TypeScript** - Type safety
+- **Vite** - Lightning-fast dev server and build
+- **Tailwind CSS v4** - Utility-first CSS
+- **React Router v7** - Client-side routing
 
-### 3. Experiencia de Usuario y Documentación
+## Common Patterns
 
-**Manual del Administrador: Configuración Económica**  
-Desde el panel de administración (`/admin`), pestaña **Config**, puedes ajustar las palancas económicas del negocio:
-*   **Comisión Videos (%):** Define cuánto retiene la plataforma de cada video vendido. (Ej. Creador vende a 100, Plataforma se queda 20, Creador recibe 80).
-*   **Comisión Marketplace (%):** Define la comisión sobre ventas de productos físicos.
-*   **Planes VIP:** Configura el precio y duración de las membresías que otorgan acceso ilimitado o bonos de saldo.
+Add a new page:
+```tsx
+// src/pages/NewPage.tsx
+export default function NewPage() {
+  return (
+    <div className="container mx-auto p-4">
+      {/* content */}
+    </div>
+  );
+}
 
-**Instrucciones de Despliegue (Servidor Estándar)**
-1.  **Base de Datos:** Crea una base de datos vacía en MariaDB/MySQL (ej. `streampay_db`).
-2.  **Archivos:** Sube el contenido de la carpeta `dist/` a tu servidor web (carpeta pública `public_html` o `www`).
-3.  **Permisos:** Asegura permisos de escritura y lectura (generalmente `777` o `755`) en la carpeta `api/uploads/` y sus subcarpetas.
-4.  **Instalación:**
-    *   Abre tu navegador y ve a `https://tu-dominio.com/#/setup` (o la ruta donde subiste los archivos).
-    *   Ingresa las credenciales de la base de datos (Host, Usuario, Contraseña, Nombre DB).
-    *   Crea tu cuenta de **Super Administrador**.
-5.  **Listo:** El sistema generará las tablas y configuraciones iniciales automáticamente.
+// src/utils/router.ts
+import NewPage from '../pages/NewPage';
+routes.push({ path: '/new', element: <NewPage /> });
+```
 
----
+Add styles:
+```css
+/* src/index.css */
+@theme {
+  --color-custom: #xxx;
+}
+```
 
-*Desarrollado con arquitectura escalable y enfoque Mobile-First.*
+Add interactivity:
+```tsx
+import { useState } from 'react';
+
+export default function Component() {
+  const [count, setCount] = useState(0);
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      Count: {count}
+    </button>
+  );
+}
+```
+
+## Development
+
+```bash
+pnpm install   # Install dependencies
+pnpm dev       # Start dev server (default port: 5173)
+pnpm build     # Build for production
+pnpm preview   # Preview production build
+```
