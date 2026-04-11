@@ -22,11 +22,6 @@ import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
 import WatchLater from './components/pages/WatchLater';
 import DownloadApp from './components/pages/DownloadApp';
-import Notifications from './components/pages/Notifications';
-import SearchPage from './components/pages/SearchPage';
-import SettingsPage from './components/pages/SettingsPage';
-import CategoriesPage from './components/pages/CategoriesPage';
-import FoldersPage from './components/pages/FoldersPage';
 import { AlertCircle, Download, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -286,11 +281,6 @@ export default function App() {
                                 <Route path="/upload" element={<SetupGuard><ProtectedRoute><Upload /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/profile" element={<SetupGuard><ProtectedRoute><Profile /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/menu" element={<SetupGuard><ProtectedRoute><MenuPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/notifications" element={<SetupGuard><ProtectedRoute><Notifications /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/search" element={<SetupGuard><ProtectedRoute><SearchPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/settings" element={<SetupGuard><ProtectedRoute><SettingsPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/categories" element={<SetupGuard><ProtectedRoute><CategoriesPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/folders" element={<SetupGuard><ProtectedRoute><FoldersPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch-later" element={<SetupGuard><ProtectedRoute><WatchLater /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/requests" element={<SetupGuard><ProtectedRoute><Requests /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace" element={<SetupGuard><ProtectedRoute><Marketplace /></ProtectedRoute></SetupGuard>} />
@@ -301,7 +291,7 @@ export default function App() {
                                 <Route path="/edit/:id" element={<SetupGuard><ProtectedRoute><EditVideo /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace/:id" element={<SetupGuard><ProtectedRoute><MarketplaceItem /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/seller-dashboard" element={<SetupGuard><ProtectedRoute><SellerDashboard /></ProtectedRoute></SetupGuard>} />
-
+                                
                                 {/* Admin Routes Independientes */}
                                 <Route path="/admin" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/users" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
