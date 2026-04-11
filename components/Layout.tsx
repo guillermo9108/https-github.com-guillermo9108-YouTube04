@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -99,8 +99,16 @@ export default function Layout() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
+            <button onClick={() => navigate('/search')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
               <Search size={20} />
+            </button>
+            <button onClick={() => navigate('/notifications')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors relative">
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[8px] font-black text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <button onClick={() => navigate('/profile')} className="p-1 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
               <Avatar size={28} />
@@ -122,13 +130,8 @@ export default function Layout() {
           <Link to="/marketplace" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
             <ShoppingBag size={24} />
           </Link>
-          <Link to="/profile" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/profile' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'} relative`}>
-            <Bell size={24} />
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-1/2 translate-x-4 w-4 h-4 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[8px] font-black text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
+          <Link to="/menu" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/menu' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
+            <MenuIcon size={24} />
           </Link>
         </nav>
       </header>

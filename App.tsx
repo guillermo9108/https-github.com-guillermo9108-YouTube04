@@ -3,6 +3,9 @@ import React, { Suspense, useState, useEffect, useRef } from 'react';
 // Page Imports
 import Login from './components/pages/Login';
 import Home from './components/pages/Home';
+import MenuPage from './components/pages/MenuPage';
+import SearchPage from './components/pages/SearchPage';
+import Notifications from './components/pages/Notifications';
 import Watch from './components/pages/Watch';
 import Upload from './components/pages/Upload';
 import Profile from './components/pages/Profile';
@@ -274,6 +277,9 @@ export default function App() {
                             
                             <Route element={<Layout />}>
                                 <Route path="/" element={<SetupGuard><ProtectedRoute><Home /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/menu" element={<SetupGuard><ProtectedRoute><MenuPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/notifications" element={<SetupGuard><ProtectedRoute><Notifications /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/search" element={<SetupGuard><ProtectedRoute><SearchPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/shorts" element={<SetupGuard><ProtectedRoute><Shorts /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch/:id" element={<SetupGuard><ProtectedRoute><Watch /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/channel/:userId" element={<SetupGuard><ProtectedRoute><Channel /></ProtectedRoute></SetupGuard>} />
