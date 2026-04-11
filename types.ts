@@ -40,6 +40,7 @@ export interface Category {
   autoSub: boolean;
   parent?: string | null;
   sortOrder?: 'LATEST' | 'ALPHA' | 'RANDOM';
+  count?: number;
 }
 
 export interface User {
@@ -193,6 +194,7 @@ export interface Notification {
     timestamp: number;
     metadata?: any;
     avatarUrl?: string;
+    videoId?: string;
 }
 
 export interface ContentRequest {

@@ -51,6 +51,14 @@ export default function Home() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     
+    // UI Interaction State
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [isListening, setIsListening] = useState(false);
+    const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false);
+    const [showNotifMenu, setShowNotifMenu] = useState(false);
+    
     // Filters State - Inicializar desde URL y Search Params
     const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
     

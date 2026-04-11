@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -84,67 +84,31 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[#18191a] pb-16 md:pb-0`}>
-      {/* Facebook Lite Header */}
-      <header className="sticky top-0 z-50 bg-[#242526] border-b border-white/5 shadow-lg">
-        <div className="flex items-center justify-between px-4 h-14">
-          {/* Logo */}
-          <Link to="/" className="text-white font-bold text-xl tracking-tight">
-            facebook
-          </Link>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Link to="/upload" className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
-              <Upload size={20} className="text-[#e4e6eb]" />
-            </Link>
-            <Link to="/search" className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
-              <Search size={20} className="text-[#e4e6eb]" />
-            </Link>
-            <Link to="/menu" className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
-              <Menu size={20} className="text-[#e4e6eb]" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex justify-around border-t border-white/5">
-          <Link to="/" className={`flex-1 flex items-center justify-center py-3 ${location.pathname === '/' ? 'border-b-2 border-[#1877f2] text-[#1877f2]' : 'text-[#b0b3b8]'}`}>
-            <Home size={24} />
-          </Link>
-          <Link to="/shorts" className={`flex-1 flex items-center justify-center py-3 ${location.pathname === '/shorts' ? 'border-b-2 border-[#1877f2] text-[#1877f2]' : 'text-[#b0b3b8]'}`}>
-            <Smartphone size={24} />
-          </Link>
-          <Link to="/marketplace" className={`flex-1 flex items-center justify-center py-3 ${location.pathname === '/marketplace' ? 'border-b-2 border-[#1877f2] text-[#1877f2]' : 'text-[#b0b3b8]'}`}>
-            <ShoppingBag size={24} />
-          </Link>
-          <Link to="/profile" className={`flex-1 flex items-center justify-center py-3 relative ${location.pathname === '/profile' ? 'border-b-2 border-[#1877f2] text-[#1877f2]' : 'text-[#b0b3b8]'}`}>
-            <User size={24} />
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-1/3 w-4 h-4 bg-[#e41e3f] border-2 border-[#242526] rounded-full flex items-center justify-center text-[8px] font-bold text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Link>
-          <Link to="/notifications" className={`flex-1 flex items-center justify-center py-3 relative ${location.pathname === '/notifications' ? 'border-b-2 border-[#1877f2] text-[#1877f2]' : 'text-[#b0b3b8]'}`}>
-            <Bell size={24} />
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-1/4 w-4 h-4 bg-[#e41e3f] border-2 border-[#242526] rounded-full flex items-center justify-center text-[8px] font-bold text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'container mx-auto max-w-2xl'}`}>
+    <div className={`min-h-screen flex flex-col bg-black pb-20 md:pb-24`}>
+      {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
+      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'container mx-auto px-4 pt-4 max-w-5xl'}`}>
         <Outlet />
       </main>
 
       <UploadIndicator />
       <ServerTaskIndicator />
       <GridProcessor />
+
+      {/* Navigation Bar - Bottom Only */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/5 flex justify-around items-center py-3 z-50 safe-area-bottom shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <Link to="/" className={isActive('/')}><Home size={22}/></Link>
+        <Link to="/shorts" className={isActive('/shorts')}><Smartphone size={22}/></Link>
+        <Link to="/upload" className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform"><Upload size={24}/></Link>
+        <Link to="/marketplace" className={isActive('/marketplace')}><ShoppingBag size={22}/></Link>
+        <Link to="/profile" className={`${isActive('/profile')} relative`}>
+            <Avatar size={24}/>
+            {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[7px] font-black text-white">
+                    {unreadCount > 9 ? '+' : unreadCount}
+                </span>
+            )}
+        </Link>
+      </nav>
     </div>
   );
 }

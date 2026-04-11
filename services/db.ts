@@ -2,7 +2,7 @@ import {
     User, Video, Transaction, VipPlan, Comment, UserInteraction, 
     Notification as AppNotification, VideoResult, ContentRequest, 
     MarketplaceItem, MarketplaceReview, BalanceRequest, VipRequest, 
-    SmartCleanerResult, FtpFile, SystemSettings 
+    SmartCleanerResult, FtpFile, SystemSettings, Category 
 } from '../types';
 
 interface VideoPagedResponse {
@@ -133,12 +133,20 @@ class DBService {
         }
     }
 
+    public async getCategories(): Promise<Category[]> {
+        return this.request<Category[]>('action=get_categories');
+    }
+
+    public async getFolders(path: string = ''): Promise<any[]> {
+        return this.request<any[]>(`action=get_folders&path=${encodeURIComponent(path)}`);
+    }
+
     public async saveSearch(term: string): Promise<void> {
         return this.request<void>(`action=save_search`, { method: 'POST', body: JSON.stringify({ term }) });
     }
 
-    public async getSearchSuggestions(q: string): Promise<any[]> {
-        return this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}`);
+    public async getSearchSuggestions(q: string, limit: number = 20): Promise<any[]> {
+        return this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
     }
 
     public async checkInstallation(): Promise<{status: string}> {
@@ -407,7 +415,9 @@ class DBService {
         if (!key || key.includes('marketplace')) localStorage.removeItem('sp_cache_market');
     }
     public setHomeDirty() { this.homeDirty = true; }
-    public async getNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}`); }
+    public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> { 
+        return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}&limit=${limit}`); 
+    }
     public async getUnreadNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_unread_notifications&userId=${userId}`); }
     public async getUnreadCount(userId: string): Promise<{count: number}> { return this.request<{count: number}>(`action=get_unread_count&userId=${userId}`); }
     public async markNotificationRead(id: string): Promise<void> { return this.request<void>(`action=mark_notification_read`, { method: 'POST', body: JSON.stringify({ id }) }); }

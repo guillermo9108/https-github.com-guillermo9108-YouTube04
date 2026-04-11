@@ -9,9 +9,10 @@ function interact_save_search($pdo, $input) {
     respond(true);
 }
 
-function interact_get_search_suggestions($pdo, $q) {
+function interact_get_search_suggestions($pdo, $q, $limit = 5) {
+    $limit = (int)$limit;
     $q = trim($q); if (empty($q)) respond(true, $pdo->query("SELECT term as label, 'HISTORY' as type FROM search_history ORDER BY count DESC LIMIT 6")->fetchAll());
-    $stmt = $pdo->prepare("SELECT title as label, id, 'VIDEO' as type FROM videos WHERE title LIKE ? LIMIT 5");
+    $stmt = $pdo->prepare("SELECT title as label, id, 'VIDEO' as type FROM videos WHERE title LIKE ? LIMIT $limit");
     $stmt->execute(["%$q%"]); respond(true, $stmt->fetchAll());
 }
 
@@ -197,8 +198,9 @@ function interact_get_subscriptions($pdo, $userId) {
     $stmt->execute([$userId]); respond(true, $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
-function interact_get_notifications($pdo, $uid) {
-    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC LIMIT 30"); $stmt->execute([$uid]);
+function interact_get_notifications($pdo, $uid, $limit = 30) {
+    $limit = (int)$limit;
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC LIMIT $limit"); $stmt->execute([$uid]);
     $notifs = $stmt->fetchAll();
     foreach ($notifs as &$n) {
         $n['avatarUrl'] = fix_url($n['avatarUrl']);

@@ -196,7 +196,7 @@ try {
         case 'fix_library_metadata': video_fix_metadata($pdo); break;
         case 'stream': streamVideo($_GET['id'] ?? '', $pdo); break;
         case 'save_search': interact_save_search($pdo, $input); break;
-        case 'get_search_suggestions': interact_get_search_suggestions($pdo, $_GET['q'] ?? ''); break;
+        case 'get_search_suggestions': interact_get_search_suggestions($pdo, $_GET['q'] ?? '', $_GET['limit'] ?? 5); break;
         case 'get_video_likers': interact_get_video_likers($pdo, $_GET['videoId'] ?? '', $_GET['userId'] ?? null); break;
         case 'get_user_followers': interact_get_user_followers($pdo, $_GET['userId'] ?? ''); break;
         case 'has_purchased': interact_has_purchased($pdo, $_GET['userId'] ?? '', $_GET['videoId'] ?? ''); break;
@@ -218,7 +218,7 @@ try {
         case 'get_user_activity': interact_get_activity($pdo, $_GET['userId'] ?? ''); break;
         case 'get_comments': interact_get_comments($pdo, $_GET['id'] ?? ''); break;
         case 'add_comment': interact_add_comment($pdo, $input); break;
-        case 'get_notifications': interact_get_notifications($pdo, $_GET['userId'] ?? ''); break;
+        case 'get_notifications': interact_get_notifications($pdo, $_GET['userId'] ?? '', $_GET['limit'] ?? 30); break;
         case 'get_unread_notifications': interact_get_unread_notifications($pdo, $_GET['userId'] ?? ''); break;
         case 'get_unread_count': interact_get_unread_count($pdo, $_GET['userId'] ?? ''); break;
         case 'get_latest_version': app_get_latest_version($pdo, $_GET['userId'] ?? null, $_GET['clientVersion'] ?? null); break;

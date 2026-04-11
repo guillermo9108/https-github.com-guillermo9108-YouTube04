@@ -13,7 +13,6 @@ import Requests from './components/pages/Requests';
 import Channel from './components/pages/Channel';
 import Marketplace from './components/pages/Marketplace';
 import MarketplaceItem from './components/pages/MarketplaceItem';
-import MenuPage from './components/pages/MenuPage';
 import MarketplaceCreate from './components/pages/MarketplaceCreate';
 import MarketplaceEdit from './components/pages/MarketplaceEdit';
 import SellerDashboard from './components/pages/SellerDashboard';
@@ -22,11 +21,6 @@ import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
 import WatchLater from './components/pages/WatchLater';
 import DownloadApp from './components/pages/DownloadApp';
-import Notifications from './components/pages/Notifications';
-import SearchPage from './components/pages/SearchPage';
-import SettingsPage from './components/pages/SettingsPage';
-import CategoriesPage from './components/pages/CategoriesPage';
-import FolderExplorerPage from './components/pages/FolderExplorerPage';
 import { AlertCircle, Download, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -285,12 +279,6 @@ export default function App() {
                                 <Route path="/channel/:userId" element={<SetupGuard><ProtectedRoute><Channel /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/upload" element={<SetupGuard><ProtectedRoute><Upload /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/profile" element={<SetupGuard><ProtectedRoute><Profile /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/menu" element={<SetupGuard><ProtectedRoute><MenuPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/notifications" element={<SetupGuard><ProtectedRoute><Notifications /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/search" element={<SetupGuard><ProtectedRoute><SearchPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/settings" element={<SetupGuard><ProtectedRoute><SettingsPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/categories" element={<SetupGuard><ProtectedRoute><CategoriesPage /></ProtectedRoute></SetupGuard>} />
-                                <Route path="/folders" element={<SetupGuard><ProtectedRoute><FolderExplorerPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch-later" element={<SetupGuard><ProtectedRoute><WatchLater /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/requests" element={<SetupGuard><ProtectedRoute><Requests /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace" element={<SetupGuard><ProtectedRoute><Marketplace /></ProtectedRoute></SetupGuard>} />
