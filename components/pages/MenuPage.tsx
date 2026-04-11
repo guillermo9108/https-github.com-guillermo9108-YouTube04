@@ -102,19 +102,6 @@ export default function MenuPage() {
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
-                <div className="flex items-center justify-between px-4 h-14">
-                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
-                        <ChevronLeft size={24} />
-                        <span className="font-bold">Menú</span>
-                    </button>
-                    <button onClick={() => navigate('/search')} className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors">
-                        <Search size={18} className="text-[var(--text-primary)]" />
-                    </button>
-                </div>
-            </header>
-
             {/* User Info Card */}
             <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)] p-4">
                 <div className="flex items-center gap-3">
@@ -176,7 +163,7 @@ export default function MenuPage() {
                 {/* Logout Button */}
                 <div className="mt-6 bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
                     <button
-                        onClick={handleLogout}
+                        onClick={() => setShowSettings(true)}
                         className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors group"
                     >
                         <div className="w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center transition-colors">
@@ -196,6 +183,33 @@ export default function MenuPage() {
                     </p>
                 </div>
             </div>
+
+            {/* Logout Confirmation Modal */}
+            {showSettings && (
+                <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-2xl w-full max-w-xs overflow-hidden shadow-2xl animate-in zoom-in-95 p-6 text-center">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <LogOut size={32} className="text-red-600" />
+                        </div>
+                        <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">¿Cerrar sesión?</h3>
+                        <p className="text-sm text-[var(--text-secondary)] mb-6">¿Estás seguro de que quieres salir de tu cuenta?</p>
+                        <div className="flex flex-col gap-2">
+                            <button 
+                                onClick={() => { logout(); navigate('/'); }}
+                                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors"
+                            >
+                                Sí, cerrar sesión
+                            </button>
+                            <button 
+                                onClick={() => setShowSettings(false)}
+                                className="w-full py-2.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-bold rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

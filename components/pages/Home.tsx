@@ -5,7 +5,7 @@ import { db } from '../../services/db';
 import { Video, Notification as AppNotification, User, SystemSettings, Category } from '../../types';
 import { useNotifications } from '../../context/NotificationContext';
 import { 
-    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic
+    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic, Image, Plus
 } from 'lucide-react';
 import { useNavigate, Link, useLocation } from '../Router';
 import { useToast } from '../../context/ToastContext';
@@ -488,56 +488,49 @@ export default function Home() {
             
             {/* Main Content Area */}
             <div className="flex-1 w-full max-w-5xl mx-auto pb-24">
-                {/* Search Bar Section - Facebook Lite Style */}
-                <div className="sticky top-[96px] z-30 bg-[var(--bg-secondary)] border-b border-[var(--divider)] p-2 shadow-sm">
-                    <form onSubmit={handleSearchSubmit} ref={searchContainerRef} className="relative flex items-center gap-2">
-                        <div className="absolute left-3 text-[var(--text-secondary)]">
-                            <Search size={16} />
-                        </div>
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => handleSearchChange(e.target.value)}
-                            onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
-                            placeholder="Buscar..."
-                            className="flex-1 bg-[var(--bg-primary)] border border-[var(--divider)] rounded-md py-1.5 pl-9 pr-9 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-all"
-                        />
-                        <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-                            {searchQuery && (
-                                <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); updateUrl({ q: '' }); }} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                                    <X size={16} />
-                                </button>
-                            )}
-                            <button type="button" onClick={toggleVoiceSearch} className={`p-1.5 rounded-md transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-                                <Mic size={16} />
-                            </button>
+                {/* What's on your mind? Section */}
+                <div className="bg-[var(--bg-secondary)] p-3 flex items-center gap-3 border-b border-[var(--divider)]">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600 shrink-0">
+                        {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
+                    </div>
+                    <button onClick={() => navigate('/upload')} className="flex-1 h-9 bg-[var(--bg-primary)] border border-[var(--divider)] rounded-full px-4 text-left text-[var(--text-secondary)] text-sm">
+                        ¿Qué estás pensando?
+                    </button>
+                    <button onClick={() => navigate('/upload')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)]">
+                        <div className="text-green-500"><Image size={20} /></div>
+                        <span className="text-[10px] font-bold">Foto</span>
+                    </button>
+                </div>
+
+                {/* Stories Section */}
+                <div className="bg-[var(--bg-secondary)] py-3 border-b border-[var(--divider)] overflow-hidden">
+                    <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
+                        {/* Create Story */}
+                        <div className="relative min-w-[100px] h-40 bg-[var(--bg-primary)] rounded-xl overflow-hidden border border-[var(--divider)] shrink-0">
+                            <div className="h-2/3 overflow-hidden">
+                                {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
+                            </div>
+                            <div className="absolute top-[60%] left-1/2 -translate-x-1/2 w-8 h-8 bg-[#1877f2] rounded-full border-4 border-[var(--bg-secondary)] flex items-center justify-center text-white">
+                                <Plus size={20} strokeWidth={3} />
+                            </div>
+                            <div className="absolute bottom-2 left-0 right-0 text-center">
+                                <span className="text-[10px] font-bold text-[var(--text-primary)]">Crear historia</span>
+                            </div>
                         </div>
 
-                        {/* Suggestions Dropdown */}
-                        {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-md shadow-lg overflow-hidden z-[60]">
-                                <div className="max-h-[60vh] overflow-y-auto py-1">
-                                    {suggestions.map((s, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => handleSuggestionClick(s)}
-                                            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left"
-                                        >
-                                            <div className="w-7 h-7 rounded bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
-                                                {getSuggestionIcon(s.type)}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{s.label}</p>
-                                                <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">{s.type}</p>
-                                            </div>
-                                            <ChevronRight size={12} className="text-[var(--text-secondary)]" />
-                                        </button>
-                                    ))}
+                        {/* Mock Stories */}
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="relative min-w-[100px] h-40 bg-slate-800 rounded-xl overflow-hidden border border-[var(--divider)] shrink-0">
+                                <img src={`https://picsum.photos/seed/story${i}/200/300`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <div className="absolute top-2 left-2 w-8 h-8 rounded-full border-2 border-[#1877f2] overflow-hidden bg-indigo-600">
+                                    <img src={`https://picsum.photos/seed/avatar${i}/100/100`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                </div>
+                                <div className="absolute bottom-2 left-2 right-2">
+                                    <span className="text-[10px] font-bold text-white drop-shadow-md line-clamp-2">Usuario {i}</span>
                                 </div>
                             </div>
-                        )}
-                    </form>
+                        ))}
+                    </div>
                 </div>
 
                 {loading ? (

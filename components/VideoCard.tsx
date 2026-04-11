@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -404,28 +404,28 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   };
 
   return (
-    <div ref={cardRef} className={`flex flex-col bg-[var(--bg-secondary)] border-b border-[var(--divider)] mb-2 ${isWatched ? 'opacity-70' : ''}`}>
+    <div ref={cardRef} className={`flex flex-col bg-[var(--bg-secondary)] mb-2 shadow-sm ${isWatched ? 'opacity-70' : ''}`}>
       {/* Header: User Info */}
-      <div className="flex items-center justify-between p-2.5">
+      <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-2">
           <Link to={`/channel/${video.creatorId}`} className="shrink-0">
               {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-full object-cover bg-[var(--bg-tertiary)] border border-[var(--divider)]" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-full object-cover bg-[var(--bg-tertiary)]" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
               ) : (
                   <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-sm font-bold text-white uppercase">{video.creatorName?.[0] || '?'}</div>
               )}
           </Link>
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
-              <Link to={`/channel/${video.creatorId}`} className="text-sm font-bold text-[var(--text-primary)] hover:underline truncate max-w-[150px]">
+              <Link to={`/channel/${video.creatorId}`} className="text-[15px] font-bold text-[var(--text-primary)] hover:underline truncate max-w-[200px] leading-tight">
                 {video.creatorName || 'Usuario'}
               </Link>
-              <CheckCircle2 size={12} className="text-[var(--accent)] fill-[var(--accent)]/10" />
+              <CheckCircle2 size={14} className="text-[var(--accent)] fill-[var(--accent)]/10" />
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+            <div className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] leading-tight">
               <span>{formatTimeAgo(video.createdAt)}</span>
               <span>•</span>
-              <ExternalLink size={10} />
+              <Globe size={12} />
             </div>
           </div>
         </div>
@@ -434,9 +434,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           <div className="relative" ref={menuRef}>
             <button 
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }} 
-                className={`p-2 rounded-full hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all ${showMenu ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' : ''}`}
+                className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-full transition-colors"
             >
-                <MoreVertical size={18} />
+                <MoreVertical size={20} />
             </button>
             
             {showMenu && (
@@ -474,24 +474,27 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 </div>
             )}
           </div>
+          <button className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-full transition-colors">
+            <CloseIcon size={20} />
+          </button>
         </div>
       </div>
 
       {/* Text Content: Title & Description */}
-      <div className="px-3 pb-2">
+      <div className="px-3 pb-3">
         <div className="relative">
-            <div className={`text-sm font-normal text-[var(--text-primary)] leading-normal ${!showFullTitle ? 'line-clamp-3' : ''}`}>
+            <div className={`text-[15px] font-normal text-[var(--text-primary)] leading-snug ${!showFullTitle ? 'line-clamp-4' : ''}`}>
               <span className="font-bold">{video.title}</span>
               {video.description && (
-                  <span className="text-[var(--text-secondary)] ml-1">
+                  <span className="text-[var(--text-primary)] ml-1">
                       {video.description}
                   </span>
               )}
             </div>
-            {((video.title?.length || 0) + (video.description?.length || 0)) > 100 && !showFullTitle && (
+            {((video.title?.length || 0) + (video.description?.length || 0)) > 150 && !showFullTitle && (
                 <button 
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowFullTitle(true); }}
-                    className="text-[var(--accent)] text-xs font-bold hover:underline mt-1"
+                    className="text-[var(--text-secondary)] text-sm font-bold hover:underline mt-1"
                 >
                     Ver más
                 </button>

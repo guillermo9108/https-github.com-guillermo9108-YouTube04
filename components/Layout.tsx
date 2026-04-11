@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon, Wallet } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon, Wallet, Plus, Users, MessageCircle, PlaySquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -87,51 +87,57 @@ export default function Layout() {
   return (
     <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] pt-[96px]`}>
       {/* Facebook Lite Style Header */}
-      <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)] shadow-sm">
+      <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)]">
         {/* Top Bar: Logo & Actions */}
-        <div className="flex items-center justify-between px-3 py-1.5">
-          <Link to="/" className="flex items-center gap-1.5">
-            <div className="w-7 h-7 bg-[#1877f2] rounded flex items-center justify-center">
-              <Zap size={18} className="text-white fill-white" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-[#1877f2]">
-              streampay
+        <div className="flex items-center justify-between px-3 h-12">
+          <Link to="/" className="flex items-center">
+            <span className="text-2xl font-bold tracking-tighter text-[#1877f2] lowercase">
+              facebook
             </span>
           </Link>
           <div className="flex items-center gap-1">
-            <button onClick={() => navigate('/search')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors">
-              <Search size={20} />
+            <button onClick={() => navigate('/upload')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors bg-[var(--bg-tertiary)]">
+              <Plus size={20} strokeWidth={3} />
             </button>
-            <button onClick={() => navigate('/notifications')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors relative">
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-600 border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+            <button onClick={() => navigate('/search')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors bg-[var(--bg-tertiary)]">
+              <Search size={20} strokeWidth={3} />
             </button>
-            <button onClick={() => navigate('/menu')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors">
-              <MenuIcon size={20} />
+            <button onClick={() => navigate('/menu')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors bg-[var(--bg-tertiary)]">
+              <MenuIcon size={20} strokeWidth={3} />
             </button>
           </div>
         </div>
 
         {/* Tab Bar: Navigation */}
-        <nav className="flex items-center justify-around">
-          <Link to="/" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <Home size={22} />
+        <nav className="flex items-center justify-around h-11">
+          <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Home size={24} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
+            <span className="absolute top-1 right-1/4 min-w-[16px] h-4 bg-red-600 border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1">
+              15+
+            </span>
           </Link>
-          <Link to="/shorts" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <Smartphone size={22} />
+          <Link to="/friends" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/friends' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Users size={24} strokeWidth={location.pathname === '/friends' ? 2.5 : 2} />
           </Link>
-          <Link to="/upload" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/upload' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <Upload size={22} />
+          <Link to="/messages" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/messages' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <MessageCircle size={24} strokeWidth={location.pathname === '/messages' ? 2.5 : 2} />
           </Link>
-          <Link to="/marketplace" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <ShoppingBag size={22} />
+          <Link to="/shorts" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <PlaySquare size={24} strokeWidth={location.pathname === '/shorts' ? 2.5 : 2} />
+            <span className="absolute top-1 right-1/4 min-w-[16px] h-4 bg-red-600 border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1">
+              1
+            </span>
           </Link>
-          <Link to="/wallet" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/wallet' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <Wallet size={22} />
+          <Link to="/notifications" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/notifications' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Bell size={24} strokeWidth={location.pathname === '/notifications' ? 2.5 : 2} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1/4 min-w-[16px] h-4 bg-red-600 border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
+          <Link to="/marketplace" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <ShoppingBag size={24} strokeWidth={location.pathname === '/marketplace' ? 2.5 : 2} />
           </Link>
         </nav>
       </header>

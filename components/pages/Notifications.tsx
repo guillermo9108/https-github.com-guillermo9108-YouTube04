@@ -83,10 +83,19 @@ export default function Notifications() {
             </header>
 
             {/* Content */}
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto bg-[var(--bg-secondary)] min-h-screen">
+                <div className="p-3 flex items-center justify-between">
+                    <h2 className="text-base font-bold text-[var(--text-primary)]">Nuevas</h2>
+                    {allNotifications.length > 0 && (
+                        <button onClick={handleMarkAllRead} className="text-sm text-[var(--accent)] font-medium">
+                            Marcar como leídas
+                        </button>
+                    )}
+                </div>
+
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--accent)]"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent)]"></div>
                     </div>
                 ) : allNotifications.length === 0 ? (
                     <div className="py-20 text-center">
@@ -101,55 +110,52 @@ export default function Notifications() {
                         </div>
                     </div>
                 ) : (
-                    <div className="divide-y divide-[var(--divider)]">
+                    <div className="flex flex-col">
                         {allNotifications.map((n: any) => (
                             <button
                                 key={n.id}
                                 onClick={() => handleNotifClick(n)}
-                                className={`w-full p-4 flex gap-3 text-left transition-all hover:bg-[var(--bg-hover)] ${
-                                    Number(n.isRead) === 0 ? 'bg-[var(--bg-tertiary)]' : 'bg-[var(--bg-secondary)]'
+                                className={`w-full px-3 py-2.5 flex gap-3 text-left transition-all hover:bg-[var(--bg-hover)] ${
+                                    Number(n.isRead) === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'bg-transparent'
                                 }`}
                             >
-                                {/* Avatar/Thumbnail */}
-                                <div
-                                    className={`shrink-0 overflow-hidden ${
-                                        n.type === 'UPLOAD' ? 'w-20 aspect-video rounded-md' : 'w-12 h-12 rounded-full'
-                                    } bg-[var(--bg-tertiary)] flex items-center justify-center border border-[var(--divider)]`}
-                                >
-                                    {n.avatarUrl ? (
-                                        <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <Bell size={18} className="text-[var(--text-secondary)]" />
-                                    )}
+                                {/* Avatar/Icon */}
+                                <div className="shrink-0 relative">
+                                    <div className="w-14 h-14 rounded-full overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--divider)]">
+                                        {n.avatarUrl ? (
+                                            <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-bold">
+                                                {n.type?.[0] || 'N'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2 border-[var(--bg-secondary)] ${
+                                        n.type === 'SALE' ? 'bg-emerald-500' : 
+                                        n.type === 'UPLOAD' ? 'bg-indigo-500' : 'bg-blue-500'
+                                    }`}>
+                                        {n.type === 'SALE' ? <ShoppingBag size={12} className="text-white" /> : 
+                                         n.type === 'UPLOAD' ? <UploadIcon size={12} className="text-white" /> : 
+                                         <Bell size={12} className="text-white" />}
+                                    </div>
                                 </div>
 
                                 {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                                        <span
-                                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                                                n.type === 'SALE'
-                                                    ? 'bg-emerald-500/10 text-emerald-500'
-                                                    : n.type === 'UPLOAD'
-                                                    ? 'bg-indigo-500/10 text-indigo-500'
-                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-                                            }`}
-                                        >
-                                            {n.type}
-                                        </span>
-                                        <span className="text-[10px] text-[var(--text-secondary)]">{formatTimeAgo(n.timestamp)}</span>
-                                    </div>
-                                    <p className="text-sm text-[var(--text-primary)] leading-snug mb-1">{n.text}</p>
-                                    {n.type === 'SALE' && n.metadata?.net && (
-                                        <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-500">
-                                            <TrendingUp size={10} />
-                                            Ganaste: +{Number(n.metadata.net).toFixed(2)} $
-                                        </div>
-                                    )}
-                                    {Number(n.isRead) === 0 && (
-                                        <div className="w-2 h-2 rounded-full bg-[var(--accent)] mt-1.5"></div>
-                                    )}
+                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                    <p className={`text-[14px] leading-snug ${Number(n.isRead) === 0 ? 'font-bold text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>
+                                        {n.text}
+                                    </p>
+                                    <span className={`text-[12px] mt-0.5 ${Number(n.isRead) === 0 ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}>
+                                        {formatTimeAgo(n.timestamp)}
+                                    </span>
                                 </div>
+
+                                {/* Unread dot */}
+                                {Number(n.isRead) === 0 && (
+                                    <div className="shrink-0 flex items-center">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]"></div>
+                                    </div>
+                                )}
                             </button>
                         ))}
                     </div>
