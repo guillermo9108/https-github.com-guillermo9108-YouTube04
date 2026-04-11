@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -85,59 +85,59 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-black pt-[104px]`}>
+    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] pt-[96px]`}>
       {/* Facebook Lite Style Header */}
-      <header className="fixed top-0 left-0 right-0 bg-slate-900 z-50 border-b border-white/5 shadow-lg">
+      <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)] shadow-sm">
         {/* Top Bar: Logo & Actions */}
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-600/20">
-              <Zap size={20} className="text-white fill-white" />
+        <div className="flex items-center justify-between px-3 py-1.5">
+          <Link to="/" className="flex items-center gap-1.5">
+            <div className="w-7 h-7 bg-[#1877f2] rounded flex items-center justify-center">
+              <Zap size={18} className="text-white fill-white" />
             </div>
-            <span className="text-xl font-black italic tracking-tighter text-white">
-              STREAM<span className="text-indigo-500">PAY</span>
+            <span className="text-lg font-bold tracking-tight text-[#1877f2]">
+              streampay
             </span>
           </Link>
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/search')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate('/search')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors">
               <Search size={20} />
             </button>
-            <button onClick={() => navigate('/notifications')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors relative">
+            <button onClick={() => navigate('/notifications')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors relative">
               <Bell size={20} />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[8px] font-black text-white">
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-600 border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
-            <button onClick={() => navigate('/profile')} className="p-1 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
-              <Avatar size={28} />
+            <button onClick={() => navigate('/menu')} className="p-2 text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-full transition-colors">
+              <MenuIcon size={20} />
             </button>
           </div>
         </div>
 
         {/* Tab Bar: Navigation */}
-        <nav className="flex items-center justify-around border-t border-white/5">
-          <Link to="/" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
-            <Home size={24} />
+        <nav className="flex items-center justify-around">
+          <Link to="/" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Home size={22} />
           </Link>
-          <Link to="/shorts" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/shorts' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
-            <Smartphone size={24} />
+          <Link to="/shorts" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Smartphone size={22} />
           </Link>
-          <Link to="/upload" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/upload' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
-            <Upload size={24} />
+          <Link to="/upload" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/upload' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Upload size={22} />
           </Link>
-          <Link to="/marketplace" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
-            <ShoppingBag size={24} />
+          <Link to="/marketplace" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <ShoppingBag size={22} />
           </Link>
-          <Link to="/menu" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/menu' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
-            <MenuIcon size={24} />
+          <Link to="/wallet" className={`flex-1 flex flex-col items-center py-2.5 border-b-2 transition-all ${location.pathname === '/wallet' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Wallet size={22} />
           </Link>
         </nav>
       </header>
 
       {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
-      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'container mx-auto px-4 max-w-5xl'}`}>
+      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'w-full max-w-5xl mx-auto'}`}>
         <Outlet />
       </main>
 

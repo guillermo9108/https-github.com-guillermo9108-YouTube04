@@ -168,59 +168,76 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 pointer-events-none z-10" />
       
-      <div className="absolute right-2 bottom-24 z-30 flex flex-col items-center gap-5 pb-safe">
-        <div className="flex flex-col items-center gap-1">
-          <button onClick={(e) => { e.stopPropagation(); handleRate('like'); }} className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-black/40 transition-colors ${interaction?.liked ? 'text-red-500' : 'text-white'}`}>
-             <Heart size={26} fill={interaction?.liked ? "currentColor" : "white"} fillOpacity={interaction?.liked ? 1 : 0.2} />
+      <div className="absolute right-2 bottom-24 z-30 flex flex-col items-center gap-4 pb-safe">
+        <div className="flex flex-col items-center">
+          <button onClick={(e) => { e.stopPropagation(); handleRate('like'); }} className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md bg-black/30 transition-colors ${interaction?.liked ? 'text-[var(--accent)]' : 'text-white'}`}>
+             <Heart size={24} fill={interaction?.liked ? "currentColor" : "none"} />
           </button>
-          <span className="text-[10px] font-black text-white drop-shadow-md">{likeCount}</span>
+          <span className="text-[11px] font-bold text-white drop-shadow-md mt-1">{likeCount}</span>
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-          <button onClick={(e) => { e.stopPropagation(); handleRate('dislike'); }} className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-black/40 transition-colors ${interaction?.disliked ? 'text-red-500' : 'text-white'}`}>
-             <ThumbsDown size={26} fill={interaction?.disliked ? "currentColor" : "white"} fillOpacity={interaction?.disliked ? 1 : 0.2} />
+        <div className="flex flex-col items-center">
+          <button onClick={(e) => { e.stopPropagation(); handleRate('dislike'); }} className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md bg-black/30 transition-colors ${interaction?.disliked ? 'text-red-500' : 'text-white'}`}>
+             <ThumbsDown size={24} fill={interaction?.disliked ? "currentColor" : "none"} />
           </button>
-          <span className="text-[10px] font-black text-white drop-shadow-md">{dislikeCount > 0 ? dislikeCount : 'NO'}</span>
+          <span className="text-[11px] font-bold text-white drop-shadow-md mt-1">{dislikeCount > 0 ? dislikeCount : '0'}</span>
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-          <button onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-black/40 text-white">
-             <MessageCircle size={26} fill="white" fillOpacity={0.2} />
+        <div className="flex flex-col items-center">
+          <button onClick={(e) => { e.stopPropagation(); setShowComments(true); }} className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md bg-black/30 text-white">
+             <MessageCircle size={24} />
           </button>
-          <span className="text-[10px] font-black text-white drop-shadow-md">{comments.length}</span>
+          <span className="text-[11px] font-bold text-white drop-shadow-md mt-1">{comments.length}</span>
         </div>
 
-        <button onClick={(e) => { e.stopPropagation(); onOpenShare(video); }} className="w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md bg-black/40 text-white">
-            <Share2 size={26} fill="white" fillOpacity={0.2} />
+        <button onClick={(e) => { e.stopPropagation(); onOpenShare(video); }} className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md bg-black/30 text-white">
+            <Share2 size={24} />
         </button>
       </div>
 
-      <div className="absolute bottom-10 left-3 right-16 z-30 text-white flex flex-col gap-3 pointer-events-none pb-safe">
-         <div className="flex items-center gap-3 pointer-events-auto">
+      <div className="absolute bottom-8 left-3 right-16 z-30 text-white flex flex-col gap-2 pointer-events-none pb-safe">
+         <div className="flex items-center gap-2 pointer-events-auto">
             <Link to={`/channel/${video.creatorId}`} className="relative shrink-0">
-                <div className="w-11 h-11 rounded-full border-2 border-white overflow-hidden bg-slate-800 shadow-xl">
-                    {video.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-white bg-indigo-600">{video.creatorName?.[0] || '?'}</div>}
+                <div className="w-10 h-10 rounded-full border border-white/50 overflow-hidden bg-slate-800">
+                    {video.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-white bg-[var(--accent)]">{video.creatorName?.[0] || '?'}</div>}
                 </div>
             </Link>
             <div className="min-w-0">
-                <Link to={`/channel/${video.creatorId}`} className="font-black text-sm drop-shadow-md hover:underline truncate block">@{video.creatorName || 'Usuario'}</Link>
-                <button className="bg-white/10 backdrop-blur-md border border-white/20 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest text-white">Seguir</button>
+                <Link to={`/channel/${video.creatorId}`} className="font-bold text-sm drop-shadow-md hover:underline truncate block">@{video.creatorName || 'Usuario'}</Link>
+                <button className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-bold uppercase text-white">Seguir</button>
             </div>
          </div>
-         <div className="pointer-events-auto"><h2 className="text-xs font-bold leading-tight mb-1 drop-shadow-md uppercase italic">{video.title}</h2><p className="text-[10px] text-slate-200 line-clamp-2 opacity-80 drop-shadow-sm font-medium">{video.description}</p></div>
+         <div className="pointer-events-auto">
+            <h2 className="text-sm font-bold leading-tight mb-1 drop-shadow-md">{video.title}</h2>
+            <p className="text-xs text-slate-200 line-clamp-2 opacity-90 drop-shadow-sm">{video.description}</p>
+         </div>
       </div>
 
       {showComments && (
         <div className="fixed inset-0 z-[100] flex items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="w-full bg-slate-900 rounded-t-[40px] h-[70%] flex flex-col border-t border-white/10 shadow-2xl animate-in slide-in-from-bottom" onClick={(e) => e.stopPropagation()}>
-              <div className="p-5 border-b border-white/5 flex justify-between items-center"><h3 className="font-black text-white uppercase text-xs tracking-widest">Conversación ({comments.length})</h3><button onClick={() => setShowComments(false)} className="text-slate-400 bg-slate-800 p-2 rounded-full"><X size={20} /></button></div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                 {comments.length === 0 ? <p className="text-center text-slate-600 py-20 italic uppercase text-[10px] font-bold tracking-widest">No hay comentarios</p> : comments.map(c => (
-                      <div key={c.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2">
-                         <div className="w-8 h-8 rounded-full bg-slate-800 shrink-0 border border-white/5 overflow-hidden">
-                            {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-400">{c?.username?.[0] || '?'}</div>}
+           <div className="w-full bg-[var(--bg-secondary)] rounded-t-xl h-[70%] flex flex-col border-t border-[var(--divider)] shadow-2xl animate-in slide-in-from-bottom" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-[var(--divider)] flex justify-between items-center">
+                <h3 className="font-bold text-[var(--text-primary)] text-sm">Comentarios ({comments.length})</h3>
+                <button onClick={() => setShowComments(false)} className="text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-1.5 rounded-full"><X size={20} /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                 {comments.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                        <MessageCircle size={40} className="text-[var(--text-secondary)] mb-2" />
+                        <p className="text-sm font-bold text-[var(--text-secondary)]">No hay comentarios aún</p>
+                    </div>
+                 ) : comments.map(c => (
+                      <div key={c.id} className="flex gap-3">
+                         <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] shrink-0 border border-[var(--divider)] overflow-hidden">
+                            {c.userAvatarUrl ? <img src={c.userAvatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-[var(--text-secondary)]">{c?.username?.[0] || '?'}</div>}
                          </div>
-                         <div><div className="flex items-baseline gap-2"><span className="text-xs font-black text-slate-300">@{c.username || 'Anónimo'}</span><span className="text-[8px] text-slate-600 uppercase font-bold">{new Date(c.timestamp * 1000).toLocaleDateString()}</span></div><p className="text-xs text-slate-400 mt-0.5 leading-snug">{c.text}</p></div>
+                         <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-[var(--text-primary)]">@{c.username || 'Anónimo'}</span>
+                                <span className="text-[10px] text-[var(--text-secondary)]">{new Date(c.timestamp * 1000).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-sm text-[var(--text-primary)] mt-0.5 leading-snug">{c.text}</p>
+                         </div>
                       </div>
                  ))}
               </div>
@@ -232,7 +249,10 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
                     if (c) setComments(p => [c, ...p]); 
                     setNewComment(''); 
                   } catch(err) {}
-              }} className="p-4 bg-slate-950 border-t border-white/5 flex gap-2 pb-safe"><input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} className="flex-1 bg-slate-900 border border-white/10 rounded-full px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all" placeholder="Escribe un comentario..." /><button type="submit" disabled={!newComment.trim()} className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-30 shadow-lg active:scale-90 transition-all"><Send size={18} /></button></form>
+              }} className="p-4 bg-[var(--bg-secondary)] border-t border-[var(--divider)] flex gap-2 pb-safe">
+                <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)} className="flex-1 bg-[var(--bg-tertiary)] border border-[var(--divider)] rounded-md px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all" placeholder="Escribe un comentario..." />
+                <button type="submit" disabled={!newComment.trim()} className="bg-[var(--accent)] text-white w-9 h-9 rounded-md flex items-center justify-center disabled:opacity-30 transition-all"><Send size={18} /></button>
+              </form>
            </div>
            <div className="absolute inset-0 -z-10" onClick={() => setShowComments(false)}></div>
         </div>

@@ -483,15 +483,16 @@ export default function Home() {
     ];
 
     return (
-        <div className="relative pb-20">
+        <div className="flex flex-col min-h-screen bg-[var(--bg-primary)]">
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
-
-            <div className="pt-4 px-0">
-                {/* Search Bar - Facebook Lite Style */}
-                <div className="px-3 mb-6">
-                    <form onSubmit={handleSearchSubmit} ref={searchContainerRef} className="relative group">
-                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                            <Search size={18} className="text-slate-500 group-focus-within:text-indigo-500 transition-colors" />
+            
+            {/* Main Content Area */}
+            <div className="flex-1 w-full max-w-5xl mx-auto pb-24">
+                {/* Search Bar Section - Facebook Lite Style */}
+                <div className="sticky top-[96px] z-30 bg-[var(--bg-secondary)] border-b border-[var(--divider)] p-2 shadow-sm">
+                    <form onSubmit={handleSearchSubmit} ref={searchContainerRef} className="relative flex items-center gap-2">
+                        <div className="absolute left-3 text-[var(--text-secondary)]">
+                            <Search size={16} />
                         </div>
                         <input
                             ref={searchInputRef}
@@ -499,38 +500,38 @@ export default function Home() {
                             value={searchQuery}
                             onChange={(e) => handleSearchChange(e.target.value)}
                             onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
-                            placeholder="Buscar videos, audios, carpetas..."
-                            className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3.5 pl-12 pr-12 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-slate-900 transition-all shadow-xl"
+                            placeholder="Buscar..."
+                            className="flex-1 bg-[var(--bg-primary)] border border-[var(--divider)] rounded-md py-1.5 pl-9 pr-9 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-all"
                         />
                         <div className="absolute inset-y-0 right-2 flex items-center gap-1">
                             {searchQuery && (
-                                <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); updateUrl({ q: '' }); }} className="p-2 text-slate-500 hover:text-white transition-colors">
-                                    <X size={18} />
+                                <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); updateUrl({ q: '' }); }} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                                    <X size={16} />
                                 </button>
                             )}
-                            <button type="button" onClick={toggleVoiceSearch} className={`p-2 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-slate-500 hover:text-white'}`}>
-                                <Mic size={18} />
+                            <button type="button" onClick={toggleVoiceSearch} className={`p-1.5 rounded-md transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <Mic size={16} />
                             </button>
                         </div>
 
                         {/* Suggestions Dropdown */}
                         {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="max-h-[60vh] overflow-y-auto py-2">
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-md shadow-lg overflow-hidden z-[60]">
+                                <div className="max-h-[60vh] overflow-y-auto py-1">
                                     {suggestions.map((s, i) => (
                                         <button
                                             key={i}
                                             onClick={() => handleSuggestionClick(s)}
-                                            className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors text-left group"
+                                            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                            <div className="w-7 h-7 rounded bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
                                                 {getSuggestionIcon(s.type)}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-white truncate">{s.label}</p>
-                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">{s.type}</p>
+                                                <p className="text-sm font-medium text-[var(--text-primary)] truncate">{s.label}</p>
+                                                <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">{s.type}</p>
                                             </div>
-                                            <ChevronRight size={14} className="text-slate-700 group-hover:text-indigo-400 transition-colors" />
+                                            <ChevronRight size={12} className="text-[var(--text-secondary)]" />
                                         </button>
                                     ))}
                                 </div>
@@ -540,89 +541,91 @@ export default function Home() {
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
+                    <div className="flex flex-col items-center justify-center py-20 gap-3"><Loader2 className="animate-spin text-[var(--accent)]" size={32} /><p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Cargando...</p></div>
                 ) : (
-                    <div className="space-y-12 animate-in fade-in duration-1000">
+                    <div className="space-y-4 animate-in fade-in duration-500">
                         {folders.length > 0 && showFoldersGrid && (
-                            <div className="space-y-6 px-1">
-                                <div className="flex items-center gap-3 px-0"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em]">{searchQuery ? 'Carpetas coincidentes' : 'Explorar Carpetas'}</h2></div>
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-6 duration-500">
+                            <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
+                                <div className="flex items-center justify-between p-3">
+                                    <h2 className="text-sm font-bold text-[var(--text-primary)]">{searchQuery ? 'Carpetas' : 'Explorar Carpetas'}</h2>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-0.5 bg-[var(--divider)]">
                                     {folders.map(folder => (
-                                        <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
-                                            <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
-                                            <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div>
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        <div className="flex gap-1.5">
-                                                            {folder.sortOrder && folder.sortOrder !== 'LATEST' && (
-                                                                <div className="bg-amber-500/30 backdrop-blur-md px-2 py-0.5 rounded-lg border border-amber-500/30 flex items-center gap-1">
-                                                                    {folder.sortOrder === 'ALPHA' ? <SortAsc size={10} className="text-amber-400" /> : <Zap size={10} className="text-amber-400" />}
-                                                                    <span className="text-[8px] text-amber-200 font-black uppercase tracking-widest">{folder.sortOrder}</span>
-                                                                </div>
-                                                            )}
-                                                            <div className="bg-indigo-600/30 backdrop-blur-md px-2 py-0.5 rounded-lg border border-indigo-500/30">
-                                                                <span className="text-[8px] text-indigo-200 font-black uppercase tracking-widest">{folder.count} ITEMS</span>
-                                                            </div>
-                                                        </div>
-                                                        {isAdmin && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingFolder(folder); }} className="p-2 bg-slate-950/80 hover:bg-indigo-600 text-white rounded-xl border border-white/10 shadow-xl transition-all active:scale-90 pointer-events-auto"><Edit3 size={14}/></button>)}
-                                                    </div>
-                                                </div>
-                                                <div className="mt-auto"><h3 className="text-base font-black text-white uppercase tracking-tight text-left leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-indigo-300 transition-colors line-clamp-2">{folder.name}</h3><div className="w-6 h-1 bg-indigo-500 mt-2 rounded-full group-hover:w-full transition-all duration-700"></div></div></div>
+                                        <div key={folder.name} className="relative aspect-square bg-[var(--bg-secondary)] group overflow-hidden">
+                                            <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); }} className="absolute inset-0 z-0">
+                                                {folder.thumbnailUrl ? ( 
+                                                    <img src={folder.thumbnailUrl} className="w-full h-full object-cover opacity-80" referrerPolicy="no-referrer" /> 
+                                                ) : ( 
+                                                    <div className="w-full h-full flex items-center justify-center bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"> 
+                                                        <Folder size={32} className="opacity-40" /> 
+                                                    </div> 
+                                                )}
+                                                <div className="absolute inset-0 bg-black/20"></div>
+                                            </button>
+                                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/40 backdrop-blur-sm pointer-events-none">
+                                                <h3 className="text-[11px] font-bold text-white truncate leading-tight">{folder.name}</h3>
+                                                <p className="text-[9px] text-white/80 font-medium">{folder.count} items</p>
+                                            </div>
+                                            {isAdmin && (
+                                                <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingFolder(folder); }} className="absolute top-1 right-1 p-1.5 bg-black/40 text-white rounded-md border border-white/20 z-10">
+                                                    <Edit3 size={12}/>
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         )}
 
-                        <div className="space-y-8">
-                            {!searchQuery && ( <div className="flex items-center gap-3 px-3"><div className={`w-1.5 h-1.5 rounded-full ${mediaFilter === 'AUDIO' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-2 flex-wrap">{selectedCategory !== 'TODOS' ? `Filtrando por: ${selectedCategory}` : (parentFolderName ? `Contenido en ${parentFolderName}` : 'Novedades')}{mediaFilter !== 'ALL' && <span className="text-slate-500 text-[9px] lowercase italic">({mediaFilter.toLowerCase()}s)</span>}{userSortOrder && <span className="text-indigo-400 text-[9px] lowercase border border-indigo-500/30 px-2 py-0.5 rounded-full whitespace-nowrap">orden: {sortOptions.find(o => o.id === userSortOrder)?.label.toLowerCase()}</span>}<span className="flex-1 h-px bg-white/10 min-w-[20px]"></span></h2></div> )}
+                        <div className="bg-[var(--bg-secondary)]">
+                            {!searchQuery && ( 
+                                <div className="p-3 border-b border-[var(--divider)]">
+                                    <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                                        {selectedCategory !== 'TODOS' ? selectedCategory : (parentFolderName ? parentFolderName : 'Novedades')}
+                                        {mediaFilter !== 'ALL' && <span className="text-[var(--text-secondary)] text-[10px] font-normal">({mediaFilter.toLowerCase()}s)</span>}
+                                    </h2>
+                                </div> 
+                            )}
                             {searchQuery && ( 
-                                <div className="flex items-center justify-between px-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-                                        <h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em] flex items-center gap-2 flex-wrap">
-                                            Resultados para: {searchQuery}
-                                            <span className="w-12 h-px bg-white/10"></span>
-                                        </h2>
-                                    </div>
-                                    <div className="flex items-center gap-4">
+                                <div className="flex items-center justify-between p-3 border-b border-[var(--divider)]">
+                                    <h2 className="text-sm font-bold text-[var(--text-primary)]">Resultados: {searchQuery}</h2>
+                                    <div className="flex items-center gap-2">
                                         <button 
                                             onClick={() => setShowSortMenu(!showSortMenu)} 
-                                            className={`p-2 rounded-xl transition-all border flex items-center gap-2 ${userSortOrder ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}
+                                            className={`p-1.5 rounded border text-[10px] font-bold uppercase ${userSortOrder ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-primary)] border-[var(--divider)] text-[var(--text-secondary)]'}`}
                                         >
-                                            <ArrowDownUp size={12}/>
-                                            <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">
-                                                {userSortOrder ? sortOptions.find(o => o.id === userSortOrder)?.label : 'Ordenar'}
-                                            </span>
+                                            {userSortOrder ? sortOptions.find(o => o.id === userSortOrder)?.label : 'Ordenar'}
                                         </button>
-                                        <button onClick={() => { updateUrl({ q: '' }); fetchVideos(0, true); }} className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5"><X size={12}/> Limpiar</button>
+                                        <button onClick={() => { updateUrl({ q: '' }); fetchVideos(0, true); }} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                                            <X size={14}/>
+                                        </button>
                                     </div>
                                 </div> 
                             )}
                             {videos.length > 0 ? ( 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 sm:gap-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-[var(--divider)]">
                                     {processedVideos.map(v => ( 
-                                        <VideoCard 
-                                            key={v.id} 
-                                            video={v} 
-                                            isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
-                                            isWatched={watchedIds.includes(v.id)} 
-                                            onCategoryClick={() => handleCategoryClick(v.category)}
-                                            context={{ 
-                                                query: searchQuery, 
-                                                category: selectedCategory, 
-                                                folder: currentFolder, 
-                                                page: page, 
-                                                sort_order: userSortOrder || appliedSortOrder 
-                                            }} 
-                                        /> 
+                                        <div key={v.id} className="bg-[var(--bg-secondary)]">
+                                            <VideoCard 
+                                                video={v} 
+                                                isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
+                                                isWatched={watchedIds.includes(v.id)} 
+                                                onCategoryClick={() => handleCategoryClick(v.category)}
+                                                context={{ 
+                                                    query: searchQuery, 
+                                                    category: selectedCategory, 
+                                                    folder: currentFolder, 
+                                                    page: page, 
+                                                    sort_order: userSortOrder || appliedSortOrder 
+                                                }} 
+                                            /> 
+                                        </div>
                                     ))}
                                 </div> 
                             ) : (folders.length === 0 && !loading) && ( 
-                                <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4">
-                                    <Folder size={80} />
-                                    <p className="font-black uppercase tracking-widest">Sin contenido disponible</p>
+                                <div className="text-center py-20 text-[var(--text-secondary)] flex flex-col items-center gap-2">
+                                    <Folder size={48} className="opacity-20" />
+                                    <p className="text-sm font-bold">Sin contenido</p>
                                 </div> 
                             )}
                         </div>

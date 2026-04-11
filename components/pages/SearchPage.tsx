@@ -120,31 +120,31 @@ export default function SearchPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#18191a]">
+        <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[#242526] border-b border-white/5 shadow-lg">
+            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
                 <div className="flex items-center gap-3 px-4 h-14">
                     <button
                         onClick={() => navigate(-1)}
-                        className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors shrink-0"
+                        className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors shrink-0"
                     >
-                        <ChevronLeft size={24} className="text-[#e4e6eb]" />
+                        <ChevronLeft size={24} className="text-[var(--text-primary)]" />
                     </button>
 
                     {/* Search Input */}
                     <form onSubmit={handleSearchSubmit} className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b3b8]" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
                         <input
                             ref={searchInputRef}
                             type="text"
                             value={searchQuery}
                             onChange={(e) => handleSearchChange(e.target.value)}
-                            placeholder="Buscar videos, categorías, carpetas..."
-                            className={`w-full bg-[#3a3b3c] border border-white/10 rounded-full pl-10 pr-20 py-2.5 text-sm text-[#e4e6eb] placeholder-[#b0b3b8] focus:bg-[#4e4f50] focus:border-[#1877f2] outline-none transition-all ${
+                            placeholder="Buscar..."
+                            className={`w-full bg-[var(--bg-tertiary)] border border-[var(--divider)] rounded-md pl-9 pr-16 py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:bg-[var(--bg-secondary)] focus:border-[var(--accent)] outline-none transition-all ${
                                 isListening ? 'ring-2 ring-red-500 animate-pulse' : ''
                             }`}
                         />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                             {searchQuery && (
                                 <button
                                     type="button"
@@ -153,18 +153,18 @@ export default function SearchPage() {
                                         handleSearchChange('');
                                         searchInputRef.current?.focus();
                                     }}
-                                    className="w-8 h-8 rounded-full bg-[#4e4f50] flex items-center justify-center hover:bg-[#5a5b5c] transition-colors"
+                                    className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                 >
-                                    <X size={16} className="text-[#e4e6eb]" />
+                                    <X size={16} />
                                 </button>
                             )}
                             <button
                                 type="button"
                                 onClick={toggleVoiceSearch}
-                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                                className={`p-1.5 rounded-md transition-colors ${
                                     isListening
                                         ? 'bg-red-500 text-white'
-                                        : 'bg-[#4e4f50] hover:bg-[#5a5b5c] text-[#e4e6eb]'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                             >
                                 <Mic size={16} />
@@ -178,28 +178,28 @@ export default function SearchPage() {
             <div className="max-w-2xl mx-auto">
                 {/* Search History */}
                 {!searchQuery && searchHistory.length > 0 && (
-                    <div className="bg-[#242526] border-b border-white/5">
+                    <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
                         <div className="flex items-center justify-between px-4 py-3">
-                            <h2 className="text-sm font-bold text-[#e4e6eb] uppercase tracking-wide">Búsquedas recientes</h2>
+                            <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Búsquedas recientes</h2>
                             <button
                                 onClick={clearHistory}
-                                className="text-xs text-[#1877f2] hover:underline font-semibold"
+                                className="text-xs text-[var(--accent)] hover:underline font-bold"
                             >
                                 Borrar todo
                             </button>
                         </div>
-                        <div className="divide-y divide-white/5">
+                        <div className="divide-y divide-[var(--divider)]">
                             {searchHistory.map((item, i) => (
                                 <button
                                     key={i}
                                     onClick={() => handleSuggestionClick({ type: 'HISTORY', value: item })}
-                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3a3b3c] transition-colors text-left"
+                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center">
-                                        <History size={18} className="text-[#b0b3b8]" />
+                                    <div className="w-8 h-8 rounded-md bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                        <History size={16} className="text-[var(--text-secondary)]" />
                                     </div>
-                                    <span className="flex-1 text-sm text-[#e4e6eb]">{item}</span>
-                                    <ChevronRight size={16} className="text-[#b0b3b8]" />
+                                    <span className="flex-1 text-sm text-[var(--text-primary)]">{item}</span>
+                                    <ChevronRight size={14} className="text-[var(--text-secondary)]" />
                                 </button>
                             ))}
                         </div>
@@ -208,39 +208,39 @@ export default function SearchPage() {
 
                 {/* Suggestions */}
                 {showSuggestions && suggestions.length > 0 && (
-                    <div className="bg-[#242526]">
+                    <div className="bg-[var(--bg-secondary)]">
                         <div className="px-4 py-3">
-                            <h2 className="text-sm font-bold text-[#e4e6eb] uppercase tracking-wide">
+                            <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
                                 {searchQuery ? 'Sugerencias' : 'Explorar'}
                             </h2>
                         </div>
-                        <div className="divide-y divide-white/5">
+                        <div className="divide-y divide-[var(--divider)]">
                             {suggestions.map((s, i) => (
                                 <button
                                     key={i}
                                     onClick={() => handleSuggestionClick(s)}
-                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3a3b3c] transition-colors text-left group"
+                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors text-left group"
                                 >
                                     <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                        className={`w-8 h-8 rounded-md flex items-center justify-center ${
                                             s.type === 'CATEGORY'
-                                                ? 'bg-green-500/20 text-green-400'
+                                                ? 'bg-green-500/10 text-green-500'
                                                 : s.type === 'FOLDER'
-                                                ? 'bg-yellow-500/20 text-yellow-400'
-                                                : 'bg-[#3a3b3c] text-[#b0b3b8]'
+                                                ? 'bg-yellow-500/10 text-yellow-500'
+                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                                         }`}
                                     >
                                         {getSuggestionIcon(s.type)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-semibold text-[#e4e6eb] group-hover:text-[#1877f2] transition-colors truncate">
+                                        <div className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
                                             {s.label}
                                         </div>
-                                        <div className="text-xs text-[#b0b3b8] uppercase">
+                                        <div className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">
                                             {s.type === 'HISTORY' ? 'Búsqueda anterior' : s.type}
                                         </div>
                                     </div>
-                                    <ChevronRight size={16} className="text-[#b0b3b8] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <ChevronRight size={14} className="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </button>
                             ))}
                         </div>
@@ -251,12 +251,12 @@ export default function SearchPage() {
                 {showSuggestions && suggestions.length === 0 && searchQuery && (
                     <div className="py-20 text-center">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-20 h-20 rounded-full bg-[#3a3b3c] flex items-center justify-center">
-                                <Search size={40} className="text-[#b0b3b8]" />
+                            <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                <Search size={32} className="text-[var(--text-secondary)]" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-[#e4e6eb] mb-2">No se encontraron resultados</h2>
-                                <p className="text-sm text-[#b0b3b8]">Intenta con otros términos de búsqueda</p>
+                                <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">No se encontraron resultados</h2>
+                                <p className="text-xs text-[var(--text-secondary)]">Intenta con otros términos de búsqueda</p>
                             </div>
                         </div>
                     </div>

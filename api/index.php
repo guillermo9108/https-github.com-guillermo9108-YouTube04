@@ -256,6 +256,7 @@ try {
         case 'admin_update_category_price': admin_update_category_price($pdo, $input); break;
         case 'admin_add_balance': admin_add_balance($pdo, $input); break;
         case 'admin_get_marketplace_items': market_admin_get_items($pdo); break;
+        case 'submit_balance_request': interact_submit_balance_request($pdo, $input); break;
         case 'get_balance_requests': admin_get_finance_requests($pdo); break;
         case 'handle_balance_request': admin_handle_balance_request($pdo, $input); break;
         case 'handle_vip_request': admin_handle_vip_request($pdo, $input); break;

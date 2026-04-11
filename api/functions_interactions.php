@@ -358,3 +358,15 @@ function interact_request_content($pdo, $input) {
         ->execute([uniqid('req_'), $input['userId'], $input['query'], time(), $input['isVip'] ? 1 : 0]);
     respond(true);
 }
+
+function interact_submit_balance_request($pdo, $input) {
+    $uid = $input['userId'];
+    $amt = floatval($input['amount']);
+    if ($amt <= 0) respond(false, null, "Monto inválido");
+    
+    $pdo->prepare("INSERT INTO balance_requests (id, userId, amount, status, createdAt) VALUES (?, ?, ?, 'PENDING', ?)")
+        ->execute([uniqid('br_'), $uid, $amt, time()]);
+    
+    send_direct_notification($pdo, $uid, 'SYSTEM', "Tu solicitud de recarga de \${$amt} ha sido recibida y está en espera de revisión.", "/wallet");
+    respond(true);
+}

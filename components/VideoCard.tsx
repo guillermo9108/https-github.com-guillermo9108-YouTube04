@@ -404,71 +404,69 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   };
 
   return (
-    <div ref={cardRef} className={`flex flex-col bg-slate-900/40 border-y border-white/5 overflow-hidden group transition-all duration-300 ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`}>
+    <div ref={cardRef} className={`flex flex-col bg-[var(--bg-secondary)] border-b border-[var(--divider)] mb-2 ${isWatched ? 'opacity-70' : ''}`}>
       {/* Header: User Info */}
       <div className="flex items-center justify-between p-2.5">
         <div className="flex items-center gap-2">
           <Link to={`/channel/${video.creatorId}`} className="shrink-0">
               {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-9 h-9 rounded-full object-cover bg-slate-800 border border-white/10" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-full object-cover bg-[var(--bg-tertiary)] border border-[var(--divider)]" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
               ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-black text-white shadow-inner uppercase">{video.creatorName?.[0] || '?'}</div>
+                  <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-sm font-bold text-white uppercase">{video.creatorName?.[0] || '?'}</div>
               )}
           </Link>
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
-              <Link to={`/channel/${video.creatorId}`} className="text-xs font-bold text-white hover:text-indigo-400 transition-colors truncate max-w-[100px]">
+              <Link to={`/channel/${video.creatorId}`} className="text-sm font-bold text-[var(--text-primary)] hover:underline truncate max-w-[150px]">
                 {video.creatorName || 'Usuario'}
               </Link>
-              <CheckCircle2 size={10} className="text-indigo-500 fill-indigo-500/10" />
-              <span className="text-slate-500 text-[10px]">•</span>
-              <button className="text-indigo-400 text-[10px] font-bold hover:text-indigo-300 transition-colors">Seguir</button>
+              <CheckCircle2 size={12} className="text-[var(--accent)] fill-[var(--accent)]/10" />
             </div>
-            <div className="flex items-center gap-1 text-[9px] text-slate-500 font-medium">
+            <div className="flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
               <span>{formatTimeAgo(video.createdAt)}</span>
-              <span className="w-0.5 h-0.5 bg-slate-700 rounded-full"></span>
-              <ExternalLink size={8} />
+              <span>•</span>
+              <ExternalLink size={10} />
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <div className="relative" ref={menuRef}>
             <button 
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }} 
-                className={`p-1.5 rounded-full hover:bg-white/5 text-slate-400 transition-all ${showMenu ? 'bg-white/10 text-white' : ''}`}
+                className={`p-2 rounded-full hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all ${showMenu ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' : ''}`}
             >
-                <MoreVertical size={16} />
+                <MoreVertical size={18} />
             </button>
             
             {showMenu && (
-                <div className="absolute top-full right-0 mt-1 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-right">
-                    <div className="p-1">
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Share2 size={14} className="text-slate-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Compartir</span>
+                <div className="absolute top-full right-0 mt-1 w-56 bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-md shadow-lg overflow-hidden z-50">
+                    <div className="py-1">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(e); }} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
+                            <Share2 size={16} className="text-[var(--text-secondary)]" />
+                            <span className="text-sm">Compartir</span>
                         </button>
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Download size={14} className="text-slate-500" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Descargar</span>
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
+                            <Download size={16} className="text-[var(--text-secondary)]" />
+                            <span className="text-sm">Descargar</span>
                         </button>
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWatchLater(e); }} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                            <Clock size={14} className={inWatchLater ? 'text-indigo-400' : 'text-slate-500'} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWatchLater(e); }} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
+                            <Clock size={16} className={inWatchLater ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
+                            <span className="text-sm">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
                         </button>
                         {canEdit && (
                             <>
-                                <div className="h-px bg-white/5 my-1"></div>
-                                <Link to={`/edit/${video.id}`} className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-white/5 text-slate-300 hover:text-white transition-colors text-left">
-                                    <Edit3 size={14} className="text-slate-500" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Editar</span>
+                                <div className="h-px bg-[var(--divider)] my-1"></div>
+                                <Link to={`/edit/${video.id}`} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
+                                    <Edit3 size={16} className="text-[var(--text-secondary)]" />
+                                    <span className="text-sm">Editar</span>
                                 </Link>
                                 <button 
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); setShowMenu(false); }}
-                                    className="w-full p-2.5 flex items-center gap-3 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors text-left"
+                                    className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-red-50 text-red-600 hover:text-white transition-colors text-left"
                                 >
-                                    <Trash2 size={14} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Eliminar</span>
+                                    <Trash2 size={16} />
+                                    <span className="text-sm">Eliminar</span>
                                 </button>
                             </>
                         )}
@@ -476,19 +474,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 </div>
             )}
           </div>
-          <button className="p-1.5 rounded-full hover:bg-white/5 text-slate-400 transition-all">
-            <X size={16} />
-          </button>
         </div>
       </div>
 
       {/* Text Content: Title & Description */}
       <div className="px-3 pb-2">
         <div className="relative">
-            <div className={`text-xs font-normal text-slate-100 leading-snug ${!showFullTitle ? 'line-clamp-3' : ''} transition-colors`}>
+            <div className={`text-sm font-normal text-[var(--text-primary)] leading-normal ${!showFullTitle ? 'line-clamp-3' : ''}`}>
               <span className="font-bold">{video.title}</span>
               {video.description && (
-                  <span className="text-slate-300 ml-1">
+                  <span className="text-[var(--text-secondary)] ml-1">
                       {video.description}
                   </span>
               )}
@@ -496,7 +491,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             {((video.title?.length || 0) + (video.description?.length || 0)) > 100 && !showFullTitle && (
                 <button 
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowFullTitle(true); }}
-                    className="text-slate-400 text-[10px] font-bold hover:text-white mt-1"
+                    className="text-[var(--accent)] text-xs font-bold hover:underline mt-1"
                 >
                     Ver más
                 </button>
@@ -505,7 +500,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       </div>
 
       {/* Media Content */}
-      <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden border-y border-white/5`}>
+      <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden`}>
         {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
             <div className="grid grid-cols-4 h-full gap-0.5" onClick={handleImageClick}>
                 {/* Main Image (Left) */}
@@ -612,46 +607,46 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-1.5">
             <div className="flex items-center -space-x-1">
-                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+                <div className="w-4 h-4 bg-[#1877f2] rounded-full flex items-center justify-center border border-[var(--bg-secondary)] shadow-sm">
                 <ThumbsUp size={8} className="text-white fill-white" />
                 </div>
-                <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border border-slate-900 shadow-sm">
+                <div className="w-4 h-4 bg-[#f02849] rounded-full flex items-center justify-center border border-[var(--bg-secondary)] shadow-sm">
                 <Heart size={8} className="text-white fill-white" />
                 </div>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium">
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium">
                 {likerName ? (
                     <>
                         {likerName} {likeCount > 1 ? `y ${likeCount - 1} más` : ''}
                     </>
                 ) : (
-                    <>{likeCount} Me gusta</>
+                    <>{likeCount}</>
                 )}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center gap-3 text-[11px] text-[var(--text-secondary)] font-medium">
             <span>{video.views} vistas</span>
             <span>{sharesCount} compartido</span>
           </div>
         </div>
         
-        <div className="h-px bg-white/5 mx-2 mb-1"></div>
+        <div className="h-px bg-[var(--divider)] mx-2 mb-1"></div>
         
         <div className="flex items-center gap-1 px-1 pb-1">
           <button 
             onClick={handleLike}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-full transition-all bg-white/5 hover:bg-white/10 ${liked ? 'text-blue-500' : 'text-slate-400'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all hover:bg-[var(--bg-hover)] ${liked ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
           >
-            <ThumbsUp size={16} className={liked ? 'fill-current' : ''} />
-            <span className="text-[11px] font-bold">Me gusta</span>
+            <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
+            <span className="text-xs font-bold">Me gusta</span>
           </button>
-          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
-            <MessageCircle size={16} />
-            <span className="text-[11px] font-bold">Comentar</span>
+          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all">
+            <MessageCircle size={18} />
+            <span className="text-xs font-bold">Comentar</span>
           </Link>
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all">
-            <Share2 size={16} />
-            <span className="text-[11px] font-bold">Compartir</span>
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all">
+            <Share2 size={18} />
+            <span className="text-xs font-bold">Compartir</span>
           </button>
         </div>
       </div>

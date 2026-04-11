@@ -45,17 +45,17 @@ export default function CategoriesPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#18191a]">
+        <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[#242526] border-b border-white/5 shadow-lg">
+            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
                 <div className="flex items-center gap-3 px-4 h-14">
                     <button
                         onClick={() => navigate(-1)}
-                        className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors"
+                        className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                        <ChevronLeft size={24} className="text-[#e4e6eb]" />
+                        <ChevronLeft size={24} className="text-[var(--text-primary)]" />
                     </button>
-                    <h1 className="text-xl font-bold text-[#e4e6eb]">Categorías</h1>
+                    <h1 className="text-lg font-bold text-[var(--text-primary)]">Categorías</h1>
                 </div>
             </header>
 
@@ -63,55 +63,53 @@ export default function CategoriesPage() {
             <div className="max-w-2xl mx-auto">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1877f2]"></div>
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--accent)]"></div>
                     </div>
                 ) : categories.length === 0 ? (
                     <div className="py-20 text-center">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-20 h-20 rounded-full bg-[#3a3b3c] flex items-center justify-center">
-                                <Tag size={40} className="text-[#b0b3b8]" />
+                            <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                <Tag size={32} className="text-[var(--text-secondary)]" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-[#e4e6eb] mb-2">No hay categorías</h2>
-                                <p className="text-sm text-[#b0b3b8]">Las categorías aparecerán aquí cuando agregues contenido</p>
+                                <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">No hay categorías</h2>
+                                <p className="text-xs text-[var(--text-secondary)]">Las categorías aparecerán aquí cuando agregues contenido</p>
                             </div>
                         </div>
                     </div>
                 ) : (
-                    <div className="p-4">
+                    <div className="p-3">
                         {/* Categoría "TODOS" especial */}
                         <button
                             onClick={() => handleCategoryClick('TODOS')}
-                            className="w-full mb-4 p-4 rounded-xl flex items-center gap-3 bg-gradient-to-r from-[#1877f2] to-[#1a5dbd] hover:from-[#1a66d6] hover:to-[#1550a8] transition-all border-2 border-[#1877f2] shadow-lg"
+                            className="w-full mb-3 p-3 rounded-md flex items-center gap-3 bg-[var(--accent)] hover:opacity-90 transition-all border border-[var(--divider)] shadow-sm"
                         >
-                            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
-                                <Tag size={24} className="text-white" />
+                            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                                <Tag size={20} className="text-white" />
                             </div>
                             <div className="flex-1 text-left">
-                                <div className="text-base font-bold text-white">Todo</div>
-                                <div className="text-xs text-white/70">Ver todo el contenido</div>
+                                <div className="text-sm font-bold text-white">Todo</div>
+                                <div className="text-[10px] text-white/70 font-bold uppercase">Ver todo el contenido</div>
                             </div>
-                            <ChevronRight size={20} className="text-white/70" />
+                            <ChevronRight size={18} className="text-white/70" />
                         </button>
 
                         {/* Grid de Categorías */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             {categories.map((cat, index) => (
                                 <button
                                     key={cat.name}
                                     onClick={() => handleCategoryClick(cat.name)}
-                                    className={`p-4 rounded-xl flex flex-col items-center gap-2 transition-all border-2 hover:scale-105 ${getCategoryColor(
-                                        index
-                                    )}`}
+                                    className="p-3 rounded-md flex flex-col items-center gap-2 transition-all border border-[var(--divider)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)]"
                                 >
-                                    <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                                        <Tag size={20} />
+                                    <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+                                        <Tag size={18} className="text-[var(--accent)]" />
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-sm font-bold uppercase tracking-tight line-clamp-1">
+                                        <div className="text-xs font-bold uppercase tracking-tight line-clamp-1 text-[var(--text-primary)]">
                                             {cat.name}
                                         </div>
-                                        <div className="text-xs opacity-70 mt-1">{cat.count || 0} videos</div>
+                                        <div className="text-[10px] text-[var(--text-secondary)] font-bold mt-0.5">{cat.count || 0} videos</div>
                                     </div>
                                 </button>
                             ))}

@@ -101,45 +101,45 @@ export default function MenuPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#18191a] pb-20">
+        <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[#242526] border-b border-white/5 shadow-lg">
+            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
                 <div className="flex items-center justify-between px-4 h-14">
-                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-[#e4e6eb] hover:text-white transition-colors">
+                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
                         <ChevronLeft size={24} />
-                        <span className="font-semibold">Menú</span>
+                        <span className="font-bold">Menú</span>
                     </button>
-                    <button onClick={() => navigate('/search')} className="w-10 h-10 rounded-full bg-[#3a3b3c] flex items-center justify-center hover:bg-[#4e4f50] transition-colors">
-                        <Search size={20} className="text-[#e4e6eb]" />
+                    <button onClick={() => navigate('/search')} className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors">
+                        <Search size={18} className="text-[var(--text-primary)]" />
                     </button>
                 </div>
             </header>
 
             {/* User Info Card */}
-            <div className="bg-[#242526] border-b border-white/5 p-4">
+            <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)] p-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-[#1877f2] border-2 border-white/10 overflow-hidden">
+                    <div className="w-14 h-14 rounded-full bg-[var(--accent)] border border-[var(--divider)] overflow-hidden">
                         {user?.avatarUrl ? (
                             <img src={user.avatarUrl} className="w-full h-full object-cover" alt={user.username} referrerPolicy="no-referrer" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white">
+                            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-white">
                                 {user?.username?.[0]?.toUpperCase() || '?'}
                             </div>
                         )}
                     </div>
                     <div className="flex-1">
-                        <h2 className="text-lg font-bold text-[#e4e6eb]">{user?.username || 'Usuario'}</h2>
-                        <p className="text-sm text-[#b0b3b8]">@{user?.username || 'usuario'}</p>
+                        <h2 className="text-base font-bold text-[var(--text-primary)]">{user?.username || 'Usuario'}</h2>
+                        <p className="text-xs text-[var(--text-secondary)]">@{user?.username || 'usuario'}</p>
                         {isVip && (
-                            <div className="flex items-center gap-1 mt-1">
-                                <Crown size={14} className="text-amber-500" />
-                                <span className="text-xs text-amber-500 font-semibold">Miembro VIP</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                                <Crown size={12} className="text-amber-500" />
+                                <span className="text-[10px] text-amber-500 font-bold uppercase">VIP</span>
                             </div>
                         )}
                     </div>
                     <button
                         onClick={() => navigate('/profile')}
-                        className="px-4 py-2 bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] rounded-lg text-sm font-semibold transition-colors"
+                        className="px-3 py-1.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-md text-xs font-bold transition-colors"
                     >
                         Ver perfil
                     </button>
@@ -149,21 +149,21 @@ export default function MenuPage() {
             {/* Menu Sections */}
             <div className="max-w-2xl mx-auto">
                 {menuSections.map((section, sectionIndex) => (
-                    <div key={sectionIndex} className="mt-6">
-                        <h3 className="px-4 text-lg font-bold text-[#e4e6eb] mb-2">{section.title}</h3>
-                        <div className="bg-[#242526] border-y border-white/5">
+                    <div key={sectionIndex} className="mt-4">
+                        <h3 className="px-4 text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">{section.title}</h3>
+                        <div className="bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
                             {section.items.map((item, itemIndex) => (
                                 <button
                                     key={itemIndex}
                                     onClick={() => handleNavigation(item)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#3a3b3c] transition-colors border-b border-white/5 last:border-b-0 group"
+                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--divider)] last:border-b-0 group"
                                 >
-                                    <div className={`w-10 h-10 rounded-full bg-[#3a3b3c] group-hover:bg-[#4e4f50] flex items-center justify-center transition-colors`}>
-                                        <item.icon size={20} className={item.color} />
+                                    <div className={`w-8 h-8 rounded-md bg-[var(--bg-tertiary)] flex items-center justify-center transition-colors`}>
+                                        <item.icon size={18} className={item.color} />
                                     </div>
-                                    <span className="flex-1 text-left text-[#e4e6eb] font-medium">{item.label}</span>
+                                    <span className="flex-1 text-left text-[var(--text-primary)] text-sm font-medium">{item.label}</span>
                                     {item.badge && (
-                                        <span className="bg-[#e41e3f] text-white text-xs font-bold px-2 py-1 rounded-full min-w-[24px] text-center">
+                                        <span className="bg-[#e41e3f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                             {item.badge}
                                         </span>
                                     )}
@@ -173,49 +173,25 @@ export default function MenuPage() {
                     </div>
                 ))}
 
-                {/* Settings Dropdown */}
-                {showSettings && (
-                    <div className="mt-4 bg-[#242526] border-y border-white/5 animate-in slide-in-from-top duration-300">
-                        <h4 className="px-4 py-3 text-sm font-bold text-[#b0b3b8] border-b border-white/5">CONFIGURACIÓN RÁPIDA</h4>
-                        <button className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#3a3b3c] transition-colors border-b border-white/5">
-                            <div className="flex items-center gap-3">
-                                <Moon size={20} className="text-[#b0b3b8]" />
-                                <span className="text-[#e4e6eb] font-medium">Modo oscuro</span>
-                            </div>
-                            <div className="w-12 h-6 bg-[#1877f2] rounded-full relative">
-                                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
-                            </div>
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#3a3b3c] transition-colors border-b border-white/5">
-                            <Languages size={20} className="text-[#b0b3b8]" />
-                            <span className="text-[#e4e6eb] font-medium">Idioma: Español</span>
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#3a3b3c] transition-colors">
-                            <Monitor size={20} className="text-[#b0b3b8]" />
-                            <span className="text-[#e4e6eb] font-medium">Calidad de video: Auto</span>
-                        </button>
-                    </div>
-                )}
-
                 {/* Logout Button */}
-                <div className="mt-6 bg-[#242526] border-y border-white/5">
+                <div className="mt-6 bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[#e41e3f]/10 transition-colors group"
+                        className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors group"
                     >
-                        <div className="w-10 h-10 rounded-full bg-[#e41e3f]/10 group-hover:bg-[#e41e3f]/20 flex items-center justify-center transition-colors">
-                            <LogOut size={20} className="text-[#e41e3f]" />
+                        <div className="w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center transition-colors">
+                            <LogOut size={18} className="text-red-600" />
                         </div>
-                        <span className="flex-1 text-left text-[#e41e3f] font-semibold">Cerrar sesión</span>
+                        <span className="flex-1 text-left text-red-600 text-sm font-bold">Cerrar sesión</span>
                     </button>
                 </div>
 
                 {/* Footer Info */}
-                <div className="px-4 py-6 text-center">
-                    <p className="text-xs text-[#b0b3b8] mb-2">
-                        StreamPay • Política de privacidad • Condiciones
+                <div className="px-4 py-8 text-center">
+                    <p className="text-[10px] text-[var(--text-secondary)] mb-1 uppercase tracking-widest font-bold">
+                        StreamPay • Política • Condiciones
                     </p>
-                    <p className="text-xs text-[#b0b3b8]">
+                    <p className="text-[10px] text-[var(--text-secondary)] opacity-50">
                         © 2024 StreamPay. Todos los derechos reservados.
                     </p>
                 </div>

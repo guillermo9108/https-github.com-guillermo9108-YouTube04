@@ -366,6 +366,17 @@ class DBService {
         return this.request<void>(`action=submit_manual_vip_request`, { method: 'POST', body: fd });
     }
 
+    public async submitBalanceRequest(userId: string, amount: number): Promise<void> {
+        return this.request<void>(`action=submit_balance_request`, { 
+            method: 'POST', 
+            body: JSON.stringify({ userId, amount }) 
+        });
+    }
+
+    public async getTransactions(userId: string): Promise<Transaction[]> {
+        return this.request<Transaction[]>(`action=get_transactions&userId=${userId}`);
+    }
+
     public async createPayLink(userId: string, plan: VipPlan): Promise<{paymentUrl: string}> {
         return this.request<{paymentUrl: string}>(`action=create_pay_link`, { method: 'POST', body: JSON.stringify({ userId, plan }) });
     }
