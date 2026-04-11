@@ -19,6 +19,15 @@ import MarketplaceItem from './components/pages/MarketplaceItem';
 import MarketplaceCreate from './components/pages/MarketplaceCreate';
 import MarketplaceEdit from './components/pages/MarketplaceEdit';
 import SellerDashboard from './components/pages/SellerDashboard';
+import CategoriesPage from './components/pages/CategoriesPage';
+import FolderExplorerPage from './components/pages/FolderExplorerPage';
+import SettingsPage from './components/pages/SettingsPage';
+import LikedPage from './components/pages/LikedPage';
+import HistoryPage from './components/pages/HistoryPage';
+import RechargePage from './components/pages/RechargePage';
+import WalletPage from './components/pages/WalletPage';
+import HelpPage from './components/pages/HelpPage';
+import ReportPage from './components/pages/ReportPage';
 import EditVideo from './components/pages/EditVideo';
 import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
@@ -295,6 +304,15 @@ export default function App() {
                                 <Route path="/edit/:id" element={<SetupGuard><ProtectedRoute><EditVideo /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/marketplace/:id" element={<SetupGuard><ProtectedRoute><MarketplaceItem /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/seller-dashboard" element={<SetupGuard><ProtectedRoute><SellerDashboard /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/categories" element={<SetupGuard><ProtectedRoute><CategoriesPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/folders" element={<SetupGuard><ProtectedRoute><FolderExplorerPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/settings" element={<SetupGuard><ProtectedRoute><SettingsPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/liked" element={<SetupGuard><ProtectedRoute><LikedPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/history" element={<SetupGuard><ProtectedRoute><HistoryPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/recharge" element={<SetupGuard><ProtectedRoute><RechargePage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/wallet" element={<SetupGuard><ProtectedRoute><WalletPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/help" element={<SetupGuard><ProtectedRoute><HelpPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/report" element={<SetupGuard><ProtectedRoute><ReportPage /></ProtectedRoute></SetupGuard>} />
                                 
                                 {/* Admin Routes Independientes */}
                                 <Route path="/admin" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
