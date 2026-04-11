@@ -51,10 +51,10 @@ export default function MenuPage() {
             title: 'Explorar',
             items: [
                 { icon: Home, label: 'Inicio', path: '/', color: 'text-[#1877f2]' },
+                { icon: Search, label: 'Buscar', path: '/search', color: 'text-[#b0b3b8]' },
+                { icon: Tag, label: 'Categorías', path: '/categories', color: 'text-green-500' },
+                { icon: Folder, label: 'Explorar Carpetas', path: '/folders', color: 'text-yellow-500' },
                 { icon: TrendingUp, label: 'Tendencias', path: '/?sort=trending', color: 'text-red-500' },
-                { icon: Tag, label: 'Categorías', path: '/?categories=all', color: 'text-green-500' },
-                { icon: Folder, label: 'Carpetas', path: '/?folders=all', color: 'text-yellow-500' },
-                { icon: Search, label: 'Buscar', path: '/?search=open', color: 'text-[#b0b3b8]' },
             ]
         },
         {
@@ -69,7 +69,7 @@ export default function MenuPage() {
         {
             title: 'Configuración y soporte',
             items: [
-                { icon: Settings, label: 'Configuración', action: () => setShowSettings(!showSettings), color: 'text-[#b0b3b8]' },
+                { icon: Settings, label: 'Configuración', path: '/settings', color: 'text-[#b0b3b8]' },
                 { icon: HelpCircle, label: 'Ayuda y soporte', path: '/help', color: 'text-[#b0b3b8]' },
                 { icon: AlertCircle, label: 'Reportar problema', path: '/report', color: 'text-[#b0b3b8]' },
             ]

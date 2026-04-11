@@ -33,23 +33,13 @@ export default function Home() {
     
     // UI State
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [showNotifMenu, setShowNotifMenu] = useState(false);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false); 
-    const [showSortMenu, setShowSortMenu] = useState(false);
     const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
-    const [navVisible, setNavVisible] = useState(true);
     const [editingFolder, setEditingFolder] = useState<any | null>(null);
-    const [isListening, setIsListening] = useState(false);
-    
-    // Filtros Persistentes
-    const [mediaFilter, setMediaFilter] = useState<'ALL' | 'VIDEO' | 'AUDIO'>(() => {
-        return (localStorage.getItem('sp_media_filter') as any) || 'ALL';
-    });
 
-    const [userSortOrder, setUserSortOrder] = useState<string>(() => {
-        return localStorage.getItem('sp_user_sort') || ''; 
-    });
+    // Filtros Persistentes - Leer desde configuración
+    const mediaFilter: 'ALL' | 'VIDEO' | 'AUDIO' = (localStorage.getItem('sp_media_filter') as any) || 'ALL';
+    const userSortOrder: string = localStorage.getItem('sp_user_sort') || '';
+    const showFoldersGrid: boolean = localStorage.getItem('sp_show_folders') === 'true' || localStorage.getItem('sp_show_folders') === null;
 
     // Data State
     const [videos, setVideos] = useState<Video[]>([]);
@@ -65,7 +55,6 @@ export default function Home() {
     const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
     
     const initialQuery = queryParams.get('q') || '';
-    const initialCategory = queryParams.get('cat') || 'TODOS';
     const initialPath = useMemo(() => {
         const folderParam = queryParams.get('folder');
         if (folderParam) return folderParam.split('/').filter(Boolean);
@@ -78,34 +67,32 @@ export default function Home() {
     }, [queryParams]);
 
     const [searchQuery, setSearchQuery] = useState(initialQuery);
-    const [selectedCategory, setSelectedCategory] = useState(initialCategory);
     const [navigationPath, setNavigationPath] = useState<string[]>(initialPath);
+
+    // Categoría fija en TODOS
+    const selectedCategory = 'TODOS';
     const [activeCategories, setActiveCategories] = useState<string[]>(['TODOS']);
 
     // Sincronizar estado con URL cuando cambia la búsqueda o navegación
     useEffect(() => {
         const q = queryParams.get('q') || '';
-        const cat = queryParams.get('cat') || 'TODOS';
         const folderParam = queryParams.get('folder');
         const path = folderParam ? folderParam.split('/').filter(Boolean) : [];
 
         setSearchQuery(q);
-        setSelectedCategory(cat);
         setNavigationPath(path);
     }, [location.search, queryParams]);
-    
+
     // Secondary Data
     const { notifications: rtNotifications, unreadCount: rtUnreadCount, markAsRead } = useNotifications();
     const [watchedIds, setWatchedIds] = useState<string[]>([]);
     const [notifs, setNotifs] = useState<AppNotification[]>([]);
-    const [suggestions, setSuggestions] = useState<any[]>([]);
 
     const searchContainerRef = useRef<HTMLFormElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const sortMenuRef = useRef<HTMLDivElement>(null);
-    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const searchTimeout = useRef<any>(null);
-    const lastScrollY = useRef(0);
 
     const currentFolder = navigationPath.join('/');
     const parentFolderName = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null;
@@ -217,28 +204,14 @@ export default function Home() {
         }
     };
 
-    // 3. Scroll Inteligente
+    // 3. Trigger de carga
     useEffect(() => {
-        const handleScroll = () => {
-            const currentScrollY = window.scrollY;
-            if (currentScrollY < 120) { setNavVisible(true); lastScrollY.current = currentScrollY; return; }
-            if (currentScrollY > lastScrollY.current + 25) { setNavVisible(false); } 
-            else if (currentScrollY < lastScrollY.current - 25) { setNavVisible(true); }
-            lastScrollY.current = currentScrollY;
-        };
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // 4. Trigger de carga
-    useEffect(() => { 
-        setSelectedCategory('TODOS');
-        fetchVideos(0, true); 
+        fetchVideos(0, true);
     }, [mediaFilter]);
 
-    useEffect(() => { fetchVideos(0, true); }, [currentFolder, searchQuery, selectedCategory, userSortOrder]);
+    useEffect(() => { fetchVideos(0, true); }, [currentFolder, searchQuery, userSortOrder]);
 
-    // 5. Infinite Scroll
+    // 4. Infinite Scroll
     useEffect(() => {
         if (!hasMore || loading || loadingMore) return;
         const observer = new IntersectionObserver((entries) => {
@@ -387,12 +360,10 @@ export default function Home() {
     const handleNavigate = (index: number) => {
         const newPath = index === -1 ? [] : navigationPath.slice(0, index + 1);
         updateUrl({ folder: newPath, cat: 'TODOS' });
-        setIsFolderGridCollapsed(false); setNavVisible(true);
     };
 
     const handleCategoryClick = (cat: string) => {
-        updateUrl({ cat });
-        if (cat !== 'TODOS') { setNavVisible(true); }
+        // Ya no se necesita - las categorías se manejan en CategoriesPage
     };
 
     const handleBulkEditFolder = async (price: number, sortOrder: string) => {
@@ -507,154 +478,18 @@ export default function Home() {
         <div className="relative pb-20">
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
 
-            <div className={`fixed top-0 left-0 right-0 z-[60] transition-transform duration-500 ease-in-out transform ${navVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-                <div className="relative z-20 backdrop-blur-2xl bg-black/40 border-b border-white/5 pt-4 pb-2 px-0 shadow-xl">
-                    <div className="flex gap-3 items-center w-full px-2">
-                        <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white active:scale-95 transition-transform shrink-0"><Menu size={20}/></button>
-                        
-                        <form className="relative flex-1 min-w-0" ref={searchContainerRef} onSubmit={handleSearchSubmit}>
-                            <Search className="absolute left-4 top-3 text-slate-400" size={18} />
-                            <input 
-                                ref={searchInputRef} type="text" value={searchQuery} 
-                                onChange={(e) => handleSearchChange(e.target.value)} 
-                                onFocus={() => handleSearchChange(searchQuery)}
-                                placeholder="Explorar biblioteca..." 
-                                className={`w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-20 py-2.5 text-sm text-white focus:bg-white/10 focus:border-indigo-500 outline-none transition-all shadow-inner ${isListening ? 'ring-2 ring-red-500 animate-pulse' : ''}`} 
-                            />
-                            <div className="absolute right-3 top-2 flex items-center gap-1">
-                                {searchQuery && <button type="button" onClick={() => { setSearchQuery(''); updateUrl({ q: '' }); fetchVideos(0, true); }} className="p-1.5 text-slate-400 hover:text-white"><X size={16}/></button>}
-                                <button type="button" onClick={toggleVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? 'text-red-500 bg-red-500/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-                                    <Mic size={18}/>
-                                </button>
-                            </div>
-                            {showSuggestions && suggestions.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top">
-                                    <div className="p-2 bg-slate-950 border-b border-white/5 flex items-center justify-between">
-                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">{searchQuery ? 'Sugerencias Inteligentes' : 'Tendencias de búsqueda'}</span>
-                                        <button type="button" onClick={() => setShowSuggestions(false)} className="text-slate-600 hover:text-white"><X size={12}/></button>
-                                    </div>
-                                    <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
-                                        {suggestions.map((s, i) => (
-                                            <button key={i} type="button" onClick={() => handleSuggestionClick(s)} className="w-full p-3.5 flex items-center gap-4 hover:bg-white/5 transition-colors text-left group border-b border-white/[0.03] last:border-0">
-                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 text-slate-400 group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-colors">
-                                                    {getSuggestionIcon(s.type)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors truncate uppercase tracking-tighter">{s.label}</div>
-                                                    <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
-                                                        {s.type === 'HISTORY' ? 'RECUPERAR BÚSQUEDA' : (s.type === 'FOLDER' ? 'NAVEGAR A CARPETA' : s.type)}
-                                                    </div>
-                                                </div>
-                                                <ChevronRight size={14} className="text-slate-700 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </form>
-
-                        <div className="relative shrink-0">
-                            <button onClick={() => { setShowNotifMenu(!showNotifMenu); if (!showNotifMenu) markAsRead(); }} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white relative active:scale-95 transition-transform">
-                                <Bell size={22} className={totalUnreadCount > 0 ? "animate-bounce" : ""} />
-                                {totalUnreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-black">{totalUnreadCount}</span>}
-                            </button>
-                            {showNotifMenu && (
-                                <div className="absolute top-full right-0 mt-3 w-80 bg-slate-900 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden z-[80] animate-in fade-in zoom-in-95 origin-top-right">
-                                    <div className="p-5 bg-slate-950 border-b border-white/5 flex justify-between items-center"><h4 className="font-black text-white uppercase text-[10px] tracking-widest">Notificaciones</h4></div>
-                                    <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
-                                        {allNotifications.length === 0 ? (
-                                            <div className="py-12 text-center text-slate-600 flex flex-col items-center gap-3"><MessageSquare size={32} className="opacity-20" /><p className="text-[10px] font-black uppercase tracking-widest">Sin alertas</p></div>
-                                        ) : allNotifications.map((n: any) => (
-                                            <button key={n.id} onClick={() => handleNotifClick(n)} className={`w-full p-4 flex gap-4 text-left border-b border-white/5 transition-all hover:bg-white/5 ${Number(n.isRead) === 0 ? 'bg-indigo-500/[0.04]' : 'opacity-70'}`}>
-                                                <div className={`shrink-0 overflow-hidden shadow-lg ${n.type === 'UPLOAD' ? 'w-20 aspect-video rounded-lg' : 'w-12 h-12 rounded-xl'} bg-slate-800 flex items-center justify-center border border-white/5`}>
-                                                    {n.avatarUrl ? <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <Bell size={16} className="text-slate-500" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                    <div className="flex justify-between items-center mb-0.5">
-                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${n.type === 'SALE' ? 'bg-emerald-500/20 text-emerald-400' : (n.type === 'UPLOAD' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-700 text-slate-400')}`}>
-                                                            {n.type}
-                                                        </span>
-                                                        <span className="text-[8px] text-slate-600 font-bold">{formatTimeAgo(n.timestamp)}</span>
-                                                    </div>
-                                                    <p className="text-[11px] leading-snug text-white font-bold line-clamp-2">{n.text}</p>
-                                                    {n.type === 'SALE' && n.metadata?.net && (
-                                                        <div className="mt-1 flex items-center gap-1 text-[10px] font-black text-emerald-400">
-                                                            <TrendingUp size={10}/> Ganaste: +{Number(n.metadata.net).toFixed(2)} $
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="p-3 bg-slate-950/50 border-t border-white/5">
-                                        <button onClick={() => { db.markAllNotificationsRead(user!.id); setNotifs(p => p.map(x => ({...x, isRead: true}))); }} className="w-full py-2 text-[9px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors flex items-center justify-center gap-2">
-                                            <CheckCircle size={12}/> Marcar todo como visto
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="relative z-10 backdrop-blur-xl bg-black/20 border-b border-white/5 pb-2 px-0 shadow-sm">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 w-full px-2">
-                            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 shrink-0 z-30">
-                                <button onClick={() => { handleNavigate(-1); updateUrl({ q: '', folder: [], cat: 'TODOS' }); }} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Ir al inicio"><HomeIcon size={16}/></button>
-                                <button onClick={() => setIsFolderModalOpen(true)} className="p-2.5 hover:bg-white/10 rounded-lg text-white transition-colors active:scale-90" title="Explorar carpetas"><Folder size={16}/></button>
-                                {folders.length > 0 && (
-                                    <button onClick={() => { if (searchQuery) { updateUrl({ q: '' }); } setIsFolderGridCollapsed(!isFolderGridCollapsed); }} className={`p-2.5 rounded-lg transition-all duration-300 active:scale-90 ${!isFolderGridCollapsed ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-300 hover:text-white'}`} title={isFolderGridCollapsed ? "Mostrar carpetas" : "Ocultar carpetas"}><ChevronDown size={16} className={`transition-transform duration-300 ${!isFolderGridCollapsed ? 'rotate-180' : ''}`} /></button>
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0 z-10"><Breadcrumbs path={navigationPath} onNavigate={(idx: number) => { handleNavigate(idx); if(searchQuery) { updateUrl({ q: '' }); } }} /></div>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-auto z-30">
-                                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 shrink-0 shadow-inner">
-                                    <button onClick={() => setMediaFilter('ALL')} className={`p-1.5 rounded-lg transition-all ${mediaFilter === 'ALL' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`} title="Todo"><Layers size={13}/></button>
-                                    <button onClick={() => setMediaFilter('VIDEO')} className={`p-1.5 rounded-lg transition-all ${mediaFilter === 'VIDEO' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`} title="Video"><Play size={13}/></button>
-                                    <button onClick={() => setMediaFilter('AUDIO')} className={`p-1.5 rounded-lg transition-all ${mediaFilter === 'AUDIO' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`} title="Audio"><Music size={13}/></button>
-                                </div>
-                                <div className="relative" ref={sortMenuRef}>
-                                    <button onClick={() => setShowSortMenu(!showSortMenu)} className={`p-2.5 rounded-xl transition-all border active:scale-90 ${userSortOrder ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'}`}><ArrowDownUp size={15}/></button>
-                                    {showSortMenu && (
-                                        <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[90] animate-in fade-in zoom-in-95 origin-top-right">
-                                            <div className="p-2 bg-slate-950 border-b border-white/5"><span className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Ordenar por</span></div>
-                                            <div className="p-1">
-                                                {sortOptions.map(opt => (
-                                                    <button key={opt.id} onClick={() => { setUserSortOrder(opt.id); setShowSortMenu(false); }} className={`w-full p-3 flex items-center gap-3 rounded-xl transition-colors text-left ${userSortOrder === opt.id ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><opt.icon size={14} className={userSortOrder === opt.id ? 'text-white' : 'text-slate-500'} /><span className="text-xs font-bold uppercase tracking-tight">{opt.label}</span>{userSortOrder === opt.id && <Check size={12} className="ml-auto" />}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        {!searchQuery && (
-                            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 px-2 animate-in fade-in duration-300">
-                                {parentFolderName && <div className="flex items-center gap-1 text-indigo-400 font-black text-[10px] uppercase tracking-tighter shrink-0 border-r border-white/10 pr-3"><Folder size={12}/> {parentFolderName}</div>}
-                                <div className="flex gap-2">
-                                    {activeCategories.map(cat => (
-                                        <button key={cat} onClick={() => handleCategoryClick(cat)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${selectedCategory === cat ? 'bg-white text-black border-white shadow-lg' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'}`}>{cat === 'TODOS' ? (parentFolderName ? 'Todo en ' + parentFolderName : 'Todo') : cat}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="pt-44 px-0">
+            <div className="pt-4 px-0">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
                 ) : (
                     <div className="space-y-12 animate-in fade-in duration-1000">
-                        {folders.length > 0 && !isFolderGridCollapsed && (
+                        {folders.length > 0 && showFoldersGrid && (
                             <div className="space-y-6 px-1">
                                 <div className="flex items-center gap-3 px-0"><div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div><h2 className="text-[11px] font-black text-white uppercase tracking-[0.3em]">{searchQuery ? 'Carpetas coincidentes' : 'Explorar Carpetas'}</h2></div>
                                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-6 duration-500">
                                     {folders.map(folder => (
                                         <div key={folder.name} className="group relative aspect-[4/5] sm:aspect-video rounded-[32px] overflow-hidden bg-slate-900 border border-white/5 hover:border-indigo-500 shadow-2xl transition-all duration-300">
-                                            <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); setIsFolderGridCollapsed(false); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
+                                            <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); }} className="absolute inset-0 z-0">{folder.thumbnailUrl ? ( <img src={folder.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60" referrerPolicy="no-referrer" /> ) : ( <div className="w-full h-full flex items-center justify-center bg-slate-950 text-slate-800"> <Folder size={48} className="opacity-20" /> </div> )}<div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-indigo-500/10"></div></button>
                                             <div className="relative z-10 h-full flex flex-col p-5 pointer-events-none">
                                                 <div className="flex justify-between items-start">
                                                     <div className="p-2.5 bg-slate-800/80 rounded-xl border border-white/5 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg"><Folder size={20}/></div>
