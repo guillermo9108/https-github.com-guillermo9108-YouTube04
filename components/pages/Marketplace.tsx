@@ -80,27 +80,8 @@ export default function Marketplace() {
     return (
         <div className="pb-20 bg-[var(--bg-primary)] min-h-screen">
             
-            {/* Header with Search */}
-            <div className="sticky top-0 z-30 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm px-4 pt-2 pb-3">
-                <div className="flex justify-between items-center mb-3">
-                    <h1 className="text-xl font-bold text-[var(--text-primary)]">Marketplace</h1>
-                    <div className="flex items-center gap-2">
-                        <Link to="/sell" className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                            <Tag size={18} />
-                        </Link>
-                        {user && (
-                            <Link to="/seller-dashboard" className="relative w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                                <Bell size={18} className={pendingCount > 0 ? "text-amber-500" : ""} />
-                                {pendingCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white">
-                                        {pendingCount}
-                                    </span>
-                                )}
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+            {/* Marketplace Controls */}
+            <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)] px-4 pt-3 pb-3">
                 <div className="flex gap-2 mb-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16}/>
@@ -109,12 +90,12 @@ export default function Marketplace() {
                             placeholder="Buscar en Marketplace" 
                             value={search} 
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full bg-[var(--bg-tertiary)] border border-[var(--divider)] rounded-md pl-9 pr-4 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
+                            className="w-full bg-[#3a3b3c] border border-[var(--divider)] rounded-full pl-9 pr-4 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                         />
                     </div>
                     <button 
                         onClick={() => setShowFilters(true)}
-                        className="bg-[var(--bg-tertiary)] border border-[var(--divider)] text-[var(--text-primary)] px-3 py-1.5 rounded-md flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"
+                        className="bg-[#3a3b3c] border border-[var(--divider)] text-[var(--text-primary)] px-3 py-1.5 rounded-full flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"
                     >
                         <SlidersHorizontal size={16}/>
                         <span className="text-xs font-bold">Filtros</span>
@@ -137,7 +118,7 @@ export default function Marketplace() {
                             className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                                 selectedSection === section.id 
                                 ? 'bg-[var(--accent)] text-white' 
-                                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                                : 'bg-[#3a3b3c] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
                             }`}
                         >
                             {section.icon}
@@ -154,7 +135,7 @@ export default function Marketplace() {
                         <button 
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`whitespace-nowrap px-4 py-1 rounded-full text-xs font-bold border transition-all ${
+                            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
                                 selectedCategory === cat 
                                 ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)]' 
                                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--divider)] hover:border-[var(--text-secondary)]'

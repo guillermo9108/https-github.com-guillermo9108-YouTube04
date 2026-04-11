@@ -136,8 +136,9 @@ export default function MenuPage() {
             {/* Menu Sections */}
             <div className="max-w-2xl mx-auto">
                 {menuSections.map((section, sectionIndex) => (
-                    <div key={sectionIndex} className="mt-4">
-                        <h3 className="px-4 text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">{section.title}</h3>
+                    <div key={sectionIndex}>
+                        <div className="h-2 bg-[var(--bg-primary)]"></div>
+                        <h3 className="px-4 py-3 text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider bg-[var(--bg-secondary)]">{section.title}</h3>
                         <div className="bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
                             {section.items.map((item, itemIndex) => (
                                 <button
@@ -145,12 +146,12 @@ export default function MenuPage() {
                                     onClick={() => handleNavigation(item)}
                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--divider)] last:border-b-0 group"
                                 >
-                                    <div className={`w-8 h-8 rounded-md bg-[var(--bg-tertiary)] flex items-center justify-center transition-colors`}>
+                                    <div className={`w-8 h-8 rounded-md bg-[#3a3b3c] flex items-center justify-center transition-colors`}>
                                         <item.icon size={18} className={item.color} />
                                     </div>
                                     <span className="flex-1 text-left text-[var(--text-primary)] text-sm font-medium">{item.label}</span>
                                     {item.badge && (
-                                        <span className="bg-[#e41e3f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                        <span className="bg-[#f02849] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                             {item.badge}
                                         </span>
                                     )}
@@ -161,7 +162,7 @@ export default function MenuPage() {
                 ))}
 
                 {/* Logout Button */}
-                <div className="mt-6 bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
+                <div className="mt-4 bg-[var(--bg-secondary)] border-y border-[var(--divider)]">
                     <button
                         onClick={() => setShowSettings(true)}
                         className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-500/10 transition-colors group"
@@ -186,7 +187,7 @@ export default function MenuPage() {
 
             {/* Logout Confirmation Modal */}
             {showSettings && (
-                <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                <div className="fixed inset-0 z-[200] bg-black flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-2xl w-full max-w-xs overflow-hidden shadow-2xl animate-in zoom-in-95 p-6 text-center">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                             <LogOut size={32} className="text-red-600" />
@@ -202,7 +203,7 @@ export default function MenuPage() {
                             </button>
                             <button 
                                 onClick={() => setShowSettings(false)}
-                                className="w-full py-2.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-bold rounded-lg transition-colors"
+                                className="w-full py-2.5 bg-[#3a3b3c] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-bold rounded-lg transition-colors"
                             >
                                 Cancelar
                             </button>

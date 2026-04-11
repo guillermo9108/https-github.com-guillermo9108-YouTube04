@@ -404,23 +404,25 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   };
 
   return (
-    <div ref={cardRef} className={`flex flex-col bg-[var(--bg-secondary)] mb-2 shadow-sm ${isWatched ? 'opacity-70' : ''}`}>
+    <div ref={cardRef} className={`flex flex-col bg-[var(--bg-secondary)] ${isWatched ? 'opacity-70' : ''}`}>
       {/* Header: User Info */}
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-2">
           <Link to={`/channel/${video.creatorId}`} className="shrink-0">
-              {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                  <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-10 h-10 rounded-full object-cover bg-[var(--bg-tertiary)]" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
-              ) : (
-                  <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-sm font-bold text-white uppercase">{video.creatorName?.[0] || '?'}</div>
-              )}
+              <div className="w-10 h-10 rounded-full border border-[var(--divider)] overflow-hidden bg-[var(--bg-tertiary)]">
+                {video.creatorAvatarUrl || settings?.defaultAvatar ? (
+                    <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm font-bold text-white uppercase">{video.creatorName?.[0] || '?'}</div>
+                )}
+              </div>
           </Link>
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
-              <Link to={`/channel/${video.creatorId}`} className="text-[15px] font-bold text-[var(--text-primary)] hover:underline truncate max-w-[200px] leading-tight">
+              <Link to={`/channel/${video.creatorId}`} className="text-[15px] font-bold text-white hover:underline truncate max-w-[200px] leading-tight">
                 {video.creatorName || 'Usuario'}
               </Link>
-              <CheckCircle2 size={14} className="text-[var(--accent)] fill-[var(--accent)]/10" />
+              <CheckCircle2 size={14} className="text-[#1877f2] fill-[#1877f2]/10" />
             </div>
             <div className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] leading-tight">
               <span>{formatTimeAgo(video.createdAt)}</span>
@@ -475,7 +477,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             )}
           </div>
           <button className="p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-full transition-colors">
-            <CloseIcon size={20} />
+            <X size={20} />
           </button>
         </div>
       </div>
@@ -638,7 +640,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         <div className="flex items-center gap-1 px-1 pb-1">
           <button 
             onClick={handleLike}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all hover:bg-[var(--bg-hover)] ${liked ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all hover:bg-[var(--bg-hover)] ${liked ? 'text-[#1877f2]' : 'text-[var(--text-secondary)]'}`}
           >
             <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
             <span className="text-xs font-bold">Me gusta</span>
@@ -653,6 +655,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           </button>
         </div>
       </div>
+
+      {/* Gutter below post */}
+      <div className="h-2 bg-[var(--bg-primary)]"></div>
 
       {showDeleteConfirm && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">

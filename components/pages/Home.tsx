@@ -489,54 +489,63 @@ export default function Home() {
             {/* Main Content Area */}
             <div className="flex-1 w-full max-w-5xl mx-auto pb-24">
                 {/* What's on your mind? Section */}
-                <div className="bg-[var(--bg-secondary)] p-3 flex items-center gap-3 border-b border-[var(--divider)]">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600 shrink-0">
-                        {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
+                <div className="bg-[var(--bg-secondary)] p-3 flex items-center gap-3">
+                    <div className="relative shrink-0">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600">
+                            {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
+                        </div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-secondary)]"></div>
                     </div>
-                    <button onClick={() => navigate('/upload')} className="flex-1 h-9 bg-[var(--bg-primary)] border border-[var(--divider)] rounded-full px-4 text-left text-[var(--text-secondary)] text-sm">
-                        ¿Qué estás pensando?
+                    <button onClick={() => navigate('/upload')} className="flex-1 h-10 bg-[#3a3b3c] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
+                        What's on your mind?
                     </button>
-                    <button onClick={() => navigate('/upload')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)]">
-                        <div className="text-green-500"><Image size={20} /></div>
-                        <span className="text-[10px] font-bold">Foto</span>
+                    <button onClick={() => navigate('/upload')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)] px-2">
+                        <div className="text-[#45bd62]"><Image size={24} /></div>
+                        <span className="text-[11px] font-medium">Photo</span>
                     </button>
                 </div>
 
+                {/* Gutter */}
+                <div className="h-2 bg-[var(--bg-primary)]"></div>
+
                 {/* Stories Section */}
-                <div className="bg-[var(--bg-secondary)] py-3 border-b border-[var(--divider)] overflow-hidden">
+                <div className="bg-[var(--bg-secondary)] py-3 overflow-hidden">
                     <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
                         {/* Create Story */}
-                        <div className="relative min-w-[100px] h-40 bg-[var(--bg-primary)] rounded-xl overflow-hidden border border-[var(--divider)] shrink-0">
-                            <div className="h-2/3 overflow-hidden">
+                        <div className="relative min-w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0">
+                            <div className="h-[70%] overflow-hidden">
                                 {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
                             </div>
-                            <div className="absolute top-[60%] left-1/2 -translate-x-1/2 w-8 h-8 bg-[#1877f2] rounded-full border-4 border-[var(--bg-secondary)] flex items-center justify-center text-white">
-                                <Plus size={20} strokeWidth={3} />
+                            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 w-9 h-9 bg-[#1877f2] rounded-full border-4 border-[#242526] flex items-center justify-center text-white">
+                                <Plus size={24} strokeWidth={3} />
                             </div>
-                            <div className="absolute bottom-2 left-0 right-0 text-center">
-                                <span className="text-[10px] font-bold text-[var(--text-primary)]">Crear historia</span>
+                            <div className="absolute bottom-2 left-0 right-0 text-center px-1">
+                                <span className="text-[11px] font-bold text-white">Create story</span>
                             </div>
                         </div>
 
                         {/* Mock Stories */}
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="relative min-w-[100px] h-40 bg-slate-800 rounded-xl overflow-hidden border border-[var(--divider)] shrink-0">
-                                <img src={`https://picsum.photos/seed/story${i}/200/300`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                <div className="absolute top-2 left-2 w-8 h-8 rounded-full border-2 border-[#1877f2] overflow-hidden bg-indigo-600">
-                                    <img src={`https://picsum.photos/seed/avatar${i}/100/100`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <div key={i} className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0">
+                                <img src={`https://picsum.photos/seed/story${i}/200/300`} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+                                <div className="absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] border-[#1877f2] p-0.5 overflow-hidden bg-indigo-600">
+                                    <img src={`https://picsum.photos/seed/avatar${i}/100/100`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                                 </div>
                                 <div className="absolute bottom-2 left-2 right-2">
-                                    <span className="text-[10px] font-bold text-white drop-shadow-md line-clamp-2">Usuario {i}</span>
+                                    <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">Usuario {i}</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
+                {/* Gutter */}
+                <div className="h-2 bg-[var(--bg-primary)]"></div>
+
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3"><Loader2 className="animate-spin text-[var(--accent)]" size={32} /><p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Cargando...</p></div>
                 ) : (
-                    <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="animate-in fade-in duration-500">
                         {folders.length > 0 && showFoldersGrid && (
                             <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
                                 <div className="flex items-center justify-between p-3">

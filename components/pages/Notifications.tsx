@@ -58,34 +58,10 @@ export default function Notifications() {
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
-                <div className="flex items-center justify-between px-4 h-14">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                            <ChevronLeft size={24} className="text-[var(--text-primary)]" />
-                        </button>
-                        <h1 className="text-lg font-bold text-[var(--text-primary)]">Notificaciones</h1>
-                    </div>
-                    {allNotifications.length > 0 && (
-                        <button
-                            onClick={handleMarkAllRead}
-                            className="px-3 py-1.5 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-md text-xs font-bold transition-colors flex items-center gap-2"
-                        >
-                            <CheckCircle size={14} />
-                            Marcar todo
-                        </button>
-                    )}
-                </div>
-            </header>
-
             {/* Content */}
             <div className="max-w-2xl mx-auto bg-[var(--bg-secondary)] min-h-screen">
-                <div className="p-3 flex items-center justify-between">
-                    <h2 className="text-base font-bold text-[var(--text-primary)]">Nuevas</h2>
+                <div className="p-3 flex items-center justify-between border-b border-[var(--divider)]">
+                    <h2 className="text-base font-bold text-[var(--text-primary)]">Notificaciones</h2>
                     {allNotifications.length > 0 && (
                         <button onClick={handleMarkAllRead} className="text-sm text-[var(--accent)] font-medium">
                             Marcar como leídas
@@ -115,8 +91,8 @@ export default function Notifications() {
                             <button
                                 key={n.id}
                                 onClick={() => handleNotifClick(n)}
-                                className={`w-full px-3 py-2.5 flex gap-3 text-left transition-all hover:bg-[var(--bg-hover)] ${
-                                    Number(n.isRead) === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'bg-transparent'
+                                className={`w-full px-3 py-3 flex gap-3 text-left transition-all hover:bg-[var(--bg-hover)] border-b border-[var(--divider)] ${
+                                    Number(n.isRead) === 0 ? 'bg-[#2e3031]' : 'bg-transparent'
                                 }`}
                             >
                                 {/* Avatar/Icon */}
