@@ -4,26 +4,12 @@ import {
     Home, Play, Clock, ShoppingBag, Folder, Search, Tag,
     TrendingUp, History, Heart, Share2, Download, HelpCircle,
     Moon, Sun, Globe, Smartphone, Monitor, Languages,
-    CheckCircle2, AlertCircle, DollarSign, CreditCard, LucideIcon
+    CheckCircle2, AlertCircle, DollarSign, CreditCard
 } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useNotifications } from '../../context/NotificationContext';
-
-interface MenuItem {
-    icon: LucideIcon;
-    label: string;
-    path?: string;
-    action?: () => void;
-    color: string;
-    badge?: number | string | null;
-}
-
-interface MenuSection {
-    title: string;
-    items: MenuItem[];
-}
 
 export default function MenuPage() {
     const navigate = useNavigate();
@@ -35,7 +21,7 @@ export default function MenuPage() {
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
     const isVip = !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000);
 
-    const menuSections: MenuSection[] = [
+    const menuSections = [
         {
             title: 'Tu cuenta',
             items: [
@@ -85,7 +71,7 @@ export default function MenuPage() {
         });
     }
 
-    const handleNavigation = (item: MenuItem) => {
+    const handleNavigation = (item: any) => {
         if (item.action) {
             item.action();
         } else if (item.path) {
