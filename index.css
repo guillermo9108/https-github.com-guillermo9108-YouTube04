@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Facebook Lite Theme - Dark Mode */
+:root {
+  --fb-bg-main: #18191a;
+  --fb-bg-surface: #242526;
+  --fb-bg-hover: #3a3b3c;
+  --fb-text-primary: #e4e6eb;
+  --fb-text-secondary: #b0b3b8;
+  --fb-blue: #1877f2;
+  --fb-red-notif: #e41e3f;
+  --fb-green-online: #31a24c;
+}
+
 /* Seguridad anti-desbordamiento global - Optimizada para permitir sticky */
 html, body {
   max-width: 100%;
@@ -9,6 +21,7 @@ html, body {
   width: 100%;
   min-height: 100vh;
   -webkit-overflow-scrolling: touch;
+  background-color: var(--fb-bg-main);
 }
 
 #root {
@@ -16,20 +29,20 @@ html, body {
   max-width: 100%;
 }
 
-/* Custom Scrollbar for Webkit */
+/* Custom Scrollbar for Webkit - Facebook Lite Style */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a; 
+  background: var(--fb-bg-main);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155; 
+  background: var(--fb-bg-hover);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569; 
+  background: #4e4f50;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
@@ -44,4 +57,22 @@ html, body {
 }
 .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Facebook Lite Utilities */
+.fb-card {
+  background-color: var(--fb-bg-surface);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.fb-text-primary {
+  color: var(--fb-text-primary);
+}
+
+.fb-text-secondary {
+  color: var(--fb-text-secondary);
+}
+
+.fb-hover:hover {
+  background-color: var(--fb-bg-hover);
 }
