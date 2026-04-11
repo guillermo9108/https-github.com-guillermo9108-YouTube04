@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -41,6 +41,7 @@ const ServerTaskIndicator = () => {
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { settings } = useSettings();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -84,31 +85,62 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-black pb-20 md:pb-24`}>
+    <div className={`min-h-screen flex flex-col bg-black pt-[104px]`}>
+      {/* Facebook Lite Style Header */}
+      <header className="fixed top-0 left-0 right-0 bg-slate-900 z-50 border-b border-white/5 shadow-lg">
+        {/* Top Bar: Logo & Actions */}
+        <div className="flex items-center justify-between px-4 py-2">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-600/20">
+              <Zap size={20} className="text-white fill-white" />
+            </div>
+            <span className="text-xl font-black italic tracking-tighter text-white">
+              STREAM<span className="text-indigo-500">PAY</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/')} className="p-2 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
+              <Search size={20} />
+            </button>
+            <button onClick={() => navigate('/profile')} className="p-1 bg-white/5 rounded-full text-slate-300 hover:bg-white/10 transition-colors">
+              <Avatar size={28} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Bar: Navigation */}
+        <nav className="flex items-center justify-around border-t border-white/5">
+          <Link to="/" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
+            <Home size={24} />
+          </Link>
+          <Link to="/shorts" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/shorts' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
+            <Smartphone size={24} />
+          </Link>
+          <Link to="/upload" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/upload' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
+            <Upload size={24} />
+          </Link>
+          <Link to="/marketplace" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'}`}>
+            <ShoppingBag size={24} />
+          </Link>
+          <Link to="/profile" className={`flex-1 flex flex-col items-center py-3 border-b-2 transition-all ${location.pathname === '/profile' ? 'border-indigo-500 text-indigo-500' : 'border-transparent text-slate-500'} relative`}>
+            <Bell size={24} />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-1/2 translate-x-4 w-4 h-4 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[8px] font-black text-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
+        </nav>
+      </header>
+
       {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
-      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'container mx-auto px-4 pt-4 max-w-5xl'}`}>
+      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'container mx-auto px-4 max-w-5xl'}`}>
         <Outlet />
       </main>
 
       <UploadIndicator />
       <ServerTaskIndicator />
       <GridProcessor />
-
-      {/* Navigation Bar - Bottom Only */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/5 flex justify-around items-center py-3 z-50 safe-area-bottom shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        <Link to="/" className={isActive('/')}><Home size={22}/></Link>
-        <Link to="/shorts" className={isActive('/shorts')}><Smartphone size={22}/></Link>
-        <Link to="/upload" className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform"><Upload size={24}/></Link>
-        <Link to="/marketplace" className={isActive('/marketplace')}><ShoppingBag size={22}/></Link>
-        <Link to="/profile" className={`${isActive('/profile')} relative`}>
-            <Avatar size={24}/>
-            {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[7px] font-black text-white">
-                    {unreadCount > 9 ? '+' : unreadCount}
-                </span>
-            )}
-        </Link>
-      </nav>
     </div>
   );
 }

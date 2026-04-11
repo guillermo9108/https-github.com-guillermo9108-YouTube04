@@ -487,6 +487,58 @@ export default function Home() {
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
 
             <div className="pt-4 px-0">
+                {/* Search Bar - Facebook Lite Style */}
+                <div className="px-3 mb-6">
+                    <form onSubmit={handleSearchSubmit} ref={searchContainerRef} className="relative group">
+                        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                            <Search size={18} className="text-slate-500 group-focus-within:text-indigo-500 transition-colors" />
+                        </div>
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
+                            placeholder="Buscar videos, audios, carpetas..."
+                            className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3.5 pl-12 pr-12 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:bg-slate-900 transition-all shadow-xl"
+                        />
+                        <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+                            {searchQuery && (
+                                <button type="button" onClick={() => { setSearchQuery(''); setSuggestions([]); updateUrl({ q: '' }); }} className="p-2 text-slate-500 hover:text-white transition-colors">
+                                    <X size={18} />
+                                </button>
+                            )}
+                            <button type="button" onClick={toggleVoiceSearch} className={`p-2 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-slate-500 hover:text-white'}`}>
+                                <Mic size={18} />
+                            </button>
+                        </div>
+
+                        {/* Suggestions Dropdown */}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="max-h-[60vh] overflow-y-auto py-2">
+                                    {suggestions.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleSuggestionClick(s)}
+                                            className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors text-left group"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                {getSuggestionIcon(s.type)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-white truncate">{s.label}</p>
+                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">{s.type}</p>
+                                            </div>
+                                            <ChevronRight size={14} className="text-slate-700 group-hover:text-indigo-400 transition-colors" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </form>
+                </div>
+
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-40 gap-4"><Loader2 className="animate-spin text-indigo-500" size={48} /><p className="text-xs font-black text-slate-500 uppercase tracking-widest animate-pulse">Sincronizando contenido...</p></div>
                 ) : (
