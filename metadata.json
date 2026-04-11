@@ -1,0 +1,8 @@
+{
+  "name": "Apk StreamPay OFICIAL 0.0.16.8",
+  "description": "StreamPay - Plataforma de streaming de video y marketplace con gestión de APK, actualizaciones automáticas y descarga directa.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
