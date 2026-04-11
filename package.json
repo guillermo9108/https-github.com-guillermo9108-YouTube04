@@ -1,5 +1,5 @@
 {
-  "name": "app-1775858646159-4b49204a",
+  "name": "app-1775852010453-9e84feb4",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "motion": "^11.16.3",
+    "lucide-react": "^0.468.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",
