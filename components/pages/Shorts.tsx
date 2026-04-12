@@ -294,6 +294,7 @@ export default function Shorts() {
   // Lógica de recomendación por carpeta
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [consecutiveNegatives, setConsecutiveNegatives] = useState(0);
+  const [shortsPath, setShortsPath] = useState<string>('');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -412,7 +413,11 @@ export default function Shorts() {
             const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
             const isAudio = Number(v.is_audio) === 1;
             const duration = Number(v.duration || 0);
-            return !isImage && !isAudio && (duration < 300 || duration === 0);
+            
+            // Si viene de la ruta de shorts, lo permitimos siempre (duration 0 suele ser que aún no se procesó)
+            const isFromShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.replace(/\\/g, '/'));
+            
+            return !isImage && !isAudio && (duration < 600 || duration === 0 || isFromShortsPath);
         });
         
         if (shortsOnly.length > 0) {
@@ -471,8 +476,11 @@ export default function Shorts() {
   };
   
   useEffect(() => {
+    db.getSystemSettings().then(s => {
+        if (s && s.shortsPath) setShortsPath(s.shortsPath);
+    });
     fetchShorts(0);
-  }, []);
+  }, [isUnseenMode, user?.id]);
 
   useEffect(() => {
     const container = containerRef.current; if (!container || videos.length === 0) return;

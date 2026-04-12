@@ -470,38 +470,49 @@ export default function Watch() {
 
         // Update source and tracks when video changes
         if (playerRef.current && video) {
-            playerRef.current.src({
-                src: streamUrl,
-                type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
-            });
-            playerRef.current.poster(posterUrl);
+            const currentSrc = playerRef.current.src();
+            if (currentSrc !== streamUrl) {
+                playerRef.current.src({
+                    src: streamUrl,
+                    type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
+                });
+                playerRef.current.poster(posterUrl);
 
-            // Clear old tracks
-            const oldTracks = playerRef.current.remoteTextTracks();
-            let i = oldTracks.length;
-            while (i--) {
-                playerRef.current.removeRemoteTextTrack(oldTracks[i]);
+                // Clear old tracks
+                const oldTracks = playerRef.current.remoteTextTracks();
+                let i = oldTracks.length;
+                while (i--) {
+                    playerRef.current.removeRemoteTextTrack(oldTracks[i]);
+                }
+
+                // Add new tracks
+                video.subtitles?.forEach((sub, idx) => {
+                    playerRef.current.addRemoteTextTrack({
+                        src: sub.url,
+                        kind: sub.kind,
+                        srclang: sub.lang.toLowerCase(),
+                        label: sub.label,
+                        default: idx === 0
+                    }, false);
+                });
             }
-
-            // Add new tracks
-            video.subtitles?.forEach((sub, idx) => {
-                playerRef.current.addRemoteTextTrack({
-                    src: sub.url,
-                    kind: sub.kind,
-                    srclang: sub.lang.toLowerCase(),
-                    label: sub.label,
-                    default: idx === 0
-                }, false);
-            });
         }
 
+        return () => {
+            // No disponemos del player aquí para permitir el cambio de video sin destruir el objeto si es posible,
+            // pero video.js a veces prefiere dispose. Para evitar el negro al cambiar, 
+            // solo hacemos dispose si el componente se desmonta de verdad.
+        };
+    }, [isUnlocked, streamUrl, video?.id]);
+
+    useEffect(() => {
         return () => {
             if (playerRef.current) {
                 playerRef.current.dispose();
                 playerRef.current = null;
             }
         };
-    }, [isUnlocked, streamUrl, video?.id]);
+    }, []);
 
     const handleDownload = (e: React.MouseEvent) => {
         if (e) { e.preventDefault(); e.stopPropagation(); }

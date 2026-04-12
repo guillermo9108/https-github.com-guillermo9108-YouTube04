@@ -306,7 +306,9 @@ function streamVideo($id, $pdo) {
         'webp' => 'image/webp',
         'gif' => 'image/gif',
         'bmp' => 'image/bmp',
-        'svg' => 'image/svg+xml'
+        'svg' => 'image/svg+xml',
+        'm3u8' => 'application/x-mpegURL',
+        'ts' => 'video/MP2T'
     ];
     
     if (isset($_GET['download'])) {

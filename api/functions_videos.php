@@ -170,10 +170,10 @@ function video_get_all($pdo) {
 
     if ($isShorts) { 
         if ($shortsPath) {
-            $where[] = "( (v.duration < 60 OR v.duration = 0 OR v.duration IS NULL) OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ? )";
+            $where[] = "( (v.duration < 600 OR v.duration = 0 OR v.duration IS NULL) OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ? )";
             $params[] = $shortsPath . '/%';
         } else {
-            $where[] = "(v.duration < 60 OR v.duration = 0 OR v.duration IS NULL)";
+            $where[] = "(v.duration < 600 OR v.duration = 0 OR v.duration IS NULL)";
         }
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
         $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
@@ -894,9 +894,11 @@ function video_scan_local($pdo, $input) {
     $scanPath = rtrim($input['path'], '/\\'); 
     if (!is_dir($scanPath)) respond(false, null, "Ruta inválida");
     $adminId = $pdo->query("SELECT id FROM users WHERE role='ADMIN' LIMIT 1")->fetchColumn();
-    $stmtS = $pdo->query("SELECT * FROM system_settings WHERE id = 1");
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths, shortsPath FROM system_settings WHERE id = 1");
     $settings = $stmtS->fetch();
     $exts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'mp3', 'wav', 'flac', 'm4a'];
+
+    $shortsPath = !empty($settings['shortsPath']) ? str_replace('\\', '/', rtrim($settings['shortsPath'], '/')) : '';
 
     try {
         $di = new RecursiveDirectoryIterator($scanPath, RecursiveDirectoryIterator::SKIP_DOTS);
@@ -920,6 +922,12 @@ function video_scan_local($pdo, $input) {
         
         // Si es MP4, forzar que NO sea audio por defecto
         if ($ext === 'mp4') $isAudio = 0;
+
+        // Si está en la ruta de shorts, marcarlo como tal (opcional, pero ayuda a la lógica)
+        $isShort = 0;
+        if ($shortsPath && strpos($path, $shortsPath) === 0) {
+            $isShort = 1;
+        }
 
         // Extract category from path
         $dir = dirname($path);
@@ -986,10 +994,11 @@ function video_scan_local($pdo, $input) {
 }
 
 function video_get_scan_folders($pdo) {
-    $stmt = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $stmt = $pdo->query("SELECT localLibraryPath, libraryPaths, shortsPath FROM system_settings WHERE id = 1");
     $s = $stmt->fetch();
     $paths = json_decode($s['libraryPaths'] ?: '[]', true);
     if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    if (!empty($s['shortsPath'])) $paths[] = $s['shortsPath'];
     $res = [];
     foreach (array_unique($paths) as $p) { 
         if (is_dir($p)) $res[] = ['path' => $p, 'name' => basename($p)]; 
