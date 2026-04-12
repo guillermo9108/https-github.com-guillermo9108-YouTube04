@@ -28,7 +28,7 @@ class DBService {
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // Aumentado a 60s para servidores lentos (NAS)
 
         const url = endpoint.startsWith('http') ? endpoint : `/api/index.php?${endpoint}`;
         const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');

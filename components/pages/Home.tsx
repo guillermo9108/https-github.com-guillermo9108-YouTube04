@@ -131,9 +131,22 @@ export default function Home() {
     }, [user?.id]);
 
     // 2. Cargador de Videos (Paginado)
+    const isInitialMount = useRef(true);
+
     const fetchVideos = async (p: number, reset: boolean = false) => {
         if (loading || (loadingMore && !reset)) return;
-        if (reset) { setLoading(true); setVideos([]); setFolders([]); } else { setLoadingMore(true); }
+        
+        // Evitar múltiples peticiones simultáneas de reset
+        if (reset && loading) return;
+
+        if (reset) { 
+            setLoading(true); 
+            setVideos([]); 
+            setFolders([]); 
+        } else { 
+            setLoadingMore(true); 
+        }
+
         try {
             // Petición principal de videos y carpetas
             const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder, user?.id);
@@ -163,12 +176,11 @@ export default function Home() {
                 if (Array.isArray(rawFolders)) {
                     finalFolders = rawFolders;
                 } else if (rawFolders && typeof rawFolders === 'object') {
-                    // Si es un objeto, convertirlo a array si tiene sentido
                     finalFolders = Object.values(rawFolders);
                 }
                 
-                // Si estamos en una ruta y no hay carpetas, intentamos recuperarlas
-                if (finalFolders.length === 0 && !searchQuery) {
+                // Si estamos en una ruta y no hay carpetas, intentamos recuperarlas (solo si no es búsqueda)
+                if (finalFolders.length === 0 && !searchQuery && currentFolder) {
                     try {
                         const structureRes = await db.getVideos(0, 50, currentFolder, '', 'TODOS', 'ALL', '', user?.id);
                         const recovered = structureRes.folders;
@@ -182,19 +194,6 @@ export default function Home() {
                     }
                 }
 
-                // Si hay búsqueda, el backend filtra. Mostramos las del nivel actual como fallback si no hay coincidencias.
-                if (searchQuery && finalFolders.length === 0) {
-                    try {
-                        const currentLevelRes = await db.getVideos(0, 1, currentFolder, '', 'TODOS', 'ALL', '', user?.id);
-                        const recovered = currentLevelRes.folders;
-                        if (Array.isArray(recovered) && recovered.length > 0) {
-                            finalFolders = recovered;
-                        } else if (recovered && typeof recovered === 'object' && Object.keys(recovered).length > 0) {
-                            finalFolders = Object.values(recovered);
-                        }
-                    } catch(e) {}
-                }
-
                 setFolders(finalFolders);
                 setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
@@ -204,6 +203,7 @@ export default function Home() {
             setHasMore(res.hasMore); 
             setPage(p);
         } catch (e) { 
+            console.error("Fetch videos error:", e);
             toast.error("Error al sincronizar catálogo"); 
         } 
         finally { 
@@ -212,12 +212,21 @@ export default function Home() {
         }
     };
 
-    // 3. Trigger de carga
+    // 3. Trigger de carga consolidado
     useEffect(() => {
-        fetchVideos(0, true);
-    }, [mediaFilter]);
+        // En el primer montaje, esperamos a que todo esté listo
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            fetchVideos(0, true);
+            return;
+        }
 
-    useEffect(() => { fetchVideos(0, true); }, [currentFolder, searchQuery, userSortOrder]);
+        const timer = setTimeout(() => {
+            fetchVideos(0, true);
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [currentFolder, searchQuery, userSortOrder, mediaFilter, selectedCategory]);
 
     // 4. Infinite Scroll
     useEffect(() => {

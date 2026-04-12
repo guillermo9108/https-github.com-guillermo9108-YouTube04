@@ -273,7 +273,10 @@ function video_get_all($pdo) {
     $total->execute($params);
     $totalCount = $total->fetchColumn();
 
-    $subfolders = video_discover_subfolders($pdo, $folder, $search, $mediaType);
+    $subfolders = [];
+    if (!$isShorts) {
+        $subfolders = video_discover_subfolders($pdo, $folder, $search, $mediaType);
+    }
 
     // Obtener categorías activas DENTRO de la carpeta actual (no globales) y filtradas por mediaType
     $catWhere = ["category NOT IN ('PENDING','PROCESSING','FAILED_METADATA')"];
@@ -546,19 +549,15 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         $prefixLen = strlen($prefix);
 
         // SQL Optimizado: Agrupar por el primer segmento de la ruta relativa
-        // Buscamos videos que tengan al menos un nivel más de carpeta (contengan un '/')
         $sql = "SELECT 
                     SUBSTRING_INDEX(SUBSTRING(REPLACE(videoUrl, '\\\\', '/'), ? + 1), '/', 1) as folderName,
                     COUNT(*) as videoCount,
-                    (SELECT thumbnailUrl FROM videos v2 
-                     WHERE REPLACE(v2.videoUrl, '\\\\', '/') LIKE CONCAT(?, SUBSTRING_INDEX(SUBSTRING(REPLACE(videos.videoUrl, '\\\\', '/'), ? + 1), '/', 1), '/%')
-                     AND v2.thumbnailUrl IS NOT NULL AND v2.thumbnailUrl NOT LIKE '%default%'
-                     ORDER BY v2.createdAt DESC LIMIT 1) as thumb
+                    MAX(thumbnailUrl) as thumb
                 FROM videos 
                 WHERE REPLACE(videoUrl, '\\\\', '/') LIKE ?
                 AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
         
-        $params = [$prefixLen, $prefix, $prefixLen, $prefix . '%/%'];
+        $params = [$prefixLen, $prefix . '%/%'];
 
         if ($mediaType === 'VIDEO') {
             $sql .= " AND (is_audio = 0 OR is_audio IS NULL)";

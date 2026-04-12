@@ -308,16 +308,20 @@ export default function Shorts() {
     );
   }
 
-  const fetchShorts = async (p: number, forceAll: boolean = false) => {
+  const fetchShorts = async (p: number, forceAll: boolean = false, retryCount: number = 0) => {
     if (loading || (!hasMore && p !== 0 && !forceAll)) return;
+    if (retryCount > 5) {
+        setHasMore(false);
+        setLoading(false);
+        return;
+    }
+    
     setLoading(true);
     
     const currentMode = forceAll ? false : isUnseenMode;
     
     try {
-        console.log('Fetching shorts for page:', p, 'Mode:', currentMode ? 'UNSEEN' : 'ALL');
         const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed, currentMode);
-        console.log('Shorts response:', res);
         
         const shortsOnly = res.videos.filter(v => {
             if (!v || loadedVideoIds.current.has(v.id)) return false;
@@ -327,8 +331,6 @@ export default function Shorts() {
             const duration = Number(v.duration || 0);
             return !isImage && !isAudio && (duration < 300 || duration === 0);
         });
-        
-        console.log('Filtered shorts:', shortsOnly.length);
         
         if (shortsOnly.length > 0) {
             shortsOnly.forEach(v => loadedVideoIds.current.add(v.id));
@@ -340,21 +342,21 @@ export default function Shorts() {
             setHasMore(res.hasMore);
             setPage(p);
         } else if (res.hasMore) {
-            // If we filtered everything out but there's more, fetch next page automatically
+            // If we filtered everything out but there's more, fetch next page automatically with a limit
             setLoading(false);
-            fetchShorts(p + 1, forceAll);
+            fetchShorts(p + 1, forceAll, retryCount + 1);
             return;
         } else if (currentMode) {
             // No more unseen videos, switch to ALL mode
-            console.log('No more unseen videos, switching to ALL mode');
             setIsUnseenMode(false);
             setLoading(false);
-            fetchShorts(0, true);
+            fetchShorts(0, true, 0);
             return;
         } else {
             setHasMore(false);
         }
     } catch (e) {
+        console.error("Fetch shorts error:", e);
         toast.error("Error al cargar shorts");
     } finally {
         setLoading(false);
