@@ -40,7 +40,8 @@ function admin_update_settings($pdo, $input) {
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
-        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory'
+        'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory',
+        'shortsPath'
     ];
     
     $fields = []; $params = [];
@@ -246,6 +247,65 @@ function admin_get_global_transactions($pdo) {
     respond(true, $stmt->fetchAll());
 }
 
+function admin_repair_broken_videos($pdo) {
+    $bins = get_ffmpeg_binaries($pdo);
+    $ffprobe = $bins['ffprobe'];
+    
+    // 1. Identificar videos físicamente eliminados
+    $stmt = $pdo->query("SELECT id, videoUrl FROM videos WHERE isLocal = 1");
+    $allVideos = $stmt->fetchAll();
+    $deletedCount = 0;
+    
+    foreach ($allVideos as $v) {
+        $path = resolve_video_path($v['videoUrl']);
+        if (!$path || !file_exists($path)) {
+            $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$v['id']]);
+            $deletedCount++;
+        }
+    }
+
+    // 2. Identificar videos sin miniatura (que no sean audios)
+    // Y videos que se reproducen sin video (detectar si tienen stream de video)
+    $stmt = $pdo->query("SELECT id, videoUrl, is_audio FROM videos WHERE isLocal = 1 AND is_audio = 0");
+    $videos = $stmt->fetchAll();
+    $requeueCount = 0;
+    
+    foreach ($videos as $v) {
+        $path = resolve_video_path($v['videoUrl']);
+        if (!$path || !file_exists($path)) continue;
+
+        $needsRepair = false;
+
+        // Caso A: Sin miniatura
+        $stmtThumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE id = ?");
+        $stmtThumb->execute([$v['id']]);
+        $thumb = $stmtThumb->fetchColumn();
+        if (empty($thumb) || strpos($thumb, 'default_video.png') !== false) {
+            $needsRepair = true;
+        }
+
+        // Caso B: Sin stream de video (reproduce solo audio)
+        if (!$needsRepair) {
+            $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+            $hasVideo = trim(shell_exec($cmd) ?? '');
+            if ($hasVideo !== 'video') {
+                $needsRepair = true;
+            }
+        }
+
+        if ($needsRepair) {
+            $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', thumbnailUrl = '' WHERE id = ?")->execute([$v['id']]);
+            $requeueCount++;
+        }
+    }
+
+    respond(true, [
+        'deleted' => $deletedCount,
+        'requeued' => $requeueCount,
+        'message' => "Reparación completada: $deletedCount eliminados, $requeueCount enviados a re-procesar."
+    ]);
+}
+
 function admin_repair_db($pdo, $input) {
     require_once 'functions_schema.php';
     $schema = getAppSchema();
@@ -265,6 +325,9 @@ function admin_repair_db($pdo, $input) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $fixed = $stmt->rowCount();
+
+    // Reparar MP4 que están como audio por error
+    $pdo->query("UPDATE videos SET is_audio = 0 WHERE is_audio = 1 AND videoUrl LIKE '%.mp4'");
     
     respond(true, "Base de datos sincronizada. Se repararon $fixed registros de audio.");
 }

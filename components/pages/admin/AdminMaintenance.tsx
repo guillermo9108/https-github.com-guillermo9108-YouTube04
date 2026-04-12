@@ -86,6 +86,17 @@ export default function AdminMaintenance() {
         finally { setCleaning(false); }
     };
 
+    const handleRepairBrokenVideos = async () => {
+        if (!confirm("Esto buscará videos eliminados, sin miniatura o sin imagen y los reparará. ¿Continuar?")) return;
+        setCleaning(true);
+        try {
+            const res = await db.request<any>('action=admin_repair_broken_videos');
+            toast.success(res.message || "Reparación completada.");
+            fetchData();
+        } catch (e: any) { toast.error(e.message); }
+        finally { setCleaning(false); }
+    };
+
     const handleDeepCleanup = async () => {
         if (!confirm("Esta acción realizará una limpieza profunda (BD, archivos temporales, logs antiguos). ¿Deseas continuar?")) return;
         setCleaning(true);
@@ -278,6 +289,10 @@ export default function AdminMaintenance() {
                         <button onClick={handleRepairDb} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl transition-all">
                              <Database size={18} className="text-indigo-500" />
                              <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar MariaDB</span><span className="block text-[9px] text-slate-500">SINCRONIZACIÓN</span></div>
+                        </button>
+                        <button onClick={handleRepairBrokenVideos} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
+                             <ShieldAlert size={18} className="text-amber-500" />
+                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Videos Rotos</span><span className="block text-[9px] text-slate-500">MINIATURAS Y ERRORES</span></div>
                         </button>
                         <button onClick={handleDeepCleanup} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
                              <RefreshCw size={18} className={`text-amber-500 ${cleaning ? 'animate-spin' : ''}`} />

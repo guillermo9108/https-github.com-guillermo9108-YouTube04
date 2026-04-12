@@ -178,7 +178,7 @@ try {
         case 'get_videos': video_get_all($pdo); break;
         case 'get_video': video_get_one($pdo, $_GET['id'] ?? ''); break;
         case 'get_videos_by_creator': video_get_by_creator($pdo, $_GET['userId'] ?? ''); break;
-        case 'get_folder_videos': video_get_folder_videos($pdo, $_GET['videoId'] ?? ''); break;
+        case 'get_folder_videos': video_get_folder_videos($pdo, $_GET['videoId'] ?? '', $_GET['sort_order'] ?? '', $_GET['folder'] ?? ''); break;
         case 'get_related_videos': video_get_related($pdo, $_GET['videoId'] ?? ''); break;
         case 'get_unprocessed_videos': video_get_unprocessed($pdo, $_GET); break;
         case 'unlock_video': video_unlock($pdo, $input); break;
@@ -195,6 +195,7 @@ try {
         case 'reorganize_all_videos': video_reorganize_all($pdo); break;
         case 'fix_library_metadata': video_fix_metadata($pdo); break;
         case 'stream': streamVideo($_GET['id'] ?? '', $pdo); break;
+        case 'stream_sub': streamSubtitle($_GET['id'] ?? '', $_GET['ext'] ?? 'vtt', $pdo); break;
         case 'save_search': interact_save_search($pdo, $input); break;
         case 'get_search_suggestions': interact_get_search_suggestions($pdo, $_GET['q'] ?? '', $_GET['limit'] ?? 5); break;
         case 'get_video_likers': interact_get_video_likers($pdo, $_GET['videoId'] ?? '', $_GET['userId'] ?? null); break;
@@ -297,6 +298,7 @@ try {
         case 'admin_suspend_seller': admin_suspend_seller($pdo, $input); break;
         case 'admin_feature_listing': admin_feature_listing($pdo, $input); break;
         case 'admin_deep_cleanup': admin_deep_cleanup($pdo); break;
+        case 'admin_repair_broken_videos': admin_repair_broken_videos($pdo); break;
         case 'admin_get_seller_verification_requests': admin_get_seller_verification_requests($pdo); break;
         case 'admin_handle_seller_verification': admin_handle_seller_verification($pdo, $input); break;
         case 'list_ftp_files': if(function_exists('listFtpFiles')) listFtpFiles($pdo, $_GET['path'] ?? '/'); else respond(false, null, "Módulo FTP no disponible"); break;

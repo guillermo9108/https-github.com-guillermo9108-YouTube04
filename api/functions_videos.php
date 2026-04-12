@@ -18,7 +18,35 @@ function video_process_rows(&$rows) {
         }
         
         $ext = strtolower(pathinfo($v['rawPath'] ?? '', PATHINFO_EXTENSION));
-        $v['is_audio'] = (isset($v['is_audio']) && $v['is_audio'] == 1) || in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac']);
+        $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+        $isAudioExt = in_array($ext, $audioExts);
+        
+        // Si es MP4, NO es audio a menos que la base de datos diga explícitamente que lo es
+        if ($ext === 'mp4') {
+            $v['is_audio'] = (isset($v['is_audio']) && ($v['is_audio'] == 1 || $v['is_audio'] === true));
+        } else {
+            $v['is_audio'] = (isset($v['is_audio']) && ($v['is_audio'] == 1 || $v['is_audio'] === true)) || $isAudioExt;
+        }
+
+        // Buscar subtítulos externos (.srt, .vtt)
+        $v['subtitles'] = [];
+        if ($isLocal || $isUploaded) {
+            $inputPath = resolve_video_path($v['rawPath']);
+            if ($inputPath && file_exists($inputPath)) {
+                $basePath = preg_replace('/\.[^.]+$/', '', $inputPath);
+                foreach (['srt', 'vtt'] as $subExt) {
+                    $subFile = $basePath . '.' . $subExt;
+                    if (file_exists($subFile)) {
+                        $v['subtitles'][] = [
+                            'url' => "api/index.php?action=stream_sub&id=" . $v['id'] . "&ext=" . $subExt,
+                            'lang' => strtoupper($subExt),
+                            'label' => strtoupper($subExt),
+                            'kind' => 'subtitles'
+                        ];
+                    }
+                }
+            }
+        }
 
         if (empty($v['thumbnailUrl'])) {
             if ($v['is_audio']) {
@@ -136,14 +164,31 @@ function video_get_all($pdo) {
         $params[] = $userId;
     }
 
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths, shortsPath FROM system_settings WHERE id = 1");
+    $s = $stmtS->fetch();
+    $shortsPath = !empty($s['shortsPath']) ? str_replace('\\', '/', rtrim($s['shortsPath'], '/')) : '';
+
     if ($isShorts) { 
-        $where[] = "(v.duration < 300 OR v.duration = 0 OR v.duration IS NULL)"; 
+        if ($shortsPath) {
+            $where[] = "( (v.duration < 60 OR v.duration = 0 OR v.duration IS NULL) OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ? )";
+            $params[] = $shortsPath . '/%';
+        } else {
+            $where[] = "(v.duration < 60 OR v.duration = 0 OR v.duration IS NULL)";
+        }
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
         $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
     } else {
         // Excluir shorts de la vista normal (ALL/VIDEO), a menos que sean música
-        // Se aplica a carpetas y categorías también según lo solicitado
-        $where[] = "(v.is_audio = 1 OR v.duration >= 300 OR v.duration IS NULL OR v.duration = 0 OR v.category LIKE '%music%' OR v.videoUrl LIKE '%music%')";
+        // Si estamos navegando por una carpeta específica, mostramos TODO el contenido (incluyendo shorts)
+        if (empty($folder)) {
+            $shortsExclusion = "(v.is_audio = 1 OR v.duration >= 60 OR v.duration IS NULL OR v.duration = 0 OR v.category LIKE '%music%' OR v.videoUrl LIKE '%music%')";
+            if ($shortsPath) {
+                $where[] = "$shortsExclusion AND REPLACE(v.videoUrl, '\\\\', '/') NOT LIKE ?";
+                $params[] = $shortsPath . '/%';
+            } else {
+                $where[] = $shortsExclusion;
+            }
+        }
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
@@ -433,7 +478,7 @@ function video_get_related($pdo, $videoId) {
 /**
  * Obtiene videos de la misma carpeta con el orden configurado
  */
-function video_get_folder_videos($pdo, $videoId, $userSort = '') {
+function video_get_folder_videos($pdo, $videoId, $userSort = '', $contextFolder = '') {
     $stmtV = $pdo->prepare("SELECT videoUrl, category FROM videos WHERE id = ?");
     $stmtV->execute([$videoId]);
     $currentVideo = $stmtV->fetch();
@@ -446,7 +491,7 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
     $videoPath = str_replace('\\', '/', $currentVideo['videoUrl']);
     $category = $currentVideo['category'];
 
-    // Obtener la carpeta del video
+    // Obtener las raíces de la librería
     $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
     $s = $stmtS->fetch();
     $paths = json_decode($s['libraryPaths'] ?: '[]', true);
@@ -455,11 +500,16 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
 
     $relativePath = '';
     $videoPathNorm = str_replace('\\', '/', $videoPath);
-    foreach ($roots as $root) {
-        if (strpos(strtolower($videoPathNorm), strtolower($root)) === 0) {
-            $rel = trim(substr($videoPathNorm, strlen($root)), '/');
-            $relativePath = dirname($rel) === '.' ? '' : dirname($rel);
-            break;
+    
+    if (!empty($contextFolder)) {
+        $relativePath = trim(str_replace('\\', '/', $contextFolder), '/');
+    } else {
+        foreach ($roots as $root) {
+            if (strpos(strtolower($videoPathNorm), strtolower($root)) === 0) {
+                $rel = trim(substr($videoPathNorm, strlen($root)), '/');
+                $relativePath = dirname($rel) === '.' ? '' : dirname($rel);
+                break;
+            }
         }
     }
 
@@ -473,19 +523,40 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '') {
     if ($effectiveSort === 'RANDOM') {
         $orderBy = "RAND()";
     } elseif ($effectiveSort === 'ALPHA') {
-        $orderBy = "title ASC";
+        $orderBy = "v.title ASC";
     } else {
-        $orderBy = "createdAt DESC";
+        $orderBy = "v.createdAt DESC";
     }
 
-    // Obtener videos de la misma carpeta
-    $folderPath = dirname($videoPath);
-    $folderMatch = str_replace('\\', '/', $folderPath) . '/%';
-    $stmt = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
-                           FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
-                           WHERE REPLACE(v.videoUrl, '\\\\', '/') LIKE ? AND v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
-                           ORDER BY $orderBy");
-    $stmt->execute([$folderMatch]);
+    // Priorizar videos de la misma carpeta exacta que el video actual
+    $currentFolderPath = dirname($videoPathNorm);
+    $sameFolderClause = "REPLACE(v.videoUrl, '\\\\', '/') LIKE " . $pdo->quote($currentFolderPath . '/%') . " AND REPLACE(v.videoUrl, '\\\\', '/') NOT LIKE " . $pdo->quote($currentFolderPath . '/%/%');
+    // Nota: La lógica anterior de "same folder" era un poco imprecisa. 
+    // Vamos a usar una técnica más robusta: comparar el dirname.
+    
+    $clauses = [];
+    $params = [];
+    foreach ($roots as $root) {
+        $clauses[] = "REPLACE(v.videoUrl, '\\\\', '/') LIKE ?";
+        $params[] = $root . '/' . ($relativePath ? $relativePath . '/' : '') . '%';
+    }
+
+    $whereClause = "v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
+    if (!empty($clauses)) {
+        $whereClause .= " AND (" . implode(" OR ", $clauses) . ")";
+    }
+
+    // Orden especial: 1. Misma carpeta, 2. Subcarpetas, 3. El resto (si aplica)
+    // Usamos un CASE para dar prioridad 0 a la carpeta actual y 1 a las subcarpetas
+    $priorityOrder = "(CASE WHEN REPLACE(v.videoUrl, '\\\\', '/') LIKE " . $pdo->quote($currentFolderPath . '/%') . " AND REPLACE(v.videoUrl, '\\\\', '/') NOT LIKE " . $pdo->quote($currentFolderPath . '/%/%') . " THEN 0 ELSE 1 END)";
+
+    $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
+            FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
+            WHERE $whereClause
+            ORDER BY $priorityOrder ASC, $orderBy";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     video_process_rows($videos);
@@ -689,7 +760,11 @@ function video_upload($pdo, $post, $files) {
 
     $transcodeStatus = 'NONE';
     $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
-    $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']) ? 1 : 0;
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudio = in_array($ext, $audioExts) ? 1 : 0;
+    
+    // Si es MP4, forzar que NO sea audio a menos que se especifique lo contrario
+    if ($ext === 'mp4') $isAudio = 0;
 
     if ($autoTranscode === 1) {
         if ($ext !== 'mp4' && $ext !== 'mp3') {
@@ -840,7 +915,11 @@ function video_scan_local($pdo, $input) {
         $id = 'loc_' . md5($path);
         
         $ext = strtolower($file->getExtension());
-        $isAudio = in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b']) ? 1 : 0;
+        $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+        $isAudio = in_array($ext, $audioExts) ? 1 : 0;
+        
+        // Si es MP4, forzar que NO sea audio por defecto
+        if ($ext === 'mp4') $isAudio = 0;
 
         // Extract category from path
         $dir = dirname($path);

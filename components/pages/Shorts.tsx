@@ -12,13 +12,16 @@ interface ShortItemProps {
   isActive: boolean;
   isNear: boolean;
   onOpenShare: (v: Video) => void;
+  onInteraction?: (videoId: string, type: 'LIKE' | 'DISLIKE' | 'WATCHED' | 'QUICK_SKIP') => void;
 }
 
-const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => {
+const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: ShortItemProps) => {
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const clickTimerRef = useRef<number | null>(null);
   const loadTimeoutRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const wasInteractedRef = useRef<boolean>(false);
   
   const [showHeart, setShowHeart] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -47,6 +50,8 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   useEffect(() => {
     const el = videoRef.current;
     if (isActive) {
+        startTimeRef.current = Date.now();
+        wasInteractedRef.current = false;
         // Delay video loading to optimize fast scrolling
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         loadTimeoutRef.current = window.setTimeout(() => {
@@ -57,6 +62,12 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
         setShouldLoadVideo(false);
         if (el) {
             try {
+                const playTime = (Date.now() - startTimeRef.current) / 1000;
+                // Si se pasó rápido (< 5s) y no hubo interacción positiva
+                if (!wasInteractedRef.current && playTime < 5 && onInteraction) {
+                    onInteraction(video.id, 'QUICK_SKIP');
+                }
+
                 el.pause(); 
                 if (user && !interaction?.isWatched) {
                     db.markSkipped(user.id, video.id);
@@ -100,8 +111,10 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
     if (el.duration > 0) {
       const progress = el.currentTime / el.duration;
       if (progress >= 0.95 && !interaction?.isWatched && user) {
+        wasInteractedRef.current = true;
         db.markWatched(user.id, video.id).then(() => {
           setInteraction(prev => prev ? { ...prev, isWatched: true, isSkipped: false } : { isWatched: true, liked: false, disliked: false, isSkipped: false });
+          if (onInteraction) onInteraction(video.id, 'WATCHED');
         });
       }
     }
@@ -110,10 +123,12 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare }: ShortItemProps) => 
   const handleRate = async (rating: 'like' | 'dislike') => {
     if (!user) return;
     try {
+        wasInteractedRef.current = true;
         const res = await db.rateVideo(user.id, video.id, rating);
         setInteraction(res); 
         if (res.newLikeCount !== undefined) setLikeCount(res.newLikeCount);
         if (res.newDislikeCount !== undefined) setDislikeCount(res.newDislikeCount);
+        if (onInteraction) onInteraction(video.id, rating === 'like' ? 'LIKE' : 'DISLIKE');
     } catch(e) {}
   };
 
@@ -276,6 +291,10 @@ export default function Shorts() {
   const loadedVideoIds = useRef<Set<string>>(new Set());
   const sessionSeed = useMemo(() => Math.random().toString(36).substring(7), []);
   
+  // Lógica de recomendación por carpeta
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [consecutiveNegatives, setConsecutiveNegatives] = useState(0);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -308,6 +327,68 @@ export default function Shorts() {
     );
   }
 
+  const getFolder = (video: Video) => {
+    const path = (video as any).rawPath || video.videoUrl || '';
+    const parts = path.split(/[\\/]/).filter(Boolean);
+    if (parts.length > 1) return parts[parts.length - 2];
+    return 'ROOT';
+  };
+
+  const handleInteraction = (videoId: string, type: 'LIKE' | 'DISLIKE' | 'WATCHED' | 'QUICK_SKIP') => {
+    if (!isUnseenMode) return; // Solo para contenido no visto
+
+    const video = videos.find(v => v.id === videoId);
+    if (!video) return;
+
+    const folder = getFolder(video);
+    const isPositive = type === 'LIKE' || type === 'WATCHED';
+    const isNegative = type === 'DISLIKE' || type === 'QUICK_SKIP';
+
+    if (isPositive) {
+        setCurrentFolder(folder);
+        setConsecutiveNegatives(0);
+        // Reordenar la cola para poner videos de esta carpeta a continuación
+        reorderQueue(folder, true);
+    } else if (isNegative) {
+        if (currentFolder === folder) {
+            const newNegs = consecutiveNegatives + 1;
+            setConsecutiveNegatives(newNegs);
+            if (newNegs >= 2) {
+                setCurrentFolder(null);
+                setConsecutiveNegatives(0);
+                reorderQueue(folder, false); // Alejar esta carpeta
+            } else {
+                // Mantener carpeta por una vez más
+                reorderQueue(folder, true);
+            }
+        } else {
+            setCurrentFolder(folder);
+            setConsecutiveNegatives(1);
+            reorderQueue(folder, true);
+        }
+    }
+  };
+
+  const reorderQueue = (folder: string, prioritize: boolean) => {
+    setVideos(prev => {
+        const currentBatch = [...prev];
+        const nextVideos = currentBatch.slice(activeIndex + 1);
+        const playedVideos = currentBatch.slice(0, activeIndex + 1);
+
+        let matching = nextVideos.filter(v => getFolder(v) === folder);
+        let others = nextVideos.filter(v => getFolder(v) !== folder);
+
+        if (prioritize) {
+            // Si no hay suficientes en la cola actual, fetchShorts se encargará al llegar al final
+            // pero aquí movemos los que tengamos
+            return [...playedVideos, ...matching, ...others];
+        } else {
+            // Alejar los de esta carpeta
+            return [...playedVideos, ...others, ...matching];
+        }
+    });
+  };
+
   const fetchShorts = async (p: number, forceAll: boolean = false, retryCount: number = 0) => {
     if (loading || (!hasMore && p !== 0 && !forceAll)) return;
     if (retryCount > 5) {
@@ -321,7 +402,9 @@ export default function Shorts() {
     const currentMode = forceAll ? false : isUnseenMode;
     
     try {
-        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed, currentMode);
+        // Si tenemos una carpeta activa y estamos en modo positivo, intentamos traer de esa carpeta
+        const folderToFetch = (currentMode && currentFolder) ? currentFolder : '';
+        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed, currentMode, folderToFetch);
         
         const shortsOnly = res.videos.filter(v => {
             if (!v || loadedVideoIds.current.has(v.id)) return false;
@@ -347,6 +430,13 @@ export default function Shorts() {
             fetchShorts(p + 1, forceAll, retryCount + 1);
             return;
         } else if (currentMode) {
+            // Si estábamos buscando en una carpeta y se agotó, intentamos modo general
+            if (currentFolder) {
+                setCurrentFolder(null);
+                setLoading(false);
+                fetchShorts(p, forceAll, 0);
+                return;
+            }
             // No more unseen videos, switch to ALL mode
             setIsUnseenMode(false);
             setLoading(false);
@@ -451,6 +541,7 @@ export default function Shorts() {
                 isActive={idx === activeIndex} 
                 isNear={Math.abs(idx - activeIndex) <= 4}
                 onOpenShare={(v) => setVideoToShare(v)}
+                onInteraction={handleInteraction}
              />
         </div>
       ))}

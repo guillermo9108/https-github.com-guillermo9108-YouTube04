@@ -127,6 +127,37 @@ function resolve_video_path($url) {
     return null;
 }
 
+function streamSubtitle($id, $ext, $pdo) {
+    while (ob_get_level()) ob_end_clean();
+    
+    $stmt = $pdo->prepare("SELECT videoUrl FROM videos WHERE id = ?");
+    $stmt->execute([$id]);
+    $video = $stmt->fetch();
+    if (!$video) { header("HTTP/1.1 404 Not Found"); exit; }
+
+    $inputPath = resolve_video_path($video['videoUrl']);
+    if (!$inputPath) { header("HTTP/1.1 404 Not Found"); exit; }
+
+    $basePath = preg_replace('/\.[^.]+$/', '', $inputPath);
+    $subFile = $basePath . '.' . $ext;
+
+    if (!file_exists($subFile)) { header("HTTP/1.1 404 Not Found"); exit; }
+
+    header("Access-Control-Allow-Origin: *");
+    header("Content-Type: text/vtt");
+    
+    $content = file_get_contents($subFile);
+    
+    if ($ext === 'srt') {
+        // Conversión básica de SRT a VTT
+        $vtt = "WEBVTT\n\n" . preg_replace('/(\d{2}:\d{2}:\d{2}),(\d{3})/', '$1.$2', $content);
+        echo $vtt;
+    } else {
+        echo $content;
+    }
+    exit;
+}
+
 function streamVideo($id, $pdo) {
     // Limpiar cualquier salida previa para evitar corrupción del stream
     while (ob_get_level()) ob_end_clean();

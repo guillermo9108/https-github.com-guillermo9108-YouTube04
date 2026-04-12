@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
 import { Video, Comment, UserInteraction, Category } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
@@ -85,6 +87,7 @@ export default function Watch() {
     const shareTimeout = useRef<any>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
+    const playerRef = useRef<any>(null);
     const viewMarkedRef = useRef(false);
 
     useEffect(() => { 
@@ -113,7 +116,7 @@ export default function Watch() {
 
             if (navigationContext.f) {
                 // Si estamos en una carpeta, usar getFolderVideos para mantener el sortOrder
-                const res = await db.getFolderVideos(id || '', navigationContext.s || '', user?.id);
+                const res = await db.getFolderVideos(id || '', navigationContext.s || '', user?.id, navigationContext.f);
                 filteredResults = res.videos;
                 hasMore = false; // getFolderVideos devuelve todo
             } else {
@@ -423,6 +426,83 @@ export default function Watch() {
         return `${base}&download=1&filename=${filename}.${ext}`;
     }, [video?.id, user?.sessionToken, video?.title, video?.is_audio]);
 
+    // Initialize Video.js
+    useEffect(() => {
+        if (isUnlocked && videoRef.current && !playerRef.current) {
+            const player = videojs(videoRef.current, {
+                autoplay: true,
+                controls: true,
+                responsive: true,
+                fluid: true,
+                playbackRates: [0.5, 1, 1.25, 1.5, 2],
+                controlBar: {
+                    children: [
+                        'playToggle',
+                        'volumePanel',
+                        'currentTimeDisplay',
+                        'timeDivider',
+                        'durationDisplay',
+                        'progressControl',
+                        'liveDisplay',
+                        'remainingTimeDisplay',
+                        'customControlSpacer',
+                        'playbackRateMenuButton',
+                        'chaptersButton',
+                        'descriptionsButton',
+                        'subsCapsButton',
+                        'audioTrackButton',
+                        'fullscreenToggle',
+                    ],
+                },
+            }, () => {
+                // Player ready
+            });
+
+            playerRef.current = player;
+
+            player.on('play', () => setThrottled(true));
+            player.on('pause', () => setThrottled(false));
+            player.on('ended', handleVideoEnded);
+            player.on('timeupdate', () => {
+                handleTimeUpdate();
+            });
+        }
+
+        // Update source and tracks when video changes
+        if (playerRef.current && video) {
+            playerRef.current.src({
+                src: streamUrl,
+                type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
+            });
+            playerRef.current.poster(posterUrl);
+
+            // Clear old tracks
+            const oldTracks = playerRef.current.remoteTextTracks();
+            let i = oldTracks.length;
+            while (i--) {
+                playerRef.current.removeRemoteTextTrack(oldTracks[i]);
+            }
+
+            // Add new tracks
+            video.subtitles?.forEach((sub, idx) => {
+                playerRef.current.addRemoteTextTrack({
+                    src: sub.url,
+                    kind: sub.kind,
+                    srclang: sub.lang.toLowerCase(),
+                    label: sub.label,
+                    default: idx === 0
+                }, false);
+            });
+        }
+
+        return () => {
+            if (playerRef.current) {
+                playerRef.current.dispose();
+                playerRef.current = null;
+            }
+        };
+    }, [isUnlocked, streamUrl, video?.id]);
+
     const handleDownload = (e: React.MouseEvent) => {
         if (e) { e.preventDefault(); e.stopPropagation(); }
         
@@ -467,19 +547,13 @@ export default function Watch() {
                             {(video?.is_audio || !video?.thumbnailUrl) && (
                                 <img src={posterUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
-                            <video 
-                                ref={videoRef} 
-                                src={streamUrl} 
-                                controls={true}
-                                autoPlay 
-                                poster={posterUrl} 
-                                className={`w-full h-full transition-transform duration-300 ${videoFit === 'cover' ? 'object-cover' : 'object-contain'}`} 
-                                onEnded={handleVideoEnded} 
-                                crossOrigin="anonymous" 
-                                onPlay={() => { setThrottled(true); }} 
-                                onPause={() => { setThrottled(false); }}
-                                onTimeUpdate={handleTimeUpdate}
-                            />
+                            <div data-vjs-player className="w-full h-full">
+                                <video 
+                                    ref={videoRef} 
+                                    className="video-js vjs-big-play-centered vjs-theme-city w-full h-full"
+                                    crossOrigin="anonymous" 
+                                />
+                            </div>
                         </div>
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">

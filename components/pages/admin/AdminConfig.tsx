@@ -394,6 +394,22 @@ export default function AdminConfig() {
                             <input type="text" value={settings?.ytDlpPath} onChange={e => updateValue('ytDlpPath', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-[10px] outline-none" />
                         </div>
                     </div>
+
+                    <div className="pt-4 border-t border-white/5 space-y-3">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-indigo-400 uppercase flex items-center gap-1 ml-1"><Watch size={10}/> Ruta para Shorts (Exclusiva)</label>
+                            <input 
+                                type="text" 
+                                value={settings?.shortsPath || ''} 
+                                onChange={e => updateValue('shortsPath', e.target.value)} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-[10px] focus:border-indigo-500 outline-none" 
+                                placeholder="Ej: /volume1/shorts"
+                            />
+                            <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">
+                                * Los videos en esta ruta se tratarán como Shorts (sin importar duración) y se ocultarán de la página principal.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 

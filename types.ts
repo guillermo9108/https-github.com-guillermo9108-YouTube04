@@ -63,6 +63,13 @@ export interface User {
   apkVersion?: string;
 }
 
+export interface VideoSubtitle {
+  url: string;
+  lang: string;
+  label: string;
+  kind: 'subtitles' | 'captions';
+}
+
 export interface Video {
   id: string;
   title: string;
@@ -93,6 +100,7 @@ export interface Video {
   reason?: string;
   transcode_progress?: number;
   size_fmt?: string;
+  subtitles?: VideoSubtitle[];
 }
 
 export interface Comment {
@@ -167,6 +175,7 @@ export interface SystemSettings {
   vapidPrivateKey?: string;
   latestApkVersion?: string;
   batteryConfig?: any;
+  shortsPath?: string;
 }
 
 export interface Transaction {

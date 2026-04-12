@@ -243,7 +243,8 @@ function getAppSchema() {
                 'vapidPrivateKey' => 'TEXT DEFAULT NULL',
                 'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'",
                 'batteryConfig' => 'JSON DEFAULT NULL',
-                'batteryHistory' => 'JSON DEFAULT NULL'
+                'batteryHistory' => 'JSON DEFAULT NULL',
+                'shortsPath' => "VARCHAR(255) DEFAULT ''"
             ]
         ],
         'transactions' => [
@@ -347,6 +348,17 @@ function syncTable($pdo, $tableName, $def) {
                         $pdo->exec("CREATE INDEX $idxName ON $tableName ($col)");
                     } catch (Exception $e) {}
                 }
+            }
+        }
+        
+        // Perfiles de Transcodificación por defecto
+        if ($tableName === 'transcode_profiles') {
+            $stmt = $pdo->query("SELECT COUNT(*) FROM transcode_profiles");
+            if ($stmt->fetchColumn() == 0) {
+                $pdo->exec("INSERT INTO transcode_profiles (extension, command_args, description) VALUES 
+                    ('ultrafast', '-c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k', 'Máxima velocidad, mínimo CPU (Ideal para PCs lentas)'),
+                    ('mp4', '-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k', 'Balanceado (MP4 Estándar)'),
+                    ('mp3', '-vn -c:a libmp3lame -q:a 2', 'Solo Audio (MP3)')");
             }
         }
     } catch (Exception $e) { 

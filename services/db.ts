@@ -89,9 +89,9 @@ class DBService {
         return this.request<VideoPagedResponse>(query);
     }
 
-    public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = '', onlyUnseen: boolean = false): Promise<VideoPagedResponse> {
+    public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = '', onlyUnseen: boolean = false, folder: string = ''): Promise<VideoPagedResponse> {
         const offset = page * limit;
-        const query = `action=get_videos&limit=${limit}&offset=${offset}&shorts=1&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}&seed=${encodeURIComponent(seed)}${onlyUnseen ? '&only_unseen=1' : ''}`;
+        const query = `action=get_videos&limit=${limit}&offset=${offset}&shorts=1&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}&seed=${encodeURIComponent(seed)}${onlyUnseen ? '&only_unseen=1' : ''}&folder=${encodeURIComponent(folder)}`;
         return this.request<VideoPagedResponse>(query);
     }
 
@@ -218,8 +218,8 @@ class DBService {
 
     public async getRelatedVideos(videoId: string): Promise<Video[]> { return this.request<Video[]>(`action=get_related_videos&videoId=${videoId}`); }
 
-    public async getFolderVideos(videoId: string, sortOrder: string = '', userId: string = ''): Promise<{videos: Video[], sortOrder: string}> { 
-        return this.request<{videos: Video[], sortOrder: string}>(`action=get_folder_videos&videoId=${videoId}&sort_order=${encodeURIComponent(sortOrder)}&userId=${userId}`); 
+    public async getFolderVideos(videoId: string, sortOrder: string = '', userId: string = '', folder: string = ''): Promise<{videos: Video[], sortOrder: string}> { 
+        return this.request<{videos: Video[], sortOrder: string}>(`action=get_folder_videos&videoId=${videoId}&sort_order=${encodeURIComponent(sortOrder)}&userId=${userId}&folder=${encodeURIComponent(folder)}`); 
     }
 
     public async getUnprocessedVideos(limit: number = 50, mode: string = 'normal'): Promise<Video[]> { return this.request<Video[]>(`action=get_unprocessed_videos&limit=${limit}&mode=${mode}`); }
