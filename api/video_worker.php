@@ -62,9 +62,8 @@ $failed = 0;
 
 for ($i = 0; $i < $batchSize; $i++) {
     $now = time();
-    // Priorizar videos con menos intentos de procesamiento y que no estén bloqueados recientemente
-    // Bajamos el tiempo de bloqueo a 60 segundos para ser más agresivos si un worker muere
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = 'PENDING' AND processing_attempts < 5 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
+    // Priorizar videos en PENDING o aquellos que no tengan miniatura válida
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE (category = 'PENDING' OR thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg') AND processing_attempts < 5 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
     $stmt->execute([$now - 60]);
     $video = $stmt->fetch();
 
@@ -135,8 +134,12 @@ for ($i = 0; $i < $batchSize; $i++) {
 
     if ($ffCode === 0) {
         echo "[SUCCESS] Procesado: {$finalDuration}s.\n";
-        $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, category = 'PROCESSING', is_audio = ?, locked_at = 0, processing_attempts = 0 WHERE id = ?")
-            ->execute([$finalDuration, $thumbUrl, $isAudio ? 1 : 0, $video['id']]);
+        
+        // Solo cambiar categoría a PROCESSING si estaba en PENDING
+        $newCategory = ($video['category'] === 'PENDING') ? 'PROCESSING' : $video['category'];
+        
+        $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, category = ?, is_audio = ?, locked_at = 0, processing_attempts = 0 WHERE id = ?")
+            ->execute([$finalDuration, $thumbUrl, $newCategory, $isAudio ? 1 : 0, $video['id']]);
         
         // Organizar inmediatamente tras el éxito
         $sets = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();

@@ -9,15 +9,22 @@ header('Content-Type: text/plain; charset=utf-8');
 
 echo "--- STREAMPAY CRON START: " . date('Y-m-d H:i:s') . " ---\n\n";
 
+// 0. Asegurar directorios de subida
+echo "[0/4] Verificando directorios...\n";
+ob_start();
+include 'check_dirs.php';
+echo ob_get_clean();
+echo "\n";
+
 // 1. Ejecutar Cleanup Worker (Eliminar archivos de 0 bytes)
-echo "[1/3] Iniciando Cleanup Worker...\n";
+echo "[1/4] Iniciando Cleanup Worker...\n";
 ob_start();
 include 'cleanup_worker.php';
 echo ob_get_clean();
 echo "\n";
 
 // 2. Ejecutar Video Worker (Metadatos y Miniaturas)
-echo "[2/3] Iniciando Video Worker...\n";
+echo "[2/4] Iniciando Video Worker...\n";
 ob_start();
 include 'video_worker.php';
 $videoOutput = ob_get_clean();
@@ -25,7 +32,7 @@ echo $videoOutput;
 echo "\n";
 
 // 3. Ejecutar Transcode Worker (Conversión de Formatos)
-echo "[3/3] Iniciando Transcode Worker...\n";
+echo "[3/4] Iniciando Transcode Worker...\n";
 ob_start();
 include 'transcode_worker.php';
 $transcodeOutput = ob_get_clean();

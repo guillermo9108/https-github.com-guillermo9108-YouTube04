@@ -523,7 +523,7 @@ export default function Home() {
         // --- ARCHITECT HIERARCHICAL LOGIC ---
         
         // 1. Phase 1: Recents (1-10)
-        const validVideos = videos.filter(v => !!v);
+        const validVideos = videos.filter(v => v && v.id && v.videoUrl && v.creatorId && v.creatorName);
         const sortedVideos = [...validVideos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         const phase1Source = sortedVideos.slice(0, 10);
         const phase2Source = sortedVideos.slice(10);
@@ -833,7 +833,7 @@ export default function Home() {
                                             <div key={v.id} className="bg-[var(--bg-secondary)]">
                                                 <VideoCard 
                                                     video={v} 
-                                                    isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
+                                                    isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000) || Number(v.price || 0) <= 0} 
                                                     isWatched={watchedIds.includes(v.id)} 
                                                     onCategoryClick={() => handleCategoryClick(v.category)}
                                                     context={{ 

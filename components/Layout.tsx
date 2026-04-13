@@ -89,7 +89,7 @@ export default function Layout() {
     <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[104px]'}`}>
       {/* Facebook Lite Style Header */}
       {!isMenuMode && (
-        <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)]">
+        <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)] shadow-sm opacity-100">
           {/* Top Bar: Logo & Actions */}
           <div className="flex items-center justify-between px-3 h-14">
             <Link to="/" className="flex items-center">

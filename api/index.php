@@ -290,6 +290,7 @@ try {
         case 'admin_clear_transcode_queue': admin_clear_transcode_queue($pdo); break;
         case 'admin_remove_from_queue': admin_remove_from_queue($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_skip_transcode': admin_skip_transcode($pdo, $_GET['videoId'] ?? ''); break;
+        case 'admin_reconstruct_thumbnails': admin_reconstruct_thumbnails($pdo); break;
         case 'admin_smart_cleaner_preview': admin_smart_cleaner_preview($pdo, $input); break;
         case 'admin_smart_cleaner_execute': admin_smart_cleaner_execute($pdo, $input); break;
         case 'admin_extreme_janitor': admin_extreme_janitor($pdo, $input); break;

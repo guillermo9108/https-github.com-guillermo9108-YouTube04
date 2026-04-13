@@ -11,6 +11,20 @@ import { generateThumbnail } from '../utils/videoGenerator';
 // Sistema de control global para no saturar el servidor
 let isAnyCardProcessing = false;
 const failedExtractions = new Set<string>();
+const thumbnailQueue: string[] = [];
+
+const processQueue = async () => {
+    if (isAnyCardProcessing || thumbnailQueue.length === 0) return;
+    
+    const videoId = thumbnailQueue.shift();
+    if (!videoId) return;
+
+    // Disparar un evento personalizado para que la instancia del VideoCard correspondiente procese
+    window.dispatchEvent(new CustomEvent('process_thumbnail', { detail: { videoId } }));
+};
+
+// Revisar la cola periódicamente
+setInterval(processQueue, 2000);
 
 interface VideoCardProps {
   video: Video;
@@ -36,6 +50,7 @@ const formatTimeAgo = (timestamp: number) => {
 };
 
 const formatDuration = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
@@ -167,53 +182,67 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
   useEffect(() => {
       let isMounted = true;
-      const canProcess = isUnlocked && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !isAnyCardProcessing && !failedExtractions.has(video.id);
-      if (canProcess) {
+      
+      const handleProcessEvent = (e: any) => {
+          if (e.detail.videoId === video.id && isMounted && !isProcessing && !localThumb) {
+              startProcessing();
+          }
+      };
+
+      const startProcessing = async () => {
+          if (isAnyCardProcessing) return;
           isAnyCardProcessing = true;
           setIsProcessing(true);
-          const process = async () => {
-              try {
-                  // Sistema de colaboración: Intentar bloquear el video para procesamiento
-                  const lockId = `client_${Math.random().toString(36).substring(2, 9)}`;
-                  const lockRes = await db.lockVideoForProcessing(video.id, lockId);
-                  
-                  if (!lockRes.success) {
-                      // Otro dispositivo ya lo está procesando
-                      failedExtractions.add(video.id);
-                      return;
-                  }
+          try {
+              // Sistema de colaboración: Intentar bloquear el video para procesamiento
+              const lockId = `client_${Math.random().toString(36).substring(2, 9)}`;
+              const lockRes = await db.lockVideoForProcessing(video.id, lockId);
+              
+              if (!lockRes.success) {
+                  failedExtractions.add(video.id);
+                  return;
+              }
 
-                  const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
-                  const result = await generateThumbnail(streamUrl, isAudio, false); // No saltar imagen
-                  if (!isMounted) return;
-                  
-                  if (result.duration > 0 || result.thumbnail) {
-                      const fd = new FormData();
-                      fd.append('id', video.id);
-                      fd.append('duration', String(result.duration || video.duration));
-                      fd.append('success', '1');
-                      if (result.thumbnail) {
-                          fd.append('thumbnail', result.thumbnail);
-                          setLocalThumb(URL.createObjectURL(result.thumbnail));
-                      }
-                      await db.request('action=update_video_metadata', { method: 'POST', body: fd });
-                      db.setHomeDirty();
-                  } else { 
-                      // Si falló la extracción local, liberar el bloqueo para que otros intenten
-                      await db.unlockVideo(video.id);
-                      failedExtractions.add(video.id); 
+              const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
+              const result = await generateThumbnail(streamUrl, isAudio, false); 
+              if (!isMounted) return;
+              
+              if (result.duration > 0 || result.thumbnail) {
+                  const fd = new FormData();
+                  fd.append('id', video.id);
+                  fd.append('duration', String(result.duration || video.duration));
+                  fd.append('success', '1');
+                  if (result.thumbnail) {
+                      fd.append('thumbnail', result.thumbnail);
+                      setLocalThumb(URL.createObjectURL(result.thumbnail));
                   }
-              } catch (e) { 
+                  await db.request('action=update_video_metadata', { method: 'POST', body: fd });
+                  db.setHomeDirty();
+              } else { 
+                  await db.unlockVideo(video.id);
                   failedExtractions.add(video.id); 
-                  // Intentar liberar en caso de error de red o similar
-                  try { await db.unlockVideo(video.id); } catch(err) {}
-              } 
-              finally { if (isMounted) { setIsProcessing(false); isAnyCardProcessing = false; } }
-          };
-          const t = setTimeout(process, 1000);
-          return () => { isMounted = false; clearTimeout(t); };
+              }
+          } catch (e) { 
+              failedExtractions.add(video.id); 
+              try { await db.unlockVideo(video.id); } catch(err) {}
+          } 
+          finally { 
+              isAnyCardProcessing = false;
+              if (isMounted) setIsProcessing(false); 
+          }
+      };
+
+      const canQueue = isUnlocked && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !failedExtractions.has(video.id);
+      if (canQueue && !thumbnailQueue.includes(video.id)) {
+          thumbnailQueue.push(video.id);
       }
-  }, [video.id, isAudio, hasDefaultThumb, isVisible, isProcessing, localThumb, isUnlocked]);
+
+      window.addEventListener('process_thumbnail', handleProcessEvent);
+      return () => {
+          isMounted = false;
+          window.removeEventListener('process_thumbnail', handleProcessEvent);
+      };
+  }, [video.id, isAudio, hasDefaultThumb, isVisible, isUnlocked, user?.sessionToken]);
 
   useEffect(() => {
       return () => {

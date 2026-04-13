@@ -4,7 +4,8 @@ import {
     Cpu, RefreshCw, Play, CheckCircle2, Terminal, Layers, Clock, Zap, Pause, 
     Filter, History, AlertCircle, Activity, Box, Radio, Trash2, Settings2, 
     Plus, X, ChevronRight, FileVideo, AlertTriangle, RotateCcw, ShieldAlert, 
-    FileText, ScrollText, Copy, FastForward, Save, PlusCircle, Loader2, Gauge, HardDrive, Edit3, ToggleLeft, ToggleRight
+    FileText, ScrollText, Copy, FastForward, Save, PlusCircle, Loader2, Gauge, HardDrive, Edit3, ToggleLeft, ToggleRight,
+    Image as ImageIcon
 } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
 import { Video, SystemSettings } from '../../../types';
@@ -156,6 +157,14 @@ export default function AdminTranscoder() {
         } catch (e: any) { toast.error(e.message); }
     };
 
+    const handleReconstructThumbnails = async () => {
+        try {
+            const res: any = await db.request('action=admin_reconstruct_thumbnails', { method: 'POST' });
+            toast.success(`${res.count} videos añadidos a la cola de reconstrucción`);
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in max-w-7xl mx-auto pb-24 px-2">
             
@@ -285,6 +294,21 @@ export default function AdminTranscoder() {
                 </div>
 
                 <div className="lg:col-span-4 space-y-6">
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+                        <h3 className="text-xs font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <ImageIcon size={14} className="text-pink-500"/> Mantenimiento de Miniaturas
+                        </h3>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-4">
+                            Escanea videos sin miniatura o con imagen por defecto y los añade a la cola de procesamiento del servidor.
+                        </p>
+                        <button 
+                            onClick={handleReconstructThumbnails}
+                            className="w-full py-3 bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-slate-700 hover:border-pink-500/30"
+                        >
+                            <RotateCcw size={16}/> Reconstruir Miniaturas
+                        </button>
+                    </div>
+
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
                         <h3 className="text-sm font-black text-white uppercase tracking-tighter mb-4 flex items-center gap-2"><Cpu size={18}/> Controles de Flujo</h3>
                         <div className="space-y-2">

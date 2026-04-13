@@ -600,11 +600,19 @@ export default function Watch() {
     const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${navigationContext.f.split('/').pop()}` : null);
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
+    if (!video) return (
+        <div className="flex flex-col items-center justify-center p-20 text-slate-400">
+            <AlertTriangle size={48} className="mb-4 text-amber-500" />
+            <h2 className="text-xl font-bold">Video no encontrado</h2>
+            <p className="mt-2">El video que buscas no existe o ha sido eliminado.</p>
+            <Link to="/" className="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-xl">Volver al inicio</Link>
+        </div>
+    );
 
     return (
         <div className="flex flex-col bg-slate-950 min-h-screen animate-in fade-in relative">
             {/* Contenedor de Video Pegajoso - Mejorado para móviles */}
-            <div className="w-full bg-black sticky top-0 z-[45] shadow-2xl border-b border-white/5 overflow-hidden">
+            <div className="w-full bg-black sticky top-[104px] z-[45] shadow-2xl border-b border-white/5 overflow-hidden transition-all duration-300">
                 <div 
                     ref={videoContainerRef}
                     className={`relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group ${isFullscreen ? 'h-screen max-w-none aspect-auto' : ''}`}

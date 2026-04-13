@@ -447,6 +447,14 @@ function admin_get_local_stats($pdo) {
     ]);
 }
 
+function admin_reconstruct_thumbnails($pdo) {
+    // Resetear intentos de procesamiento para videos sin miniatura o con miniatura por defecto
+    $stmt = $pdo->prepare("UPDATE videos SET processing_attempts = 0, locked_at = 0 WHERE thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg'");
+    $stmt->execute();
+    $count = $stmt->rowCount();
+    respond(true, ['count' => $count]);
+}
+
 function admin_get_logs() {
     $logFile = 'transcode_log.txt';
     if (!file_exists($logFile)) respond(true, []);
