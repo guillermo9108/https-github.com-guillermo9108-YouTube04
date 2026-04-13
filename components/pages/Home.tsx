@@ -457,7 +457,17 @@ export default function Home() {
         const collectionsSeen = new Set<string>();
 
         const isShort = (v: any) => {
-            return !v.is_audio && v.duration > 0 && v.duration < 60 && v.category !== 'IMAGES' && !v.category?.toLowerCase().includes('music');
+            const path = (v.videoUrl || '').toLowerCase();
+            const category = (v.category || '').toLowerCase();
+            const isMusic = category.includes('music') || path.includes('music');
+            
+            if (isMusic) return false;
+            
+            const isUnder10Min = v.duration > 0 && v.duration < 600;
+            const shortsPath = systemSettings?.shortsPath;
+            const isInShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.toLowerCase().replace(/\\/g, '/'));
+            
+            return !v.is_audio && category !== 'IMAGES' && (isUnder10Min || isInShortsPath);
         };
 
         // Pre-calculate counts for all categories
@@ -572,7 +582,7 @@ export default function Home() {
                         {/* Create Story */}
                         <div 
                             onClick={() => navigate('/create-story')}
-                            className="relative min-w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                            className="relative w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                         >
                             <div className="h-[70%] overflow-hidden">
                                 {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
@@ -590,7 +600,7 @@ export default function Home() {
                             <div 
                                 key={story.id} 
                                 onClick={() => navigate(`/stories?userId=${story.userId}`)}
-                                className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                                className="relative w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                             >
                                 {story.type === 'IMAGE' ? (
                                     <img src={story.contentUrl} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />

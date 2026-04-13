@@ -255,6 +255,7 @@ try {
         case 'upload_channel_images': upload_channel_images($pdo, $_POST, $_FILES); break;
         case 'upload_story': upload_story($pdo, $_POST, $_FILES); break;
         case 'get_stories': get_stories($pdo); break;
+        case 'delete_story': delete_story($pdo, $input); break;
         case 'admin_bulk_edit_folder': admin_bulk_edit_folder($pdo, $input); break;
         case 'admin_update_category_price': admin_update_category_price($pdo, $input); break;
         case 'admin_add_balance': admin_add_balance($pdo, $input); break;

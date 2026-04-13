@@ -1240,4 +1240,29 @@ function get_stories($pdo) {
     
     respond(true, $stories);
 }
+
+function delete_story($pdo, $input) {
+    $id = $input['id'] ?? '';
+    $userId = $input['userId'] ?? '';
+    
+    if (!$id || !$userId) respond(false, null, "ID o Usuario faltante");
+    
+    // Check ownership
+    $stmt = $pdo->prepare("SELECT contentUrl FROM stories WHERE id = ? AND userId = ?");
+    $stmt->execute([$id, $userId]);
+    $story = $stmt->fetch();
+    
+    if (!$story) respond(false, null, "Historia no encontrada o no autorizada");
+    
+    // Delete file
+    if (file_exists($story['contentUrl'])) {
+        @unlink($story['contentUrl']);
+    }
+    
+    // Delete from DB
+    $stmt = $pdo->prepare("DELETE FROM stories WHERE id = ?");
+    $stmt->execute([$id]);
+    
+    respond(true);
+}
 ?>

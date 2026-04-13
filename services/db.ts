@@ -391,7 +391,12 @@ class DBService {
     public async adminServerControl(action: 'shutdown' | 'reboot'): Promise<any> { return this.request<any>('action=admin_server_control', { method: 'POST', body: JSON.stringify({ serverAction: action }) }); }
 
     public async getAllUsers(): Promise<User[]> { return this.request<User[]>('action=get_all_users'); }
-    public async searchUsers(userId: string, query: string): Promise<User[]> { return this.request<User[]>(`action=search_users`, { method: 'POST', body: JSON.stringify({ userId, q: query }) }); }
+    public async searchUsers(query: string): Promise<User[]> {
+        return this.request<User[]>('action=search_users', {
+            method: 'POST',
+            body: JSON.stringify({ query })
+        });
+    }
     public async updateUserProfile(userId: string, data: any): Promise<void> {
         if (data.avatar instanceof File || data.newPassword) {
             const fd = new FormData(); fd.append('userId', userId);
@@ -468,6 +473,13 @@ class DBService {
 
     public async getStories(): Promise<any[]> {
         return this.request<any[]>('action=get_stories');
+    }
+
+    public async deleteStory(id: string, userId: string): Promise<void> {
+        return this.request<void>('action=delete_story', {
+            method: 'POST',
+            body: JSON.stringify({ id, userId })
+        });
     }
 
     public async subscribePush(data: { userId: string, subscription: any }): Promise<void> {

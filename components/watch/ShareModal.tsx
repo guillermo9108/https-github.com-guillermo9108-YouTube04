@@ -23,7 +23,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ video, user, onClose, onShareSu
         if (val.length < 2) { setShareSuggestions([]); return; }
         shareTimeout.current = setTimeout(async () => {
             if (!user) return;
-            const hits = await db.searchUsers(user.id, val);
+            const hits = await db.searchUsers(val);
             setShareSuggestions(hits);
         }, 300);
     };

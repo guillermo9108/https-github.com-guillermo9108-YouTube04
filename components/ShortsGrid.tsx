@@ -35,7 +35,7 @@ export default function ShortsGrid({ shorts }: ShortsGridProps) {
                     <div 
                         key={short.id}
                         onClick={() => navigate(`/shorts?id=${short.id}`)}
-                        className="relative min-w-[110px] w-[110px] aspect-[9/16] bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)]"
+                        className="relative min-w-[130px] w-[130px] aspect-[9/16] bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)]"
                     >
                         <img 
                             src={short.thumbnailUrl || '/api/uploads/thumbnails/default.jpg'} 

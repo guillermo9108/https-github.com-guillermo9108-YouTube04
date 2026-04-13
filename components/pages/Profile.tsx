@@ -62,7 +62,7 @@ export default function Profile() {
       if (val.length < 2) { setUserSuggestions([]); return; }
       searchTimeout.current = setTimeout(async () => {
           if (!user) return;
-          const hits = await db.searchUsers(user.id, val);
+          const hits = await db.searchUsers(val);
           setUserSuggestions(hits);
       }, 300);
   };

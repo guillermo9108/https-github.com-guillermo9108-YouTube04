@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronLeft, ChevronRight, Play, Pause, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Play, Pause, Loader2, Trash2 } from 'lucide-react';
 import { Story } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
@@ -81,9 +81,43 @@ export default function StoryViewer() {
             setCurrentStoryIndex(prev => prev - 1);
             setProgress(0);
         } else if (currentUserIndex > 0) {
-            setCurrentUserIndex(prev => prev - 1);
-            setCurrentStoryIndex(groupedStories[currentUserIndex - 1].length - 1);
+            const prevUserIdx = currentUserIndex - 1;
+            setCurrentUserIndex(prevUserIdx);
+            setCurrentStoryIndex(groupedStories[prevUserIdx].length - 1);
             setProgress(0);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!currentStory || !user || currentStory.userId !== user.id) return;
+        if (!window.confirm("¿Estás seguro de que quieres eliminar esta historia?")) return;
+
+        try {
+            await db.deleteStory(currentStory.id, user.id);
+            // Remove from local state
+            const newStories = stories.filter(s => s.id !== currentStory.id);
+            setStories(newStories);
+            
+            if (newStories.length === 0) {
+                navigate('/');
+                return;
+            }
+
+            // Adjust indices if necessary
+            if (currentStoryIndex >= currentGroup.length - 1) {
+                if (currentUserIndex >= groupedStories.length - 1) {
+                    // Last story of last user
+                    setCurrentUserIndex(Math.max(0, currentUserIndex - 1));
+                    setCurrentStoryIndex(0);
+                } else {
+                    // Last story of current user, move to next user
+                    setCurrentStoryIndex(0);
+                }
+            }
+            setProgress(0);
+        } catch (e) {
+            console.error("Failed to delete story:", e);
+            alert("Error al eliminar la historia");
         }
     };
 
@@ -180,9 +214,20 @@ export default function StoryViewer() {
                         </span>
                     </div>
                 </div>
-                <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
-                    <X size={24} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {user?.id === currentStory.userId && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(); }} 
+                            className="text-white p-2 hover:bg-red-500/20 rounded-full transition-colors"
+                            title="Eliminar historia"
+                        >
+                            <Trash2 size={24} className="text-red-400" />
+                        </button>
+                    )}
+                    <button onClick={() => navigate('/')} className="text-white p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
             </div>
 
             {/* Content Area */}
