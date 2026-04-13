@@ -84,52 +84,9 @@ class DBService {
     }
 
     public async getVideos(page: number = 0, limit: number = 40, folder: string = '', search: string = '', category: string = '', mediaType: string = 'ALL', sortOrder: string = '', userId: string = ''): Promise<VideoPagedResponse> {
-        // Usar datos mock para demostración
-        const { demoVideos } = await import('./mockData');
-
-        let filteredVideos = [...demoVideos];
-
-        // Filtrar por búsqueda
-        if (search) {
-            const searchLower = search.toLowerCase();
-            filteredVideos = filteredVideos.filter(v =>
-                v.title.toLowerCase().includes(searchLower) ||
-                v.description.toLowerCase().includes(searchLower)
-            );
-        }
-
-        // Filtrar por categoría
-        if (category && category !== 'TODOS') {
-            filteredVideos = filteredVideos.filter(v => v.category === category);
-        }
-
-        // Filtrar por tipo de medio
-        if (mediaType === 'VIDEO') {
-            filteredVideos = filteredVideos.filter(v => !v.is_audio);
-        } else if (mediaType === 'AUDIO') {
-            filteredVideos = filteredVideos.filter(v => v.is_audio);
-        }
-
-        // Ordenar
-        if (sortOrder === 'LATEST') {
-            filteredVideos.sort((a, b) => b.createdAt - a.createdAt);
-        } else if (sortOrder === 'ALPHA') {
-            filteredVideos.sort((a, b) => a.title.localeCompare(b.title));
-        } else if (sortOrder === 'RANDOM') {
-            filteredVideos.sort(() => Math.random() - 0.5);
-        }
-
         const offset = page * limit;
-        const paginatedVideos = filteredVideos.slice(offset, offset + limit);
-
-        return {
-            videos: paginatedVideos,
-            folders: [],
-            activeCategories: ['Educación', 'Programación', 'Music', 'Tecnología', 'Diseño', 'Marketing'],
-            appliedSortOrder: sortOrder,
-            total: filteredVideos.length,
-            hasMore: offset + limit < filteredVideos.length
-        };
+        const query = `action=get_videos&limit=${limit}&offset=${offset}&folder=${encodeURIComponent(folder)}&search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}`;
+        return this.request<VideoPagedResponse>(query);
     }
 
     public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = '', onlyUnseen: boolean = false, folder: string = ''): Promise<VideoPagedResponse> {
@@ -165,11 +122,15 @@ class DBService {
         return this.request<{active: boolean}>(`action=check_price_alert&userId=${userId}&itemId=${itemId}`);
     }
 
-    public async getSystemSettings(): Promise<SystemSettings> {
-        // Usar datos mock para demostración
-        const { demoSystemSettings } = await import('./mockData');
-        localStorage.setItem('sp_cache_settings', JSON.stringify(demoSystemSettings));
-        return demoSystemSettings;
+    public async getSystemSettings(): Promise<SystemSettings> { 
+        try {
+            const s = await this.request<SystemSettings>('action=get_system_settings');
+            localStorage.setItem('sp_cache_settings', JSON.stringify(s));
+            return s;
+        } catch (e) {
+            const cached = localStorage.getItem('sp_cache_settings');
+            return cached ? JSON.parse(cached) : { categories: [] } as any;
+        }
     }
 
     public async getCategories(): Promise<Category[]> {
@@ -181,19 +142,11 @@ class DBService {
     }
 
     public async saveSearch(term: string): Promise<void> {
-        // En modo demo, no hacemos nada
-        return Promise.resolve();
+        return this.request<void>(`action=save_search`, { method: 'POST', body: JSON.stringify({ term }) });
     }
 
     public async getSearchSuggestions(q: string, limit: number = 20): Promise<any[]> {
-        // Usar sugerencias mock para demo
-        const { demoSuggestions } = await import('./mockData');
-        if (!q) return [];
-
-        const searchLower = q.toLowerCase();
-        return demoSuggestions.filter(s =>
-            s.label.toLowerCase().includes(searchLower)
-        ).slice(0, limit);
+        return this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
     }
 
     public async checkInstallation(): Promise<{status: string}> {
@@ -230,11 +183,7 @@ class DBService {
     public enableDemoMode(): void { localStorage.setItem('sp_demo_mode', 'true'); }
 
     public async login(username: string, password: string): Promise<User> {
-        // Usar datos mock para demostración
-        const { demoUser } = await import('./mockData');
-        // Simular un token de sesión
-        const token = 'demo_token_' + Math.random().toString(36).substring(7);
-        return { ...demoUser, sessionToken: token };
+        return this.request<User>(`action=login`, { method: 'POST', body: JSON.stringify({ username, password, deviceId: navigator.userAgent.substring(0, 255) }) });
     }
 
     public async register(username: string, password: string, avatar?: File | null): Promise<User> {
@@ -249,15 +198,11 @@ class DBService {
     }
 
     public async getUser(userId: string): Promise<User | null> {
-        // Usar datos mock para demostración
-        const { demoUser } = await import('./mockData');
-        return demoUser;
+        return this.request<User | null>(`action=get_user&userId=${userId}`);
     }
 
     public async heartbeat(userId: string): Promise<User> {
-        // Usar datos mock para demostración
-        const { demoUser } = await import('./mockData');
-        return demoUser;
+        return this.request<User>(`action=heartbeat&userId=${userId}`);
     }
 
     public saveOfflineUser(user: User): void { localStorage.setItem('sp_offline_user', JSON.stringify(user)); }
@@ -285,10 +230,7 @@ class DBService {
             body: JSON.stringify({ videoId, lockId })
         });
     }
-    public async getUserActivity(userId: string): Promise<{watched: string[], liked: string[]}> {
-        // Retornar actividad vacía para demo
-        return { watched: [], liked: [] };
-    }
+    public async getUserActivity(userId: string): Promise<{watched: string[], liked: string[]}> { return this.request<{watched: string[], liked: string[]}>(`action=get_user_activity&userId=${userId}`); }
 
     public async toggleWatchLater(userId: string, videoId: string): Promise<string[]> {
         return this.request<string[]>(`action=update_user_profile`, { 
@@ -499,9 +441,8 @@ class DBService {
         if (!key || key.includes('marketplace')) localStorage.removeItem('sp_cache_market');
     }
     public setHomeDirty() { this.homeDirty = true; }
-    public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> {
-        // Retornar notificaciones vacías para demo
-        return [];
+    public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> { 
+        return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}&limit=${limit}`); 
     }
     public async getUnreadNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_unread_notifications&userId=${userId}`); }
     public async getUnreadCount(userId: string): Promise<{count: number}> { return this.request<{count: number}>(`action=get_unread_count&userId=${userId}`); }
@@ -541,9 +482,7 @@ class DBService {
     }
 
     public async getStories(): Promise<any[]> {
-        // Usar datos mock para demostración
-        const { demoStories } = await import('./mockData');
-        return demoStories;
+        return this.request<any[]>('action=get_stories');
     }
 
     public async deleteStory(id: string, userId: string): Promise<void> {
