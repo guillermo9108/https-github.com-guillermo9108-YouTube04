@@ -26,6 +26,29 @@ const formatTimeAgo = (timestamp: number) => {
     return `hace ${Math.floor(diff / 86400)} d`;
 };
 
+// Helper for seeded random
+function seededRandom(seed: string) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+    return function() {
+        hash = (hash * 16807) % 2147483647;
+        return (hash - 1) / 2147483646;
+    };
+}
+
+function shuffleWithSeed<T>(array: T[], seed: string): T[] {
+    const rng = seededRandom(seed);
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
+
 export default function Home() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -453,80 +476,163 @@ export default function Home() {
     const processedVideos = useMemo(() => {
         if (!videos || videos.length === 0) return [];
         
-        const result: any[] = [];
-        const collectionsSeen = new Set<string>();
-
         const isShort = (v: any) => {
             const path = (v.videoUrl || '').toLowerCase();
             const category = (v.category || '').toLowerCase();
             const isMusic = category.includes('music') || path.includes('music');
-            
             if (isMusic) return false;
-            
             const isUnder10Min = v.duration > 0 && v.duration < 600;
             const shortsPath = systemSettings?.shortsPath;
             const isInShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.toLowerCase().replace(/\\/g, '/'));
-            
             return !v.is_audio && category !== 'IMAGES' && (isUnder10Min || isInShortsPath);
         };
 
-        // Pre-calculate counts for all categories
-        const categoryCounts: Record<string, number> = {};
-        videos.forEach(v => {
-            if (v) {
-                const cat = (v.category || '').toUpperCase();
-                categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        const getItemType = (v: any) => {
+            if (isShort(v)) return 'short';
+            if (v.is_audio) return 'audio';
+            if (v.category?.toUpperCase() === 'IMAGES') return 'imagen';
+            return 'video';
+        };
+
+        const isOnRoot = !searchQuery && currentFolder.length === 0 && selectedCategory === 'TODOS';
+
+        if (!isOnRoot) {
+            // Standard Logic for Search/Folders/Categories
+            const result: any[] = [];
+            let i = 0;
+            while (i < videos.length) {
+                const item = videos[i];
+                if (!item) { i++; continue; }
+                if (isShort(item)) {
+                    const group: any[] = [];
+                    while (i < videos.length && videos[i] && isShort(videos[i])) {
+                        group.push(videos[i]);
+                        i++;
+                    }
+                    result.push({ isShortsGroup: true, shorts: group, id: `shorts-group-${i}` });
+                    continue;
+                }
+                result.push(item);
+                i++;
             }
-        });
+            return result;
+        }
+
+        // --- ARCHITECT HIERARCHICAL LOGIC ---
+        
+        // 1. Phase 1: Recents (1-10)
+        const sortedVideos = [...videos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const phase1Source = sortedVideos.slice(0, 10);
+        const phase2Source = sortedVideos.slice(10);
+        
+        const result: any[] = [];
 
         let i = 0;
-        while (i < videos.length) {
-            const item = videos[i];
-            if (!item) { i++; continue; }
-
-            // 1. Group Consecutive Shorts
-            if (isShort(item)) {
-                const shortsGroup: any[] = [];
-                while (i < videos.length && videos[i] && isShort(videos[i])) {
-                    shortsGroup.push(videos[i]);
+        while (i < phase1Source.length) {
+            const item = phase1Source[i];
+            const type = getItemType(item);
+            
+            if (type === 'short') {
+                const group: any[] = [item];
+                let j = i + 1;
+                while (j < phase1Source.length && j < i + 10 && getItemType(phase1Source[j]) === 'short' && phase1Source[j].creatorId === item.creatorId) {
+                    group.push(phase1Source[j]);
+                    j++;
+                }
+                
+                if (group.length > 1) {
+                    result.push({
+                        id: `group-user-${item.creatorId}-${i}`,
+                        tipo: 'short_group_user',
+                        isShortsGroup: true,
+                        shorts: group,
+                        items: group
+                    });
+                    i = j;
+                } else {
+                    result.push({ ...item, tipo: 'short_individual', isShort: true });
                     i++;
                 }
-                result.push({
-                    isShortsGroup: true,
-                    shorts: shortsGroup,
-                    id: `shorts-group-${i}`
-                });
-                continue;
-            }
-
-            const itemCat = (item.category || '').toUpperCase();
-
-            // 2. Group Images by Collection (Album)
-            if (item.collection && itemCat === 'IMAGES') {
-                if (!collectionsSeen.has(item.collection)) {
-                    collectionsSeen.add(item.collection);
-                    const albumItems = videos.filter(v => v && v.collection === item.collection);
-                    result.push({
-                        ...item,
-                        isAlbum: true,
-                        albumItems: albumItems,
-                        categoryCount: categoryCounts[itemCat]
-                    });
-                }
+            } else {
+                result.push({ ...item, tipo: type });
                 i++;
-                continue;
             }
+        }
 
-            // All other items (Videos, Audios) are shown independently
-            result.push({
-                ...item,
-                categoryCount: categoryCounts[itemCat]
-            });
-            i++;
+        // 2. Phase 2: Discovery (11+)
+        if (phase2Source.length > 0) {
+            const seed = "discovery-" + (new Date().toDateString());
+            const shuffled = shuffleWithSeed(phase2Source, seed);
+            
+            const poolShorts = shuffled.filter(v => getItemType(v) === 'short');
+            const poolOthers = shuffled.filter(v => getItemType(v) !== 'short');
+            
+            let discoveryResult: any[] = [];
+            let lastTypes: string[] = [];
+            let countSinceTopicGroup = 0;
+
+            const getNextItem = () => {
+                const forbiddenType = lastTypes.length === 2 && lastTypes[0] === lastTypes[1] ? lastTypes[0] : null;
+                
+                // Try to interleave
+                for (let k = 0; k < poolOthers.length; k++) {
+                    const type = getItemType(poolOthers[k]);
+                    if (type !== forbiddenType) {
+                        const item = poolOthers.splice(k, 1)[0];
+                        return { ...item, tipo: type };
+                    }
+                }
+                
+                for (let k = 0; k < poolShorts.length; k++) {
+                    if ('short' !== forbiddenType) {
+                        const item = poolShorts.splice(k, 1)[0];
+                        return { ...item, tipo: 'short_individual', isShort: true };
+                    }
+                }
+                
+                if (poolOthers.length > 0) return { ...poolOthers.shift(), tipo: getItemType(poolOthers[0]) };
+                if (poolShorts.length > 0) return { ...poolShorts.shift(), tipo: 'short_individual', isShort: true };
+                return null;
+            };
+
+            while (poolOthers.length > 0 || poolShorts.length > 0) {
+                // Every 10 positions, insert short_group_topic
+                if (countSinceTopicGroup === 10 && poolShorts.length >= 2) {
+                    const firstShort = poolShorts[0];
+                    const cat = firstShort.category;
+                    const group = poolShorts.filter(s => s.category === cat).slice(0, 10);
+                    
+                    if (group.length >= 2) {
+                        discoveryResult.push({
+                            id: `group-topic-${cat}-${discoveryResult.length}`,
+                            tipo: 'short_group_topic',
+                            isShortsGroup: true,
+                            shorts: group,
+                            items: group
+                        });
+                        const groupedIds = new Set(group.map(g => g.id));
+                        for (let k = poolShorts.length - 1; k >= 0; k--) {
+                            if (groupedIds.has(poolShorts[k].id)) poolShorts.splice(k, 1);
+                        }
+                        countSinceTopicGroup = 0;
+                        lastTypes = ['short_group_topic'];
+                        continue;
+                    }
+                }
+
+                const next = getNextItem();
+                if (next) {
+                    discoveryResult.push(next);
+                    lastTypes.push(getItemType(next));
+                    if (lastTypes.length > 2) lastTypes.shift();
+                    countSinceTopicGroup++;
+                } else break;
+            }
+            result.push(...discoveryResult);
         }
 
         return result;
-    }, [videos]);
+    }, [videos, searchQuery, currentFolder, selectedCategory, systemSettings]);
 
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
