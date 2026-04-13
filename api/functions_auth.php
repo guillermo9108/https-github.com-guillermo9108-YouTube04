@@ -156,8 +156,10 @@ function auth_update_user($pdo, $input) {
 }
 
 function auth_get_all_users($pdo) {
-    $stmt = $pdo->query("SELECT id, username, role, balance, lastActive, is_verified_seller FROM users ORDER BY lastActive DESC");
-    respond(true, $stmt->fetchAll());
+    $stmt = $pdo->query("SELECT id, username, role, balance, lastActive, is_verified_seller, avatarUrl FROM users ORDER BY lastActive DESC");
+    $users = $stmt->fetchAll();
+    foreach ($users as &$u) $u['avatarUrl'] = fix_url($u['avatarUrl']);
+    respond(true, $users);
 }
 
 function auth_search_users($pdo, $input) {

@@ -224,6 +224,12 @@ class DBService {
 
     public async getUnprocessedVideos(limit: number = 50, mode: string = 'normal'): Promise<Video[]> { return this.request<Video[]>(`action=get_unprocessed_videos&limit=${limit}&mode=${mode}`); }
     public async unlockVideo(id: string): Promise<void> { return this.request<void>(`action=unlock_video`, { method: 'POST', body: JSON.stringify({ id }) }); }
+    public async lockVideoForProcessing(videoId: string, lockId: string): Promise<{success: boolean}> {
+        return this.request<{success: boolean}>(`action=lock_video_for_processing`, {
+            method: 'POST',
+            body: JSON.stringify({ videoId, lockId })
+        });
+    }
     public async getUserActivity(userId: string): Promise<{watched: string[], liked: string[]}> { return this.request<{watched: string[], liked: string[]}>(`action=get_user_activity&userId=${userId}`); }
 
     public async toggleWatchLater(userId: string, videoId: string): Promise<string[]> {
@@ -234,6 +240,10 @@ class DBService {
     }
 
     public async getSubscriptions(userId: string): Promise<string[]> { return this.request<string[]>(`action=get_subscriptions&userId=${userId}`); }
+
+    public async getMutualFriends(userId: string, targetId: string): Promise<User[]> {
+        return this.request<User[]>(`action=get_mutual_friends&userId=${userId}&targetId=${targetId}`);
+    }
 
     public async checkSubscription(userId: string, creatorId: string): Promise<boolean> {
         const res = await this.request<{isSubscribed: boolean}>(`action=check_subscription&userId=${userId}&creatorId=${creatorId}`);

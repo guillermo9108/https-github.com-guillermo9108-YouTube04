@@ -3,6 +3,25 @@
  * VIDEOS - CORE FUNCTIONS V22.0 (Sort Order Fix - Herencia de Orden)
  */
 
+function video_lock_for_processing($pdo, $input) {
+    $videoId = $input['videoId'] ?? '';
+    $lockId = $input['lockId'] ?? '';
+    if (!$videoId || !$lockId) respond(false, null, "Faltan parámetros");
+
+    $now = time();
+    $timeout = 60; // 1 minuto de bloqueo
+
+    // Intentar bloquear si no está bloqueado o si el bloqueo expiró
+    $stmt = $pdo->prepare("UPDATE videos SET locked_at = ?, lock_id = ? WHERE id = ? AND (locked_at < ? OR locked_at IS NULL)");
+    $stmt->execute([$now, $lockId, $videoId, $now - $timeout]);
+
+    if ($stmt->rowCount() > 0) {
+        respond(true);
+    } else {
+        respond(false, null, "Video ya está siendo procesado por otro dispositivo");
+    }
+}
+
 function video_process_rows(&$rows) {
     if (!$rows) return;
     global $pdo;
@@ -1198,22 +1217,47 @@ function video_update($pdo, $input) {
 function upload_story($pdo, $post, $files) {
     $userId = $post['userId'];
     $type = $post['type'] ?? 'IMAGE';
+    $overlayText = $post['overlayText'] ?? null;
+    $overlayColor = $post['overlayColor'] ?? null;
+    $overlayBg = $post['overlayBg'] ?? null;
     
+    $audioUrl = null;
+    if (isset($files['audio']) && $files['audio']['error'] === UPLOAD_ERR_OK) {
+        $audioId = uniqid('audio_');
+        $audioExt = pathinfo($files['audio']['name'], PATHINFO_EXTENSION);
+        $audioFilename = $audioId . '.' . $audioExt;
+        $audioTarget = 'uploads/videos/' . $audioFilename;
+        if (move_uploaded_file($files['audio']['tmp_name'], $audioTarget)) {
+            $audioUrl = $audioTarget;
+        }
+    }
+
     if (!isset($files['file']) || $files['file']['error'] !== UPLOAD_ERR_OK) {
+        // If no file, but we have text, we can create a text-only story
+        if ($type === 'IMAGE' && $overlayText) {
+            // Create a placeholder or just use the text
+            $id = uniqid('story_');
+            $now = time();
+            $expiry = $now + (24 * 3600);
+            $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$id, $userId, '', $type, $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
+            respond(true, ['id' => $id]);
+            return;
+        }
         respond(false, null, "Archivo no recibido");
     }
 
     $id = uniqid('story_');
     $ext = pathinfo($files['file']['name'], PATHINFO_EXTENSION);
     $filename = $id . '.' . $ext;
-    $target = 'uploads/videos/' . $filename; // Using same folder for simplicity
+    $target = 'uploads/videos/' . $filename;
 
     if (move_uploaded_file($files['file']['tmp_name'], $target)) {
         $now = time();
         $expiry = $now + (24 * 3600); // 24 hours
         
-        $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$id, $userId, $target, $type, $now, $expiry]);
+        $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $userId, $target, $type, $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
         
         respond(true, ['id' => $id]);
     } else {
@@ -1223,7 +1267,6 @@ function upload_story($pdo, $post, $files) {
 
 function get_stories($pdo) {
     $now = time();
-    // Get active stories and group them by user
     $sql = "SELECT s.*, u.username, u.avatarUrl 
             FROM stories s 
             JOIN users u ON s.userId = u.id 
@@ -1236,6 +1279,7 @@ function get_stories($pdo) {
     foreach ($stories as &$s) {
         $s['contentUrl'] = fix_url($s['contentUrl']);
         $s['avatarUrl'] = fix_url($s['avatarUrl']);
+        $s['audioUrl'] = fix_url($s['audioUrl']);
     }
     
     respond(true, $stories);

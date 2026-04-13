@@ -13,6 +13,7 @@ export default function FriendsPage() {
     
     const [users, setUsers] = useState<User[]>([]);
     const [subscriptions, setSubscriptions] = useState<string[]>([]);
+    const [mutualFriendsMap, setMutualFriendsMap] = useState<Record<string, User[]>>({});
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'suggestions' | 'your_friends'>('suggestions');
@@ -26,9 +27,22 @@ export default function FriendsPage() {
                     db.getAllUsers(),
                     db.getSubscriptions(user.id)
                 ]);
-                // Filter out current user
-                setUsers(allUsers.filter(u => u.id !== user.id));
+                
+                const filtered = allUsers.filter(u => u.id !== user.id);
+                setUsers(filtered);
                 setSubscriptions(subs);
+
+                // Fetch mutual friends for each user (limited to avoid too many requests)
+                // In a real app, this would be done in the backend or on demand
+                const mutuals: Record<string, User[]> = {};
+                const topUsers = filtered.slice(0, 20); // Only for the first 20 to avoid saturation
+                await Promise.all(topUsers.map(async (u) => {
+                    try {
+                        const m = await db.getMutualFriends(user.id, u.id);
+                        mutuals[u.id] = m;
+                    } catch (e) {}
+                }));
+                setMutualFriendsMap(mutuals);
             } catch (error) {
                 console.error("Failed to fetch friends data:", error);
                 toast.error("Error al cargar usuarios");
@@ -154,15 +168,28 @@ export default function FriendsPage() {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1 mb-2">
-                                        <div className="flex -space-x-2">
-                                            <div className="w-5 h-5 rounded-full border-2 border-[var(--bg-primary)] bg-slate-700 overflow-hidden">
-                                                <img src="https://picsum.photos/seed/u1/20/20" className="w-full h-full object-cover" />
-                                            </div>
-                                            <div className="w-5 h-5 rounded-full border-2 border-[var(--bg-primary)] bg-slate-600 overflow-hidden">
-                                                <img src="https://picsum.photos/seed/u2/20/20" className="w-full h-full object-cover" />
-                                            </div>
-                                        </div>
-                                        <span className="text-[var(--text-secondary)] text-[13px] ml-1">19 amigos en común</span>
+                                        {mutualFriendsMap[u.id] && mutualFriendsMap[u.id].length > 0 ? (
+                                            <>
+                                                <div className="flex -space-x-2">
+                                                    {mutualFriendsMap[u.id].slice(0, 2).map(m => (
+                                                        <div key={m.id} className="w-5 h-5 rounded-full border-2 border-[var(--bg-primary)] bg-slate-700 overflow-hidden">
+                                                            {m.avatarUrl ? (
+                                                                <img src={m.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-white uppercase">
+                                                                    {m.username?.[0]}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <span className="text-[var(--text-secondary)] text-[13px] ml-1">
+                                                    {mutualFriendsMap[u.id].length} amigo{mutualFriendsMap[u.id].length !== 1 ? 's' : ''} en común
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-[var(--text-secondary)] text-[13px]">Sin amigos en común</span>
+                                        )}
                                     </div>
                                     <div className="flex gap-2">
                                         <button 

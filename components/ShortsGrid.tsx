@@ -5,9 +5,10 @@ import { Play, MoreHorizontal, Eye } from 'lucide-react';
 
 interface ShortsGridProps {
     shorts: Video[];
+    isSingle?: boolean;
 }
 
-export default function ShortsGrid({ shorts }: ShortsGridProps) {
+export default function ShortsGrid({ shorts, isSingle }: ShortsGridProps) {
     const navigate = useNavigate();
 
     const formatViews = (views: number) => {
@@ -30,12 +31,16 @@ export default function ShortsGrid({ shorts }: ShortsGridProps) {
                 </button>
             </div>
 
-            <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide pb-1">
+            <div className={`flex gap-2 px-3 pb-1 ${isSingle ? '' : 'overflow-x-auto scrollbar-hide'}`}>
                 {shorts.map((short) => (
                     <div 
                         key={short.id}
                         onClick={() => navigate(`/shorts?id=${short.id}`)}
-                        className="relative min-w-[130px] w-[130px] aspect-[9/16] bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)]"
+                        className={`relative bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)] ${
+                            isSingle 
+                            ? 'w-full max-w-[280px] aspect-[9/16] mx-auto' 
+                            : 'min-w-[130px] w-[130px] aspect-[9/16]'
+                        }`}
                     >
                         <img 
                             src={short.thumbnailUrl || '/api/uploads/thumbnails/default.jpg'} 

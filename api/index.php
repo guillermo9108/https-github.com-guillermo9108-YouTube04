@@ -229,6 +229,7 @@ try {
         case 'toggle_subscribe': interact_toggle_subscribe($pdo, $input); break;
         case 'check_subscription': interact_check_subscription($pdo, $_GET['userId'] ?? '', $_GET['creatorId'] ?? ''); break;
         case 'get_subscriptions': interact_get_subscriptions($pdo, $_GET['userId'] ?? ''); break;
+        case 'get_mutual_friends': interact_get_mutual_friends($pdo, $_GET['userId'] ?? '', $_GET['targetId'] ?? ''); break;
         case 'request_content': interact_request_content($pdo, $input); break;
         case 'create_pay_link': if(function_exists('payment_create_link')) payment_create_link($pdo, $input); else respond(false, null, "Módulo de pago no disponible"); break;
         case 'verify_payment': if(function_exists('payment_verify')) payment_verify($pdo, $input); else respond(false, null, "Módulo de pago no disponible"); break;
@@ -256,6 +257,7 @@ try {
         case 'upload_story': upload_story($pdo, $_POST, $_FILES); break;
         case 'get_stories': get_stories($pdo); break;
         case 'delete_story': delete_story($pdo, $input); break;
+        case 'lock_video_for_processing': video_lock_for_processing($pdo, $input); break;
         case 'admin_bulk_edit_folder': admin_bulk_edit_folder($pdo, $input); break;
         case 'admin_update_category_price': admin_update_category_price($pdo, $input); break;
         case 'admin_add_balance': admin_add_balance($pdo, $input); break;

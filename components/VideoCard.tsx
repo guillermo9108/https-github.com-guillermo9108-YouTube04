@@ -173,9 +173,20 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           setIsProcessing(true);
           const process = async () => {
               try {
+                  // Sistema de colaboración: Intentar bloquear el video para procesamiento
+                  const lockId = `client_${Math.random().toString(36).substring(2, 9)}`;
+                  const lockRes = await db.lockVideoForProcessing(video.id, lockId);
+                  
+                  if (!lockRes.success) {
+                      // Otro dispositivo ya lo está procesando
+                      failedExtractions.add(video.id);
+                      return;
+                  }
+
                   const streamUrl = db.getStreamerUrl(video.id, user?.sessionToken);
                   const result = await generateThumbnail(streamUrl, isAudio, false); // No saltar imagen
                   if (!isMounted) return;
+                  
                   if (result.duration > 0 || result.thumbnail) {
                       const fd = new FormData();
                       fd.append('id', video.id);
@@ -187,8 +198,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                       }
                       await db.request('action=update_video_metadata', { method: 'POST', body: fd });
                       db.setHomeDirty();
-                  } else { failedExtractions.add(video.id); }
-              } catch (e) { failedExtractions.add(video.id); } 
+                  } else { 
+                      // Si falló la extracción local, liberar el bloqueo para que otros intenten
+                      await db.unlockVideo(video.id);
+                      failedExtractions.add(video.id); 
+                  }
+              } catch (e) { 
+                  failedExtractions.add(video.id); 
+                  // Intentar liberar en caso de error de red o similar
+                  try { await db.unlockVideo(video.id); } catch(err) {}
+              } 
               finally { if (isMounted) { setIsProcessing(false); isAnyCardProcessing = false; } }
           };
           const t = setTimeout(process, 1000);

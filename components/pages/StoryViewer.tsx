@@ -232,23 +232,59 @@ export default function StoryViewer() {
 
             {/* Content Area */}
             <div className="flex-1 relative flex items-center justify-center overflow-hidden" onClick={() => setPaused(!paused)}>
-                {currentStory.type === 'IMAGE' ? (
-                    <img 
-                        src={currentStory.contentUrl} 
-                        className="max-w-full max-h-full object-contain" 
-                        referrerPolicy="no-referrer"
-                        alt="Story content"
-                    />
+                {currentStory.contentUrl ? (
+                    currentStory.type === 'IMAGE' ? (
+                        <img 
+                            src={currentStory.contentUrl} 
+                            className="max-w-full max-h-full object-contain" 
+                            referrerPolicy="no-referrer"
+                            alt="Story content"
+                        />
+                    ) : (
+                        <video 
+                            ref={videoRef}
+                            src={currentStory.contentUrl} 
+                            className="max-w-full max-h-full object-contain"
+                            autoPlay
+                            playsInline
+                            onLoadedMetadata={handleVideoMetadata}
+                            onPlay={() => setPaused(false)}
+                            onPause={() => setPaused(true)}
+                        />
+                    )
                 ) : (
-                    <video 
-                        ref={videoRef}
-                        src={currentStory.contentUrl} 
-                        className="max-w-full max-h-full object-contain"
-                        autoPlay
-                        playsInline
-                        onLoadedMetadata={handleVideoMetadata}
-                        onPlay={() => setPaused(false)}
-                        onPause={() => setPaused(true)}
+                    // Text-only story background
+                    <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600" />
+                )}
+
+                {/* Overlay Text */}
+                {currentStory.overlayText && (
+                    <div className="absolute inset-0 flex items-center justify-center p-8 pointer-events-none">
+                        <p 
+                            className="text-3xl md:text-5xl font-bold text-center break-words px-4 py-2 rounded-lg"
+                            style={{ 
+                                color: currentStory.overlayColor || '#ffffff',
+                                backgroundColor: currentStory.overlayBg || 'transparent'
+                            }}
+                        >
+                            {currentStory.overlayText}
+                        </p>
+                    </div>
+                )}
+
+                {/* Background Audio */}
+                {currentStory.audioUrl && (
+                    <audio 
+                        src={currentStory.audioUrl} 
+                        autoPlay 
+                        loop 
+                        muted={paused}
+                        ref={(el) => {
+                            if (el) {
+                                if (paused) el.pause();
+                                else el.play().catch(() => {});
+                            }
+                        }}
                     />
                 )}
 

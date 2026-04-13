@@ -317,6 +317,10 @@ function getAppSchema() {
                 'userId' => 'VARCHAR(50)',
                 'contentUrl' => 'TEXT',
                 'type' => "ENUM('IMAGE', 'VIDEO') DEFAULT 'IMAGE'",
+                'overlayText' => 'TEXT DEFAULT NULL',
+                'overlayColor' => 'VARCHAR(20) DEFAULT NULL',
+                'overlayBg' => 'VARCHAR(20) DEFAULT NULL',
+                'audioUrl' => 'TEXT DEFAULT NULL',
                 'createdAt' => 'BIGINT',
                 'expiresAt' => 'BIGINT'
             ],

@@ -60,12 +60,12 @@ export default function CreateStory() {
             
             if (text) {
                 fd.append('overlayText', text);
-                fd.append('textColor', textColor);
-                fd.append('textBg', textBg);
+                fd.append('overlayColor', textColor);
+                fd.append('overlayBg', textBg);
             }
             
             if (audioFile) {
-                fd.append('audioFile', audioFile);
+                fd.append('audio', audioFile);
             }
 
             await db.uploadStory(fd);

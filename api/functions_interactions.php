@@ -198,6 +198,27 @@ function interact_get_subscriptions($pdo, $userId) {
     $stmt->execute([$userId]); respond(true, $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
+function interact_get_mutual_friends($pdo, $userId, $targetId) {
+    if (!$userId || !$targetId) respond(true, []);
+    
+    // Mutual friends = Users that both $userId and $targetId follow
+    $sql = "SELECT u.id, u.username, u.avatarUrl 
+            FROM users u
+            WHERE u.id IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?)
+            AND u.id IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?)
+            LIMIT 10";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$userId, $targetId]);
+    $mutuals = $stmt->fetchAll();
+    
+    foreach ($mutuals as &$m) {
+        $m['avatarUrl'] = fix_url($m['avatarUrl']);
+    }
+    
+    respond(true, $mutuals);
+}
+
 function interact_get_notifications($pdo, $uid, $limit = 30) {
     $limit = (int)$limit;
     $stmt = $pdo->prepare("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC LIMIT $limit"); $stmt->execute([$uid]);

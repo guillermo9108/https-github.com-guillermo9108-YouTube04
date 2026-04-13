@@ -70,6 +70,10 @@ export interface Story {
   avatarUrl?: string;
   contentUrl: string;
   type: 'IMAGE' | 'VIDEO';
+  overlayText?: string;
+  overlayColor?: string;
+  overlayBg?: string;
+  audioUrl?: string;
   createdAt: number;
   expiresAt: number;
 }

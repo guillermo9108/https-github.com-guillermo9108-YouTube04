@@ -619,6 +619,21 @@ export default function Home() {
                                 <div className="absolute bottom-2 left-2 right-2">
                                     <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">{story.username}</span>
                                 </div>
+                                
+                                {/* Overlay Text Preview */}
+                                {story.overlayText && (
+                                    <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
+                                        <p 
+                                            className="text-[10px] font-bold text-center line-clamp-3 px-1 rounded"
+                                            style={{ 
+                                                color: story.overlayColor || '#ffffff',
+                                                backgroundColor: story.overlayBg || 'transparent'
+                                            }}
+                                        >
+                                            {story.overlayText}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -703,7 +718,7 @@ export default function Home() {
                                     {processedVideos.map((v, idx) => ( 
                                         v.isShortsGroup ? (
                                             <div key={v.id} className="col-span-full">
-                                                <ShortsGrid shorts={v.shorts} />
+                                                <ShortsGrid shorts={v.shorts} isSingle={v.shorts.length === 1} />
                                             </div>
                                         ) : (
                                             <div key={v.id} className="bg-[var(--bg-secondary)]">
