@@ -479,10 +479,31 @@ export default function Shorts() {
   };
   
   useEffect(() => {
-    db.getSystemSettings().then(s => {
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    const initialId = params.get('id');
+
+    const init = async () => {
+        const s = await db.getSystemSettings();
         if (s && s.shortsPath) setShortsPath(s.shortsPath);
-    });
-    fetchShorts(0);
+
+        if (initialId && !loadedVideoIds.current.has(initialId)) {
+            try {
+                const video = await db.getVideo(initialId);
+                if (video) {
+                    setVideos([video]);
+                    loadedVideoIds.current.add(video.id);
+                    // Fetch more shorts after the initial one
+                    fetchShorts(0);
+                    return;
+                }
+            } catch (e) {
+                console.error("Error loading initial short:", e);
+            }
+        }
+        fetchShorts(0);
+    };
+
+    init();
   }, [isUnseenMode, user?.id]);
 
   useEffect(() => {

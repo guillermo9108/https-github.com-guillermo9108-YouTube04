@@ -310,6 +310,20 @@ function getAppSchema() {
             'indices' => [
                 'idx_push_user' => 'userId'
             ]
+        ],
+        'stories' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'userId' => 'VARCHAR(50)',
+                'contentUrl' => 'TEXT',
+                'type' => "ENUM('IMAGE', 'VIDEO') DEFAULT 'IMAGE'",
+                'createdAt' => 'BIGINT',
+                'expiresAt' => 'BIGINT'
+            ],
+            'indices' => [
+                'idx_story_user' => 'userId',
+                'idx_story_expiry' => 'expiresAt'
+            ]
         ]
     ];
 }

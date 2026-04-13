@@ -29,6 +29,8 @@ import WalletPage from './components/pages/WalletPage';
 import HelpPage from './components/pages/HelpPage';
 import ReportPage from './components/pages/ReportPage';
 import EditVideo from './components/pages/EditVideo';
+import CreatePost from './components/pages/CreatePost';
+import CreateStory from './components/pages/CreateStory';
 import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
 import WatchLater from './components/pages/WatchLater';
@@ -293,6 +295,8 @@ export default function App() {
                                 <Route path="/watch/:id" element={<SetupGuard><ProtectedRoute><Watch /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/channel/:userId" element={<SetupGuard><ProtectedRoute><Channel /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/upload" element={<SetupGuard><ProtectedRoute><Upload /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/create-post" element={<SetupGuard><ProtectedRoute><CreatePost /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/create-story" element={<SetupGuard><ProtectedRoute><CreateStory /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/profile" element={<SetupGuard><ProtectedRoute><Profile /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch-later" element={<SetupGuard><ProtectedRoute><WatchLater /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/requests" element={<SetupGuard><ProtectedRoute><Requests /></ProtectedRoute></SetupGuard>} />

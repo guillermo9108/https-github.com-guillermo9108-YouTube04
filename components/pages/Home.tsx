@@ -15,6 +15,7 @@ import Sidebar from '../home/Sidebar';
 import Breadcrumbs from '../home/Breadcrumbs';
 import FolderEditModal from '../home/FolderEditModal';
 import FolderNavigationModal from '../home/FolderNavigationModal';
+import ShortsGrid from '../ShortsGrid';
 
 // Helper de tiempo relativo para notificaciones
 const formatTimeAgo = (timestamp: number) => {
@@ -58,6 +59,21 @@ export default function Home() {
     const [isListening, setIsListening] = useState(false);
     const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false);
     const [showNotifMenu, setShowNotifMenu] = useState(false);
+    const [stories, setStories] = useState<any[]>([]);
+    const [showAllFolders, setShowAllFolders] = useState(false);
+
+    // Fetch stories
+    useEffect(() => {
+        const fetchStories = async () => {
+            try {
+                const data = await db.getStories();
+                setStories(data);
+            } catch (error) {
+                console.error("Error fetching stories", error);
+            }
+        };
+        fetchStories();
+    }, []);
     
     // Filters State - Inicializar desde URL y Search Params
     const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -427,8 +443,12 @@ export default function Home() {
     const processedVideos = useMemo(() => {
         if (!videos || videos.length === 0) return [];
         
-        const result: Video[] = [];
+        const result: any[] = [];
         const collectionsSeen = new Set<string>();
+
+        const isShort = (v: any) => {
+            return !v.is_audio && v.duration > 0 && v.duration < 60 && v.category !== 'IMAGES' && !v.category?.toLowerCase().includes('music');
+        };
 
         // Pre-calculate counts for all categories
         const categoryCounts: Record<string, number> = {};
@@ -439,12 +459,29 @@ export default function Home() {
             }
         });
 
-        videos.forEach(item => {
-            if (!item) return;
-            
+        let i = 0;
+        while (i < videos.length) {
+            const item = videos[i];
+            if (!item) { i++; continue; }
+
+            // 1. Group Consecutive Shorts
+            if (isShort(item)) {
+                const shortsGroup: any[] = [];
+                while (i < videos.length && videos[i] && isShort(videos[i])) {
+                    shortsGroup.push(videos[i]);
+                    i++;
+                }
+                result.push({
+                    isShortsGroup: true,
+                    shorts: shortsGroup,
+                    id: `shorts-group-${i}`
+                });
+                continue;
+            }
+
             const itemCat = (item.category || '').toUpperCase();
 
-            // 1. Group Images by Collection (Album)
+            // 2. Group Images by Collection (Album)
             if (item.collection && itemCat === 'IMAGES') {
                 if (!collectionsSeen.has(item.collection)) {
                     collectionsSeen.add(item.collection);
@@ -454,9 +491,10 @@ export default function Home() {
                         isAlbum: true,
                         albumItems: albumItems,
                         categoryCount: categoryCounts[itemCat]
-                    } as any);
+                    });
                 }
-                return;
+                i++;
+                continue;
             }
 
             // All other items (Videos, Audios) are shown independently
@@ -464,7 +502,8 @@ export default function Home() {
                 ...item,
                 categoryCount: categoryCounts[itemCat]
             });
-        });
+            i++;
+        }
 
         return result;
     }, [videos]);
@@ -505,12 +544,12 @@ export default function Home() {
                         </div>
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-secondary)]"></div>
                     </div>
-                    <button onClick={() => navigate('/upload')} className="flex-1 h-10 bg-[#3a3b3c] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
-                        What's on your mind?
+                    <button onClick={() => navigate('/create-post')} className="flex-1 h-10 bg-[#3a3b3c] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
+                        ¿Qué estás pensando?
                     </button>
-                    <button onClick={() => navigate('/upload')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)] px-2">
+                    <button onClick={() => navigate('/create-post')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)] px-2">
                         <div className="text-[#45bd62]"><Image size={24} /></div>
-                        <span className="text-[11px] font-medium">Photo</span>
+                        <span className="text-[11px] font-medium">Foto</span>
                     </button>
                 </div>
 
@@ -521,7 +560,10 @@ export default function Home() {
                 <div className="bg-[var(--bg-secondary)] py-3 overflow-hidden">
                     <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
                         {/* Create Story */}
-                        <div className="relative min-w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0">
+                        <div 
+                            onClick={() => navigate('/create-story')}
+                            className="relative min-w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                        >
                             <div className="h-[70%] overflow-hidden">
                                 {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
                             </div>
@@ -529,19 +571,29 @@ export default function Home() {
                                 <Plus size={24} strokeWidth={3} />
                             </div>
                             <div className="absolute bottom-2 left-0 right-0 text-center px-1">
-                                <span className="text-[11px] font-bold text-white">Create story</span>
+                                <span className="text-[11px] font-bold text-white">Crear historia</span>
                             </div>
                         </div>
 
-                        {/* Mock Stories */}
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0">
-                                <img src={`https://picsum.photos/seed/story${i}/200/300`} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+                        {/* Real Stories */}
+                        {stories.map(story => (
+                            <div key={story.id} className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0">
+                                {story.type === 'IMAGE' ? (
+                                    <img src={story.contentUrl} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+                                ) : (
+                                    <video src={story.contentUrl} className="w-full h-full object-cover opacity-90" muted />
+                                )}
                                 <div className="absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] border-[#1877f2] p-0.5 overflow-hidden bg-indigo-600">
-                                    <img src={`https://picsum.photos/seed/avatar${i}/100/100`} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                    {story.avatarUrl ? (
+                                        <img src={story.avatarUrl} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                            {story.username?.[0]?.toUpperCase()}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="absolute bottom-2 left-2 right-2">
-                                    <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">Usuario {i}</span>
+                                    <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">{story.username}</span>
                                 </div>
                             </div>
                         ))}
@@ -561,7 +613,7 @@ export default function Home() {
                                     <h2 className="text-sm font-bold text-[var(--text-primary)]">{searchQuery ? 'Carpetas' : 'Explorar Carpetas'}</h2>
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-0.5 bg-[var(--divider)]">
-                                    {folders.map(folder => (
+                                    {(showAllFolders ? folders : folders.slice(0, 2)).map(folder => (
                                         <div key={folder.name} className="relative aspect-square bg-[var(--bg-secondary)] group overflow-hidden">
                                             <button onClick={() => { updateUrl({ q: '', folder: [...navigationPath, folder.name], cat: 'TODOS' }); }} className="absolute inset-0 z-0">
                                                 {folder.thumbnailUrl ? ( 
@@ -585,6 +637,15 @@ export default function Home() {
                                         </div>
                                     ))}
                                 </div>
+                                {folders.length > 2 && (
+                                    <button 
+                                        onClick={() => setShowAllFolders(!showAllFolders)}
+                                        className="w-full py-3 text-sm font-bold text-[#1877f2] hover:bg-[#3a3b3c] transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {showAllFolders ? 'Ver menos' : 'Ver más carpetas'}
+                                        <ChevronDown size={16} className={`transition-transform ${showAllFolders ? 'rotate-180' : ''}`} />
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -615,22 +676,28 @@ export default function Home() {
                             )}
                             {videos.length > 0 ? ( 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-[var(--divider)]">
-                                    {processedVideos.map(v => ( 
-                                        <div key={v.id} className="bg-[var(--bg-secondary)]">
-                                            <VideoCard 
-                                                video={v} 
-                                                isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
-                                                isWatched={watchedIds.includes(v.id)} 
-                                                onCategoryClick={() => handleCategoryClick(v.category)}
-                                                context={{ 
-                                                    query: searchQuery, 
-                                                    category: selectedCategory, 
-                                                    folder: currentFolder, 
-                                                    page: page, 
-                                                    sort_order: userSortOrder || appliedSortOrder 
-                                                }} 
-                                            /> 
-                                        </div>
+                                    {processedVideos.map((v, idx) => ( 
+                                        v.isShortsGroup ? (
+                                            <div key={v.id} className="col-span-full">
+                                                <ShortsGrid shorts={v.shorts} />
+                                            </div>
+                                        ) : (
+                                            <div key={v.id} className="bg-[var(--bg-secondary)]">
+                                                <VideoCard 
+                                                    video={v} 
+                                                    isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000)} 
+                                                    isWatched={watchedIds.includes(v.id)} 
+                                                    onCategoryClick={() => handleCategoryClick(v.category)}
+                                                    context={{ 
+                                                        query: searchQuery, 
+                                                        category: selectedCategory, 
+                                                        folder: currentFolder, 
+                                                        page: page, 
+                                                        sort_order: userSortOrder || appliedSortOrder 
+                                                    }} 
+                                                /> 
+                                            </div>
+                                        )
                                     ))}
                                 </div> 
                             ) : (folders.length === 0 && !loading) && ( 

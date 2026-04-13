@@ -69,6 +69,7 @@ export default function Layout() {
   const isActive = (path: string) => location.pathname === path ? 'text-indigo-400' : 'text-slate-400 hover:text-indigo-200';
   const isShortsMode = location.pathname === '/shorts';
   const isWatchMode = location.pathname.startsWith('/watch/');
+  const isMenuMode = location.pathname === '/menu';
   
   if (isShortsMode) {
       return (
@@ -85,68 +86,70 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] pt-[104px]`}>
+    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[104px]'}`}>
       {/* Facebook Lite Style Header */}
-      <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)]">
-        {/* Top Bar: Logo & Actions */}
-        <div className="flex items-center justify-between px-3 h-14">
-          <Link to="/" className="flex items-center">
-            <span className="text-[28px] font-bold tracking-tighter text-white lowercase">
-              facebook
-            </span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/upload')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
-              <Plus size={24} strokeWidth={2.5} />
-            </button>
-            <button onClick={() => navigate('/search')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
-              <Search size={22} strokeWidth={2.5} />
-            </button>
-            <button onClick={() => navigate('/menu')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
-              <MenuIcon size={24} strokeWidth={2.5} />
-            </button>
+      {!isMenuMode && (
+        <header className="fixed top-0 left-0 right-0 bg-[var(--bg-secondary)] z-50 border-b border-[var(--divider)]">
+          {/* Top Bar: Logo & Actions */}
+          <div className="flex items-center justify-between px-3 h-14">
+            <Link to="/" className="flex items-center">
+              <span className="text-[28px] font-bold tracking-tighter text-white lowercase">
+                facebook
+              </span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate('/upload')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
+                <Plus size={24} strokeWidth={2.5} />
+              </button>
+              <button onClick={() => navigate('/search')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
+                <Search size={22} strokeWidth={2.5} />
+              </button>
+              <button onClick={() => navigate('/menu')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">
+                <MenuIcon size={24} strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Tab Bar: Navigation */}
-        <nav className="flex items-center justify-around h-12">
-          <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <div className="relative">
-              <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
-              <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                15+
-              </span>
-            </div>
-          </Link>
-          <Link to="/friends" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/friends' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <Users size={28} strokeWidth={location.pathname === '/friends' ? 2.5 : 2} />
-          </Link>
-          <Link to="/messages" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/messages' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <MessageCircle size={28} strokeWidth={location.pathname === '/messages' ? 2.5 : 2} />
-          </Link>
-          <Link to="/shorts" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <div className="relative">
-              <PlaySquare size={28} strokeWidth={location.pathname === '/shorts' ? 2.5 : 2} />
-              <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                1
-              </span>
-            </div>
-          </Link>
-          <Link to="/notifications" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/notifications' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <div className="relative">
-              <Bell size={28} strokeWidth={location.pathname === '/notifications' ? 2.5 : 2} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                  {unreadCount > 9 ? '9+' : unreadCount}
+          {/* Tab Bar: Navigation */}
+          <nav className="flex items-center justify-around h-12">
+            <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <div className="relative">
+                <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
+                <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
+                  15+
                 </span>
-              )}
-            </div>
-          </Link>
-          <Link to="/marketplace" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-            <ShoppingBag size={28} strokeWidth={location.pathname === '/marketplace' ? 2.5 : 2} />
-          </Link>
-        </nav>
-      </header>
+              </div>
+            </Link>
+            <Link to="/friends" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/friends' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <Users size={28} strokeWidth={location.pathname === '/friends' ? 2.5 : 2} />
+            </Link>
+            <Link to="/messages" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/messages' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <MessageCircle size={28} strokeWidth={location.pathname === '/messages' ? 2.5 : 2} />
+            </Link>
+            <Link to="/shorts" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <div className="relative">
+                <PlaySquare size={28} strokeWidth={location.pathname === '/shorts' ? 2.5 : 2} />
+                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
+                  1
+                </span>
+              </div>
+            </Link>
+            <Link to="/notifications" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/notifications' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <div className="relative">
+                <Bell size={28} strokeWidth={location.pathname === '/notifications' ? 2.5 : 2} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+            </Link>
+            <Link to="/marketplace" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/marketplace' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <ShoppingBag size={28} strokeWidth={location.pathname === '/marketplace' ? 2.5 : 2} />
+            </Link>
+          </nav>
+        </header>
+      )}
 
       {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
       <main className={`flex-1 ${isWatchMode ? 'w-full' : 'w-full max-w-5xl mx-auto'}`}>

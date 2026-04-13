@@ -183,17 +183,7 @@ function video_get_all($pdo) {
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
         $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
     } else {
-        // Excluir shorts de la vista normal (ALL/VIDEO), a menos que sean música
-        // Si estamos navegando por una carpeta específica, mostramos TODO el contenido (incluyendo shorts)
-        if (empty($folder)) {
-            $shortsExclusion = "(v.is_audio = 1 OR v.duration >= 60 OR v.duration IS NULL OR v.duration = 0 OR v.category LIKE '%music%' OR v.videoUrl LIKE '%music%')";
-            if ($shortsPath) {
-                $where[] = "$shortsExclusion AND REPLACE(v.videoUrl, '\\\\', '/') NOT LIKE ?";
-                $params[] = $shortsPath . '/%';
-            } else {
-                $where[] = $shortsExclusion;
-            }
-        }
+        // Shorts are now included in the main list as requested by the user
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
@@ -1203,5 +1193,51 @@ function video_update($pdo, $input) {
     $params[] = $id;
     $pdo->prepare("UPDATE videos SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
     respond(true);
+}
+
+function upload_story($pdo, $post, $files) {
+    $userId = $post['userId'];
+    $type = $post['type'] ?? 'IMAGE';
+    
+    if (!isset($files['file']) || $files['file']['error'] !== UPLOAD_ERR_OK) {
+        respond(false, null, "Archivo no recibido");
+    }
+
+    $id = uniqid('story_');
+    $ext = pathinfo($files['file']['name'], PATHINFO_EXTENSION);
+    $filename = $id . '.' . $ext;
+    $target = 'uploads/videos/' . $filename; // Using same folder for simplicity
+
+    if (move_uploaded_file($files['file']['tmp_name'], $target)) {
+        $now = time();
+        $expiry = $now + (24 * 3600); // 24 hours
+        
+        $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $userId, $target, $type, $now, $expiry]);
+        
+        respond(true, ['id' => $id]);
+    } else {
+        respond(false, null, "Error al guardar el archivo");
+    }
+}
+
+function get_stories($pdo) {
+    $now = time();
+    // Get active stories and group them by user
+    $sql = "SELECT s.*, u.username, u.avatarUrl 
+            FROM stories s 
+            JOIN users u ON s.userId = u.id 
+            WHERE s.expiresAt > ? 
+            ORDER BY s.createdAt DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$now]);
+    $stories = $stmt->fetchAll();
+    
+    foreach ($stories as &$s) {
+        $s['contentUrl'] = fix_url($s['contentUrl']);
+        $s['avatarUrl'] = fix_url($s['avatarUrl']);
+    }
+    
+    respond(true, $stories);
 }
 ?>

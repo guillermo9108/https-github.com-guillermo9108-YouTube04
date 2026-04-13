@@ -1,0 +1,67 @@
+import React from 'react';
+import { Video } from '../types';
+import { useNavigate } from './Router';
+import { Play, MoreHorizontal, Eye } from 'lucide-react';
+
+interface ShortsGridProps {
+    shorts: Video[];
+}
+
+export default function ShortsGrid({ shorts }: ShortsGridProps) {
+    const navigate = useNavigate();
+
+    const formatViews = (views: number) => {
+        if (views >= 1000000) return (views / 1000000).toFixed(1) + 'M';
+        if (views >= 1000) return (views / 1000).toFixed(1) + 'K';
+        return views.toString();
+    };
+
+    return (
+        <div className="bg-[var(--bg-secondary)] py-4">
+            <div className="flex items-center justify-between px-4 mb-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-gradient-to-br from-pink-500 to-orange-500 rounded flex items-center justify-center text-white">
+                        <Play size={14} fill="currentColor" />
+                    </div>
+                    <h2 className="text-[17px] font-bold text-[var(--text-primary)]">Reels</h2>
+                </div>
+                <button className="text-[var(--text-secondary)]">
+                    <MoreHorizontal size={20} />
+                </button>
+            </div>
+
+            <div className="flex gap-2 px-4 overflow-x-auto scrollbar-hide">
+                {shorts.map((short) => (
+                    <div 
+                        key={short.id}
+                        onClick={() => navigate(`/shorts?id=${short.id}`)}
+                        className="relative min-w-[140px] aspect-[9/16] bg-zinc-900 rounded-xl overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform"
+                    >
+                        <img 
+                            src={short.thumbnailUrl || '/api/uploads/thumbnails/default.jpg'} 
+                            className="w-full h-full object-cover opacity-90 group-hover:scale-110 transition-transform duration-500"
+                            alt={short.title}
+                            referrerPolicy="no-referrer"
+                        />
+                        
+                        {/* Overlay Gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+
+                        {/* Play Icon Center */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
+                                <Play size={20} className="text-white fill-white ml-1" />
+                            </div>
+                        </div>
+
+                        {/* Views */}
+                        <div className="absolute bottom-3 left-3 flex items-center gap-1 text-white text-[11px] font-bold drop-shadow-md">
+                            <Eye size={12} />
+                            <span>{formatViews(short.views)}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}

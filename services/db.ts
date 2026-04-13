@@ -452,6 +452,24 @@ class DBService {
         return this.request<any[]>(`action=get_channel_content&userId=${userId}&filter=${filter}`);
     }
 
+    public async uploadChannelImages(formData: FormData): Promise<any> {
+        return this.request<any>('action=upload_channel_images', {
+            method: 'POST',
+            body: formData
+        });
+    }
+
+    public async uploadStory(formData: FormData): Promise<any> {
+        return this.request<any>('action=upload_story', {
+            method: 'POST',
+            body: formData
+        });
+    }
+
+    public async getStories(): Promise<any[]> {
+        return this.request<any[]>('action=get_stories');
+    }
+
     public async subscribePush(data: { userId: string, subscription: any }): Promise<void> {
         return this.request<void>(`action=subscribe_push`, { method: 'POST', body: JSON.stringify(data) });
     }
