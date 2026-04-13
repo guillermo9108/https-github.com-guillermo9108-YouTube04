@@ -86,13 +86,19 @@ body {
 /* Video.js Custom Styles */
 .video-js {
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9;
   background-color: #000 !important;
+}
+
+.vjs-fluid {
+  padding-top: 56.25% !important;
 }
 
 .video-js .vjs-control-bar {
   background-color: rgba(0, 0, 0, 0.8) !important;
   height: 50px !important;
+  z-index: 100 !important;
 }
 
 .video-js .vjs-button > .vjs-icon-placeholder:before {
@@ -110,6 +116,7 @@ body {
   margin-top: -40px !important;
   margin-left: -40px !important;
   transition: all 0.3s ease !important;
+  z-index: 101 !important;
 }
 
 .video-js .vjs-big-play-button:hover {
@@ -122,14 +129,25 @@ body {
 }
 
 /* Fix for APK WebView controls visibility */
-.vjs-user-active .vjs-control-bar {
+.vjs-user-active .vjs-control-bar,
+.vjs-paused .vjs-control-bar,
+.video-js:hover .vjs-control-bar {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
 }
 
-.vjs-paused .vjs-control-bar {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+.vjs-control-bar {
+  transition: opacity 0.3s ease, visibility 0.3s ease !important;
+}
+
+/* Ensure subtitles are visible */
+.vjs-text-track-display {
+  bottom: 60px !important;
+  pointer-events: none !important;
+}
+
+.vjs-text-track-cue {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  font-size: 1.2em !important;
 }

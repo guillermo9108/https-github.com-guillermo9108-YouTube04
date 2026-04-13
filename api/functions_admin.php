@@ -248,7 +248,7 @@ function admin_get_global_transactions($pdo) {
 }
 
 function admin_repair_broken_videos($pdo) {
-    set_time_limit(1800); // 30 minutos
+    set_time_limit(3600); // 1 hora
     ignore_user_abort(true);
     
     $bins = get_ffmpeg_binaries($pdo);

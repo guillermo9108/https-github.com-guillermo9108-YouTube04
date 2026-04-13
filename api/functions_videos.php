@@ -157,7 +157,12 @@ function video_get_all($pdo) {
     $onlyUnseen = !empty($_GET['only_unseen']);
 
     $params = []; 
-    $where = ["v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')"];
+    // Por defecto ocultar videos pendientes, EXCEPTO si estamos en modo Shorts y tenemos un shortsPath configurado
+    // Esto permite ver los videos mientras se procesan (aunque no tengan miniatura aún)
+    $where = ["v.category NOT IN ('PROCESSING', 'FAILED_METADATA')"];
+    if (!$isShorts) {
+        $where[] = "v.category != 'PENDING'";
+    }
 
     if ($onlyUnseen && !empty($userId)) {
         $where[] = "NOT EXISTS (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND (i.isWatched = 1 OR i.isSkipped = 1))";
@@ -891,81 +896,84 @@ function getPriceForCategory($category, $settings, $parent_category = null) {
 }
 
 function video_scan_local($pdo, $input) {
-    $scanPath = rtrim($input['path'], '/\\'); 
-    if (!is_dir($scanPath)) respond(false, null, "Ruta inválida");
-    $adminId = $pdo->query("SELECT id FROM users WHERE role='ADMIN' LIMIT 1")->fetchColumn();
-    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths, shortsPath FROM system_settings WHERE id = 1");
+    $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths, shortsPath, autoTranscode FROM system_settings WHERE id = 1");
     $settings = $stmtS->fetch();
+    
+    $scanPath = !empty($input['path']) ? rtrim($input['path'], '/\\') : '';
+    
+    // Si no se provee ruta, usamos la principal configurada
+    if (empty($scanPath)) {
+        $scanPath = $settings['localLibraryPath'] ?? '';
+    }
+
+    if (empty($scanPath) || !is_dir($scanPath)) {
+        respond(false, null, "Ruta inválida o no configurada: " . ($scanPath ?: 'VACÍA'));
+    }
+
+    $adminId = $pdo->query("SELECT id FROM users WHERE role='ADMIN' LIMIT 1")->fetchColumn();
     $exts = ['mp4', 'mkv', 'webm', 'avi', 'mov', 'mp3', 'wav', 'flac', 'm4a'];
 
     $shortsPath = !empty($settings['shortsPath']) ? str_replace('\\', '/', rtrim($settings['shortsPath'], '/')) : '';
-
-    try {
-        $di = new RecursiveDirectoryIterator($scanPath, RecursiveDirectoryIterator::SKIP_DOTS);
-        $it = new RecursiveIteratorIterator($di);
-    } catch (Exception $e) {
-        respond(false, null, "No se pudo acceder a la carpeta: " . $e->getMessage());
+    
+    // Lista de rutas a escanear (la principal + shorts si es distinta)
+    $pathsToScan = [$scanPath];
+    if ($shortsPath && $shortsPath !== $scanPath && is_dir($shortsPath)) {
+        $pathsToScan[] = $shortsPath;
     }
 
     $found = 0; $new = 0; $errors = [];
     $newCategories = [];
 
-    foreach ($it as $file) {
-        if ($file->isDir() || !in_array(strtolower($file->getExtension()), $exts)) continue;
-        $found++; 
-        $path = str_replace('\\', '/', $file->getRealPath());
-        $id = 'loc_' . md5($path);
-        
-        $ext = strtolower($file->getExtension());
-        $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
-        $isAudio = in_array($ext, $audioExts) ? 1 : 0;
-        
-        // Si es MP4, forzar que NO sea audio por defecto
-        if ($ext === 'mp4') $isAudio = 0;
-
-        // Si está en la ruta de shorts, marcarlo como tal (opcional, pero ayuda a la lógica)
-        $isShort = 0;
-        if ($shortsPath && strpos($path, $shortsPath) === 0) {
-            $isShort = 1;
-        }
-
-        // Extract category from path
-        $dir = dirname($path);
-        $parts = explode('/', $dir);
-        $categoryName = array_pop($parts);
-        if ($categoryName && !in_array($categoryName, $newCategories)) {
-            $newCategories[] = $categoryName;
-        }
-
+    foreach ($pathsToScan as $currentPath) {
         try {
-            $stmt = $pdo->prepare("SELECT id FROM videos WHERE videoUrl = ? OR id = ?");
-            $stmt->execute([$path, $id]);
+            $di = new RecursiveDirectoryIterator($currentPath, RecursiveDirectoryIterator::SKIP_DOTS);
+            $it = new RecursiveIteratorIterator($di);
+            
+            foreach ($it as $file) {
+                if ($file->isDir() || !in_array(strtolower($file->getExtension()), $exts)) continue;
+                $found++; 
+                $path = str_replace('\\', '/', $file->getRealPath());
+                $id = 'loc_' . md5($path);
+                
+                $ext = strtolower($file->getExtension());
+                $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+                $isAudio = in_array($ext, $audioExts) ? 1 : 0;
+                if ($ext === 'mp4') $isAudio = 0;
 
-            if (!$stmt->fetch()) {
-                $title = pathinfo($path, PATHINFO_FILENAME);
-                
-                // Lógica de Auto-Encolado para el Transcodificador
-                $transcodeStatus = 'NONE';
-                $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
-                
-                if ($autoTranscode === 1) {
-                    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                    // Encolar si no es MP4 (video) o MP3 (audio)
-                    if ($ext !== 'mp4' && $ext !== 'mp3') {
-                        $transcodeStatus = 'WAITING';
-                    }
+                $dir = dirname($path);
+                $parts = explode('/', $dir);
+                $categoryName = array_pop($parts);
+                if ($categoryName && !in_array($categoryName, $newCategories)) {
+                    $newCategories[] = $categoryName;
                 }
 
-                $price = getPriceForCategory($categoryName, $settings);
-                
-                // Default price 1.0 to avoid free access by accident
-                $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, ?, ?)")
-                    ->execute([$id, $title, $path, $adminId, time(), $isAudio, $price, $transcodeStatus]);
-                $new++;
+                try {
+                    $stmt = $pdo->prepare("SELECT id FROM videos WHERE videoUrl = ? OR id = ?");
+                    $stmt->execute([$path, $id]);
+
+                    if (!$stmt->fetch()) {
+                        $title = pathinfo($path, PATHINFO_FILENAME);
+                        $transcodeStatus = 'NONE';
+                        $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
+                        
+                        if ($autoTranscode === 1) {
+                            if ($ext !== 'mp4' && $ext !== 'mp3') {
+                                $transcodeStatus = 'WAITING';
+                            }
+                        }
+
+                        $price = getPriceForCategory($categoryName, $settings);
+                        
+                        $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, 'PENDING', 1, ?, ?, ?)")
+                            ->execute([$id, $title, $path, $adminId, time(), $isAudio, $price, $transcodeStatus]);
+                        $new++;
+                    }
+                } catch (Exception $e) {
+                    $errors[] = "Error en '" . basename($path) . "': " . $e->getMessage();
+                }
             }
         } catch (Exception $e) {
-            $errors[] = "Error en '" . basename($path) . "': " . $e->getMessage();
-            write_log("Scanner Error on file $path: " . $e->getMessage(), 'ERROR');
+            $errors[] = "Error al acceder a $currentPath: " . $e->getMessage();
         }
     }
     

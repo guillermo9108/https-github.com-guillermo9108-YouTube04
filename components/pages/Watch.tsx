@@ -29,7 +29,45 @@ export default function Watch() {
     const navigate = useNavigate();
     const toast = useToast();
     
-    // Obtener contexto completo desde la URL
+    // 1. Estado del componente primero para evitar TDZ
+    const [video, setVideo] = useState<Video | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [isPurchasing, setIsPurchasing] = useState(false);
+    const [interaction, setInteraction] = useState<UserInteraction | null>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+    const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
+    const [seriesQueue, setSeriesQueue] = useState<Video[]>([]); 
+
+    // 2. Variables de apoyo
+    const isAdmin = useMemo(() => user?.role?.trim().toUpperCase() === 'ADMIN', [user?.role]);
+    
+    const isApp = useMemo(() => {
+        const di = user?.deviceInfo || '';
+        const ldi = user?.lastDeviceId || '';
+        return di.includes('com.streampay.app') || ldi.includes('com.streampay.app') || 
+               di.includes('StreamPayAPK') || ldi.includes('StreamPayAPK') ||
+               di.includes('StreamPay');
+    }, [user?.deviceInfo, user?.lastDeviceId]);
+
+    const streamUrl = useMemo(() => {
+        if (!id) return '';
+        return db.getStreamerUrl(id, user?.sessionToken);
+    }, [id, user?.sessionToken]);
+
+    const isAudio = useMemo(() => {
+        const path = (video as any)?.rawPath || video?.videoUrl || '';
+        return Boolean(video?.is_audio) || path.match(/\.(mp3|wav|aac|m4a|flac|ogg|opus|m4b)(\?.*)?$/i);
+    }, [video]);
+
+    const posterUrl = useMemo(() => {
+        const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
+        return video?.thumbnailUrl || defaultThumb || (isAudio ? '/api/uploads/thumbnails/defaultaudio.jpg' : '/api/uploads/thumbnails/default.jpg');
+    }, [video?.thumbnailUrl, isAudio, settings]);
+    
+    // Contexto de navegación
     const navigationContext = useMemo(() => {
         const hash = window.location.hash;
         if (!hash.includes('?')) return { q: null, f: '', c: 'TODOS', p: 0, s: '' };
@@ -42,26 +80,6 @@ export default function Watch() {
             s: params.get('s') || ''
         };
     }, [id, window.location.hash]);
-
-    const isAdmin = useMemo(() => user?.role?.trim().toUpperCase() === 'ADMIN', [user?.role]);
-    const isApp = useMemo(() => {
-        const di = user?.deviceInfo || '';
-        const ldi = user?.lastDeviceId || '';
-        return di.includes('com.streampay.app') || ldi.includes('com.streampay.app') || 
-               di.includes('StreamPayAPK') || ldi.includes('StreamPayAPK') ||
-               di.includes('StreamPay');
-    }, [user?.deviceInfo, user?.lastDeviceId]);
-
-    const [video, setVideo] = useState<Video | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [isUnlocked, setIsUnlocked] = useState(false);
-    const [isPurchasing, setIsPurchasing] = useState(false);
-    const [interaction, setInteraction] = useState<UserInteraction | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
-    const videoContainerRef = useRef<HTMLDivElement>(null);
-    const [relatedVideos, setRelatedVideos] = useState<Video[]>([]);
-    const [seriesQueue, setSeriesQueue] = useState<Video[]>([]); 
     
     // Paginación de Relacionados
     const [relatedPage, setRelatedPage] = useState(navigationContext.p);
@@ -100,6 +118,20 @@ export default function Watch() {
         setSeriesQueue([]);
         setShowComments(false);
         setExtractionAttempted(false); 
+        
+        // Reset critical state to prevent stale data and blue screen
+        setVideo(null);
+        setIsUnlocked(false);
+        setInteraction(null);
+        setLoading(true);
+
+        if (playerRef.current) {
+            try {
+                playerRef.current.dispose();
+                playerRef.current = null;
+            } catch (e) {}
+        }
+
         return () => { setThrottled(false); };
     }, [id, navigationContext.s]);
 
@@ -413,11 +445,6 @@ export default function Watch() {
         }
     };
 
-    const streamUrl = useMemo(() => {
-        if (!video) return '';
-        return db.getStreamerUrl(video.id, user?.sessionToken);
-    }, [video?.id, user?.sessionToken]);
-
     const downloadUrl = useMemo(() => {
         if (!video) return '';
         const base = db.getStreamerUrl(video.id, user?.sessionToken);
@@ -428,105 +455,115 @@ export default function Watch() {
 
     // Initialize Video.js
     useEffect(() => {
-        if (isUnlocked && videoRef.current && !playerRef.current) {
-            const player = videojs(videoRef.current, {
-                autoplay: true,
-                controls: true,
-                responsive: true,
-                fluid: true,
-                playbackRates: [0.5, 1, 1.25, 1.5, 2],
-                nativeControlsForTouch: false, // Preferimos Video.js UI
-                html5: {
-                    nativeAudioTracks: true,
-                    nativeVideoTracks: true,
-                    nativeTextTracks: true,
-                    vhs: {
-                        overrideNative: true
-                    }
-                },
-                controlBar: {
-                    children: [
-                        'playToggle',
-                        'volumePanel',
-                        'currentTimeDisplay',
-                        'timeDivider',
-                        'durationDisplay',
-                        'progressControl',
-                        'liveDisplay',
-                        'remainingTimeDisplay',
-                        'customControlSpacer',
-                        'playbackRateMenuButton',
-                        'chaptersButton',
-                        'descriptionsButton',
-                        'subsCapsButton',
-                        'audioTrackButton',
-                        'fullscreenToggle',
-                    ],
-                },
-            }, () => {
-                // Player ready
-                if (video && playerRef.current) {
-                    playerRef.current.src({
-                        src: streamUrl,
-                        type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
-                    });
-                    playerRef.current.poster(posterUrl);
-                }
-            });
+        // Solo inicializar si tenemos video, url y está desbloqueado
+        if (!isUnlocked || !video || !streamUrl || !videoRef.current) return;
 
-            playerRef.current = player;
+        let player: any = null;
 
-            player.on('play', () => setThrottled(true));
-            player.on('pause', () => setThrottled(false));
-            player.on('ended', handleVideoEnded);
-            player.on('timeupdate', () => {
-                handleTimeUpdate();
-            });
+        const initPlayer = () => {
+            if (!videoRef.current) return;
             
-            player.on('error', () => {
-                const error = player.error();
-                console.error("Video.js Error:", error);
-                // Intentar recuperar si es posible o mostrar mensaje
-            });
-        }
-
-        // Update source and tracks when video changes
-        if (playerRef.current && video) {
-            const currentSrc = playerRef.current.src();
-            if (currentSrc !== streamUrl) {
-                // Reset player state before changing source to avoid "blue/black screen" artifacts
-                playerRef.current.pause();
-                playerRef.current.reset();
-                
-                playerRef.current.src({
-                    src: streamUrl,
-                    type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
-                });
-                playerRef.current.poster(posterUrl);
-                playerRef.current.load();
-
-                // Clear old tracks
-                const oldTracks = playerRef.current.remoteTextTracks();
-                let i = oldTracks.length;
-                while (i--) {
-                    playerRef.current.removeRemoteTextTrack(oldTracks[i]);
+            try {
+                // Destruir instancia previa si existe por seguridad
+                if (playerRef.current) {
+                    try {
+                        playerRef.current.dispose();
+                    } catch (e) {}
+                    playerRef.current = null;
                 }
 
-                // Add new tracks
-                video.subtitles?.forEach((sub, idx) => {
-                    playerRef.current.addRemoteTextTrack({
-                        src: sub.url,
-                        kind: sub.kind,
-                        srclang: sub.lang.toLowerCase(),
-                        label: sub.label,
-                        default: idx === 0
-                    }, false);
+                player = videojs(videoRef.current, {
+                    autoplay: true,
+                    controls: true,
+                    responsive: true,
+                    fluid: true,
+                    playbackRates: [0.5, 1, 1.25, 1.5, 2],
+                    nativeControlsForTouch: false,
+                    preload: 'auto',
+                    html5: {
+                        vhs: { overrideNative: true },
+                        nativeAudioTracks: false,
+                        nativeVideoTracks: false,
+                        nativeTextTracks: false
+                    },
+                    controlBar: {
+                        children: [
+                            'playToggle',
+                            'volumePanel',
+                            'currentTimeDisplay',
+                            'timeDivider',
+                            'durationDisplay',
+                            'progressControl',
+                            'liveDisplay',
+                            'remainingTimeDisplay',
+                            'customControlSpacer',
+                            'playbackRateMenuButton',
+                            'chaptersButton',
+                            'descriptionsButton',
+                            'subsCapsButton',
+                            'audioTrackButton',
+                            'fullscreenToggle',
+                        ],
+                    },
+                }, () => {
+                    if (player) {
+                        player.src({
+                            src: streamUrl,
+                            type: video.videoUrl.endsWith('.m3u8') ? 'application/x-mpegURL' : (isAudio ? 'audio/mpeg' : 'video/mp4')
+                        });
+                        player.poster(posterUrl);
+                        
+                        // Add tracks
+                        video.subtitles?.forEach((sub, idx) => {
+                            player.addRemoteTextTrack({
+                                src: sub.url,
+                                kind: sub.kind,
+                                srclang: sub.lang.toLowerCase(),
+                                label: sub.label,
+                                default: idx === 0
+                            }, false);
+                        });
+                    }
                 });
+
+                playerRef.current = player;
+
+                player.on('play', () => setThrottled(true));
+                player.on('pause', () => setThrottled(false));
+                player.on('ended', handleVideoEnded);
+                player.on('timeupdate', handleTimeUpdate);
                 
-                playerRef.current.play().catch(() => {});
+                player.on('error', () => {
+                    const error = player.error();
+                    console.error("Video.js Error:", error);
+                    // Si hay error de red, intentar re-conectar una vez
+                    if (error?.code === 4) {
+                        setTimeout(() => {
+                            if (player && !player.isDisposed()) {
+                                player.src(streamUrl);
+                                player.load();
+                            }
+                        }, 2000);
+                    }
+                });
+            } catch (err) {
+                console.error("Failed to init videojs", err);
             }
-        }
-    }, [isUnlocked, streamUrl, video?.id]);
+        };
+
+        // Pequeño delay para asegurar que el DOM está listo tras el cambio de ID
+        const timer = setTimeout(initPlayer, 100);
+
+        return () => {
+            clearTimeout(timer);
+            if (player) {
+                try {
+                    player.dispose();
+                } catch (e) {}
+                playerRef.current = null;
+            }
+        };
+    }, [id, isUnlocked, !!video, streamUrl]);
 
     useEffect(() => {
         return () => {
@@ -564,10 +601,6 @@ export default function Watch() {
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
 
-    const isAudio = Boolean(video?.is_audio);
-    const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
-    const posterUrl = video?.thumbnailUrl || defaultThumb || (isAudio ? '/api/uploads/thumbnails/defaultaudio.jpg' : '/api/uploads/thumbnails/default.jpg');
-
     return (
         <div className="flex flex-col bg-slate-950 min-h-screen animate-in fade-in relative">
             {/* Contenedor de Video Pegajoso - Mejorado para móviles */}
@@ -581,7 +614,7 @@ export default function Watch() {
                             {(video?.is_audio || !video?.thumbnailUrl) && (
                                 <img src={posterUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
-                            <div data-vjs-player className="w-full h-full">
+                            <div key={video?.id} data-vjs-player className="w-full h-full">
                                 <video 
                                     ref={videoRef} 
                                     className="video-js vjs-big-play-centered vjs-fill w-full h-full"

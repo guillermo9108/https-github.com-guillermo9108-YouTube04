@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Heart, MessageCircle, Share2, ThumbsDown, Send, X, Loader2, ArrowLeft, Pause, Search, UserCheck, VideoOff, Crown } from 'lucide-react';
+import { Heart, MessageCircle, Share2, ThumbsDown, Send, X, Loader2, ArrowLeft, Pause, Search, UserCheck, VideoOff, Crown, RefreshCw } from 'lucide-react';
 import { db } from '../../services/db';
 import { Video, Comment, UserInteraction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -405,7 +405,7 @@ export default function Shorts() {
     try {
         // Si tenemos una carpeta activa y estamos en modo positivo, intentamos traer de esa carpeta
         const folderToFetch = (currentMode && currentFolder) ? currentFolder : '';
-        const res = await db.getShorts(p, 20, 'VIDEO', '', user?.id || '', sessionSeed, currentMode, folderToFetch);
+        const res = await db.getShorts(p, 40, 'VIDEO', '', user?.id || '', sessionSeed, currentMode, folderToFetch);
         
         const shortsOnly = res.videos.filter(v => {
             if (!v || loadedVideoIds.current.has(v.id)) return false;
@@ -417,7 +417,10 @@ export default function Shorts() {
             // Si viene de la ruta de shorts, lo permitimos siempre (duration 0 suele ser que aún no se procesó)
             const isFromShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.replace(/\\/g, '/'));
             
-            return !isImage && !isAudio && (duration < 600 || duration === 0 || isFromShortsPath);
+            // Permitir videos PENDING para que aparezcan aunque no tengan miniatura aún
+            const isPending = v.category === 'PENDING';
+            
+            return !isImage && !isAudio && (duration < 600 || duration === 0 || isFromShortsPath || isPending);
         });
         
         if (shortsOnly.length > 0) {
@@ -528,7 +531,42 @@ export default function Shorts() {
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-scroll snap-y snap-mandatory bg-black scrollbar-hide relative">
-      <div className="fixed top-4 left-4 z-50"><Link to="/" className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"><ArrowLeft size={24} /></Link></div>
+      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
+          <Link to="/" className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"><ArrowLeft size={24} /></Link>
+          <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full text-white font-black italic text-sm tracking-tighter">SHORTS</div>
+      </div>
+
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          <button 
+              onClick={() => {
+                  setVideos([]);
+                  setPage(0);
+                  loadedVideoIds.current.clear();
+                  fetchShorts(0, false, 0);
+              }}
+              className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"
+              title="Refrescar"
+          >
+              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
+          
+          {user?.role === 'ADMIN' && (
+              <button 
+                  onClick={async () => {
+                      try {
+                          await db.scanLocalLibrary('');
+                          toast.success('Escaneo iniciado en segundo plano');
+                      } catch (e) {
+                          toast.error('Error al iniciar escaneo');
+                      }
+                  }}
+                  className="p-3 bg-indigo-600/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"
+                  title="Escanear NAS"
+              >
+                  <Search size={20} />
+              </button>
+          )}
+      </div>
       
       {loading && videos.length === 0 ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-4"><Loader2 className="animate-spin text-indigo-500" size={32}/><p className="font-black uppercase text-[10px] tracking-widest italic opacity-50">Sintonizando...</p></div>

@@ -56,15 +56,16 @@ if (strpos($testOutput, 'ffprobe version') === false) {
 }
 echo "-------------------------------\n";
 
-$batchSize = 5; // Reducido para mayor agilidad en ciclos cortos
+$batchSize = 20; // Aumentado para procesar más videos por ciclo
 $processed = 0;
 $failed = 0;
 
 for ($i = 0; $i < $batchSize; $i++) {
     $now = time();
-    // Priorizar videos con menos intentos de procesamiento
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = 'PENDING' AND processing_attempts < 3 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
-    $stmt->execute([$now - 300]);
+    // Priorizar videos con menos intentos de procesamiento y que no estén bloqueados recientemente
+    // Bajamos el tiempo de bloqueo a 60 segundos para ser más agresivos si un worker muere
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = 'PENDING' AND processing_attempts < 5 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
+    $stmt->execute([$now - 60]);
     $video = $stmt->fetch();
 
     if (!$video) break;
@@ -74,8 +75,16 @@ for ($i = 0; $i < $batchSize; $i++) {
     
     $realPath = resolve_video_path($video['videoUrl']);
     
-    if (!$realPath || !file_exists($realPath) || filesize($realPath) < 100) {
-        $reason = (!$realPath || !file_exists($realPath)) ? '404: Archivo no encontrado' : 'Error: Archivo ilegible o vacío';
+    if (!$realPath || !file_exists($realPath)) {
+        $reason = '404: Archivo no encontrado';
+        echo "[ERROR] $reason\n";
+        $pdo->prepare("UPDATE videos SET category = 'FAILED_METADATA', reason = ?, locked_at = 0 WHERE id = ?")->execute([$reason, $video['id']]);
+        $failed++;
+        continue;
+    }
+
+    if (filesize($realPath) < 100) {
+        $reason = 'Error: Archivo ilegible o vacío';
         echo "[ERROR] $reason\n";
         $pdo->prepare("UPDATE videos SET category = 'FAILED_METADATA', reason = ?, locked_at = 0 WHERE id = ?")->execute([$reason, $video['id']]);
         $failed++;
