@@ -435,6 +435,15 @@ export default function Watch() {
                 responsive: true,
                 fluid: true,
                 playbackRates: [0.5, 1, 1.25, 1.5, 2],
+                nativeControlsForTouch: false, // Preferimos Video.js UI
+                html5: {
+                    nativeAudioTracks: true,
+                    nativeVideoTracks: true,
+                    nativeTextTracks: true,
+                    vhs: {
+                        overrideNative: true
+                    }
+                },
                 controlBar: {
                     children: [
                         'playToggle',
@@ -456,6 +465,13 @@ export default function Watch() {
                 },
             }, () => {
                 // Player ready
+                if (video && playerRef.current) {
+                    playerRef.current.src({
+                        src: streamUrl,
+                        type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
+                    });
+                    playerRef.current.poster(posterUrl);
+                }
             });
 
             playerRef.current = player;
@@ -466,17 +482,28 @@ export default function Watch() {
             player.on('timeupdate', () => {
                 handleTimeUpdate();
             });
+            
+            player.on('error', () => {
+                const error = player.error();
+                console.error("Video.js Error:", error);
+                // Intentar recuperar si es posible o mostrar mensaje
+            });
         }
 
         // Update source and tracks when video changes
         if (playerRef.current && video) {
             const currentSrc = playerRef.current.src();
             if (currentSrc !== streamUrl) {
+                // Reset player state before changing source to avoid "blue/black screen" artifacts
+                playerRef.current.pause();
+                playerRef.current.reset();
+                
                 playerRef.current.src({
                     src: streamUrl,
                     type: video.is_audio ? 'audio/mpeg' : 'video/mp4'
                 });
                 playerRef.current.poster(posterUrl);
+                playerRef.current.load();
 
                 // Clear old tracks
                 const oldTracks = playerRef.current.remoteTextTracks();
@@ -495,14 +522,10 @@ export default function Watch() {
                         default: idx === 0
                     }, false);
                 });
+                
+                playerRef.current.play().catch(() => {});
             }
         }
-
-        return () => {
-            // No disponemos del player aquí para permitir el cambio de video sin destruir el objeto si es posible,
-            // pero video.js a veces prefiere dispose. Para evitar el negro al cambiar, 
-            // solo hacemos dispose si el componente se desmonta de verdad.
-        };
     }, [isUnlocked, streamUrl, video?.id]);
 
     useEffect(() => {
@@ -561,8 +584,10 @@ export default function Watch() {
                             <div data-vjs-player className="w-full h-full">
                                 <video 
                                     ref={videoRef} 
-                                    className="video-js vjs-big-play-centered vjs-theme-city w-full h-full"
+                                    className="video-js vjs-big-play-centered vjs-fill w-full h-full"
                                     crossOrigin="anonymous" 
+                                    playsInline
+                                    style={{ backgroundColor: 'black' }}
                                 />
                             </div>
                         </div>

@@ -82,3 +82,54 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Video.js Custom Styles */
+.video-js {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #000 !important;
+}
+
+.video-js .vjs-control-bar {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  height: 50px !important;
+}
+
+.video-js .vjs-button > .vjs-icon-placeholder:before {
+  font-size: 24px !important;
+  line-height: 50px !important;
+}
+
+.video-js .vjs-big-play-button {
+  background-color: rgba(99, 102, 241, 0.9) !important;
+  border: none !important;
+  width: 80px !important;
+  height: 80px !important;
+  line-height: 80px !important;
+  border-radius: 50% !important;
+  margin-top: -40px !important;
+  margin-left: -40px !important;
+  transition: all 0.3s ease !important;
+}
+
+.video-js .vjs-big-play-button:hover {
+  background-color: #4f46e5 !important;
+  transform: scale(1.1);
+}
+
+.video-js .vjs-menu-button-popup .vjs-menu {
+  bottom: 50px !important;
+}
+
+/* Fix for APK WebView controls visibility */
+.vjs-user-active .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.vjs-paused .vjs-control-bar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
