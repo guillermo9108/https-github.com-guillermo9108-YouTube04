@@ -17,25 +17,25 @@ export default function ShortsGrid({ shorts }: ShortsGridProps) {
     };
 
     return (
-        <div className="bg-[var(--bg-secondary)] py-4">
-            <div className="flex items-center justify-between px-4 mb-3">
+        <div className="bg-[var(--bg-secondary)] py-3 border-y border-[var(--divider)] my-1">
+            <div className="flex items-center justify-between px-4 mb-2">
                 <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-gradient-to-br from-pink-500 to-orange-500 rounded flex items-center justify-center text-white">
-                        <Play size={14} fill="currentColor" />
+                    <div className="w-5 h-5 bg-gradient-to-br from-pink-500 to-orange-500 rounded-sm flex items-center justify-center text-white">
+                        <Play size={12} fill="currentColor" />
                     </div>
-                    <h2 className="text-[17px] font-bold text-[var(--text-primary)]">Reels</h2>
+                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Reels</h2>
                 </div>
-                <button className="text-[var(--text-secondary)]">
-                    <MoreHorizontal size={20} />
+                <button className="text-[var(--text-secondary)] p-1 hover:bg-[var(--bg-hover)] rounded-full transition-colors">
+                    <MoreHorizontal size={18} />
                 </button>
             </div>
 
-            <div className="flex gap-2 px-4 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide pb-1">
                 {shorts.map((short) => (
                     <div 
                         key={short.id}
                         onClick={() => navigate(`/shorts?id=${short.id}`)}
-                        className="relative min-w-[140px] aspect-[9/16] bg-zinc-900 rounded-xl overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform"
+                        className="relative min-w-[110px] w-[110px] aspect-[9/16] bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)]"
                     >
                         <img 
                             src={short.thumbnailUrl || '/api/uploads/thumbnails/default.jpg'} 
