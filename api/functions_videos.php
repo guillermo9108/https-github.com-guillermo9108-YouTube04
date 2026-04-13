@@ -183,7 +183,7 @@ function video_get_all($pdo) {
         $where[] = "v.is_audio = 0"; // Solo videos en Shorts
         $where[] = "v.category != 'IMAGES'"; // Excluir imágenes
     } else {
-        // Shorts are now included in the main list as requested by the user
+        // Shorts are included to be grouped by the frontend into the Reels section
     }
     
     if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }

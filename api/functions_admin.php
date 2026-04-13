@@ -339,8 +339,9 @@ function admin_cleanup_files($pdo) {
     $videos = $pdo->query("SELECT thumbnailUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
     $avatars = $pdo->query("SELECT avatarUrl FROM users")->fetchAll(PDO::FETCH_COLUMN);
     $market = $pdo->query("SELECT images FROM marketplace_items")->fetchAll(PDO::FETCH_COLUMN);
+    $stories = $pdo->query("SELECT contentUrl FROM stories")->fetchAll(PDO::FETCH_COLUMN);
     
-    $usedFiles = array_merge($videos, $avatars);
+    $usedFiles = array_merge($videos, $avatars, $stories);
     foreach ($market as $imgs) {
         $decoded = json_decode($imgs ?: '[]', true);
         if (is_array($decoded)) $usedFiles = array_merge($usedFiles, $decoded);

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
-import { Video, Notification as AppNotification, User, SystemSettings, Category } from '../../types';
+import { Video, Notification as AppNotification, User, SystemSettings, Category, Story } from '../../types';
 import { useNotifications } from '../../context/NotificationContext';
 import { 
     RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic, Image, Plus
@@ -59,8 +59,18 @@ export default function Home() {
     const [isListening, setIsListening] = useState(false);
     const [isFolderGridCollapsed, setIsFolderGridCollapsed] = useState(false);
     const [showNotifMenu, setShowNotifMenu] = useState(false);
-    const [stories, setStories] = useState<any[]>([]);
+    const [stories, setStories] = useState<Story[]>([]);
     const [showAllFolders, setShowAllFolders] = useState(false);
+
+    // Group stories by user for display
+    const groupedStories = useMemo(() => {
+        const groups: Record<string, Story[]> = {};
+        stories.forEach(s => {
+            if (!groups[s.userId]) groups[s.userId] = [];
+            groups[s.userId].push(s);
+        });
+        return Object.values(groups).map(group => group[0]); // Show first story of each user
+    }, [stories]);
 
     // Fetch stories
     useEffect(() => {
@@ -576,8 +586,12 @@ export default function Home() {
                         </div>
 
                         {/* Real Stories */}
-                        {stories.map(story => (
-                            <div key={story.id} className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0">
+                        {groupedStories.map(story => (
+                            <div 
+                                key={story.id} 
+                                onClick={() => navigate(`/stories?userId=${story.userId}`)}
+                                className="relative min-w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                            >
                                 {story.type === 'IMAGE' ? (
                                     <img src={story.contentUrl} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
                                 ) : (

@@ -31,6 +31,7 @@ import ReportPage from './components/pages/ReportPage';
 import EditVideo from './components/pages/EditVideo';
 import CreatePost from './components/pages/CreatePost';
 import CreateStory from './components/pages/CreateStory';
+import StoryViewer from './components/pages/StoryViewer';
 import Cart from './components/pages/Cart';
 import VipStore from './components/pages/VipStore';
 import WatchLater from './components/pages/WatchLater';
@@ -297,6 +298,7 @@ export default function App() {
                                 <Route path="/upload" element={<SetupGuard><ProtectedRoute><Upload /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/create-post" element={<SetupGuard><ProtectedRoute><CreatePost /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/create-story" element={<SetupGuard><ProtectedRoute><CreateStory /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/stories" element={<SetupGuard><ProtectedRoute><StoryViewer /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/profile" element={<SetupGuard><ProtectedRoute><Profile /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/watch-later" element={<SetupGuard><ProtectedRoute><WatchLater /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/requests" element={<SetupGuard><ProtectedRoute><Requests /></ProtectedRoute></SetupGuard>} />

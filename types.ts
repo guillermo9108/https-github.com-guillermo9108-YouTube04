@@ -63,6 +63,17 @@ export interface User {
   apkVersion?: string;
 }
 
+export interface Story {
+  id: string;
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  contentUrl: string;
+  type: 'IMAGE' | 'VIDEO';
+  createdAt: number;
+  expiresAt: number;
+}
+
 export interface VideoSubtitle {
   url: string;
   lang: string;
