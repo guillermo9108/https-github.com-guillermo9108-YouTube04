@@ -477,6 +477,7 @@ export default function Home() {
         if (!videos || videos.length === 0) return [];
         
         const isShort = (v: any) => {
+            if (!v) return false;
             const path = (v.videoUrl || '').toLowerCase();
             const category = (v.category || '').toLowerCase();
             const isMusic = category.includes('music') || path.includes('music');
@@ -488,6 +489,7 @@ export default function Home() {
         };
 
         const getItemType = (v: any) => {
+            if (!v) return 'video';
             if (isShort(v)) return 'short';
             if (v.is_audio) return 'audio';
             if (v.category?.toUpperCase() === 'IMAGES') return 'imagen';
@@ -521,7 +523,8 @@ export default function Home() {
         // --- ARCHITECT HIERARCHICAL LOGIC ---
         
         // 1. Phase 1: Recents (1-10)
-        const sortedVideos = [...videos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const validVideos = videos.filter(v => !!v);
+        const sortedVideos = [...validVideos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         const phase1Source = sortedVideos.slice(0, 10);
         const phase2Source = sortedVideos.slice(10);
         

@@ -9,16 +9,23 @@ header('Content-Type: text/plain; charset=utf-8');
 
 echo "--- STREAMPAY CRON START: " . date('Y-m-d H:i:s') . " ---\n\n";
 
-// 1. Ejecutar Video Worker (Metadatos y Miniaturas)
-echo "[1/2] Iniciando Video Worker...\n";
+// 1. Ejecutar Cleanup Worker (Eliminar archivos de 0 bytes)
+echo "[1/3] Iniciando Cleanup Worker...\n";
+ob_start();
+include 'cleanup_worker.php';
+echo ob_get_clean();
+echo "\n";
+
+// 2. Ejecutar Video Worker (Metadatos y Miniaturas)
+echo "[2/3] Iniciando Video Worker...\n";
 ob_start();
 include 'video_worker.php';
 $videoOutput = ob_get_clean();
 echo $videoOutput;
 echo "\n";
 
-// 2. Ejecutar Transcode Worker (Conversión de Formatos)
-echo "[2/2] Iniciando Transcode Worker...\n";
+// 3. Ejecutar Transcode Worker (Conversión de Formatos)
+echo "[3/3] Iniciando Transcode Worker...\n";
 ob_start();
 include 'transcode_worker.php';
 $transcodeOutput = ob_get_clean();
