@@ -7,6 +7,7 @@
   --bg-secondary: #ffffff;
   --bg-tertiary: #e4e6eb;
   --bg-hover: #f2f2f2;
+  --bg-header: #ffffff;
   --text-primary: #050505;
   --text-secondary: #65676b;
   --accent: #1877f2;
@@ -22,6 +23,7 @@
   --bg-secondary: #242526;
   --bg-tertiary: #3a3b3c;
   --bg-hover: #4e4f50;
+  --bg-header: #242526;
   --text-primary: #e4e6eb;
   --text-secondary: #b0b3b8;
   --accent: #1877f2;

@@ -482,7 +482,7 @@ export default function Home() {
             const category = (v.category || '').toLowerCase();
             const isMusic = category.includes('music') || path.includes('music');
             if (isMusic) return false;
-            const isUnder10Min = v.duration > 0 && v.duration < 600;
+            const isUnder10Min = v.duration >= 0 && v.duration < 600;
             const shortsPath = systemSettings?.shortsPath;
             const isInShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.toLowerCase().replace(/\\/g, '/'));
             return !v.is_audio && category !== 'IMAGES' && (isUnder10Min || isInShortsPath);
@@ -499,6 +499,7 @@ export default function Home() {
         const validVideos = videos.filter(v => 
             v && 
             v.id && 
+            v.title && 
             v.videoUrl && 
             v.creatorId && 
             v.creatorName && 
@@ -520,7 +521,9 @@ export default function Home() {
                         group.push(validVideos[i]);
                         i++;
                     }
-                    result.push({ isShortsGroup: true, shorts: group, id: `shorts-group-${i}` });
+                    if (group.length > 0) {
+                        result.push({ isShortsGroup: true, shorts: group, id: `shorts-group-${i}` });
+                    }
                     continue;
                 }
                 result.push(item);
@@ -551,19 +554,14 @@ export default function Home() {
                     j++;
                 }
                 
-                if (group.length > 1) {
-                    result.push({
-                        id: `group-user-${item.creatorId}-${i}`,
-                        tipo: 'short_group_user',
-                        isShortsGroup: true,
-                        shorts: group,
-                        items: group
-                    });
-                    i = j;
-                } else {
-                    result.push({ ...item, tipo: 'short_individual', isShort: true });
-                    i++;
-                }
+                result.push({
+                    id: `group-user-${item.creatorId}-${i}`,
+                    tipo: 'short_group_user',
+                    isShortsGroup: true,
+                    shorts: group,
+                    items: group
+                });
+                i = j;
             } else {
                 result.push({ ...item, tipo: type });
                 i++;
@@ -594,15 +592,30 @@ export default function Home() {
                     }
                 }
                 
-                for (let k = 0; k < poolShorts.length; k++) {
-                    if ('short' !== forbiddenType) {
-                        const item = poolShorts.splice(k, 1)[0];
-                        return { ...item, tipo: 'short_individual', isShort: true };
+                if (poolShorts.length > 0 && 'short' !== forbiddenType) {
+                    const item = poolShorts.shift();
+                    if (item) {
+                        return { 
+                            id: `short-single-${item.id}`,
+                            isShortsGroup: true, 
+                            shorts: [item], 
+                            tipo: 'short_individual' 
+                        };
                     }
                 }
                 
                 if (poolOthers.length > 0) return { ...poolOthers.shift(), tipo: getItemType(poolOthers[0]) };
-                if (poolShorts.length > 0) return { ...poolShorts.shift(), tipo: 'short_individual', isShort: true };
+                if (poolShorts.length > 0) {
+                    const item = poolShorts.shift();
+                    if (item) {
+                        return { 
+                            id: `short-single-fallback-${item.id}`,
+                            isShortsGroup: true, 
+                            shorts: [item], 
+                            tipo: 'short_individual' 
+                        };
+                    }
+                }
                 return null;
             };
 
