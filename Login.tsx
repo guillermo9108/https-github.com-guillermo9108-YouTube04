@@ -1,2 +1,0 @@
-// ESTE ARCHIVO YA NO ES NECESARIO. USA pages/Login.tsx.
-// THIS FILE IS DEPRECATED. USE pages/Login.tsx.
