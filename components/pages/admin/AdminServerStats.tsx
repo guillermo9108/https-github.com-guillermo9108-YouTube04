@@ -232,10 +232,21 @@ export default function AdminServerStats() {
         vReal: battery.voltage,
         lastUpdate: Date.now()
       };
-      await db.updateSystemSettings({ batteryConfig: updatedBattery });
+      
+      // Enviar configuración completa para asegurar persistencia
+      await db.updateSystemSettings({ 
+        batteryConfig: updatedBattery 
+      });
+      
+      // Actualizar estado local
       setBattery(updatedBattery);
+      
+      // Forzar actualización del servidor inmediatamente
+      await db.adminGetServerStats();
+      
       toastSuccess("Configuración de batería guardada");
     } catch (error) {
+      console.error("Error saving battery config:", error);
       toastError("Error al guardar configuración");
     } finally {
       setIsEditing(false);

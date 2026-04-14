@@ -503,6 +503,7 @@ export default function Home() {
             v.videoUrl && 
             v.creatorId && 
             v.creatorName && 
+            (v.title.toLowerCase() !== 'usuario' && v.title.toLowerCase() !== 'ahora') &&
             !isNaN(Number(v.duration))
         );
 
@@ -522,7 +523,12 @@ export default function Home() {
                         i++;
                     }
                     if (group.length > 0) {
-                        result.push({ isShortsGroup: true, shorts: group, id: `shorts-group-${i}` });
+                        result.push({ 
+                            isShortsGroup: true, 
+                            shorts: group, 
+                            items: group,
+                            id: `shorts-group-${i}` 
+                        });
                     }
                     continue;
                 }
@@ -549,13 +555,13 @@ export default function Home() {
             if (type === 'short') {
                 const group: any[] = [item];
                 let j = i + 1;
-                while (j < phase1Source.length && j < i + 10 && getItemType(phase1Source[j]) === 'short' && phase1Source[j].creatorId === item.creatorId) {
+                while (j < phase1Source.length && j < i + 10 && getItemType(phase1Source[j]) === 'short') {
                     group.push(phase1Source[j]);
                     j++;
                 }
                 
                 result.push({
-                    id: `group-user-${item.creatorId}-${i}`,
+                    id: `group-shorts-phase1-${i}`,
                     tipo: 'short_group_user',
                     isShortsGroup: true,
                     shorts: group,

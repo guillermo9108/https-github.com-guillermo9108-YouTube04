@@ -91,7 +91,7 @@ export default function Layout() {
       {!isMenuMode && (
         <header className="fixed top-0 left-0 right-0 bg-[var(--bg-header)] z-50 border-b border-[var(--divider)] shadow-md opacity-100">
           {/* Top Bar: Logo & Actions */}
-          <div className="flex items-center justify-between px-3 h-14">
+          <div className="flex items-center justify-between px-3 h-14 bg-[var(--bg-header)]">
             <Link to="/" className="flex items-center">
               <span className="text-[28px] font-bold tracking-tighter text-white lowercase">
                 facebook
@@ -111,7 +111,7 @@ export default function Layout() {
           </div>
 
           {/* Tab Bar: Navigation */}
-          <nav className="flex items-center justify-around h-12">
+          <nav className="flex items-center justify-around h-12 bg-[var(--bg-header)]">
             <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <div className="relative">
                 <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
