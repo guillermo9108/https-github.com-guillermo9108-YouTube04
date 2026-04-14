@@ -496,19 +496,28 @@ export default function Home() {
             return 'video';
         };
 
+        const validVideos = videos.filter(v => 
+            v && 
+            v.id && 
+            v.videoUrl && 
+            v.creatorId && 
+            v.creatorName && 
+            !isNaN(Number(v.duration))
+        );
+
         const isOnRoot = !searchQuery && currentFolder.length === 0 && selectedCategory === 'TODOS';
 
         if (!isOnRoot) {
             // Standard Logic for Search/Folders/Categories
             const result: any[] = [];
             let i = 0;
-            while (i < videos.length) {
-                const item = videos[i];
+            while (i < validVideos.length) {
+                const item = validVideos[i];
                 if (!item) { i++; continue; }
                 if (isShort(item)) {
                     const group: any[] = [];
-                    while (i < videos.length && videos[i] && isShort(videos[i])) {
-                        group.push(videos[i]);
+                    while (i < validVideos.length && validVideos[i] && isShort(validVideos[i])) {
+                        group.push(validVideos[i]);
                         i++;
                     }
                     result.push({ isShortsGroup: true, shorts: group, id: `shorts-group-${i}` });
@@ -523,8 +532,7 @@ export default function Home() {
         // --- ARCHITECT HIERARCHICAL LOGIC ---
         
         // 1. Phase 1: Recents (1-10)
-        const validVideos = videos.filter(v => v && v.id && v.videoUrl && v.creatorId && v.creatorName);
-        const sortedVideos = [...validVideos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const sortedVideos = [...validVideos].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
         const phase1Source = sortedVideos.slice(0, 10);
         const phase2Source = sortedVideos.slice(10);
         
@@ -822,7 +830,7 @@ export default function Home() {
                                     </div>
                                 </div> 
                             )}
-                            {videos.length > 0 ? ( 
+                            {processedVideos.length > 0 ? ( 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-[var(--divider)]">
                                     {processedVideos.map((v, idx) => ( 
                                         v.isShortsGroup ? (

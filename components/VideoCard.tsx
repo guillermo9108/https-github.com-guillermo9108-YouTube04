@@ -49,11 +49,12 @@ const formatTimeAgo = (timestamp: number) => {
   return "Ahora";
 };
 
-const formatDuration = (seconds: number) => {
-    if (!seconds || isNaN(seconds)) return '0:00';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
+const formatDuration = (seconds: any) => {
+    const sNum = Number(seconds);
+    if (isNaN(sNum) || sNum <= 0) return '0:00';
+    const h = Math.floor(sNum / 3600);
+    const m = Math.floor((sNum % 3600) / 60);
+    const s = Math.floor(sNum % 60);
     return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
 };
 
