@@ -455,6 +455,16 @@ function admin_reconstruct_thumbnails($pdo) {
     respond(true, ['count' => $count]);
 }
 
+function admin_battery_manual_shutdown($pdo) {
+    $stmt = $pdo->query("SELECT batteryConfig FROM system_settings WHERE id = 1");
+    $battery = json_decode($stmt->fetchColumn() ?: 'null', true);
+    if ($battery) {
+        $battery['isManualShutdown'] = true;
+        $pdo->prepare("UPDATE system_settings SET batteryConfig = ? WHERE id = 1")->execute([json_encode($battery)]);
+    }
+    respond(true);
+}
+
 function admin_get_logs() {
     $logFile = 'transcode_log.txt';
     if (!file_exists($logFile)) respond(true, []);
@@ -923,20 +933,58 @@ function update_battery_simulation($pdo) {
     }
 
     // Si el salto es mayor a 5 minutos, probablemente el sistema estuvo apagado.
-    // En ese caso, asumimos que el consumo del sistema (pSys) fue 0 durante el tiempo de apagado.
     $isOutage = $elapsedSeconds > 300;
     $elapsedHours = $elapsedSeconds / 3600;
 
     if ($isOutage) {
-        // Si no estaba cargando, asumimos que se agotó la batería y se apagó forzosamente
-        if (!($battery['isCharging'] ?? false)) {
-            $battery['currentWh'] = 0;
-            $battery['vQuimico'] = 12.0; // Voltaje mínimo
-        }
-        // Al encenderse de nuevo, asumimos que hay corriente y está cargando
-        $battery['isCharging'] = true;
+        $lastPoint = end($history);
+        $lastV = $lastPoint ? $lastPoint['v'] : 14.8;
+        $lastPct = round(($lastV - 12.0) / 4.8 * 100);
         
-        // No calculamos cambios de energía durante el tiempo que estuvo apagado (ya lo forzamos a 0 si aplica)
+        $isManual = $battery['isManualShutdown'] ?? false;
+        $battery['isManualShutdown'] = false; // Reset flag
+        
+        if (!$isManual) {
+            // Apagado inesperado (Corte de luz o batería agotada realmente)
+            if ($lastPct <= 0) {
+                // Contar cuántos puntos de 0% hubo al final
+                $zeroCount = 0;
+                for ($i = count($history) - 1; $i >= 0; $i--) {
+                    $p = $history[$i];
+                    $pPct = round(($p['v'] - 12.0) / 4.8 * 100);
+                    if ($pPct <= 0) $zeroCount++;
+                    else break;
+                }
+                
+                if ($zeroCount >= 3) {
+                    // Calibración: La batería aguantó más de lo esperado a 0%
+                    $battery['calibration']['status'] = 'CALIBRATED_DEEP_DISCHARGE';
+                    $battery['calibration']['lastEvent'] = "Batería agotada con margen extra ($zeroCount min a 0%)";
+                }
+            } else if ($lastPct < 3) {
+                // Calibración por descarga casi completa
+                $battery['calibration']['status'] = 'CALIBRATED_LOW';
+                $battery['calibration']['lastEvent'] = "Apagado con batería baja ($lastPct%)";
+            } else {
+                // Apagado con carga -> Posible sobreestimación de capacidad
+                $battery['calibration']['status'] = 'CALIBRATED_UNEXPECTED';
+                $battery['calibration']['lastEvent'] = "Apagado inesperado con $lastPct% restante";
+            }
+        } else {
+            $battery['calibration']['lastEvent'] = "Apagado manual registrado con $lastPct%";
+        }
+        
+        // Lógica de reanudación
+        if ($lastPct > 5) {
+            // Continuar desde donde se quedó (no forzamos a 0)
+        } else {
+            // Forzar a 0% si estaba muy bajo o fue inesperado
+            $battery['currentWh'] = 0;
+            $battery['vQuimico'] = 12.0;
+        }
+        
+        // Al encenderse, asumimos que está conectado a la red
+        $battery['isCharging'] = true;
         $elapsedHours = 0;
     }
     
@@ -1061,9 +1109,9 @@ function update_battery_simulation($pdo) {
         }
     }
 
-    // Update History (cada 5 minutos = 300,000 ms)
+    // Update History (cada 1 minuto = 60,000 ms)
     $lastHistory = end($history);
-    if (empty($history) || ($now - $lastHistory['t']) >= 300000) {
+    if (empty($history) || ($now - $lastHistory['t']) >= 60000) {
         $history[] = [
             't' => $now, 
             'v' => $battery['voltage'], 
@@ -1071,7 +1119,7 @@ function update_battery_simulation($pdo) {
             'p' => $pSys,
             'temp' => $battery['temp']
         ];
-        if (count($history) > 288) array_shift($history);
+        if (count($history) > 1440) array_shift($history); // 24 horas a 1 min/punto
     }
 
     $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")

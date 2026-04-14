@@ -291,6 +291,7 @@ try {
         case 'admin_remove_from_queue': admin_remove_from_queue($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_skip_transcode': admin_skip_transcode($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_reconstruct_thumbnails': admin_reconstruct_thumbnails($pdo); break;
+        case 'admin_battery_manual_shutdown': admin_battery_manual_shutdown($pdo); break;
         case 'admin_smart_cleaner_preview': admin_smart_cleaner_preview($pdo, $input); break;
         case 'admin_smart_cleaner_execute': admin_smart_cleaner_execute($pdo, $input); break;
         case 'admin_extreme_janitor': admin_extreme_janitor($pdo, $input); break;

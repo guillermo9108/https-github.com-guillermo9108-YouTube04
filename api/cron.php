@@ -39,4 +39,11 @@ $transcodeOutput = ob_get_clean();
 echo $transcodeOutput;
 echo "\n";
 
+// 4. Ejecutar Battery Worker (Simulación de Batería)
+echo "[4/4] Iniciando Battery Worker...\n";
+ob_start();
+include 'cron_battery.php';
+echo ob_get_clean();
+echo "\n";
+
 echo "--- STREAMPAY CRON END: " . date('Y-m-d H:i:s') . " ---\n";

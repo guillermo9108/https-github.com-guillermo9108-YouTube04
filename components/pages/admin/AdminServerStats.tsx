@@ -51,6 +51,7 @@ interface BatteryConfig {
   calibration?: {
     status: string;
     suggestions: string[];
+    lastEvent?: string;
   };
 }
 
@@ -238,6 +239,16 @@ export default function AdminServerStats() {
       toastError("Error al guardar configuración");
     } finally {
       setIsEditing(false);
+    }
+  };
+
+  const handleManualShutdown = async () => {
+    if (!window.confirm("¿Avisar al sistema de un APAGADO MANUAL? Esto calibrará el emulador correctamente.")) return;
+    try {
+      await db.request('action=admin_battery_manual_shutdown', { method: 'POST' });
+      toastSuccess("Aviso de apagado manual registrado");
+    } catch (e) {
+      toastError("Error al registrar apagado manual");
     }
   };
 
@@ -494,13 +505,26 @@ export default function AdminServerStats() {
                 <h4 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
                   <TrendingUp size={16} className="text-indigo-400" /> Historial 24h (Voltaje)
                 </h4>
-                <button 
-                  onClick={() => setShowCalibration(!showCalibration)}
-                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                >
-                  <Calculator size={14} /> Calibrar Simulador
-                </button>
+                <div className="flex items-center gap-4">
+                  {battery.calibration?.status && (
+                    <div className="text-[10px] font-black px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 uppercase tracking-tighter">
+                      {battery.calibration.status}
+                    </div>
+                  )}
+                  <button 
+                    onClick={() => setShowCalibration(!showCalibration)}
+                    className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                  >
+                    <Calculator size={14} /> Calibrar
+                  </button>
+                </div>
               </div>
+
+              {battery.calibration?.lastEvent && (
+                <div className="mb-4 p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl text-[10px] text-slate-400 font-bold uppercase italic">
+                  Último Evento: {battery.calibration.lastEvent}
+                </div>
+              )}
               
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -797,6 +821,13 @@ export default function AdminServerStats() {
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${battery.isCharging ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
+
+            <button 
+              onClick={handleManualShutdown}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-400 rounded-xl font-bold transition-all border border-white/5"
+            >
+              <Power size={18} /> Aviso de Apagado Manual
+            </button>
 
             <button 
               onClick={saveBatteryConfig}
