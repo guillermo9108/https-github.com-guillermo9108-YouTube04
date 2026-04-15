@@ -1135,7 +1135,7 @@ function update_battery_simulation($pdo) {
         ->execute([json_encode($battery), json_encode($history)]);
 
     // Al final del update, aseguramos que la versión de la APK esté actualizada en los settings
-    $pdo->prepare("UPDATE system_settings SET latestApkVersion = '1.0.1' WHERE id = 1 AND (latestApkVersion != '1.0.1' OR latestApkVersion IS NULL)")->execute();
+    $pdo->prepare("UPDATE system_settings SET latestApkVersion = '1.0.2' WHERE id = 1 AND (latestApkVersion != '1.0.2' OR latestApkVersion IS NULL)")->execute();
 
     return [
         'config' => $battery,

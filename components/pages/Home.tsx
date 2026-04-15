@@ -499,8 +499,8 @@ export default function Home() {
         const validVideos = videos.filter(v => 
             v && 
             v.id && 
-            v.title && 
-            v.videoUrl && 
+            v.title && v.title.trim().length > 0 &&
+            v.videoUrl && v.videoUrl.startsWith('http') &&
             v.creatorId && 
             v.creatorName && 
             (v.title.toLowerCase() !== 'usuario' && v.title.toLowerCase() !== 'ahora') &&
@@ -590,9 +590,11 @@ export default function Home() {
             const getNextItem = () => {
                 const forbiddenType = lastTypes.length === 2 && lastTypes[0] === lastTypes[1] ? lastTypes[0] : null;
                 
-                // Si hay muchos shorts acumulados, agruparlos
-                if (poolShorts.length >= 3 && forbiddenType !== 'short') {
+                // Si hay shorts acumulados (incluso 1 o 2), agruparlos si el tipo no está prohibido
+                // Esto asegura que los shorts siempre aparezcan en su contenedor especial
+                if (poolShorts.length > 0 && forbiddenType !== 'short') {
                     const group: any[] = [];
+                    // Agrupar hasta 5 shorts
                     const size = Math.min(poolShorts.length, 5);
                     for (let k = 0; k < size; k++) {
                         const s = poolShorts.shift();
@@ -616,32 +618,24 @@ export default function Home() {
                     }
                 }
                 
-                if (poolShorts.length > 0 && 'short' !== forbiddenType) {
-                    const item = poolShorts.shift();
-                    if (item) {
-                        return { 
-                            id: `short-single-${item.id}`,
-                            isShortsGroup: true, 
-                            shorts: [item], 
-                            items: [item],
-                            tipo: 'short_individual' 
-                        };
+                // Fallback for shorts if they were forbidden but we have nothing else
+                if (poolShorts.length > 0) {
+                    const group: any[] = [];
+                    const size = Math.min(poolShorts.length, 5);
+                    for (let k = 0; k < size; k++) {
+                        const s = poolShorts.shift();
+                        if (s) group.push(s);
                     }
+                    return {
+                        id: `short-group-discovery-fallback-${Date.now()}`,
+                        isShortsGroup: true,
+                        shorts: group,
+                        items: group,
+                        tipo: 'short_group_discovery_fallback'
+                    };
                 }
                 
                 if (poolOthers.length > 0) return { ...poolOthers.shift(), tipo: getItemType(poolOthers[0]) };
-                if (poolShorts.length > 0) {
-                    const item = poolShorts.shift();
-                    if (item) {
-                        return { 
-                            id: `short-single-fallback-${item.id}`,
-                            isShortsGroup: true, 
-                            shorts: [item],
-                            items: [item],
-                            tipo: 'short_individual_fallback'
-                        };
-                    }
-                }
                 return null;
             };
 

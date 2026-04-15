@@ -224,13 +224,14 @@ export default function AdminServerStats() {
     return () => clearInterval(simInterval);
   }, [stats?.cpu]);
 
-  const saveBatteryConfig = async () => {
+  const saveBatteryConfig = async (configOverride?: Partial<BatteryConfig>) => {
     setIsEditing(true);
     try {
+      const baseConfig = configOverride ? { ...battery, ...configOverride } : battery;
       const updatedBattery = {
-        ...battery,
-        vQuimico: battery.voltage,
-        vReal: battery.voltage,
+        ...baseConfig,
+        vQuimico: baseConfig.voltage,
+        vReal: baseConfig.voltage,
         lastUpdate: Date.now(),
         manualOverrideUntil: Date.now() + 10000 // 10 segundos de gracia
       };
@@ -830,11 +831,7 @@ export default function AdminServerStats() {
               <button 
                 onClick={() => {
                   const newState = !battery.isCharging;
-                  setBattery({
-                    ...battery, 
-                    isCharging: newState,
-                    manualOverrideUntil: Date.now() + 10000
-                  });
+                  saveBatteryConfig({ isCharging: newState });
                 }}
                 className={`w-12 h-6 rounded-full transition-colors relative ${battery.isCharging ? 'bg-emerald-500' : 'bg-slate-700'}`}
               >
@@ -850,7 +847,7 @@ export default function AdminServerStats() {
             </button>
 
             <button 
-              onClick={saveBatteryConfig}
+              onClick={() => saveBatteryConfig()}
               className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/20"
             >
               <Save size={18} /> Guardar Configuración

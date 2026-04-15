@@ -89,9 +89,12 @@ export default function Layout() {
     <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[104px]'}`}>
       {/* Facebook Lite Style Header */}
       {!isMenuMode && (
-        <header className="fixed top-0 left-0 right-0 bg-[var(--bg-header)] z-50 border-b border-[var(--divider)] shadow-md opacity-100">
+        <header 
+          className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--divider)] shadow-md opacity-100"
+          style={{ backgroundColor: 'var(--bg-header)' }}
+        >
           {/* Top Bar: Logo & Actions */}
-          <div className="flex items-center justify-between px-3 h-14 bg-[var(--bg-header)]">
+          <div className="flex items-center justify-between px-3 h-14" style={{ backgroundColor: 'var(--bg-header)' }}>
             <Link to="/" className="flex items-center">
               <span className="text-[28px] font-bold tracking-tighter text-[#1877f2] lowercase">
                 facebook
@@ -111,7 +114,7 @@ export default function Layout() {
           </div>
 
           {/* Tab Bar: Navigation */}
-          <nav className="flex items-center justify-around h-12 bg-[var(--bg-header)]">
+          <nav className="flex items-center justify-around h-12" style={{ backgroundColor: 'var(--bg-header)' }}>
             <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <div className="relative">
                 <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
