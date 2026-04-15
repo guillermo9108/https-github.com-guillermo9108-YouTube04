@@ -11,6 +11,7 @@ interface AuthContextType {
   refreshUser: () => void;
   isLoading: boolean;
   isOffline: boolean;
+  socket: WebSocket | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -25,12 +26,33 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(db.getIsOffline());
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
   const userRef = useRef<User | null>(null); 
   const toast = useToast();
   
   // Sincronizar Ref con State
   useEffect(() => { userRef.current = user; }, [user]);
+
+  useEffect(() => {
+    if (user && !socket) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}`);
+      
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'IDENTIFY', payload: { userId: user.id } }));
+      };
+
+      ws.onclose = () => {
+        setSocket(null);
+      };
+
+      setSocket(ws);
+    } else if (!user && socket) {
+      socket.close();
+      setSocket(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     const handleOffline = () => setIsOffline(true);
@@ -191,7 +213,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline, socket }}>
       {children}
     </AuthContext.Provider>
   );

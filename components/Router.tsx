@@ -45,6 +45,16 @@ export function useParams(): Record<string, string | undefined> {
     return { id: editVideoMatch[1] };
   }
 
+  const chatMatch = pathname.match(/\/chat\/([^/?&]+)/);
+  if (chatMatch) {
+    return { id: chatMatch[1] };
+  }
+
+  const profileMatch = pathname.match(/\/profile\/([^/?&]+)/);
+  if (profileMatch) {
+    return { id: profileMatch[1] };
+  }
+
   const marketMatch = pathname.match(/\/marketplace\/([^/?&]+)/);
   if (marketMatch && !pathname.includes('/marketplace/create') && !pathname.includes('/marketplace/edit') && !pathname.endsWith('/marketplace')) {
     return { id: marketMatch[1] };

@@ -1069,84 +1069,78 @@ function update_battery_simulation($pdo) {
         $elapsedHours = 0;
     }
     
-    // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
-    $capTotalWh = 250; 
-    $cargadorMaxW = 45;
+    // 1. Constantes del Sistema (4S4P 21700)
+    $soh = ($battery['cellHealth'] ?? 100) / 100;
+    $capTotalWh = 250 * $soh; 
+    $cargadorMaxW = ($battery['chargePower'] ?? 45);
     $vMax = 16.8;
-    $vMin = 12.7; // Punto crítico 4S4P
+    $vMin = 12.0; // Punto de corte real
 
-    // 2. Cálculo de Consumo (P_sys)
-    $load = sys_getloadavg();
-    $cpuUsage = $load ? $load[0] * 100 / 4 : 10;
-    $diskActivity = rand(0, 100); // Simulado
-    
-    // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
-    $pSys = 18 + ($cpuUsage * 0.25) + (($diskActivity / 100) * 2);
-    
-    // Si detectamos un apagón, el consumo real durante ese tiempo fue 0 (solo queda el inversor si es externo, pero asumimos 0 para el laptop)
-    $effectivePSys = $isOutage ? 0 : $pSys;
-
-    // 3. Lógica de Carga (AC Conectado)
-    $isCharging = $battery['isCharging'] ?? false;
-    $highChargeStart = $battery['highChargeStart'] ?? 0;
-    
-    // Migración de highChargeStart
-    if ($highChargeStart > 0 && $highChargeStart < 10000000000) {
-        $highChargeStart *= 1000;
+    // 2. Aprendizaje del Historial (Calibración Automática)
+    if (!empty($history) && count($history) > 10 && !isset($battery['lastLearning'])) {
+        $lastPoints = array_slice($history, -20);
+        $vDiff = $lastPoints[count($lastPoints)-1]['v'] - $lastPoints[0]['v'];
+        $tDiff = ($lastPoints[count($lastPoints)-1]['t'] - $lastPoints[0]['t']) / 3600000; // Horas
+        
+        if ($tDiff > 0.1) { // Al menos 6 minutos de datos
+            $observedRate = abs($vDiff / $tDiff); // V/h
+            $expectedRate = ($vMax - $vMin) / ($capTotalWh / 25); // Estimación simple
+            
+            // Si la descarga es mucho más rápida de lo esperado, bajar SOH
+            if ($vDiff < 0 && $observedRate > $expectedRate * 1.2) {
+                $battery['cellHealth'] = max(50, ($battery['cellHealth'] ?? 100) - 0.1);
+            }
+            $battery['lastLearning'] = $now;
+        }
+    }
+    // Reset learning flag periodically
+    if (isset($battery['lastLearning']) && ($now - $battery['lastLearning']) > 86400000) {
+        unset($battery['lastLearning']);
     }
 
+    // 3. Cálculo de Consumo (P_sys)
+    $load = sys_getloadavg();
+    $cpuUsage = $load ? $load[0] * 100 / 4 : 10;
+    $diskActivity = rand(0, 100);
+    
+    $pSys = ($battery['minWatts'] ?? 18) + ($cpuUsage * 0.25) + (($diskActivity / 100) * 2);
+    $effectivePSys = $isOutage ? 0 : $pSys;
+
+    // 4. Lógica de Carga
+    $isCharging = $battery['isCharging'] ?? false;
     $pCharge = 0;
 
     if ($isCharging) {
-        $currentCargadorMax = $cargadorMaxW;
-        
-        // Thermal Throttling (Simulado)
-        if (isset($battery['pCharge']) && $battery['pCharge'] > 40) {
-            if ($highChargeStart == 0) {
-                $highChargeStart = $now;
-                $battery['highChargeStart'] = $now;
-            } else if (($now - $highChargeStart) > 3600000) { // 1 hora en ms
-                $currentCargadorMax = 35;
-                $battery['thermalThrottling'] = true;
-            }
-        } else {
-            $battery['highChargeStart'] = 0;
-            $battery['thermalThrottling'] = false;
+        $pCharge = max(0, $cargadorMaxW - $effectivePSys);
+        // Thermal Throttling suave
+        if (($battery['temp'] ?? 25) > 45) {
+            $pCharge *= 0.7;
         }
-
-        $pCharge = max(0, $currentCargadorMax - $effectivePSys);
-    } else {
-        $battery['highChargeStart'] = 0;
-        $battery['thermalThrottling'] = false;
     }
 
-    // 4. Curva No Lineal de Voltaje (Actualización de V_quimico)
+    // 5. Curva No Lineal de Voltaje (V_quimico)
     $vQuimico = $battery['vQuimico'] ?? ($battery['voltage'] ?? 14.8);
-    
-    // Tasa de cambio de energía
     $netPower = $isCharging ? $pCharge : -$effectivePSys;
     $deltaWh = $netPower * $elapsedHours;
     
     $currentWh = ($battery['currentWh'] ?? ($capTotalWh * 0.5)) + $deltaWh;
     $currentWh = max(0, min($capTotalWh, $currentWh));
 
-    // Tasa estándar de cambio de voltaje
+    // Tasa de cambio de voltaje basada en capacidad real (SOH)
     $baseVPerWh = ($vMax - $vMin) / $capTotalWh;
     $vChange = $deltaWh * $baseVPerWh;
 
-    // Multiplicadores según el rango de V_quimico
-    if ($vQuimico >= 14.5 && $vQuimico <= 15.5) {
-        $vChange *= 0.5; // Efecto Meseta
+    // Efecto Meseta y Tramos Críticos
+    if ($vQuimico >= 14.2 && $vQuimico <= 15.8) {
+        $vChange *= 0.6; 
+    }
+    if (!$isCharging && $vQuimico < 13.5) {
+        $vChange *= 1.8; 
     }
     
-    // Tramo crítico: 13.7V a 12.7V descarga rápida
-    if (!$isCharging && $vQuimico < 13.7) {
-        $vChange *= 2.5; // Descarga acelerada en el tramo final
-    }
-    
-    // Fase CV - Saturación (16.2V a 16.8V)
-    if ($isCharging && $vQuimico > 16.2) {
-        $cvFactor = max(0, pow(($vMax - $vQuimico) / ($vMax - 16.2), 2));
+    // Fase CV suave
+    if ($isCharging && $vQuimico > 16.0) {
+        $cvFactor = max(0.1, ($vMax - $vQuimico) / ($vMax - 16.0));
         $vChange *= $cvFactor;
         $pCharge *= $cvFactor;
     }
@@ -1154,28 +1148,36 @@ function update_battery_simulation($pdo) {
     $vQuimico += $vChange;
     $vQuimico = max($vMin, min($vMax, $vQuimico));
 
-    // 5. Voltaje de Pantalla (V_display)
-    $vDisplay = $vQuimico - ($pSys * 0.01);
+    // 6. Voltaje de Pantalla (V_display) - Transiciones Suaves
+    // El voltaje de pantalla cae bajo carga y sube al cargar (Resistencia Interna)
+    $internalRes = 0.02 * (1.2 - $soh); // Aumenta con el desgaste
+    $vDrop = $effectivePSys * $internalRes;
+    $vRise = $isCharging ? ($pCharge * $internalRes * 1.5) : 0;
     
-    if ($isCharging) {
-        $vDisplay += 0.2;
-    }
+    $targetVDisplay = $vQuimico - $vDrop + $vRise;
+    
+    // Suavizado de V_display para evitar saltos bruscos
+    $currentVDisplay = $battery['voltage'] ?? $vQuimico;
+    $smoothingFactor = min(1, $elapsedSeconds / 10); // 10 segundos para estabilizar
+    $vDisplay = $currentVDisplay + ($targetVDisplay - $currentVDisplay) * $smoothingFactor;
 
-    // 6. Monitor de Temperatura
+    // 7. Monitor de Temperatura
     $tempBase = 25;
-    $tempLoad = ($pSys / 45) * 15;
-    $tempVolt = max(0, ($vQuimico - 14.8) * 5);
-    $battery['temp'] = round($tempBase + $tempLoad + $tempVolt, 1);
+    $tempLoad = ($pSys / 50) * 12;
+    $tempCharge = $isCharging ? ($pCharge / 45) * 15 : 0;
+    $targetTemp = $tempBase + $tempLoad + $tempCharge;
+    $currentTemp = $battery['temp'] ?? 25;
+    $battery['temp'] = round($currentTemp + ($targetTemp - $currentTemp) * $smoothingFactor, 1);
 
     // Actualizar estado
     $battery['vQuimico'] = round($vQuimico, 3);
     $battery['voltage'] = round($vDisplay, 3);
-    $battery['vReal'] = round($vQuimico, 3); 
+    $battery['vReal'] = round($vQuimico, 3); // Voltaje para cálculo de % (sin caídas por carga)
     $battery['pSys'] = round($pSys, 2);
     $battery['pCharge'] = round($pCharge, 2);
     $battery['currentWh'] = round($currentWh, 2);
     $battery['lastUpdate'] = $now;
-    $battery['vMin'] = $vMin; // Guardar para referencia en el cliente
+    $battery['vMin'] = $vMin; 
     $battery['vMax'] = $vMax;
 
     // Sugerencias de Calibración

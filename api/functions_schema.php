@@ -278,9 +278,29 @@ function getAppSchema() {
                 'liked' => 'TINYINT(1) DEFAULT 0',
                 'disliked' => 'TINYINT(1) DEFAULT 0',
                 'isWatched' => 'TINYINT(1) DEFAULT 0',
-                'isSkipped' => 'TINYINT(1) DEFAULT 0'
+                'isSkipped' => 'TINYINT(1) DEFAULT 0',
+                'watchedAt' => 'BIGINT DEFAULT 0'
             ],
-            'pk' => 'PRIMARY KEY (userId, videoId)'
+            'pk' => 'PRIMARY KEY (userId, videoId)',
+            'indices' => [
+                'idx_inter_watched' => 'watchedAt'
+            ]
+        ],
+        'messages' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'senderId' => 'VARCHAR(50)',
+                'receiverId' => 'VARCHAR(50)',
+                'text' => 'TEXT',
+                'imageUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'isRead' => 'TINYINT(1) DEFAULT 0',
+                'timestamp' => 'BIGINT'
+            ],
+            'indices' => [
+                'idx_msg_sender' => 'senderId',
+                'idx_msg_receiver' => 'receiverId',
+                'idx_msg_time' => 'timestamp'
+            ]
         ],
         'notifications' => [
             'cols' => [

@@ -48,6 +48,25 @@ async function startServer() {
             }));
           }
         }
+
+        if (message.type === "CHAT_MESSAGE") {
+          const { receiverId, senderId, text, imageUrl, timestamp, id } = message.payload;
+          const targetWs = clients.get(receiverId);
+
+          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(JSON.stringify({
+              type: "CHAT_MESSAGE",
+              payload: {
+                id,
+                senderId,
+                receiverId,
+                text,
+                imageUrl,
+                timestamp
+              }
+            }));
+          }
+        }
       } catch (err) {
         console.error("Error parsing WS message:", err);
       }
@@ -65,6 +84,9 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+
+  // Serve api/uploads as static
+  app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

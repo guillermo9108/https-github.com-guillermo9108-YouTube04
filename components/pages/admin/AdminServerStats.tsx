@@ -147,32 +147,31 @@ export default function AdminServerStats() {
 
       setBattery(prev => {
         const now = Date.now();
-        const elapsedHours = (now - prev.lastUpdate) / (1000 * 60 * 60);
+        const elapsedMs = now - prev.lastUpdate;
+        const elapsedHours = elapsedMs / (1000 * 60 * 60);
+        const elapsedSeconds = elapsedMs / 1000;
         
-        // 1. Constantes del Sistema (4S4P 21700, 89% SOH)
-        const capTotalWh = 250; 
-        const cargadorMaxW = 45;
+        if (elapsedSeconds <= 0) return prev;
+
+        // 1. Constantes del Sistema (4S4P 21700)
+        const soh = (prev.cellHealth || 100) / 100;
+        const capTotalWh = 250 * soh; 
+        const cargadorMaxW = prev.chargePower || 45;
         const vMax = 16.8;
-        const vMin = 12.7;
+        const vMin = 12.0;
 
         // 2. Cálculo de Consumo (P_sys)
-        // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
-        const pSys = 18 + (stats.cpu * 0.25) + (10 * 0.02); // Simulado 10% disco
+        const pSys = (prev.minWatts || 18) + (stats.cpu * 0.25) + (10 * 0.02);
         
-        // 3. Lógica de Carga (AC Conectado)
+        // 3. Lógica de Carga
         let pCharge = 0;
-        let currentCargadorMax = cargadorMaxW;
-
         if (prev.isCharging) {
-          if (prev.thermalThrottling) {
-            currentCargadorMax = 35;
-          }
-          pCharge = Math.max(0, currentCargadorMax - pSys);
+          pCharge = Math.max(0, cargadorMaxW - pSys);
+          if ((prev.temp || 25) > 45) pCharge *= 0.7;
         }
 
-        // 4. Curva No Lineal de Voltaje (Actualización de V_quimico)
+        // 4. Curva No Lineal de Voltaje (V_quimico)
         let vQuimico = prev.vQuimico || prev.voltage || 14.8;
-        
         const netPower = prev.isCharging ? pCharge : -pSys;
         const deltaWh = netPower * elapsedHours;
         
@@ -182,19 +181,11 @@ export default function AdminServerStats() {
         const baseVPerWh = (vMax - vMin) / capTotalWh;
         let vChange = deltaWh * baseVPerWh;
 
-        // Multiplicadores según el rango de V_quimico
-        if (vQuimico >= 14.5 && vQuimico <= 15.5) {
-          vChange *= 0.5; // Efecto Meseta
-        }
+        if (vQuimico >= 14.2 && vQuimico <= 15.8) vChange *= 0.6;
+        if (!prev.isCharging && vQuimico < 13.5) vChange *= 1.8;
         
-        // Tramo crítico: 13.7V a 12.7V descarga rápida
-        if (!prev.isCharging && vQuimico < 13.7) {
-          vChange *= 2.5;
-        }
-        
-        // Fase CV - Saturación (16.2V a 16.8V)
-        if (prev.isCharging && vQuimico > 16.2) {
-          const cvFactor = Math.max(0, Math.pow((vMax - vQuimico) / (vMax - 16.2), 2));
+        if (prev.isCharging && vQuimico > 16.0) {
+          const cvFactor = Math.max(0.1, (vMax - vQuimico) / (vMax - 16.0));
           vChange *= cvFactor;
           pCharge *= cvFactor;
         }
@@ -202,26 +193,33 @@ export default function AdminServerStats() {
         vQuimico += vChange;
         vQuimico = Math.max(vMin, Math.min(vMax, vQuimico));
 
-        // 5. Voltaje de Pantalla (V_display)
-        let vDisplay = vQuimico - (pSys * 0.01);
-        if (prev.isCharging) vDisplay += 0.2;
+        // 5. Voltaje de Pantalla (V_display) - Transiciones Suaves
+        const internalRes = 0.02 * (1.2 - soh);
+        const vDrop = pSys * internalRes;
+        const vRise = prev.isCharging ? (pCharge * internalRes * 1.5) : 0;
+        const targetVDisplay = vQuimico - vDrop + vRise;
+        
+        const smoothingFactor = Math.min(1, elapsedSeconds / 10);
+        const vDisplay = prev.voltage + (targetVDisplay - prev.voltage) * smoothingFactor;
 
         // 6. Monitor de Temperatura
         const tempBase = 25;
-        const tempLoad = (pSys / 45) * 15;
-        const tempVolt = Math.max(0, (vQuimico - 14.8) * 5);
-        const temp = Math.round(tempBase + tempLoad + tempVolt);
+        const tempLoad = (pSys / 50) * 12;
+        const tempCharge = prev.isCharging ? (pCharge / 45) * 15 : 0;
+        const targetTemp = tempBase + tempLoad + tempCharge;
+        const currentTemp = prev.temp || 25;
+        const newTemp = currentTemp + (targetTemp - currentTemp) * smoothingFactor;
 
         return {
           ...prev,
-          currentWh: newWh,
-          vQuimico: parseFloat(vQuimico.toFixed(3)),
-          voltage: parseFloat(vDisplay.toFixed(3)),
-          vReal: parseFloat(vQuimico.toFixed(3)),
-          lastUpdate: now,
-          pSys: parseFloat(pSys.toFixed(2)),
-          pCharge: parseFloat(pCharge.toFixed(2)),
-          temp
+          vQuimico: Number(vQuimico.toFixed(3)),
+          voltage: Number(vDisplay.toFixed(3)),
+          vReal: Number(vQuimico.toFixed(3)),
+          pSys: Number(pSys.toFixed(2)),
+          pCharge: Number(pCharge.toFixed(2)),
+          currentWh: Number(newWh.toFixed(2)),
+          temp: Number(newTemp.toFixed(1)),
+          lastUpdate: now
         };
       });
     }, 1000);
@@ -352,7 +350,7 @@ export default function AdminServerStats() {
     );
   }
 
-  const batteryPercentage = Math.min(100, Math.max(0, (battery.voltage - 12) / 4.8 * 100));
+  const batteryPercentage = Math.min(100, Math.max(0, ((battery.vReal || battery.voltage) - 12) / 4.8 * 100));
   const isLowBattery = batteryPercentage < 15;
   const isFullBattery = batteryPercentage > 95;
 

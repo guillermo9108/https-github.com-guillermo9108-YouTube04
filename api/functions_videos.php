@@ -872,6 +872,7 @@ function video_increment_share($pdo, $videoId) {
 
 function smartParseFilename($path, $currentCategory, $categories) {
     $title = pathinfo($path, PATHINFO_FILENAME);
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
     $dir = dirname($path);
     $parts = explode('/', str_replace('\\', '/', $dir));
     
@@ -879,11 +880,22 @@ function smartParseFilename($path, $currentCategory, $categories) {
     $parent_category = null;
     $collection = null;
 
-    if (count($parts) > 0) {
-        $category = array_pop($parts);
-    }
-    if (count($parts) > 0) {
-        $parent_category = array_pop($parts);
+    // Detectar si es una imagen por extensión
+    $imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
+    if (in_array($ext, $imageExts)) {
+        $category = 'IMAGES';
+    } else {
+        if (count($parts) > 0) {
+            $lastPart = array_pop($parts);
+            // Evitar usar nombres de carpetas genéricos de sistema como categoría
+            $systemFolders = ['videos', 'uploads', 'temp', 'thumbnails'];
+            if (!in_array(strtolower($lastPart), $systemFolders)) {
+                $category = $lastPart;
+            }
+        }
+        if (count($parts) > 0) {
+            $parent_category = array_pop($parts);
+        }
     }
 
     return [
@@ -1339,5 +1351,34 @@ function delete_story($pdo, $input) {
     $stmt->execute([$id]);
     
     respond(true);
+}
+
+function video_get_trending($pdo) {
+    // Tendencias: Videos con más vistas y likes, priorizando los más recientes (últimos 30 días)
+    $thirtyDaysAgo = time() - (30 * 24 * 60 * 60);
+    
+    $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl 
+            FROM videos v 
+            LEFT JOIN users u ON v.creatorId = u.id 
+            WHERE v.createdAt > ? 
+            ORDER BY (v.views + (v.likes * 5)) DESC 
+            LIMIT 50";
+            
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$thirtyDaysAgo]);
+    $rows = $stmt->fetchAll();
+    
+    // Si hay pocos videos recientes, rellenar con los más populares de siempre
+    if (count($rows) < 10) {
+        $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl 
+                FROM videos v 
+                LEFT JOIN users u ON v.creatorId = u.id 
+                ORDER BY (v.views + (v.likes * 5)) DESC 
+                LIMIT 50";
+        $rows = $pdo->query($sql)->fetchAll();
+    }
+    
+    video_process_rows($rows);
+    respond(true, $rows);
 }
 ?>

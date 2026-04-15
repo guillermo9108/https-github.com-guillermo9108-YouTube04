@@ -127,18 +127,21 @@ export default function Home() {
     const [searchQuery, setSearchQuery] = useState(initialQuery);
     const [navigationPath, setNavigationPath] = useState<string[]>(initialPath);
 
-    // Categoría fija en TODOS
-    const selectedCategory = 'TODOS';
-    const [activeCategories, setActiveCategories] = useState<string[]>(['TODOS']);
+    // Categoría dinámica desde URL
+    const [selectedCategory, setSelectedCategory] = useState(queryParams.get('cat') || 'TODOS');
+    const [activeCategories, setActiveCategories] = useState<string[]>([queryParams.get('cat') || 'TODOS']);
 
-    // Sincronizar estado con URL cuando cambia la búsqueda o navegación
+    // Sincronizar estado con URL cuando cambia la búsqueda, navegación o categoría
     useEffect(() => {
         const q = queryParams.get('q') || '';
         const folderParam = queryParams.get('folder');
+        const catParam = queryParams.get('cat') || 'TODOS';
         const path = folderParam ? folderParam.split('/').filter(Boolean) : [];
 
         setSearchQuery(q);
         setNavigationPath(path);
+        setSelectedCategory(catParam);
+        setActiveCategories([catParam]);
     }, [location.search, queryParams]);
 
     // Secondary Data

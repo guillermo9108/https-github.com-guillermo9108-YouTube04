@@ -153,7 +153,8 @@ function interact_get_activity($pdo, $userId) {
 }
 
 function interact_mark_watched($pdo, $input) {
-    $pdo->prepare("INSERT INTO interactions (userId, videoId, isWatched, isSkipped) VALUES (?, ?, 1, 0) ON DUPLICATE KEY UPDATE isWatched = 1, isSkipped = 0")->execute([$input['userId'], $input['videoId']]);
+    $now = time();
+    $pdo->prepare("INSERT INTO interactions (userId, videoId, isWatched, isSkipped, watchedAt) VALUES (?, ?, 1, 0, ?) ON DUPLICATE KEY UPDATE isWatched = 1, isSkipped = 0, watchedAt = ?")->execute([$input['userId'], $input['videoId'], $now, $now]);
     respond(true);
 }
 
@@ -390,4 +391,103 @@ function interact_submit_balance_request($pdo, $input) {
     
     send_direct_notification($pdo, $uid, 'SYSTEM', "Tu solicitud de recarga de \${$amt} ha sido recibida y está en espera de revisión.", "/wallet");
     respond(true);
+}
+
+function interact_get_history($pdo, $userId) {
+    $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, i.watchedAt 
+            FROM interactions i 
+            JOIN videos v ON i.videoId = v.id 
+            LEFT JOIN users u ON v.creatorId = u.id 
+            WHERE i.userId = ? AND i.isWatched = 1 
+            ORDER BY i.watchedAt DESC 
+            LIMIT 50";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$userId]);
+    $rows = $stmt->fetchAll();
+    
+    if (file_exists('functions_videos.php')) {
+        require_once 'functions_videos.php';
+        video_process_rows($rows);
+    }
+    respond(true, $rows);
+}
+
+function interact_get_chats($pdo, $userId) {
+    // Obtener lista de usuarios con los que se ha chateado
+    $sql = "SELECT DISTINCT 
+                CASE WHEN senderId = ? THEN receiverId ELSE senderId END as otherId 
+            FROM messages 
+            WHERE senderId = ? OR receiverId = ? 
+            ORDER BY timestamp DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$userId, $userId, $userId]);
+    $userIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    $chats = [];
+    foreach ($userIds as $otherId) {
+        $stmtU = $pdo->prepare("SELECT id, username, avatarUrl, lastActive FROM users WHERE id = ?");
+        $stmtU->execute([$otherId]);
+        $otherUser = $stmtU->fetch();
+        if (!$otherUser) continue;
+        
+        // Último mensaje
+        $stmtM = $pdo->prepare("SELECT * FROM messages WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) ORDER BY timestamp DESC LIMIT 1");
+        $stmtM->execute([$userId, $otherId, $otherId, $userId]);
+        $lastMsg = $stmtM->fetch();
+        
+        // No leídos
+        $stmtUnread = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE senderId = ? AND receiverId = ? AND isRead = 0");
+        $stmtUnread->execute([$otherId, $userId]);
+        $unreadCount = $stmtUnread->fetchColumn();
+        
+        $otherUser['avatarUrl'] = fix_url($otherUser['avatarUrl']);
+        $chats[] = [
+            'user' => $otherUser,
+            'lastMessage' => $lastMsg,
+            'unreadCount' => $unreadCount
+        ];
+    }
+    
+    respond(true, $chats);
+}
+
+function interact_get_messages($pdo, $userId, $otherId) {
+    // Marcar como leídos
+    $pdo->prepare("UPDATE messages SET isRead = 1 WHERE senderId = ? AND receiverId = ?")->execute([$otherId, $userId]);
+    
+    $sql = "SELECT * FROM messages 
+            WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) 
+            ORDER BY timestamp ASC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$userId, $otherId, $otherId, $userId]);
+    $messages = $stmt->fetchAll();
+    
+    foreach ($messages as &$m) {
+        if ($m['imageUrl']) $m['imageUrl'] = fix_url($m['imageUrl']);
+    }
+    
+    respond(true, $messages);
+}
+
+function interact_send_message($pdo, $input) {
+    $senderId = $input['userId'];
+    $receiverId = $input['receiverId'];
+    $text = $input['text'] ?? '';
+    $imageUrl = $input['imageUrl'] ?? null;
+    $id = uniqid('msg_');
+    $now = time();
+    
+    if (empty($text) && empty($imageUrl)) respond(false, null, "Mensaje vacío");
+    
+    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, isRead, timestamp) VALUES (?, ?, ?, ?, ?, 0, ?)")
+        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $now]);
+        
+    respond(true, [
+        'id' => $id,
+        'senderId' => $senderId,
+        'receiverId' => $receiverId,
+        'text' => $text,
+        'imageUrl' => $imageUrl,
+        'timestamp' => $now
+    ]);
 }

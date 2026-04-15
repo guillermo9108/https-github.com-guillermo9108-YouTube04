@@ -549,6 +549,29 @@ class DBService {
     public async generateVapidKeys(): Promise<any> {
         return this.request<any>(`action=generate_vapid_keys`, { method: 'POST' });
     }
+
+    public async getTrendingVideos(): Promise<Video[]> {
+        return this.request<Video[]>('action=get_trending_videos');
+    }
+
+    public async getUserHistory(userId: string): Promise<Video[]> {
+        return this.request<Video[]>(`action=get_user_history&userId=${userId}`);
+    }
+
+    public async getChats(userId: string): Promise<any[]> {
+        return this.request<any[]>(`action=get_chats&userId=${userId}`);
+    }
+
+    public async getMessages(userId: string, otherId: string): Promise<any[]> {
+        return this.request<any[]>(`action=get_messages&userId=${userId}&otherId=${otherId}`);
+    }
+
+    public async sendMessage(data: { userId: string, receiverId: string, text?: string, imageUrl?: string }): Promise<any> {
+        return this.request<any>('action=send_message', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
 }
 
 export const db = new DBService();

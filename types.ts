@@ -340,3 +340,19 @@ export interface SellerVerificationRequest {
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     createdAt: number;
 }
+
+export interface ChatMessage {
+    id: string;
+    senderId: string;
+    receiverId: string;
+    text: string;
+    imageUrl?: string;
+    isRead: boolean;
+    timestamp: number;
+}
+
+export interface Chat {
+    user: User;
+    lastMessage: ChatMessage;
+    unreadCount: number;
+}
