@@ -55,6 +55,9 @@ const AppContent: React.FC = () => {
   const { settings } = useSettings();
 
   React.useEffect(() => {
+    // Set dark mode by default
+    document.documentElement.setAttribute('data-theme', 'dark');
+    
     if (settings?.latestApkVersion && settings.latestApkVersion !== APP_VERSION) {
       console.log(`Version mismatch: Local ${APP_VERSION} vs Server ${settings.latestApkVersion}. Updating...`);
       

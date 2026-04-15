@@ -187,8 +187,13 @@ function market_create_listing($pdo, $post, $files) {
     if (isset($files['images'])) {
         if (!is_dir('uploads/market/')) mkdir('uploads/market/', 0777, true);
         foreach ($files['images']['tmp_name'] as $idx => $tmp) {
-            $name = "{$id}_{$idx}.jpg"; move_uploaded_file($tmp, 'uploads/market/' . $name);
-            $imgs[] = 'api/uploads/market/' . $name;
+            $name = "{$id}_{$idx}.jpg"; 
+            $target = 'uploads/market/' . $name;
+            move_uploaded_file($tmp, $target);
+            $imgs[] = 'api/' . $target;
+            
+            // Crear miniatura
+            create_thumbnail($target, str_replace('.jpg', '_thumb.jpg', $target), 400, 400, 75);
         }
     }
     $isFlashSale = (isset($post['isFlashSale']) && ($post['isFlashSale'] === 'true' || $post['isFlashSale'] === '1')) ? 1 : 0;

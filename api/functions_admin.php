@@ -336,12 +336,15 @@ function admin_repair_db($pdo, $input) {
 }
 
 function admin_cleanup_files($pdo) {
-    $videos = $pdo->query("SELECT thumbnailUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
+    $videos = $pdo->query("SELECT videoUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
+    $thumbs = $pdo->query("SELECT thumbnailUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
     $avatars = $pdo->query("SELECT avatarUrl FROM users")->fetchAll(PDO::FETCH_COLUMN);
     $market = $pdo->query("SELECT images FROM marketplace_items")->fetchAll(PDO::FETCH_COLUMN);
     $stories = $pdo->query("SELECT contentUrl FROM stories")->fetchAll(PDO::FETCH_COLUMN);
+    $storyAudio = $pdo->query("SELECT audioUrl FROM stories")->fetchAll(PDO::FETCH_COLUMN);
+    $proofs = $pdo->query("SELECT proofImageUrl FROM vip_requests")->fetchAll(PDO::FETCH_COLUMN);
     
-    $usedFiles = array_merge($videos, $avatars, $stories);
+    $usedFiles = array_merge($videos, $thumbs, $avatars, $stories, $storyAudio, $proofs);
     foreach ($market as $imgs) {
         $decoded = json_decode($imgs ?: '[]', true);
         if (is_array($decoded)) $usedFiles = array_merge($usedFiles, $decoded);
@@ -359,6 +362,14 @@ function admin_cleanup_files($pdo) {
         if (!empty($path)) {
             $localUsed[] = $path;
             $localUsed[] = './' . $path; // Por si glob devuelve ./
+            
+            // Si es una imagen, proteger también su miniatura convencional
+            $ext = pathinfo($path, PATHINFO_EXTENSION);
+            if (in_array(strtolower($ext), ['jpg', 'jpeg', 'png', 'webp'])) {
+                $thumbPath = str_replace('.' . $ext, '_thumb.jpg', $path);
+                $localUsed[] = $thumbPath;
+                $localUsed[] = './' . $thumbPath;
+            }
         }
     }
     
@@ -718,11 +729,15 @@ function admin_smart_cleaner_execute($pdo, $input) {
         $vPath = resolve_video_path($v['videoUrl']);
         if ($vPath && file_exists($vPath)) {
             @unlink($vPath);
+            $ext = pathinfo($vPath, PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $vPath));
         }
         
         $tPath = resolve_video_path($v['thumbnailUrl']);
         if ($tPath && file_exists($tPath) && basename($tPath) !== 'default.jpg' && basename($tPath) !== 'defaultaudio.jpg') {
             @unlink($tPath);
+            $ext = pathinfo($tPath, PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $tPath));
         }
     }
     
@@ -769,11 +784,15 @@ function admin_extreme_janitor($pdo, $input) {
         $vPath = resolve_video_path($v['videoUrl']);
         if ($vPath && file_exists($vPath)) {
             @unlink($vPath);
+            $ext = pathinfo($vPath, PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $vPath));
         }
         
         $tPath = resolve_video_path($v['thumbnailUrl']);
         if ($tPath && file_exists($tPath) && basename($tPath) !== 'default.jpg' && basename($tPath) !== 'defaultaudio.jpg') {
             @unlink($tPath);
+            $ext = pathinfo($tPath, PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $tPath));
         }
     }
     
@@ -992,8 +1011,10 @@ function update_battery_simulation($pdo) {
             $battery['vQuimico'] = 12.0;
         }
         
-        // Al encenderse, asumimos que está conectado a la red
-        $battery['isCharging'] = true;
+        // Al encenderse, asumimos que está conectado a la red solo si no hay una configuración previa que diga lo contrario
+        if (!isset($battery['isCharging'])) {
+            $battery['isCharging'] = true;
+        }
         $elapsedHours = 0;
     }
     
@@ -1001,7 +1022,7 @@ function update_battery_simulation($pdo) {
     $capTotalWh = 250; 
     $cargadorMaxW = 45;
     $vMax = 16.8;
-    $vMin = 12.0;
+    $vMin = 12.7; // Punto crítico 4S4P
 
     // 2. Cálculo de Consumo (P_sys)
     $load = sys_getloadavg();
@@ -1067,6 +1088,11 @@ function update_battery_simulation($pdo) {
         $vChange *= 0.5; // Efecto Meseta
     }
     
+    // Tramo crítico: 13.7V a 12.7V descarga rápida
+    if (!$isCharging && $vQuimico < 13.7) {
+        $vChange *= 2.5; // Descarga acelerada en el tramo final
+    }
+    
     // Fase CV - Saturación (16.2V a 16.8V)
     if ($isCharging && $vQuimico > 16.2) {
         $cvFactor = max(0, pow(($vMax - $vQuimico) / ($vMax - 16.2), 2));
@@ -1098,6 +1124,8 @@ function update_battery_simulation($pdo) {
     $battery['pCharge'] = round($pCharge, 2);
     $battery['currentWh'] = round($currentWh, 2);
     $battery['lastUpdate'] = $now;
+    $battery['vMin'] = $vMin; // Guardar para referencia en el cliente
+    $battery['vMax'] = $vMax;
 
     // Sugerencias de Calibración
     if (!isset($battery['calibration'])) {
@@ -1135,7 +1163,7 @@ function update_battery_simulation($pdo) {
         ->execute([json_encode($battery), json_encode($history)]);
 
     // Al final del update, aseguramos que la versión de la APK esté actualizada en los settings
-    $pdo->prepare("UPDATE system_settings SET latestApkVersion = '1.0.2' WHERE id = 1 AND (latestApkVersion != '1.0.2' OR latestApkVersion IS NULL)")->execute();
+    $pdo->prepare("UPDATE system_settings SET latestApkVersion = '1.0.3' WHERE id = 1 AND (latestApkVersion != '1.0.3' OR latestApkVersion IS NULL)")->execute();
 
     return [
         'config' => $battery,

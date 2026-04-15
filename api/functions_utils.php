@@ -415,3 +415,53 @@ function parse_user_agent($ua) {
     
     return "$os - $browser";
 }
+
+function create_thumbnail($sourcePath, $targetPath, $maxWidth = 400, $maxHeight = 400, $quality = 80) {
+    if (!file_exists($sourcePath)) return false;
+    
+    $info = getimagesize($sourcePath);
+    if (!$info) return false;
+    
+    $width = $info[0];
+    $height = $info[1];
+    $type = $info[2];
+    
+    $ratio = $width / $height;
+    if ($maxWidth / $maxHeight > $ratio) {
+        $newWidth = $maxHeight * $ratio;
+        $newHeight = $maxHeight;
+    } else {
+        $newHeight = $maxWidth / $ratio;
+        $newWidth = $maxWidth;
+    }
+    
+    $srcImage = null;
+    switch ($type) {
+        case IMAGETYPE_JPEG: $srcImage = imagecreatefromjpeg($sourcePath); break;
+        case IMAGETYPE_PNG:  $srcImage = imagecreatefrompng($sourcePath); break;
+        case IMAGETYPE_GIF:  $srcImage = imagecreatefromgif($sourcePath); break;
+        case IMAGETYPE_WEBP: $srcImage = imagecreatefromwebp($sourcePath); break;
+    }
+    
+    if (!$srcImage) return false;
+    
+    $dstImage = imagecreatetruecolor($newWidth, $newHeight);
+    
+    // Preservar transparencia para PNG/WEBP si es necesario, pero el usuario pidió pocos KB, así que JPEG es mejor
+    if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_WEBP) {
+        imagealphablending($dstImage, false);
+        imagesavealpha($dstImage, true);
+        $transparent = imagecolorallocatealpha($dstImage, 255, 255, 255, 127);
+        imagefilledrectangle($dstImage, 0, 0, $newWidth, $newHeight, $transparent);
+    }
+    
+    imagecopyresampled($dstImage, $srcImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+    
+    // Siempre guardamos como JPEG para optimizar tamaño si no es GIF animado
+    $result = imagejpeg($dstImage, $targetPath, $quality);
+    
+    imagedestroy($srcImage);
+    imagedestroy($dstImage);
+    
+    return $result;
+}

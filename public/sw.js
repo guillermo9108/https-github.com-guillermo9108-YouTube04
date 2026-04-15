@@ -65,7 +65,7 @@ self.addEventListener('notificationclick', function(event) {
 });
 
 // Estrategia de caché mejorada
-const CACHE_NAME = 'streampay-cache-v1.0.2';
+const CACHE_NAME = 'streampay-cache-v1.0.3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

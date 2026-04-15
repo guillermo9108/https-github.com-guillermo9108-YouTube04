@@ -153,7 +153,7 @@ export default function AdminServerStats() {
         const capTotalWh = 250; 
         const cargadorMaxW = 45;
         const vMax = 16.8;
-        const vMin = 12.0;
+        const vMin = 12.7;
 
         // 2. Cálculo de Consumo (P_sys)
         // Idle Base: 18W + (CPU% * 0.25W) + (Disk% * 2W)
@@ -185,6 +185,11 @@ export default function AdminServerStats() {
         // Multiplicadores según el rango de V_quimico
         if (vQuimico >= 14.5 && vQuimico <= 15.5) {
           vChange *= 0.5; // Efecto Meseta
+        }
+        
+        // Tramo crítico: 13.7V a 12.7V descarga rápida
+        if (!prev.isCharging && vQuimico < 13.7) {
+          vChange *= 2.5;
         }
         
         // Fase CV - Saturación (16.2V a 16.8V)
@@ -713,7 +718,7 @@ export default function AdminServerStats() {
               <input 
                 type="number" 
                 step="0.01"
-                min="12"
+                min="12.7"
                 max="16.8"
                 value={battery.voltage}
                 onFocus={() => setIsEditing(true)}
@@ -724,7 +729,7 @@ export default function AdminServerStats() {
                   const nominalVoltage = battery.cellsSeries * 3.7;
                   const totalAh = (battery.cellCapacityMah * battery.cellsParallel) / 1000;
                   const maxWh = nominalVoltage * totalAh * soh;
-                  const percentage = Math.max(0, Math.min(1, (v - 12) / 4.8));
+                  const percentage = Math.max(0, Math.min(1, (v - 12.7) / 4.1));
                   const newWh = maxWh * percentage;
                   setBattery({
                     ...battery, 

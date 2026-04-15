@@ -5,6 +5,7 @@ import { MarketplaceItem } from '../../types';
 import { Link, useNavigate } from '../Router';
 import { useCart } from '../../context/CartContext';
 import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell } from 'lucide-react';
+import { getThumbnailUrl } from '../../utils/image';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Marketplace() {
@@ -153,7 +154,7 @@ export default function Marketplace() {
                             <div className="relative aspect-square bg-[var(--bg-tertiary)] overflow-hidden">
                                 {item.images && item.images.length > 0 ? (
                                     <img 
-                                        src={item.images[0]} 
+                                        src={getThumbnailUrl(item.images[0]) || ''} 
                                         className={`w-full h-full object-cover transition-transform duration-500 ${item.status === 'AGOTADO' || (item.stock === 0) ? 'grayscale opacity-50' : ''}`} 
                                         loading="lazy"
                                         referrerPolicy="no-referrer"

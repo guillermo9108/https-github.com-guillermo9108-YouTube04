@@ -6,6 +6,7 @@ import { Video, Comment, UserInteraction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from '../Router';
 import { useToast } from '../../context/ToastContext';
+import { getThumbnailUrl } from '../../utils/image';
 
 interface ShortItemProps {
   video: Video;
@@ -88,7 +89,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
   useEffect(() => {
     if (isNear && video.thumbnailUrl) {
       const img = new Image();
-      img.src = video.thumbnailUrl;
+      img.src = getThumbnailUrl(video.thumbnailUrl) || '';
     }
   }, [isNear, video.thumbnailUrl]);
 
@@ -166,14 +167,14 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
       <div className="absolute inset-0 z-0 bg-black" onClick={handleScreenTouch}>
         {(!videoSrc || !shouldLoadVideo) && (
             <img 
-              src={video.thumbnailUrl} 
+              src={getThumbnailUrl(video.thumbnailUrl) || ''} 
               className="w-full h-full object-cover opacity-60" 
               referrerPolicy="no-referrer" 
             />
         )}
         {videoSrc && (
             <video
-                ref={videoRef} src={videoSrc} poster={video.thumbnailUrl}
+                ref={videoRef} src={videoSrc} poster={getThumbnailUrl(video.thumbnailUrl) || ''}
                 className="w-full h-full object-cover" loop playsInline preload="metadata" crossOrigin="anonymous"
                 onTimeUpdate={handleTimeUpdate}
             />
@@ -214,7 +215,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
          <div className="flex items-center gap-2 pointer-events-auto">
             <Link to={`/channel/${video.creatorId}`} className="relative shrink-0">
                 <div className="w-10 h-10 rounded-full border border-white/50 overflow-hidden bg-slate-800">
-                    {video.creatorAvatarUrl ? <img src={video.creatorAvatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-white bg-[var(--accent)]">{video.creatorName?.[0] || '?'}</div>}
+                    {video.creatorAvatarUrl ? <img src={getThumbnailUrl(video.creatorAvatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-white bg-[var(--accent)]">{video.creatorName?.[0] || '?'}</div>}
                 </div>
             </Link>
             <div className="min-w-0">

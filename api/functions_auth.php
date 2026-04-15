@@ -184,6 +184,10 @@ function auth_upload_avatar($pdo, $userId, $file) {
     if ($oldFiles) foreach($oldFiles as $f) @unlink($f);
 
     if (move_uploaded_file($file['tmp_name'], $uploadDir . $name)) {
+        $target = $uploadDir . $name;
+        // Crear miniatura para el avatar
+        create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 200, 200, 80);
+        
         $url = 'api/uploads/avatars/' . $name;
         $pdo->prepare("UPDATE users SET avatarUrl = ? WHERE id = ?")->execute([$url, $userId]);
         return $url;

@@ -6,6 +6,7 @@ import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
+import { getThumbnailUrl } from '../utils/image';
 import { generateThumbnail } from '../utils/videoGenerator';
 
 // Sistema de control global para no saturar el servidor
@@ -413,7 +414,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           return defaultThumb || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg");
       }
 
-      return video.thumbnailUrl;
+      return getThumbnailUrl(video.thumbnailUrl);
   }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, video.videoUrl, isAudio, isImage, defaultThumb]);
 
   const [liked, setLiked] = useState(false);
@@ -460,7 +461,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           <Link to={`/channel/${video.creatorId}`} className="shrink-0">
               <div className="w-10 h-10 rounded-full border border-[var(--divider)] overflow-hidden bg-[var(--bg-tertiary)]">
                 {video.creatorAvatarUrl || settings?.defaultAvatar ? (
-                    <img src={video.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
+                    <img src={getThumbnailUrl(video.creatorAvatarUrl) || settings?.defaultAvatar} className="w-full h-full object-cover" alt={video.creatorName} loading="lazy" referrerPolicy="no-referrer" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-sm font-bold text-white uppercase">{video.creatorName?.[0] || '?'}</div>
                 )}
@@ -831,7 +832,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                                   >
                                       <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border border-white/10">
                                           {follower.avatarUrl ? (
-                                              <img src={follower.avatarUrl} className="w-full h-full object-cover" alt={follower.username} referrerPolicy="no-referrer" />
+                                              <img src={getThumbnailUrl(follower.avatarUrl)} className="w-full h-full object-cover" alt={follower.username} referrerPolicy="no-referrer" />
                                           ) : (
                                               <div className="w-full h-full flex items-center justify-center text-sm font-black text-white/20 uppercase">{follower.username[0]}</div>
                                           )}

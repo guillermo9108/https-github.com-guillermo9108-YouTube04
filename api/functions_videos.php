@@ -763,8 +763,12 @@ function video_upload($pdo, $post, $files) {
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "t_{$id}.jpg"; 
         if (!is_dir('uploads/thumbnails/')) mkdir('uploads/thumbnails/', 0777, true);
-        move_uploaded_file($files['thumbnail']['tmp_name'], 'uploads/thumbnails/' . $thumbName);
+        $dest = 'uploads/thumbnails/' . $thumbName;
+        move_uploaded_file($files['thumbnail']['tmp_name'], $dest);
         $thumbPath = 'api/uploads/thumbnails/' . $thumbName;
+        
+        // Crear miniatura optimizada
+        create_thumbnail($dest);
     }
     $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
     $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
@@ -815,9 +819,14 @@ function video_update_metadata($pdo, $post, $files) {
     $params = [intval($post['duration'])];
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "t_{$id}.jpg"; 
-        move_uploaded_file($files['thumbnail']['tmp_name'], 'uploads/thumbnails/' . $thumbName);
+        $target = 'uploads/thumbnails/' . $thumbName;
+        move_uploaded_file($files['thumbnail']['tmp_name'], $target);
+        
+        // Crear miniatura optimizada del thumbnail
+        create_thumbnail($target, str_replace('.jpg', '_thumb.jpg', $target), 480, 270, 75);
+        
         $fields[] = "thumbnailUrl = ?"; 
-        $params[] = 'api/uploads/thumbnails/' . $thumbName;
+        $params[] = 'api/' . $target;
     }
     $params[] = $id; 
     $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . " WHERE id = ?")->execute($params);
@@ -1116,6 +1125,9 @@ function upload_channel_images($pdo, $post, $files) {
             $target = 'uploads/videos/' . $filename; 
             
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
+                // Crear miniatura para la imagen del canal
+                create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 600, 600, 75);
+                
                 $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $id = uniqid();
                 $stmt->execute([
@@ -1173,8 +1185,18 @@ function video_delete($pdo, $input) {
     $stmt->execute([$id]); 
     $v = $stmt->fetch();
     if ($v) { 
-        if (strpos($v['videoUrl'], 'uploads/') !== false) @unlink($v['videoUrl']); 
-        if (strpos($v['thumbnailUrl'], 'uploads/') !== false) @unlink($v['thumbnailUrl']); 
+        if (strpos($v['videoUrl'], 'uploads/') !== false) {
+            @unlink($v['videoUrl']);
+            // También intentar borrar miniatura si existe
+            $ext = pathinfo($v['videoUrl'], PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $v['videoUrl']));
+        } 
+        if (strpos($v['thumbnailUrl'], 'uploads/') !== false) {
+            @unlink($v['thumbnailUrl']);
+            // También intentar borrar miniatura si existe
+            $ext = pathinfo($v['thumbnailUrl'], PATHINFO_EXTENSION);
+            @unlink(str_replace('.' . $ext, '_thumb.jpg', $v['thumbnailUrl']));
+        } 
     }
     $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$id]); 
     respond(true);
@@ -1253,6 +1275,11 @@ function upload_story($pdo, $post, $files) {
     $target = 'uploads/videos/' . $filename;
 
     if (move_uploaded_file($files['file']['tmp_name'], $target)) {
+        // Crear miniatura si es una imagen
+        if ($type === 'IMAGE') {
+            create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 400, 700, 70);
+        }
+        
         $now = time();
         $expiry = $now + (24 * 3600); // 24 hours
         

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
+import { getThumbnailUrl } from '../../utils/image';
 import { Video, Notification as AppNotification, User, SystemSettings, Category, Story } from '../../types';
 import { useNotifications } from '../../context/NotificationContext';
 import { 
@@ -499,14 +500,13 @@ export default function Home() {
         const validVideos = videos.filter(v => 
             v && 
             v.id && 
-            v.title && v.title.trim().length > 0 &&
-            v.videoUrl && v.videoUrl.startsWith('http') &&
-            v.creatorId && 
-            v.creatorName && 
-            (v.title.toLowerCase() !== 'usuario' && v.title.toLowerCase() !== 'ahora') &&
-            (v.creatorName.toLowerCase() !== 'usuario') &&
+            v.videoUrl && (v.videoUrl.startsWith('http') || v.videoUrl.includes('api/index.php')) &&
             !isNaN(Number(v.duration))
-        );
+        ).map(v => ({
+            ...v,
+            title: v.title && v.title.trim().length > 0 ? v.title : 'Video sin título',
+            creatorName: v.creatorName || 'Usuario'
+        }));
 
         const isOnRoot = !searchQuery && currentFolder.length === 0 && selectedCategory === 'TODOS';
 
@@ -710,7 +710,7 @@ export default function Home() {
                 <div className="bg-[var(--bg-secondary)] p-3 flex items-center gap-3">
                     <div className="relative shrink-0">
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600">
-                            {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
+                            {user?.avatarUrl ? <img src={getThumbnailUrl(user.avatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
                         </div>
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-secondary)]"></div>
                     </div>
@@ -735,7 +735,7 @@ export default function Home() {
                             className="relative w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                         >
                             <div className="h-[70%] overflow-hidden">
-                                {user?.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
+                                {user?.avatarUrl ? <img src={getThumbnailUrl(user.avatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
                             </div>
                             <div className="absolute top-[62%] left-1/2 -translate-x-1/2 w-9 h-9 bg-[#1877f2] rounded-full border-4 border-[#242526] flex items-center justify-center text-white">
                                 <Plus size={24} strokeWidth={3} />
@@ -753,13 +753,13 @@ export default function Home() {
                                 className="relative w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                             >
                                 {story.type === 'IMAGE' ? (
-                                    <img src={story.contentUrl} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+                                    <img src={getThumbnailUrl(story.contentUrl) || ''} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
                                 ) : (
                                     <video src={story.contentUrl} className="w-full h-full object-cover opacity-90" muted />
                                 )}
                                 <div className="absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] border-[#1877f2] p-0.5 overflow-hidden bg-indigo-600">
                                     {story.avatarUrl ? (
-                                        <img src={story.avatarUrl} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                        <img src={getThumbnailUrl(story.avatarUrl) || ''} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">
                                             {story.username?.[0]?.toUpperCase()}
