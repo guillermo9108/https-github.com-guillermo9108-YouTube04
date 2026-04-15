@@ -500,7 +500,7 @@ export default function Home() {
         const validVideos = videos.filter(v => 
             v && 
             v.id && 
-            v.videoUrl && (v.videoUrl.startsWith('http') || v.videoUrl.includes('api/index.php')) &&
+            v.videoUrl &&
             !isNaN(Number(v.duration))
         ).map(v => ({
             ...v,
@@ -714,7 +714,7 @@ export default function Home() {
                         </div>
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-secondary)]"></div>
                     </div>
-                    <button onClick={() => navigate('/create-post')} className="flex-1 h-10 bg-[#3a3b3c] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
+                    <button onClick={() => navigate('/create-post')} className="flex-1 h-10 bg-[var(--bg-tertiary)] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
                         ¿Qué estás pensando?
                     </button>
                     <button onClick={() => navigate('/create-post')} className="flex flex-col items-center gap-0.5 text-[var(--text-secondary)] px-2">
@@ -732,12 +732,12 @@ export default function Home() {
                         {/* Create Story */}
                         <div 
                             onClick={() => navigate('/create-story')}
-                            className="relative w-[105px] h-44 bg-[#3a3b3c] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                            className="relative w-[105px] h-44 bg-[var(--bg-tertiary)] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                         >
                             <div className="h-[70%] overflow-hidden">
-                                {user?.avatarUrl ? <img src={getThumbnailUrl(user.avatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-800" />}
+                                {user?.avatarUrl ? <img src={getThumbnailUrl(user.avatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-[var(--bg-tertiary)]" />}
                             </div>
-                            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 w-9 h-9 bg-[#1877f2] rounded-full border-4 border-[#242526] flex items-center justify-center text-white">
+                            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 w-9 h-9 bg-[var(--accent)] rounded-full border-4 border-[var(--bg-secondary)] flex items-center justify-center text-white">
                                 <Plus size={24} strokeWidth={3} />
                             </div>
                             <div className="absolute bottom-2 left-0 right-0 text-center px-1">
@@ -750,7 +750,7 @@ export default function Home() {
                             <div 
                                 key={story.id} 
                                 onClick={() => navigate(`/stories?userId=${story.userId}`)}
-                                className="relative w-[105px] h-44 bg-slate-800 rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                                className="relative w-[105px] h-44 bg-[var(--bg-tertiary)] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                             >
                                 {story.type === 'IMAGE' ? (
                                     <img src={getThumbnailUrl(story.contentUrl) || ''} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
@@ -829,7 +829,7 @@ export default function Home() {
                                 {folders.length > 2 && (
                                     <button 
                                         onClick={() => setShowAllFolders(!showAllFolders)}
-                                        className="w-full py-3 text-sm font-bold text-[#1877f2] hover:bg-[#3a3b3c] transition-colors flex items-center justify-center gap-2"
+                                        className="w-full py-3 text-sm font-bold text-[var(--accent)] hover:bg-[var(--bg-hover)] transition-colors flex items-center justify-center gap-2"
                                     >
                                         {showAllFolders ? 'Ver menos' : 'Ver más carpetas'}
                                         <ChevronDown size={16} className={`transition-transform ${showAllFolders ? 'rotate-180' : ''}`} />

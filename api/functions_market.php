@@ -280,8 +280,31 @@ function market_check_price_alert($pdo, $uid, $iid) {
 
 function market_admin_delete_listing($pdo, $input) {
     $id = $input['id'];
+    
+    // Obtener imágenes para borrar archivos físicos
+    $stmt = $pdo->prepare("SELECT images FROM marketplace_items WHERE id = ?");
+    $stmt->execute([$id]);
+    $item = $stmt->fetch();
+    
+    if ($item && $item['images']) {
+        $images = json_decode($item['images'], true);
+        if (is_array($images)) {
+            foreach ($images as $img) {
+                // Normalizar ruta
+                $path = str_replace('api/', '', $img);
+                if (file_exists($path)) {
+                    @unlink($path);
+                    // Borrar miniatura si existe
+                    $ext = pathinfo($path, PATHINFO_EXTENSION);
+                    $thumb = str_replace('.' . $ext, '_thumb.jpg', $path);
+                    if (file_exists($thumb)) @unlink($thumb);
+                }
+            }
+        }
+    }
+
     // Marcamos como eliminado para no romper historial de transacciones si existieran
-    $pdo->prepare("UPDATE marketplace_items SET status = 'ELIMINADO' WHERE id = ?")->execute([$id]);
+    $pdo->prepare("UPDATE marketplace_items SET status = 'ELIMINADO', images = '[]' WHERE id = ?")->execute([$id]);
     respond(true);
 }
 

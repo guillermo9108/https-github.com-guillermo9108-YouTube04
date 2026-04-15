@@ -1328,6 +1328,10 @@ function delete_story($pdo, $input) {
     // Delete file
     if (file_exists($story['contentUrl'])) {
         @unlink($story['contentUrl']);
+        // Borrar miniatura si existe
+        $ext = pathinfo($story['contentUrl'], PATHINFO_EXTENSION);
+        $thumb = str_replace('.' . $ext, '_thumb.jpg', $story['contentUrl']);
+        if (file_exists($thumb)) @unlink($thumb);
     }
     
     // Delete from DB

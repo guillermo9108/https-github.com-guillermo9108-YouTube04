@@ -42,10 +42,24 @@ export default function Notifications() {
     // Combinar notificaciones en tiempo real con las de DB
     const allNotifications = [...rtNotifications, ...notifs].sort((a, b) => b.timestamp - a.timestamp);
 
-    const handleNotifClick = (n: AppNotification) => {
+    const handleNotifClick = async (n: AppNotification) => {
+        // Marcar como leída individualmente
+        if (Number(n.isRead) === 0) {
+            try {
+                await db.markNotificationRead(n.id);
+                setNotifs(prev => prev.map(notif => notif.id === n.id ? { ...notif, isRead: true } : notif));
+            } catch (err) {
+                console.error('Error marking notification as read:', err);
+            }
+        }
+
         if (n.type === 'UPLOAD' && n.videoId) {
             navigate(`/watch/${n.videoId}`);
-        } else if (n.type === 'SALE' && n.videoId) {
+        } else if (n.type === 'SALE') {
+            navigate(`/seller-dashboard`);
+        } else if (n.type === 'SYSTEM' && n.videoId) {
+            navigate(`/watch/${n.videoId}`);
+        } else if (n.videoId) {
             navigate(`/watch/${n.videoId}`);
         }
     };

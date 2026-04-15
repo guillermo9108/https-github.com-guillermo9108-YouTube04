@@ -620,7 +620,12 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
         {!isImage && (
             <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
-               {formatDuration(video.duration)}
+               {isProcessing ? (
+                   <div className="flex items-center gap-1">
+                       <RefreshCw size={10} className="animate-spin text-indigo-400" />
+                       <span>PROCESANDO</span>
+                   </div>
+               ) : formatDuration(video.duration)}
             </div>
         )}
 
@@ -662,7 +667,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-1.5">
             <div className="flex items-center -space-x-1">
-                <div className="w-4 h-4 bg-[#1877f2] rounded-full flex items-center justify-center border border-[var(--bg-secondary)] shadow-sm">
+                <div className="w-4 h-4 bg-[var(--accent)] rounded-full flex items-center justify-center border border-[var(--bg-secondary)] shadow-sm">
                 <ThumbsUp size={8} className="text-white fill-white" />
                 </div>
                 <div className="w-4 h-4 bg-[#f02849] rounded-full flex items-center justify-center border border-[var(--bg-secondary)] shadow-sm">
@@ -726,7 +731,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                       </button>
                       <button 
                           onClick={() => setShowDeleteConfirm(false)}
-                          className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-2xl transition-all"
+                          className="w-full py-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-black rounded-2xl transition-all"
                       >
                           CANCELAR
                       </button>
@@ -830,7 +835,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                                       onClick={() => handleShareToUser(follower.username)}
                                       className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors group"
                                   >
-                                      <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border border-white/10">
+                                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--divider)]">
                                           {follower.avatarUrl ? (
                                               <img src={getThumbnailUrl(follower.avatarUrl)} className="w-full h-full object-cover" alt={follower.username} referrerPolicy="no-referrer" />
                                           ) : (
@@ -886,7 +891,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                       <button onClick={handlePurchase} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
                           COMPRAR POR {video.price} $
                       </button>
-                      <button onClick={() => setShowPurchaseModal(false)} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-2xl transition-all">
+                      <button onClick={() => setShowPurchaseModal(false)} className="w-full py-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-black rounded-2xl transition-all">
                           CANCELAR
                       </button>
                   </div>

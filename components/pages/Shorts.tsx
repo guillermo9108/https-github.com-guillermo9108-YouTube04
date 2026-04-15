@@ -27,6 +27,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
   const [showHeart, setShowHeart] = useState(false);
   const [paused, setPaused] = useState(false);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const [interaction, setInteraction] = useState<UserInteraction | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -61,6 +62,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
     } else {
         if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
         setShouldLoadVideo(false);
+        setIsPlaying(false);
         if (el) {
             try {
                 const playTime = (Date.now() - startTimeRef.current) / 1000;
@@ -98,10 +100,15 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
     if (isActive && shouldLoadVideo && el) {
         el.currentTime = 0; 
         setPaused(false);
+        setIsPlaying(false);
         el.muted = false; 
-        el.play().catch(() => {
+        el.play().then(() => {
+            setIsPlaying(true);
+        }).catch(() => {
             el.muted = true;
-            el.play().catch(() => {});
+            el.play().then(() => {
+                setIsPlaying(true);
+            }).catch(() => {});
         });
         db.incrementView(video.id);
     }
@@ -177,7 +184,17 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
                 ref={videoRef} src={videoSrc} poster={getThumbnailUrl(video.thumbnailUrl) || ''}
                 className="w-full h-full object-cover" loop playsInline preload="metadata" crossOrigin="anonymous"
                 onTimeUpdate={handleTimeUpdate}
+                onPlaying={() => setIsPlaying(true)}
+                onWaiting={() => setIsPlaying(false)}
             />
+        )}
+        {isActive && shouldLoadVideo && !isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <div className="relative">
+                    <div className="w-16 h-16 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+                    <div className="absolute inset-0 rounded-full bg-emerald-500/10 blur-xl animate-pulse"></div>
+                </div>
+            </div>
         )}
         {paused && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-white/50"><Pause size={64} fill="currentColor" /></div>}
         {showHeart && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><Heart size={120} className="text-red-500 fill-red-500 drop-shadow-2xl" /></div>}

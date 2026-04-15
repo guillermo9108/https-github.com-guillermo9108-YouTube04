@@ -265,6 +265,10 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }, []);
+
   return (
     <ToastProvider>
       <SettingsProvider>
