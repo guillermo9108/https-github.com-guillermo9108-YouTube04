@@ -8,6 +8,7 @@ import { UploadProvider } from '../context/UploadContext';
 import { CartProvider } from '../context/CartContext';
 import { ServerTaskProvider } from '../context/ServerTaskContext';
 import Layout from '../components/Layout';
+import { APP_VERSION } from './constants';
 
 // Pages
 import Home from '../components/pages/Home';
@@ -44,53 +45,82 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <NotificationProvider>
-          <ToastProvider>
-            <UploadProvider>
-              <CartProvider>
-                <ServerTaskProvider>
-                  <HashRouter>
-                    <Routes>
-                      <Route path="/login" element={<Login />} />
-                      <Route element={<Layout />}>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/watch/:id" element={<Watch />} />
-                        <Route path="/channel/:userId" element={<Channel />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/upload" element={<Upload />} />
-                        <Route path="/edit/:id" element={<EditVideo />} />
-                        <Route path="/marketplace" element={<Marketplace />} />
-                        <Route path="/marketplace/:id" element={<MarketplaceItem />} />
-                        <Route path="/marketplace/create" element={<MarketplaceCreate />} />
-                        <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
-                        <Route path="/seller-dashboard" element={<SellerDashboard />} />
-                        <Route path="/cart" element={<Cart />} />
-                        <Route path="/notifications" element={<Notifications />} />
-                        <Route path="/menu" element={<MenuPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="/vip" element={<VipStore />} />
-                        <Route path="/wallet" element={<WalletPage />} />
-                        <Route path="/recharge" element={<RechargePage />} />
-                        <Route path="/history" element={<HistoryPage />} />
-                        <Route path="/liked" element={<LikedPage />} />
-                        <Route path="/watch-later" element={<WatchLater />} />
-                        <Route path="/search" element={<SearchPage />} />
-                        <Route path="/categories" element={<CategoriesPage />} />
-                        <Route path="/folders" element={<FolderExplorerPage />} />
-                        <Route path="/shorts" element={<Shorts />} />
-                        <Route path="/help" element={<HelpPage />} />
-                        <Route path="/report" element={<ReportPage />} />
-                        <Route path="/admin" element={<Admin />} />
-                      </Route>
-                    </Routes>
-                  </HashRouter>
-                </ServerTaskProvider>
-              </CartProvider>
-            </UploadProvider>
-          </ToastProvider>
-        </NotificationProvider>
+        <AppContent />
       </SettingsProvider>
     </AuthProvider>
+  );
+};
+
+const AppContent: React.FC = () => {
+  const { settings } = useSettings();
+
+  React.useEffect(() => {
+    if (settings?.latestApkVersion && settings.latestApkVersion !== APP_VERSION) {
+      console.log(`Version mismatch: Local ${APP_VERSION} vs Server ${settings.latestApkVersion}. Updating...`);
+      
+      // Clear cache and reload
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.update();
+          }
+          // Give it a moment to update then reload
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        });
+      } else {
+        window.location.reload();
+      }
+    }
+  }, [settings?.latestApkVersion]);
+
+  return (
+    <NotificationProvider>
+      <ToastProvider>
+        <UploadProvider>
+          <CartProvider>
+            <ServerTaskProvider>
+              <HashRouter>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route element={<Layout />}>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/watch/:id" element={<Watch />} />
+                    <Route path="/channel/:userId" element={<Channel />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/upload" element={<Upload />} />
+                    <Route path="/edit/:id" element={<EditVideo />} />
+                    <Route path="/marketplace" element={<Marketplace />} />
+                    <Route path="/marketplace/:id" element={<MarketplaceItem />} />
+                    <Route path="/marketplace/create" element={<MarketplaceCreate />} />
+                    <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
+                    <Route path="/seller-dashboard" element={<SellerDashboard />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/menu" element={<MenuPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/vip" element={<VipStore />} />
+                    <Route path="/wallet" element={<WalletPage />} />
+                    <Route path="/recharge" element={<RechargePage />} />
+                    <Route path="/history" element={<HistoryPage />} />
+                    <Route path="/liked" element={<LikedPage />} />
+                    <Route path="/watch-later" element={<WatchLater />} />
+                    <Route path="/search" element={<SearchPage />} />
+                    <Route path="/categories" element={<CategoriesPage />} />
+                    <Route path="/folders" element={<FolderExplorerPage />} />
+                    <Route path="/shorts" element={<Shorts />} />
+                    <Route path="/help" element={<HelpPage />} />
+                    <Route path="/report" element={<ReportPage />} />
+                    <Route path="/admin" element={<Admin />} />
+                  </Route>
+                </Routes>
+              </HashRouter>
+            </ServerTaskProvider>
+          </CartProvider>
+        </UploadProvider>
+      </ToastProvider>
+    </NotificationProvider>
   );
 };
 

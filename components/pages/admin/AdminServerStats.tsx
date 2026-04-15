@@ -48,6 +48,7 @@ interface BatteryConfig {
   pCharge?: number;
   temp?: number;
   lastChargeTime?: number;
+  manualOverrideUntil?: number;
   calibration?: {
     status: string;
     suggestions: string[];
@@ -230,7 +231,8 @@ export default function AdminServerStats() {
         ...battery,
         vQuimico: battery.voltage,
         vReal: battery.voltage,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        manualOverrideUntil: Date.now() + 10000 // 10 segundos de gracia
       };
       
       // Enviar configuración completa para asegurar persistencia
@@ -826,7 +828,14 @@ export default function AdminServerStats() {
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
               <span className="text-sm font-bold text-white">Estado de Carga</span>
               <button 
-                onClick={() => setBattery({...battery, isCharging: !battery.isCharging})}
+                onClick={() => {
+                  const newState = !battery.isCharging;
+                  setBattery({
+                    ...battery, 
+                    isCharging: newState,
+                    manualOverrideUntil: Date.now() + 10000
+                  });
+                }}
                 className={`w-12 h-6 rounded-full transition-colors relative ${battery.isCharging ? 'bg-emerald-500' : 'bg-slate-700'}`}
               >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${battery.isCharging ? 'left-7' : 'left-1'}`} />

@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
+import './src/index.css';
 import { db } from './services/db';
 
 // Capture Global JS Errors and report to Server Log

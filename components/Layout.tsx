@@ -66,7 +66,7 @@ export default function Layout() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
   
-  const isActive = (path: string) => location.pathname === path ? 'text-indigo-400' : 'text-slate-400 hover:text-indigo-200';
+  const isActive = (path: string) => location.pathname === path ? 'text-[#1877f2]' : 'text-[var(--text-secondary)]';
   const isShortsMode = location.pathname === '/shorts';
   const isWatchMode = location.pathname.startsWith('/watch/');
   const isMenuMode = location.pathname === '/menu';
@@ -93,7 +93,7 @@ export default function Layout() {
           {/* Top Bar: Logo & Actions */}
           <div className="flex items-center justify-between px-3 h-14 bg-[var(--bg-header)]">
             <Link to="/" className="flex items-center">
-              <span className="text-[28px] font-bold tracking-tighter text-white lowercase">
+              <span className="text-[28px] font-bold tracking-tighter text-[#1877f2] lowercase">
                 facebook
               </span>
             </Link>

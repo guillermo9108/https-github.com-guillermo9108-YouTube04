@@ -64,31 +64,66 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// Estrategia de caché básica
-const CACHE_NAME = 'streampay-cache-v1';
+// Estrategia de caché mejorada
+const CACHE_NAME = 'streampay-cache-v1.0.1';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/src/index.css'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS);
+    }).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
 self.addEventListener('fetch', (event) => {
-  // Ignorar requests a la API y chrome-extension
-  if (event.request.url.includes('/api/') || event.request.url.startsWith('chrome-extension')) {
+  const url = new URL(event.request.url);
+
+  // Ignorar requests a la API, socket y extensiones
+  if (url.pathname.startsWith('/api/') || url.protocol === 'chrome-extension:' || event.request.method !== 'GET') {
     return;
   }
 
+  // Estrategia Network First para navegación (asegura index.html actualizado)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request) || caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Estrategia Stale-While-Revalidate para el resto
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request).then((fetchResponse) => {
-        // Solo cachear assets estáticos exitosos
-        if (event.request.method === 'GET' && fetchResponse.status === 200) {
-          const responseToCache = fetchResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
-        return fetchResponse;
+        return networkResponse;
       });
-    }).catch(() => {
-      // Fallback si falla el network y no hay caché
-      if (event.request.mode === 'navigate') {
-        return caches.match('/index.html');
-      }
+      return cachedResponse || fetchPromise;
     })
   );
 });

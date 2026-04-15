@@ -504,6 +504,7 @@ export default function Home() {
             v.creatorId && 
             v.creatorName && 
             (v.title.toLowerCase() !== 'usuario' && v.title.toLowerCase() !== 'ahora') &&
+            (v.creatorName.toLowerCase() !== 'usuario') &&
             !isNaN(Number(v.duration))
         );
 
@@ -589,6 +590,23 @@ export default function Home() {
             const getNextItem = () => {
                 const forbiddenType = lastTypes.length === 2 && lastTypes[0] === lastTypes[1] ? lastTypes[0] : null;
                 
+                // Si hay muchos shorts acumulados, agruparlos
+                if (poolShorts.length >= 3 && forbiddenType !== 'short') {
+                    const group: any[] = [];
+                    const size = Math.min(poolShorts.length, 5);
+                    for (let k = 0; k < size; k++) {
+                        const s = poolShorts.shift();
+                        if (s) group.push(s);
+                    }
+                    return {
+                        id: `short-group-discovery-${Date.now()}-${Math.random()}`,
+                        isShortsGroup: true,
+                        shorts: group,
+                        items: group,
+                        tipo: 'short_group_discovery'
+                    };
+                }
+
                 // Try to interleave
                 for (let k = 0; k < poolOthers.length; k++) {
                     const type = getItemType(poolOthers[k]);
@@ -605,6 +623,7 @@ export default function Home() {
                             id: `short-single-${item.id}`,
                             isShortsGroup: true, 
                             shorts: [item], 
+                            items: [item],
                             tipo: 'short_individual' 
                         };
                     }
@@ -617,8 +636,9 @@ export default function Home() {
                         return { 
                             id: `short-single-fallback-${item.id}`,
                             isShortsGroup: true, 
-                            shorts: [item], 
-                            tipo: 'short_individual' 
+                            shorts: [item],
+                            items: [item],
+                            tipo: 'short_individual_fallback'
                         };
                     }
                 }

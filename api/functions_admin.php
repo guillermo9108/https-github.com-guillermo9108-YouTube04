@@ -917,6 +917,15 @@ function update_battery_simulation($pdo) {
     $now = floor(microtime(true) * 1000);
     $lastUpdate = $battery['lastUpdate'] ?? $now;
     
+    // Check for manual override to prevent UI settings from being immediately overwritten by simulation
+    $manualOverrideUntil = $battery['manualOverrideUntil'] ?? 0;
+    if ($now < $manualOverrideUntil) {
+        return [
+            'config' => $battery,
+            'history' => $history
+        ];
+    }
+    
     // Convertir de segundos a milisegundos si es necesario (migración)
     if ($lastUpdate < 10000000000) {
         $lastUpdate *= 1000;
@@ -1124,6 +1133,9 @@ function update_battery_simulation($pdo) {
 
     $pdo->prepare("UPDATE system_settings SET batteryConfig = ?, batteryHistory = ? WHERE id = 1")
         ->execute([json_encode($battery), json_encode($history)]);
+
+    // Al final del update, aseguramos que la versión de la APK esté actualizada en los settings
+    $pdo->prepare("UPDATE system_settings SET latestApkVersion = '1.0.1' WHERE id = 1 AND (latestApkVersion != '1.0.1' OR latestApkVersion IS NULL)")->execute();
 
     return [
         'config' => $battery,
