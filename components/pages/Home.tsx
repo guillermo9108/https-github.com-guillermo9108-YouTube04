@@ -144,7 +144,14 @@ export default function Home() {
     // Secondary Data
     const { notifications: rtNotifications, unreadCount: rtUnreadCount, markAsRead } = useNotifications();
     const [watchedIds, setWatchedIds] = useState<string[]>([]);
+    const [followingIds, setFollowingIds] = useState<string[]>([]);
     const [notifs, setNotifs] = useState<AppNotification[]>([]);
+
+    // Pull to refresh state
+    const [refreshing, setRefreshing] = useState(false);
+    const [pullDistance, setPullDistance] = useState(0);
+    const touchStartRef = useRef<number>(0);
+    const isPullingRef = useRef(false);
 
     const searchContainerRef = useRef<HTMLFormElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -176,6 +183,7 @@ export default function Home() {
         });
         if (user) {
             db.getUserActivity(user.id).then(act => setWatchedIds(act?.watched || []));
+            db.getSubscriptions(user.id).then(setFollowingIds);
             db.getNotifications(user.id).then(setNotifs);
         }
     }, [user?.id]);
@@ -228,6 +236,8 @@ export default function Home() {
                 } else if (rawFolders && typeof rawFolders === 'object') {
                     finalFolders = Object.values(rawFolders);
                 }
+                
+                finalFolders = finalFolders.filter(f => f && typeof f.name === 'string' && f.name.trim().length > 0);
                 
                 // Si estamos en una ruta y no hay carpetas, intentamos recuperarlas (solo si no es búsqueda)
                 if (finalFolders.length === 0 && !searchQuery && currentFolder) {
@@ -499,19 +509,22 @@ export default function Home() {
 
         const validVideos = videos.filter(v => 
             v && 
+            typeof v === 'object' &&
             v.id && 
             v.videoUrl &&
+            typeof v.videoUrl === 'string' &&
+            v.videoUrl.trim().length > 0 &&
             !isNaN(Number(v.duration))
         ).map(v => ({
             ...v,
-            title: v.title && v.title.trim().length > 0 ? v.title : 'Video sin título',
+            title: (v.title && typeof v.title === 'string' && v.title.trim().length > 0) ? v.title : 'Video sin título',
             creatorName: v.creatorName || 'Usuario'
         }));
 
         const isOnRoot = !searchQuery && currentFolder.length === 0 && selectedCategory === 'TODOS';
 
         if (!isOnRoot) {
-            // Standard Logic for Search/Folders/Categories
+            // Standard Greedy Logic for Search/Folders/Categories
             const result: any[] = [];
             let i = 0;
             while (i < validVideos.length) {
@@ -539,144 +552,59 @@ export default function Home() {
             return result;
         }
 
-        // --- ARCHITECT HIERARCHICAL LOGIC ---
+        // --- ROOT HIERARCHICAL LOGIC (4 PHASES) ---
+        // Filter out watched content for root
+        const unwatched = validVideos.filter(v => !watchedIds.includes(v.id));
         
-        // 1. Phase 1: Recents (1-10)
-        const sortedVideos = [...validVideos].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
-        const phase1Source = sortedVideos.slice(0, 10);
-        const phase2Source = sortedVideos.slice(10);
-        
-        const result: any[] = [];
+        // Phase 1: 5 Recent
+        const recent = [...unwatched].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)).slice(0, 5);
+        const usedIds = new Set(recent.map(v => v.id));
 
-        let i = 0;
-        while (i < phase1Source.length) {
-            const item = phase1Source[i];
-            const type = getItemType(item);
-            
-            if (type === 'short') {
-                const group: any[] = [item];
-                let j = i + 1;
-                while (j < phase1Source.length && j < i + 10 && getItemType(phase1Source[j]) === 'short') {
-                    group.push(phase1Source[j]);
-                    j++;
+        // Phase 2: 5 Most Liked
+        const mostLiked = unwatched
+            .filter(v => !usedIds.has(v.id))
+            .sort((a, b) => (Number(b.likes) || 0) - (Number(a.likes) || 0))
+            .slice(0, 5);
+        mostLiked.forEach(v => usedIds.add(v.id));
+
+        // Phase 3: 5 From Followed
+        const followed = unwatched
+            .filter(v => !usedIds.has(v.id) && followingIds.includes(v.creatorId))
+            .slice(0, 5);
+        followed.forEach(v => usedIds.add(v.id));
+
+        // Phase 4: Random rest
+        const rest = unwatched.filter(v => !usedIds.has(v.id));
+        const randomRest = shuffleWithSeed(rest, "root-discovery-" + (new Date().toDateString()));
+
+        const combined = [...recent, ...mostLiked, ...followed, ...randomRest];
+
+        // Apply greedy grouping to combined
+        const finalResult: any[] = [];
+        let k = 0;
+        while (k < combined.length) {
+            const item = combined[k];
+            if (isShort(item)) {
+                const group: any[] = [];
+                while (k < combined.length && isShort(combined[k])) {
+                    group.push(combined[k]);
+                    k++;
                 }
-                
-                result.push({
-                    id: `group-shorts-phase1-${i}`,
-                    tipo: 'short_group_user',
-                    isShortsGroup: true,
-                    shorts: group,
-                    items: group
-                });
-                i = j;
+                if (group.length > 0) {
+                    finalResult.push({ 
+                        isShortsGroup: true, 
+                        shorts: group, 
+                        items: group, 
+                        id: `root-shorts-${k}` 
+                    });
+                }
             } else {
-                result.push({ ...item, tipo: type });
-                i++;
+                finalResult.push(item);
+                k++;
             }
         }
-
-        // 2. Phase 2: Discovery (11+)
-        if (phase2Source.length > 0) {
-            const seed = "discovery-" + (new Date().toDateString());
-            const shuffled = shuffleWithSeed(phase2Source, seed);
-            
-            const poolShorts = shuffled.filter(v => getItemType(v) === 'short');
-            const poolOthers = shuffled.filter(v => getItemType(v) !== 'short');
-            
-            let discoveryResult: any[] = [];
-            let lastTypes: string[] = [];
-            let countSinceTopicGroup = 0;
-
-            const getNextItem = () => {
-                const forbiddenType = lastTypes.length === 2 && lastTypes[0] === lastTypes[1] ? lastTypes[0] : null;
-                
-                // Si hay shorts acumulados (incluso 1 o 2), agruparlos si el tipo no está prohibido
-                // Esto asegura que los shorts siempre aparezcan en su contenedor especial
-                if (poolShorts.length > 0 && forbiddenType !== 'short') {
-                    const group: any[] = [];
-                    // Agrupar hasta 5 shorts
-                    const size = Math.min(poolShorts.length, 5);
-                    for (let k = 0; k < size; k++) {
-                        const s = poolShorts.shift();
-                        if (s) group.push(s);
-                    }
-                    return {
-                        id: `short-group-discovery-${Date.now()}-${Math.random()}`,
-                        isShortsGroup: true,
-                        shorts: group,
-                        items: group,
-                        tipo: 'short_group_discovery'
-                    };
-                }
-
-                // Try to interleave
-                for (let k = 0; k < poolOthers.length; k++) {
-                    const type = getItemType(poolOthers[k]);
-                    if (type !== forbiddenType) {
-                        const item = poolOthers.splice(k, 1)[0];
-                        return { ...item, tipo: type };
-                    }
-                }
-                
-                // Fallback for shorts if they were forbidden but we have nothing else
-                if (poolShorts.length > 0) {
-                    const group: any[] = [];
-                    const size = Math.min(poolShorts.length, 5);
-                    for (let k = 0; k < size; k++) {
-                        const s = poolShorts.shift();
-                        if (s) group.push(s);
-                    }
-                    return {
-                        id: `short-group-discovery-fallback-${Date.now()}`,
-                        isShortsGroup: true,
-                        shorts: group,
-                        items: group,
-                        tipo: 'short_group_discovery_fallback'
-                    };
-                }
-                
-                if (poolOthers.length > 0) return { ...poolOthers.shift(), tipo: getItemType(poolOthers[0]) };
-                return null;
-            };
-
-            while (poolOthers.length > 0 || poolShorts.length > 0) {
-                // Every 10 positions, insert short_group_topic
-                if (countSinceTopicGroup === 10 && poolShorts.length >= 2) {
-                    const firstShort = poolShorts[0];
-                    const cat = firstShort.category;
-                    const group = poolShorts.filter(s => s.category === cat).slice(0, 10);
-                    
-                    if (group.length >= 2) {
-                        discoveryResult.push({
-                            id: `group-topic-${cat}-${discoveryResult.length}`,
-                            tipo: 'short_group_topic',
-                            isShortsGroup: true,
-                            shorts: group,
-                            items: group
-                        });
-                        const groupedIds = new Set(group.map(g => g.id));
-                        for (let k = poolShorts.length - 1; k >= 0; k--) {
-                            if (groupedIds.has(poolShorts[k].id)) poolShorts.splice(k, 1);
-                        }
-                        countSinceTopicGroup = 0;
-                        lastTypes = ['short_group_topic'];
-                        continue;
-                    }
-                }
-
-                const next = getNextItem();
-                if (next) {
-                    discoveryResult.push(next);
-                    lastTypes.push(getItemType(next));
-                    if (lastTypes.length > 2) lastTypes.shift();
-                    countSinceTopicGroup++;
-                } else break;
-            }
-            result.push(...discoveryResult);
-        }
-
-        return result;
-    }, [videos, searchQuery, currentFolder, selectedCategory, systemSettings]);
+        return finalResult;
+    }, [videos, searchQuery, currentFolder, selectedCategory, systemSettings, watchedIds, followingIds]);
 
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
 
@@ -700,8 +628,70 @@ export default function Home() {
         { id: 'RANDOM', label: 'Aleatorio', icon: Zap }
     ];
 
+    const handlePullStart = (e: React.TouchEvent) => {
+        if (window.scrollY === 0) {
+            touchStartRef.current = e.touches[0].clientY;
+            isPullingRef.current = true;
+        }
+    };
+
+    const handlePullMove = (e: React.TouchEvent) => {
+        if (!isPullingRef.current) return;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - touchStartRef.current;
+        
+        if (diff > 0) {
+            // Aplicar resistencia
+            const distance = Math.min(diff * 0.4, 80);
+            setPullDistance(distance);
+            if (distance > 0) {
+                // No prevenimos el default aquí para no romper el scroll natural si el usuario decide bajar
+            }
+        } else {
+            isPullingRef.current = false;
+            setPullDistance(0);
+        }
+    };
+
+    const handlePullEnd = () => {
+        if (!isPullingRef.current) return;
+        isPullingRef.current = false;
+        
+        if (pullDistance >= 60) {
+            setRefreshing(true);
+            setPullDistance(0);
+            fetchVideos(0, true).finally(() => {
+                setTimeout(() => setRefreshing(false), 500);
+            });
+        } else {
+            setPullDistance(0);
+        }
+    };
+
     return (
-        <div className="flex flex-col min-h-screen bg-[var(--bg-primary)]">
+        <div 
+            className="flex flex-col min-h-screen bg-[var(--bg-primary)]"
+            onTouchStart={handlePullStart}
+            onTouchMove={handlePullMove}
+            onTouchEnd={handlePullEnd}
+        >
+            {/* Pull to refresh indicator */}
+            <div 
+                className="fixed top-0 left-0 right-0 z-[60] flex justify-center pointer-events-none transition-all duration-200"
+                style={{ 
+                    transform: `translateY(${pullDistance}px)`,
+                    opacity: pullDistance > 0 || refreshing ? 1 : 0
+                }}
+            >
+                <div className="bg-[var(--bg-secondary)] p-2 rounded-full shadow-lg border border-[var(--divider)] mt-4">
+                    <RefreshCw 
+                        size={20} 
+                        className={`text-[var(--accent)] ${refreshing ? 'animate-spin' : ''}`} 
+                        style={{ transform: `rotate(${pullDistance * 4}deg)` }}
+                    />
+                </div>
+            </div>
+
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user} isAdmin={isAdmin} logout={logout}/>
             
             {/* Main Content Area */}

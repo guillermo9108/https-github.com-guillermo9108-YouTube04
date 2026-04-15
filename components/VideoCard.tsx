@@ -406,12 +406,15 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       if (!shouldLoadImg) return null; 
       if (localThumb) return localThumb;
       
+      const hasThumb = video.thumbnailUrl && typeof video.thumbnailUrl === 'string' && video.thumbnailUrl.trim().length > 0 && !video.thumbnailUrl.includes('default.jpg');
+
       // Si es una imagen y no tiene miniatura, usar la URL de streaming
-      if (isImage && !video.thumbnailUrl) return db.getStreamerUrl(video.id);
+      if (isImage && !hasThumb) return db.getStreamerUrl(video.id);
 
       // Si hay error en la imagen o no hay miniatura, intentar usar el default de configuración
-      if (imgError || !video.thumbnailUrl) {
-          return defaultThumb || (isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg");
+      if (imgError || !hasThumb) {
+          const fallback = isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg";
+          return defaultThumb || fallback;
       }
 
       return getThumbnailUrl(video.thumbnailUrl);
@@ -599,14 +602,22 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
                     loading="lazy" 
                     referrerPolicy="no-referrer"
-                    onError={() => setImgError(true)}
+                    onError={() => {
+                        console.warn("Thumbnail error for video:", video.id, displayThumb);
+                        setImgError(true);
+                    }}
                     />
                 ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800 p-4">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-slate-700 p-4">
                         <div className="relative">
-                            {isAudio ? <Music size={48} className="opacity-20 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-20 mb-2" /> : <Play size={48} className="opacity-20 mb-2"/>}
-                            {isProcessing && <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full scale-150"><RefreshCw size={20} className="text-indigo-500 animate-spin" /></div>}
+                            {isAudio ? <Music size={48} className="opacity-10 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-10 mb-2" /> : <Play size={48} className="opacity-10 mb-2"/>}
+                            {isProcessing && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                                </div>
+                            )}
                         </div>
+                        {!shouldLoadImg && <div className="text-[10px] font-bold opacity-20 uppercase tracking-widest mt-2">Cargando...</div>}
                     </div>
                 )}
             </Link>

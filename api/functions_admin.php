@@ -459,11 +459,59 @@ function admin_get_local_stats($pdo) {
 }
 
 function admin_reconstruct_thumbnails($pdo) {
-    // Resetear intentos de procesamiento para videos sin miniatura o con miniatura por defecto
-    $stmt = $pdo->prepare("UPDATE videos SET processing_attempts = 0, locked_at = 0 WHERE thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg'");
-    $stmt->execute();
-    $count = $stmt->rowCount();
-    respond(true, ['count' => $count]);
+    $dirs = [
+        'uploads/thumbnails/',
+        'uploads/avatars/',
+        'uploads/market/',
+        'uploads/videos/'
+    ];
+
+    $processed = 0;
+    $created = 0;
+
+    foreach ($dirs as $dir) {
+        if (!is_dir($dir)) continue;
+        
+        $files = glob($dir . '*');
+        if (!$files) continue;
+        
+        foreach ($files as $file) {
+            if (!is_file($file)) continue;
+            
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) continue;
+            
+            // Si ya es una miniatura con el nuevo formato, ignorar
+            if (strpos($file, '_thumb.') !== false) continue;
+            
+            $thumbPath = str_replace('.' . $ext, '_thumb.jpg', $file);
+            
+            if (!file_exists($thumbPath)) {
+                // Si el archivo está en la carpeta de thumbnails, probablemente sea la miniatura original
+                // En ese caso, simplemente la copiamos al nuevo nombre para no romper referencias en DB
+                if (strpos($dir, 'thumbnails') !== false) {
+                    if (copy($file, $thumbPath)) {
+                        $created++;
+                    }
+                } else {
+                    // Si está en otra carpeta, es un original, creamos la miniatura optimizada
+                    if (create_thumbnail($file, $thumbPath)) {
+                        $created++;
+                    }
+                }
+            }
+            $processed++;
+        }
+    }
+
+    // También resetear intentos de procesamiento para videos sin miniatura o con miniatura por defecto
+    $pdo->prepare("UPDATE videos SET processing_attempts = 0, locked_at = 0 WHERE thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg'")->execute();
+
+    respond(true, [
+        'processed' => $processed,
+        'created' => $created,
+        'message' => "Reconstrucción finalizada. Analizados: $processed, Creados: $created"
+    ]);
 }
 
 function admin_battery_manual_shutdown($pdo) {

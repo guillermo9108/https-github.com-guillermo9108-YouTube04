@@ -416,8 +416,13 @@ function parse_user_agent($ua) {
     return "$os - $browser";
 }
 
-function create_thumbnail($sourcePath, $targetPath, $maxWidth = 400, $maxHeight = 400, $quality = 80) {
+function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $maxHeight = 400, $quality = 80) {
     if (!file_exists($sourcePath)) return false;
+    
+    if ($targetPath === null) {
+        $ext = pathinfo($sourcePath, PATHINFO_EXTENSION);
+        $targetPath = str_replace('.' . $ext, '_thumb.jpg', $sourcePath);
+    }
     
     $info = getimagesize($sourcePath);
     if (!$info) return false;

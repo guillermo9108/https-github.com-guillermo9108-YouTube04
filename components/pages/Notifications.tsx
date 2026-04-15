@@ -53,14 +53,23 @@ export default function Notifications() {
             }
         }
 
-        if (n.type === 'UPLOAD' && n.videoId) {
+        // Navegación inteligente
+        if (n.videoId) {
             navigate(`/watch/${n.videoId}`);
+        } else if (n.link) {
+            // Si el link es una ruta relativa, navegar directamente
+            if (n.link.startsWith('/')) {
+                navigate(n.link);
+            } else if (n.link.includes('watch/')) {
+                // Extraer ID si el link tiene formato /watch/v_123
+                const parts = n.link.split('/');
+                const id = parts[parts.length - 1];
+                if (id) navigate(`/watch/${id}`);
+            } else {
+                navigate(n.link);
+            }
         } else if (n.type === 'SALE') {
             navigate(`/seller-dashboard`);
-        } else if (n.type === 'SYSTEM' && n.videoId) {
-            navigate(`/watch/${n.videoId}`);
-        } else if (n.videoId) {
-            navigate(`/watch/${n.videoId}`);
         }
     };
 
