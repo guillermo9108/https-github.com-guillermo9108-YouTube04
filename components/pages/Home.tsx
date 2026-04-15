@@ -598,12 +598,14 @@ export default function Home() {
                         id: `root-shorts-${k}` 
                     });
                 }
-            } else {
+            } else if (item) {
                 finalResult.push(item);
+                k++;
+            } else {
                 k++;
             }
         }
-        return finalResult;
+        return finalResult.filter(Boolean);
     }, [videos, searchQuery, currentFolder, selectedCategory, systemSettings, watchedIds, followingIds]);
 
     const isAdmin = user?.role?.trim().toUpperCase() === 'ADMIN';
@@ -855,9 +857,9 @@ export default function Home() {
                             )}
                             {processedVideos.length > 0 ? ( 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-[var(--divider)]">
-                                    {processedVideos.map((v, idx) => ( 
+                                    {processedVideos.map((v, idx) => v && ( 
                                         v.isShortsGroup ? (
-                                            <div key={v.id} className="col-span-full">
+                                            <div key={v.id || `group-${idx}`} className="col-span-full">
                                                 <ShortsGrid shorts={v.shorts} isSingle={v.shorts.length === 1} />
                                             </div>
                                         ) : (
