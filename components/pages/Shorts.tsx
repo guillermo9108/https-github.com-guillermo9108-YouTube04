@@ -295,7 +295,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
 };
 
 export default function Shorts() {
-  const { user } = useAuth();
+  const { user, isOffline } = useAuth();
   const toast = useToast();
   
   const isVip = user?.role === 'ADMIN' || (user?.vipExpiry && user.vipExpiry > Date.now() / 1000);
@@ -473,7 +473,9 @@ export default function Shorts() {
         }
     } catch (e) {
         console.error("Fetch shorts error:", e);
-        toast.error("Error al cargar shorts");
+        if (!isOffline) {
+            toast.error("Error al cargar shorts");
+        }
     } finally {
         setLoading(false);
     }

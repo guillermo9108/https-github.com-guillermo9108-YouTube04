@@ -16,8 +16,11 @@ interface VideoPagedResponse {
 
 class DBService {
     private homeDirty = false;
+    private isOffline = false;
+    private lastErrorTime = 0;
 
     public async logRemote(message: string, level: 'ERROR' | 'INFO' | 'WARNING' = 'ERROR') {
+        if (this.isOffline) return; // Don't try to log if offline
         try {
             await fetch(`/api/index.php?action=client_log`, {
                 method: 'POST',
@@ -28,7 +31,7 @@ class DBService {
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // Aumentado a 60s para servidores lentos (NAS)
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // Reducido a 15s para detectar offline más rápido
 
         const url = endpoint.startsWith('http') ? endpoint : `/api/index.php?${endpoint}`;
         const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
@@ -51,6 +54,12 @@ class DBService {
 
         return fetch(url, options).then(async (response) => {
             clearTimeout(timeoutId);
+            
+            if (this.isOffline) {
+                this.isOffline = false;
+                window.dispatchEvent(new CustomEvent('sp_online'));
+            }
+
             const rawText = await response.text();
             
             if (response.status === 401) {
@@ -69,10 +78,21 @@ class DBService {
             return json.data as T;
         }).catch(err => {
             clearTimeout(timeoutId);
+            
+            // Detectar error de conexión o timeout
+            const isNetworkError = err.name === 'TypeError' || err.name === 'AbortError' || err.message.includes('Failed to fetch');
+            
+            if (isNetworkError && !this.isOffline) {
+                this.isOffline = true;
+                window.dispatchEvent(new CustomEvent('sp_offline'));
+            }
+
             if (err.name === 'AbortError') throw new Error("La petición ha tardado demasiado tiempo.");
             throw err;
         });
     }
+
+    public getIsOffline() { return this.isOffline; }
 
     /**
      * Genera la URL para el reproductor usando el microservicio Node.js (Puerto 3001)
@@ -86,13 +106,35 @@ class DBService {
     public async getVideos(page: number = 0, limit: number = 40, folder: string = '', search: string = '', category: string = '', mediaType: string = 'ALL', sortOrder: string = '', userId: string = ''): Promise<VideoPagedResponse> {
         const offset = page * limit;
         const query = `action=get_videos&limit=${limit}&offset=${offset}&folder=${encodeURIComponent(folder)}&search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}`;
-        return this.request<VideoPagedResponse>(query);
+        
+        const cacheKey = `sp_cache_videos_${folder}_${search}_${category}_${mediaType}_${sortOrder}_${page}`;
+        
+        try {
+            const res = await this.request<VideoPagedResponse>(query);
+            if (page === 0) localStorage.setItem(cacheKey, JSON.stringify(res));
+            return res;
+        } catch (e) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) return JSON.parse(cached);
+            throw e;
+        }
     }
 
     public async getShorts(page: number = 0, limit: number = 20, mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', seed: string = '', onlyUnseen: boolean = false, folder: string = ''): Promise<VideoPagedResponse> {
         const offset = page * limit;
         const query = `action=get_videos&limit=${limit}&offset=${offset}&shorts=1&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}&seed=${encodeURIComponent(seed)}${onlyUnseen ? '&only_unseen=1' : ''}&folder=${encodeURIComponent(folder)}`;
-        return this.request<VideoPagedResponse>(query);
+        
+        const cacheKey = `sp_cache_shorts_${mediaType}_${sortOrder}_${page}`;
+        
+        try {
+            const res = await this.request<VideoPagedResponse>(query);
+            if (page === 0) localStorage.setItem(cacheKey, JSON.stringify(res));
+            return res;
+        } catch (e) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) return JSON.parse(cached);
+            throw e;
+        }
     }
 
     public async getAllVideos(): Promise<Video[]> { 

@@ -25,7 +25,7 @@ interface GridMenuItem {
 
 export default function MenuPage() {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user, logout, isOffline } = useAuth();
     const { settings } = useSettings();
     const { unreadCount } = useNotifications();
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -86,14 +86,17 @@ export default function MenuPage() {
                     onClick={() => navigate('/profile')}
                     className="w-full bg-[#242526] rounded-xl p-3 flex items-center gap-3 hover:bg-[#3a3b3c] transition-colors text-left"
                 >
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-[#3a3b3c] shrink-0">
-                        {user?.avatarUrl ? (
-                            <img src={user.avatarUrl} className="w-full h-full object-cover" alt={user.username} referrerPolicy="no-referrer" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-lg font-bold text-white">
-                                {user?.username?.[0]?.toUpperCase() || '?'}
-                            </div>
-                        )}
+                    <div className="relative shrink-0">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-[#3a3b3c]">
+                            {user?.avatarUrl ? (
+                                <img src={user.avatarUrl} className="w-full h-full object-cover" alt={user.username} referrerPolicy="no-referrer" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-lg font-bold text-white">
+                                    {user?.username?.[0]?.toUpperCase() || '?'}
+                                </div>
+                            )}
+                        </div>
+                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 ${isOffline ? 'bg-red-500' : 'bg-green-500'} rounded-full border-2 border-[#242526]`}></div>
                     </div>
                     <div className="flex-1 min-w-0">
                         <h2 className="text-base font-bold truncate">{user?.username || 'Usuario'}</h2>

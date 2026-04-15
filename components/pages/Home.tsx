@@ -51,7 +51,7 @@ function shuffleWithSeed<T>(array: T[], seed: string): T[] {
 }
 
 export default function Home() {
-    const { user, logout } = useAuth();
+    const { user, logout, isOffline } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const toast = useToast();
@@ -264,7 +264,9 @@ export default function Home() {
             setPage(p);
         } catch (e) { 
             console.error("Fetch videos error:", e);
-            toast.error("Error al sincronizar catálogo"); 
+            if (!isOffline) {
+                toast.error("Error al sincronizar catálogo"); 
+            }
         } 
         finally { 
             setLoading(false); 
@@ -704,7 +706,7 @@ export default function Home() {
                         <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600">
                             {user?.avatarUrl ? <img src={getThumbnailUrl(user.avatarUrl) || ''} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white font-bold">{user?.username?.[0] || '?'}</div>}
                         </div>
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--bg-secondary)]"></div>
+                        <div className={`absolute bottom-0 right-0 w-3 h-3 ${isOffline ? 'bg-red-500' : 'bg-green-500'} rounded-full border-2 border-[var(--bg-secondary)]`}></div>
                     </div>
                     <button onClick={() => navigate('/create-post')} className="flex-1 h-10 bg-[var(--bg-tertiary)] rounded-full px-4 text-left text-[var(--text-secondary)] text-[15px]">
                         ¿Qué estás pensando?

@@ -10,6 +10,7 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => void;
   isLoading: boolean;
+  isOffline: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -23,12 +24,30 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(db.getIsOffline());
   const heartbeatTimerRef = useRef<number | null>(null);
   const userRef = useRef<User | null>(null); 
   const toast = useToast();
   
   // Sincronizar Ref con State
   useEffect(() => { userRef.current = user; }, [user]);
+
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    
+    window.addEventListener('sp_offline', handleOffline);
+    window.addEventListener('sp_online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+        window.removeEventListener('sp_offline', handleOffline);
+        window.removeEventListener('sp_online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+        window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   const logout = () => {
     if (userRef.current) {
@@ -172,7 +191,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline }}>
       {children}
     </AuthContext.Provider>
   );

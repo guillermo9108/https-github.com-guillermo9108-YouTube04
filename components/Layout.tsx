@@ -42,7 +42,7 @@ const ServerTaskIndicator = () => {
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isOffline } = useAuth();
   const { settings } = useSettings();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -152,6 +152,13 @@ export default function Layout() {
             </Link>
           </nav>
         </header>
+      )}
+
+      {isOffline && (
+        <div className="fixed top-[104px] left-0 right-0 z-[45] bg-red-600 text-white text-[12px] font-bold py-1.5 px-4 flex items-center justify-center gap-2 animate-in slide-in-from-top-full duration-300">
+          <AlertTriangle size={14} />
+          <span>Modo Offline: Mostrando contenido en caché</span>
+        </div>
       )}
 
       {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
