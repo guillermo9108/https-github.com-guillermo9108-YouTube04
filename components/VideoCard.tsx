@@ -66,6 +66,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const isNew = (Date.now() / 1000 - video.createdAt) < 86400;
   
   const [imgError, setImgError] = useState(false);
+  const [retryOriginal, setRetryOriginal] = useState(false);
   const [localThumb, setLocalThumb] = useState<string | null>(null);
   const [inWatchLater, setInWatchLater] = useState(user?.watchLater?.includes(video.id) || false);
   
@@ -411,6 +412,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       // Si es una imagen y no tiene miniatura, usar la URL de streaming
       if (isImage && !hasThumb) return db.getStreamerUrl(video.id);
 
+      // Si ya intentamos la miniatura optimizada y falló, intentar la original
+      if (retryOriginal && hasThumb) return video.thumbnailUrl;
+
       // Si hay error en la imagen o no hay miniatura, intentar usar el default de configuración
       if (imgError || !hasThumb) {
           const fallback = isAudio ? "/api/uploads/thumbnails/defaultaudio.jpg" : "/api/uploads/thumbnails/default.jpg";
@@ -418,7 +422,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       }
 
       return getThumbnailUrl(video.thumbnailUrl);
-  }, [shouldLoadImg, localThumb, imgError, video.thumbnailUrl, video.videoUrl, isAudio, isImage, defaultThumb]);
+  }, [shouldLoadImg, localThumb, imgError, retryOriginal, video.thumbnailUrl, video.videoUrl, isAudio, isImage, defaultThumb]);
 
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(Number(video.likes || 0));
@@ -603,8 +607,12 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                     loading="lazy" 
                     referrerPolicy="no-referrer"
                     onError={() => {
-                        console.warn("Thumbnail error for video:", video.id, displayThumb);
-                        setImgError(true);
+                        // Si falló la miniatura optimizada, intentar cargar la original antes de rendirse
+                        if (!retryOriginal && video.thumbnailUrl && getThumbnailUrl(video.thumbnailUrl) !== video.thumbnailUrl) {
+                            setRetryOriginal(true);
+                        } else {
+                            setImgError(true);
+                        }
                     }}
                     />
                 ) : (

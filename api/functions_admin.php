@@ -487,15 +487,18 @@ function admin_reconstruct_thumbnails($pdo) {
             $thumbPath = str_replace('.' . $ext, '_thumb.jpg', $file);
             
             if (!file_exists($thumbPath)) {
-                // Si el archivo está en la carpeta de thumbnails, probablemente sea la miniatura original
-                // En ese caso, simplemente la copiamos al nuevo nombre para no romper referencias en DB
+                // Si el archivo está en la carpeta de thumbnails, es una miniatura capturada
                 if (strpos($dir, 'thumbnails') !== false) {
-                    if (copy($file, $thumbPath)) {
+                    // Intentar crear la versión optimizada
+                    if (create_thumbnail($file, $thumbPath, 480, 270, 75)) {
+                        $created++;
+                    } else if (copy($file, $thumbPath)) {
+                        // Fallback a copia simple si falla GD
                         $created++;
                     }
                 } else {
-                    // Si está en otra carpeta, es un original, creamos la miniatura optimizada
-                    if (create_thumbnail($file, $thumbPath)) {
+                    // Si está en otra carpeta (videos, avatares), es un original, creamos la miniatura optimizada
+                    if (create_thumbnail($file, $thumbPath, 480, 270, 75)) {
                         $created++;
                     }
                 }

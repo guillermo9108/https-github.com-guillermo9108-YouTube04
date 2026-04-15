@@ -2,7 +2,11 @@ export function getThumbnailUrl(url: string | null | undefined): string | undefi
   if (!url) return undefined;
   
   // Si no es una imagen local o ya es una miniatura, devolver tal cual
-  if (!url.includes('api/uploads/') || url.includes('_thumb.')) {
+  // También evitamos procesar las miniaturas por defecto
+  if (!url.includes('api/uploads/') || 
+      url.includes('_thumb.') || 
+      url.includes('default.jpg') || 
+      url.includes('defaultaudio.jpg')) {
     return url;
   }
 

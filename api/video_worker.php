@@ -113,7 +113,8 @@ for ($i = 0; $i < $batchSize; $i++) {
         $thumbUrl = 'api/uploads/thumbnails/defaultaudio.jpg';
         echo "[INFO] Audio: Usando carátula genérica.\n";
     } else {
-        $thumbFile = 'uploads/thumbnails/' . $video['id'] . '.jpg';
+        $thumbName = "t_{$video['id']}.jpg";
+        $thumbFile = 'uploads/thumbnails/' . $thumbName;
         $fullThumbPath = __DIR__ . '/' . $thumbFile;
         if (!is_dir(dirname($fullThumbPath))) mkdir(dirname($fullThumbPath), 0777, true);
         
@@ -124,6 +125,8 @@ for ($i = 0; $i < $batchSize; $i++) {
         exec($cmdFfmpeg, $ffOutput, $ffCode);
         
         if ($ffCode === 0 && file_exists($fullThumbPath) && filesize($fullThumbPath) > 0) {
+            // Crear miniatura optimizada (_thumb.jpg) para que el frontend la encuentre
+            create_thumbnail($fullThumbPath, str_replace('.jpg', '_thumb.jpg', $fullThumbPath), 480, 270, 75);
             $thumbUrl = 'api/' . $thumbFile;
         } else {
             echo "[WARN] Falló captura de video. Usando miniatura genérica.\n";
