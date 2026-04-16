@@ -95,7 +95,16 @@ export default function Layout() {
         >
           {/* Top Bar: Logo & Actions */}
           <div className="flex items-center justify-between px-3 h-14" style={{ backgroundColor: 'var(--bg-header)' }}>
-            <Link to="/" className="flex items-center">
+            <Link 
+              to="/" 
+              onClick={(e) => {
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  window.location.reload();
+                }
+              }}
+              className="flex items-center"
+            >
               <span className="text-[28px] font-bold tracking-tighter text-[#1877f2] lowercase">
                 facebook
               </span>

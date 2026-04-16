@@ -25,7 +25,7 @@ export default function TrendingPage() {
     }, []);
 
     const handleVideoClick = (videoId: string) => {
-        navigate(`/video/${videoId}`);
+        navigate(`/watch/${videoId}`);
     };
 
     return (

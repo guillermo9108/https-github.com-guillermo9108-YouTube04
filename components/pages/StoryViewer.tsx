@@ -38,7 +38,9 @@ export default function StoryViewer() {
                 setStories(res);
                 
                 // Check if we should start at a specific user (from URL)
-                const params = new URLSearchParams(window.location.hash.split('?')[1]);
+                const hash = window.location.hash || '';
+                const parts = hash.split('?');
+                const params = new URLSearchParams(parts.length > 1 ? parts[1] : '');
                 const startUserId = params.get('userId');
                 if (startUserId) {
                     const groups = Object.values(

@@ -30,7 +30,7 @@ export default function HistoryPage() {
     };
 
     const handleVideoClick = (videoId: string) => {
-        navigate(`/video/${videoId}`);
+        navigate(`/watch/${videoId}`);
     };
 
     const formatTime = (timestamp: number) => {

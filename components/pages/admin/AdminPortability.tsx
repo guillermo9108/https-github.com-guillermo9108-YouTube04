@@ -56,18 +56,18 @@ export default function AdminPortability() {
                     categories: settings.categories || []
                 },
                 videos: videos.map(v => {
-                    const realPath = (v as any).rawPath || v.videoUrl;
+                    const realPath = (v as any).rawPath || v.videoUrl || '';
                     let relativePath = realPath;
                     if (rootPath && realPath.startsWith(rootPath)) {
                         relativePath = realPath.substring(rootPath.length).replace(/^[\\/]+/, '');
-                    } else {
-                        relativePath = realPath.split(/[\\/]/).pop();
+                    } else if (realPath) {
+                        relativePath = realPath.split(/[\\/]/).pop() || '';
                     }
 
                     return {
                         ...v,
                         relativePath: relativePath,
-                        fileName: realPath.split(/[\\/]/).pop()
+                        fileName: realPath ? (realPath.split(/[\\/]/).pop() || '') : ''
                     };
                 })
             };
@@ -86,7 +86,7 @@ export default function AdminPortability() {
                             const resp = await fetch(v.thumbnailUrl);
                             if (resp.ok) {
                                 const blob = await resp.blob();
-                                const thumbName = v.thumbnailUrl.split('/').pop() || `${v.id}.jpg`;
+                                const thumbName = (v.thumbnailUrl || '').split('/').pop() || `${v.id}.jpg`;
                                 thumbFolder?.file(thumbName, blob);
                             }
                         } catch (e) { console.warn("Fallo al incluir thumb:", v.title); }

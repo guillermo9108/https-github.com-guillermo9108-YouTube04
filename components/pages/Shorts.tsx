@@ -499,7 +499,9 @@ export default function Shorts() {
   };
   
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    const hash = window.location.hash || '';
+    const parts = hash.split('?');
+    const params = new URLSearchParams(parts.length > 1 ? parts[1] : '');
     const initialId = params.get('id');
 
     const init = async () => {

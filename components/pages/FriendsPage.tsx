@@ -143,16 +143,21 @@ export default function FriendsPage() {
                     <div className="flex flex-col gap-4">
                         {filteredUsers.map(u => (
                             <div key={u.id} className="flex items-center gap-3 group">
-                                <div 
-                                    onClick={() => navigate(`/channel/${u.id}`)}
-                                    className="w-20 h-20 rounded-full overflow-hidden bg-slate-800 cursor-pointer shrink-0 border border-[var(--divider)]"
-                                >
-                                    {u.avatarUrl ? (
-                                        <img src={u.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white uppercase">
-                                            {u.username?.[0]}
-                                        </div>
+                                <div className="relative shrink-0">
+                                    <div 
+                                        onClick={() => navigate(`/channel/${u.id}`)}
+                                        className="w-20 h-20 rounded-full overflow-hidden bg-slate-800 cursor-pointer border border-[var(--divider)]"
+                                    >
+                                        {u.avatarUrl ? (
+                                            <img src={u.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white uppercase">
+                                                {u.username?.[0]}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) && (
+                                        <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-[#242526] rounded-full" />
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">

@@ -69,9 +69,10 @@ export default function Watch() {
     
     // Contexto de navegación
     const navigationContext = useMemo(() => {
-        const hash = window.location.hash;
+        const hash = window.location.hash || '';
         if (!hash.includes('?')) return { q: null, f: '', c: 'TODOS', p: 0, s: '' };
-        const params = new URLSearchParams(hash.split('?')[1]);
+        const parts = hash.split('?');
+        const params = new URLSearchParams(parts.length > 1 ? parts[1] : '');
         return {
             q: params.get('q'),
             f: params.get('f') || '',
@@ -528,7 +529,13 @@ export default function Watch() {
 
                 playerRef.current = player;
 
-                player.on('play', () => setThrottled(true));
+                player.on('play', () => {
+                    setThrottled(true);
+                    if (!viewMarkedRef.current && video) {
+                        db.incrementView(video.id);
+                        viewMarkedRef.current = true;
+                    }
+                });
                 player.on('pause', () => setThrottled(false));
                 player.on('ended', handleVideoEnded);
                 player.on('timeupdate', handleTimeUpdate);
@@ -597,7 +604,7 @@ export default function Watch() {
         }
     };
 
-    const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${navigationContext.f.split('/').pop()}` : null);
+    const searchContextLabel = navigationContext.q || (navigationContext.f ? `Carpeta: ${(navigationContext.f || '').split('/').pop()}` : null);
 
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-indigo-500" size={48}/></div>;
     if (!video) return (

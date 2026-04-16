@@ -174,7 +174,10 @@ export default function AdminFtp() {
                             {/* Parent Directory */}
                             {currentPath !== '/' && (
                                 <div 
-                                    onClick={() => listFiles(currentPath.split('/').slice(0,-1).join('/') || '/')}
+                                    onClick={() => {
+                                        const path = currentPath || '';
+                                        listFiles(path.split('/').slice(0,-1).join('/') || '/');
+                                    }}
                                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 cursor-pointer text-slate-400"
                                 >
                                     <Folder size={18} className="text-slate-500"/>

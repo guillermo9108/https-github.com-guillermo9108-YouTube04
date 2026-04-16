@@ -20,9 +20,10 @@ export default function GridProcessor() {
             setStatus('INIT');
             processedRef.current = false;
             
-            const ext = activeTask.videoUrl.split('.').pop()?.toLowerCase();
+            const videoUrl = activeTask.videoUrl || '';
+            const ext = videoUrl.split('.').pop()?.toLowerCase();
             const audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
-            const audioDetected = Boolean(activeTask.is_audio) || (ext ? audioExts.includes(ext) : false) || activeTask.videoUrl.includes('.mp3');
+            const audioDetected = Boolean(activeTask.is_audio) || (ext ? audioExts.includes(ext) : false) || videoUrl.includes('.mp3');
             setIsAudioMode(audioDetected);
         }
     }, [activeTask]);
