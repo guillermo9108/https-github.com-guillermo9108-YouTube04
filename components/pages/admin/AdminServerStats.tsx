@@ -286,8 +286,8 @@ export default function AdminServerStats() {
 
   const handleCalibrate = () => {
     // Lógica de calibración basada en el historial manual del admin
-    const [h1, m1] = calibData.tStart.split(':').map(Number);
-    const [h2, m2] = calibData.tEnd.split(':').map(Number);
+    const [h1, m1] = (calibData.tStart || "00:00").split(':').map(Number);
+    const [h2, m2] = (calibData.tEnd || "00:00").split(':').map(Number);
     const durationHours = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     
     if (durationHours <= 0) {

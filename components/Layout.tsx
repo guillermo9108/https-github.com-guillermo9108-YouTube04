@@ -115,7 +115,16 @@ export default function Layout() {
 
           {/* Tab Bar: Navigation */}
           <nav className="flex items-center justify-around h-12" style={{ backgroundColor: 'var(--bg-header)' }}>
-            <Link to="/" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+            <Link 
+              to="/" 
+              onClick={(e) => {
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  window.location.reload();
+                }
+              }}
+              className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}
+            >
               <div className="relative">
                 <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
                 <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">

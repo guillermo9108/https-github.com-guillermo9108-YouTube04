@@ -159,8 +159,8 @@ export default function AdminTranscoder() {
 
     const handleReconstructThumbnails = async () => {
         try {
-            const res: any = await db.request('action=admin_reconstruct_thumbnails', { method: 'POST' });
-            toast.success(`${res.count} videos añadidos a la cola de reconstrucción`);
+            const res: any = await db.request('action=admin_reconstruct_thumbnails');
+            toast.success(res.message || "Reconstrucción completada");
             loadData();
         } catch (e: any) { toast.error(e.message); }
     };

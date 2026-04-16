@@ -799,7 +799,7 @@ function video_upload($pdo, $post, $files) {
     // La notificación se enviará en video_organize_single cuando se procese el video
     // interact_notify_subscribers($pdo, $post['userId'], 'UPLOAD', "Nuevo contenido: {$post['title']}", "/watch/{$id}", $thumbPath);
 
-    respond(true);
+    respond(true, ['id' => $id, 'url' => $videoPath]);
 }
 
 function video_unlock($pdo, $input) {

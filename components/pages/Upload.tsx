@@ -76,15 +76,18 @@ export default function Upload() {
       const startIndex = files.length;
       const newTitles = newFiles.map(f => f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
       
-      const defaultCat = VideoCategory.PERSONAL;
-      const defaultPrice = getPriceForCategory(defaultCat);
+      const newCategories = newFiles.map(f => {
+          if (f.type.startsWith('image/')) return VideoCategory.IMAGES;
+          return VideoCategory.PERSONAL;
+      });
+      const newPrices = newCategories.map(cat => getPriceForCategory(cat));
 
       setFiles(prev => [...prev, ...newFiles]);
       setTitles(prev => [...prev, ...newTitles]);
       setThumbnails(prev => [...prev, ...new Array(newFiles.length).fill(null)]);
       setDurations(prev => [...prev, ...new Array(newFiles.length).fill(0)]);
-      setCategories(prev => [...prev, ...new Array(newFiles.length).fill(defaultCat)]);
-      setPrices(prev => [...prev, ...new Array(newFiles.length).fill(defaultPrice)]);
+      setCategories(prev => [...prev, ...newCategories]);
+      setPrices(prev => [...prev, ...newPrices]);
 
       newFiles.forEach((f, i) => queueRef.current.push({ file: f, index: startIndex + i }));
       setQueueProgress(prev => ({ ...prev, total: prev.total + newFiles.length }));

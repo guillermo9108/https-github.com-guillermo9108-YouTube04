@@ -498,10 +498,15 @@ export default function Home() {
             const category = (v.category || '').toLowerCase();
             const isMusic = category.includes('music') || path.includes('music');
             if (isMusic) return false;
+            
+            // Si es una imagen por extensión o categoría, NO es un short
+            const isImg = category === 'images' || !!path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
+            if (isImg) return false;
+
             const isUnder10Min = v.duration >= 0 && v.duration < 600;
             const shortsPath = systemSettings?.shortsPath;
             const isInShortsPath = shortsPath && path.replace(/\\/g, '/').includes(shortsPath.toLowerCase().replace(/\\/g, '/'));
-            return !v.is_audio && category !== 'IMAGES' && (isUnder10Min || isInShortsPath);
+            return !v.is_audio && (isUnder10Min || isInShortsPath);
         };
 
         const getItemType = (v: any) => {

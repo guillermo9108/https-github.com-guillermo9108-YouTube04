@@ -25,9 +25,9 @@ const ScannerPlayer: React.FC<ScannerPlayerProps> = ({ video, onComplete }) => {
 
     useEffect(() => {
         const checkType = () => {
-            const ext = video.videoUrl.split('.').pop()?.toLowerCase();
+            const ext = video.videoUrl?.split('.').pop()?.toLowerCase();
             const audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
-            const audioDetected = Boolean(video.is_audio) || (ext && audioExts.includes(ext)) || video.videoUrl.includes('.mp3');
+            const audioDetected = Boolean(video.is_audio) || (ext && audioExts.includes(ext)) || (video.videoUrl && video.videoUrl.includes('.mp3'));
             if (audioDetected) {
                 setIsAudio(true);
                 processMedia(true);
@@ -258,6 +258,7 @@ export default function AdminLibrary() {
     };
 
     const basename = (path: string) => {
+        if (!path) return '';
         return path.split(/[\\/]/).pop() || path;
     };
 

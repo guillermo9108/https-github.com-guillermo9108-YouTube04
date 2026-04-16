@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info } from 'lucide-react';
+import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
@@ -14,7 +14,9 @@ export default function ChatDetailPage() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isUploading, setIsUploading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (user && otherId) {
@@ -60,9 +62,10 @@ export default function ChatDetailPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const handleSendMessage = async (e?: React.FormEvent) => {
+    const handleSendMessage = async (e?: React.FormEvent, imageUrl?: string) => {
         e?.preventDefault();
-        if (!inputText.trim() || !user || !otherId) return;
+        if (!inputText.trim() && !imageUrl) return;
+        if (!user || !otherId) return;
 
         const text = inputText.trim();
         setInputText('');
@@ -71,7 +74,8 @@ export default function ChatDetailPage() {
             const newMsg = await db.sendMessage({
                 userId: user.id,
                 receiverId: otherId,
-                text
+                text,
+                imageUrl
             });
 
             setMessages(prev => [...prev, newMsg]);
@@ -85,6 +89,39 @@ export default function ChatDetailPage() {
             }
         } catch (error) {
             console.error("Error sending message", error);
+        }
+    };
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user || !otherId) return;
+
+        setIsUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('userId', user.id);
+            formData.append('title', `Chat Image ${Date.now()}`);
+            formData.append('description', 'Chat attachment');
+            formData.append('category', 'IMAGES');
+
+            const res: any = await db.request('action=video_upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.url) {
+                await handleSendMessage(undefined, res.url);
+            }
+        } catch (error) {
+            console.error("Error uploading chat image", error);
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -190,7 +227,18 @@ export default function ChatDetailPage() {
                                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-tl-none border border-[var(--divider)]'
                                         }`}
                                     >
-                                        {msg.text}
+                                        {msg.imageUrl ? (
+                                            <div className="flex flex-col gap-2">
+                                                <img 
+                                                    src={msg.imageUrl} 
+                                                    className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                                                    alt="Chat attachment"
+                                                    referrerPolicy="no-referrer"
+                                                    onClick={() => window.open(msg.imageUrl, '_blank')}
+                                                />
+                                                {msg.text && <span>{msg.text}</span>}
+                                            </div>
+                                        ) : msg.text}
                                     </div>
                                     {showTime && (
                                         <span className="text-[9px] text-[var(--text-secondary)] font-bold mt-1 px-1">
@@ -213,10 +261,19 @@ export default function ChatDetailPage() {
                 >
                     <button 
                         type="button"
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+                        onClick={handleImageClick}
+                        disabled={isUploading}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0 ${isUploading ? 'animate-pulse opacity-50' : ''}`}
                     >
-                        <ImageIcon size={20} />
+                        {isUploading ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
                     </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        accept="image/*" 
+                        className="hidden" 
+                    />
                     <div className="flex-1 relative">
                         <input
                             type="text"
