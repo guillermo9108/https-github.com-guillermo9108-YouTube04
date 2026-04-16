@@ -175,17 +175,16 @@ export default function Layout() {
         </header>
       )}
 
+      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'w-full max-w-5xl mx-auto'}`}>
+        <Outlet />
+      </main>
+
       {isOffline && (
-        <div className="fixed top-[104px] left-0 right-0 z-[45] bg-red-600 text-white text-[12px] font-bold py-1.5 px-4 flex items-center justify-center gap-2 animate-in slide-in-from-top-full duration-300">
+        <div className="fixed bottom-0 left-0 right-0 z-[100] bg-red-600 text-white text-[12px] font-bold py-2 px-4 flex items-center justify-center gap-2 shadow-lg">
           <AlertTriangle size={14} />
           <span>Modo Offline: Mostrando contenido en caché</span>
         </div>
       )}
-
-      {/* Container removed or made fluid for Watch mode to allow full-width player and proper sticky behavior */}
-      <main className={`flex-1 ${isWatchMode ? 'w-full' : 'w-full max-w-5xl mx-auto'}`}>
-        <Outlet />
-      </main>
 
       <UploadIndicator />
       <ServerTaskIndicator />

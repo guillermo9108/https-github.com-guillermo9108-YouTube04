@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, MessageCircle, Search, UserPlus, MoreVertical, Circle, X } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Search, UserPlus, MoreVertical, Circle, X, Settings, Plus, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
@@ -95,234 +95,229 @@ export default function ChatPage() {
     );
 
     return (
-        <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
+        <div className="min-h-screen bg-[#111] text-white pb-24">
+            {/* Messenger Lite Header */}
+            <header className="sticky top-[104px] z-40 bg-[#111] border-b border-white/5">
                 <div className="flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                            <ChevronLeft size={24} className="text-[var(--text-primary)]" />
-                        </button>
-                        <h1 className="text-lg font-bold text-[var(--text-primary)]">Chats</h1>
+                        <h1 className="text-xl font-bold tracking-tight">Messages</h1>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                                <Settings size={22} className="text-white/80" />
+                            </button>
+                            {/* Static unread badge for the gear like in the pic */}
+                            <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-[#111] flex items-center justify-center text-[8px] font-bold">1</div>
+                        </div>
                         <button 
                             onClick={() => setShowNewChatModal(true)}
-                            className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors"
                         >
-                            <UserPlus size={20} />
+                            <Search size={22} className="text-white/80" />
                         </button>
-                        <button className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                            <MoreVertical size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Search */}
-                <div className="px-4 pb-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Buscar chats..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full h-10 pl-10 pr-4 bg-[var(--bg-tertiary)] border border-[var(--divider)] rounded-full text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-                        />
                     </div>
                 </div>
             </header>
 
-            {/* Content */}
-            <div className="max-w-2xl mx-auto">
-                {/* Active People Bar */}
-                {!loading && onlineFriends.length > 0 && (
-                    <div className="px-4 py-3 border-b border-[var(--divider)]/50 overflow-x-auto scrollbar-hide flex gap-4">
-                        {onlineFriends.map(f => (
-                            <button
-                                key={f.id}
-                                onClick={() => handleChatClick(f.id)}
-                                className="flex flex-col items-center gap-1 shrink-0 group"
-                            >
-                                <div className="relative">
-                                    <img
-                                        src={f.avatarUrl || 'https://picsum.photos/seed/avatar/100/100'}
-                                        className="w-14 h-14 rounded-full object-cover border-2 border-green-500 p-0.5 group-hover:scale-105 transition-transform"
-                                        alt={f.username}
-                                        referrerPolicy="no-referrer"
-                                    />
-                                    <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[var(--bg-secondary)] rounded-full shadow-sm" />
-                                </div>
-                                <span className="text-[10px] font-bold text-[var(--text-secondary)] truncate w-14 text-center">
-                                    {f.username}
-                                </span>
-                            </button>
-                        ))}
+            {/* Stories/Notes Row */}
+            <div className="px-4 py-3 overflow-x-auto scrollbar-hide flex gap-5 items-start">
+                {/* My Note */}
+                <div className="flex flex-col items-center gap-1.5 shrink-0">
+                    <div className="relative">
+                        <div className="w-[60px] h-[60px] rounded-full overflow-hidden bg-white/5 border border-white/10">
+                            <img 
+                                src={user?.avatarUrl || 'https://picsum.photos/seed/mynote/200/200'}
+                                className="w-full h-full object-cover blur-[1px] opacity-60"
+                                referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                                <span className="text-[8px] font-bold text-center leading-tight">Share a note...</span>
+                            </div>
+                        </div>
                     </div>
-                )}
+                    <span className="text-[11px] text-white/60 font-medium">Your note</span>
+                </div>
 
+                {/* Online Friends */}
+                {!loading && onlineFriends.map(f => (
+                    <button
+                        key={f.id}
+                        onClick={() => handleChatClick(f.id)}
+                        className="flex flex-col items-center gap-1.5 shrink-0"
+                    >
+                        <div className="relative">
+                            <img
+                                src={f.avatarUrl || `https://picsum.photos/seed/${f.id}/200/200`}
+                                className="w-[60px] h-[60px] rounded-full object-cover"
+                                alt={f.username}
+                                referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute bottom-0 right-1 w-4 h-4 bg-green-500 border-[3px] border-[#111] rounded-full" />
+                        </div>
+                        <span className="text-[11px] text-white/80 font-medium truncate w-[60px] text-center">
+                            {f.username.split(' ')[0]}
+                        </span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Chat List */}
+            <div className="mt-2">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--accent)]"></div>
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
                     </div>
                 ) : filteredChats.length === 0 ? (
-                    <div className="py-20 text-center">
-                        <MessageCircle size={48} className="mx-auto text-[var(--text-secondary)] mb-4 opacity-20" />
-                        <h2 className="text-base font-bold text-[var(--text-primary)]">No hay mensajes</h2>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">Envía un mensaje a tus seguidores para empezar</p>
+                    <div className="py-20 text-center px-10">
+                        <MessageCircle size={48} className="mx-auto text-white/20 mb-4" />
+                        <h2 className="text-lg font-bold">No hay mensajes</h2>
+                        <p className="text-sm text-white/40 mt-1">Encuentra a alguien para chatear usando el buscador</p>
                     </div>
                 ) : (
                     <div className="flex flex-col">
-                        {filteredChats.map((chat, index) => (
-                            <motion.button
-                                key={chat.user.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.03 }}
-                                onClick={() => handleChatClick(chat.user.id)}
-                                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--divider)]/30 group"
-                            >
-                                <div className="relative shrink-0">
-                                    <img
-                                        src={chat.user.avatarUrl || 'https://picsum.photos/seed/avatar/100/100'}
-                                        className="w-14 h-14 rounded-full object-cover border border-[var(--divider)]"
-                                        alt={chat.user.username}
-                                        referrerPolicy="no-referrer"
-                                    />
-                                    {chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 300) && (
-                                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-[var(--bg-secondary)] rounded-full" />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0 text-left">
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">
-                                            {chat.user.username}
-                                        </span>
-                                        <span className={`text-[10px] font-bold uppercase ${chat.unreadCount > 0 ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>
-                                            {formatTime(chat.lastMessage.timestamp)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <p className={`text-xs truncate ${chat.unreadCount > 0 ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-secondary)] font-medium'}`}>
-                                            {chat.lastMessage.senderId === user?.id ? 'Tú: ' : ''}
-                                            {chat.lastMessage.text || '📷 Imagen'}
-                                        </p>
-                                        {chat.unreadCount > 0 && (
-                                            <div className="min-w-[18px] h-[18px] px-1 bg-[var(--accent)] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-                                                {chat.unreadCount}
-                                            </div>
+                        {filteredChats.map((chat, index) => {
+                            const isOnline = chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 300);
+                            return (
+                                <button
+                                    key={chat.user.id}
+                                    onClick={() => handleChatClick(chat.user.id)}
+                                    className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/5 transition-colors active:bg-white/10"
+                                >
+                                    <div className="relative shrink-0">
+                                        <img
+                                            src={chat.user.avatarUrl || `https://picsum.photos/seed/${chat.user.id}/200/200`}
+                                            className="w-14 h-14 rounded-full object-cover"
+                                            alt={chat.user.username}
+                                            referrerPolicy="no-referrer"
+                                        />
+                                        {isOnline && (
+                                            <div className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-500 border-[3px] border-[#111] rounded-full" />
                                         )}
                                     </div>
-                                </div>
-                            </motion.button>
-                        ))}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-baseline">
+                                            <h3 className="text-[16px] font-bold text-white truncate pr-2">
+                                                {chat.user.username}
+                                            </h3>
+                                            <span className="text-[11px] text-white/40 shrink-0">
+                                                {formatTime(chat.lastMessage.timestamp)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-0.5">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                {chat.unreadCount > 0 && (
+                                                    <div className="shrink-0 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center text-[9px] font-bold">
+                                                        {chat.unreadCount}
+                                                    </div>
+                                                )}
+                                                <p className={`text-[14px] truncate ${chat.unreadCount > 0 ? 'text-white font-bold' : 'text-white/60 font-medium'}`}>
+                                                    {chat.lastMessage.senderId === user?.id ? 'You: ' : ''}
+                                                    {chat.lastMessage.text || (chat.lastMessage.imageUrl ? 'sent an attachment' : 'Live video ended')}
+                                                </p>
+                                            </div>
+                                            {chat.lastMessage.senderId === user?.id && (
+                                                <CheckCircle2 size={14} className="text-blue-500 ml-2 shrink-0" />
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
+            {/* Plus FAB */}
+            <button
+                onClick={() => setShowNewChatModal(true)}
+                className="fixed bottom-24 right-5 w-14 h-14 rounded-full bg-[#1877f2] flex items-center justify-center shadow-xl shadow-black/40 hover:scale-110 active:scale-95 transition-transform z-40"
+            >
+                <Plus size={32} className="text-white" />
+            </button>
+
             {/* New Chat Modal */}
             {showNewChatModal && (
-                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-                    <motion.div 
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl"
-                    >
-                        <div className="p-4 border-b border-[var(--divider)] flex justify-between items-center bg-[var(--bg-primary)]">
-                            <h3 className="font-bold text-[var(--text-primary)]">Nuevo mensaje</h3>
-                            <button 
-                                onClick={() => {
-                                    setShowNewChatModal(false);
-                                    setNewChatSearch('');
-                                    setUserSuggestions([]);
-                                }} 
-                                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-4 space-y-4">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={18} />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    placeholder="Buscar personas..."
-                                    value={newChatSearch}
-                                    onChange={(e) => handleSearchNewChat(e.target.value)}
-                                    className="w-full h-11 pl-10 pr-4 bg-[var(--bg-tertiary)] border border-[var(--divider)] rounded-2xl text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
-                                />
-                            </div>
+                <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col p-4 animate-in fade-in slide-in-from-bottom-5">
+                    <div className="flex items-center gap-4 mb-6">
+                        <button onClick={() => setShowNewChatModal(false)} className="p-2 hover:bg-white/10 rounded-full">
+                            <ChevronLeft size={28} />
+                        </button>
+                        <h2 className="text-xl font-bold">Nuevo Mensaje</h2>
+                    </div>
 
-                            <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                                {isSearching ? (
-                                    <div className="flex justify-center py-8">
-                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--accent)]"></div>
+                    <div className="relative mb-6">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={20} />
+                        <input
+                            type="text"
+                            autoFocus
+                            placeholder="Buscar personas..."
+                            value={newChatSearch}
+                            onChange={(e) => handleSearchNewChat(e.target.value)}
+                            className="w-full h-12 pl-12 pr-4 bg-white/5 border border-white/10 rounded-xl text-[16px] focus:outline-none focus:border-indigo-500 transition-all"
+                        />
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-4">
+                        {isSearching ? (
+                            <div className="flex justify-center py-10">
+                                <Loader2 className="animate-spin text-indigo-500" size={32} />
+                            </div>
+                        ) : userSuggestions.length > 0 ? (
+                            userSuggestions.map(u => (
+                                <button
+                                    key={u.id}
+                                    onClick={() => {
+                                        handleChatClick(u.id);
+                                        setShowNewChatModal(false);
+                                    }}
+                                    className="w-full flex items-center gap-4 p-2 hover:bg-white/5 rounded-xl transition-colors"
+                                >
+                                    <div className="relative">
+                                        <img src={u.avatarUrl || `https://picsum.photos/seed/${u.id}/200/200`} className="w-14 h-14 rounded-full object-cover" referrerPolicy="no-referrer" />
+                                        {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) && (
+                                            <div className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-500 border-[3px] border-[#000] rounded-full" />
+                                        )}
                                     </div>
-                                ) : userSuggestions.length === 0 && newChatSearch.length >= 2 ? (
-                                    <div className="py-8 text-center text-[var(--text-secondary)] text-sm font-medium">
-                                        No se encontraron resultados
+                                    <div className="text-left">
+                                        <div className="font-bold text-[16px]">{u.username}</div>
+                                        <div className="text-xs text-white/40">{u.lastActive && (Date.now() / 1000 - u.lastActive < 300) ? 'En línea' : 'Seguidor'}</div>
                                     </div>
-                                ) : userSuggestions.length > 0 ? (
-                                    userSuggestions.map(u => (
+                                </button>
+                            ))
+                        ) : (
+                            <div className="px-2">
+                                <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-4">Sugerencias</p>
+                                <div className="space-y-4">
+                                    {onlineFriends.map(f => (
                                         <button
-                                            key={u.id}
+                                            key={f.id}
                                             onClick={() => {
-                                                handleChatClick(u.id);
+                                                handleChatClick(f.id);
                                                 setShowNewChatModal(false);
                                             }}
-                                            className="w-full p-2 flex items-center gap-3 hover:bg-[var(--bg-tertiary)] rounded-2xl transition-colors group"
+                                            className="w-full flex items-center gap-4 group"
                                         >
-                                            <div className="relative shrink-0">
-                                                <img 
-                                                    src={u.avatarUrl || 'https://picsum.photos/seed/avatar/100/100'} 
-                                                    className="w-11 h-11 rounded-full object-cover border border-[var(--divider)]" 
-                                                    alt={u.username}
-                                                    referrerPolicy="no-referrer"
-                                                />
-                                                {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) && (
-                                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[var(--bg-secondary)] rounded-full" />
-                                                )}
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <div className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                                                    {u.username}
-                                                </div>
-                                                <div className="text-[10px] text-[var(--text-secondary)] font-bold uppercase">
-                                                    {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) ? 'En línea ahora' : 'Seguidor de StreamPay'}
-                                                </div>
-                                            </div>
+                                            <img src={f.avatarUrl || `https://picsum.photos/seed/${f.id}/200/200`} className="w-12 h-12 rounded-full" referrerPolicy="no-referrer" />
+                                            <span className="font-bold text-[16px] group-hover:text-indigo-400 transition-colors">{f.username}</span>
+                                            <div className="ml-auto w-2.5 h-2.5 rounded-full bg-green-500" />
                                         </button>
-                                    ))
-                                ) : (
-                                    <div className="py-4 px-2">
-                                        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-3">Sugerencias</p>
-                                        <div className="space-y-2">
-                                            {onlineFriends.slice(0, 5).map(u => (
-                                                <button
-                                                    key={u.id}
-                                                    onClick={() => {
-                                                        handleChatClick(u.id);
-                                                        setShowNewChatModal(false);
-                                                    }}
-                                                    className="w-full flex items-center gap-3 p-1 rounded-xl hover:bg-[var(--bg-tertiary)]"
-                                                >
-                                                    <img src={u.avatarUrl || 'https://picsum.photos/seed/avatar/100/100'} className="w-8 h-8 rounded-full" alt={u.username} referrerPolicy="no-referrer" />
-                                                    <span className="text-xs font-bold text-[var(--text-primary)]">{u.username}</span>
-                                                    <div className="w-2 h-2 rounded-full bg-green-500 ml-auto" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    </motion.div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
     );
 }
+
+const Loader2 = ({ size, className }: any) => (
+    <div className={`animate-spin ${className}`} style={{ width: size, height: size }}>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+            <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75" />
+        </svg>
+    </div>
+);
