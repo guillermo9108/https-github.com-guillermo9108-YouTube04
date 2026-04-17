@@ -213,7 +213,13 @@ export default function ChatPage() {
                                                 )}
                                                 <p className={`text-[14px] truncate ${chat.unreadCount > 0 ? 'text-white font-bold' : 'text-white/60 font-medium'}`}>
                                                     {chat.lastMessage.senderId === user?.id ? 'You: ' : ''}
-                                                    {chat.lastMessage.text || (chat.lastMessage.imageUrl ? 'sent an attachment' : 'Live video ended')}
+                                                    {chat.lastMessage.text || 
+                                                     (chat.lastMessage.mediaType === 'IMAGE' ? 'sent a photo' : 
+                                                      chat.lastMessage.mediaType === 'VIDEO' ? 'sent a video' : 
+                                                      chat.lastMessage.mediaType === 'AUDIO' ? 'sent a voice message' : 
+                                                      chat.lastMessage.mediaType === 'FILE' ? 'sent a file' : 
+                                                      chat.lastMessage.imageUrl ? 'sent an attachment' : 'Live video ended')
+                                                    }
                                                 </p>
                                             </div>
                                             {chat.lastMessage.senderId === user?.id && (

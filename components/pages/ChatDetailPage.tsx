@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2 } from 'lucide-react';
+import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus } from 'lucide-react';
 import { useNavigate, useParams } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
@@ -134,13 +134,17 @@ export default function ChatDetailPage() {
             formData.append('description', 'Chat attachment');
             formData.append('category', type === 'IMAGE' ? 'IMAGES' : 'GENERAL');
 
-            const res: any = await db.request('action=video_upload', {
+            const res: any = await db.request('action=upload_video', {
                 method: 'POST',
                 body: formData
             });
 
             if (res.url) {
-                await handleSendMessage(undefined, { url: res.url, type });
+                let finalUrl = res.url;
+                if (!finalUrl.startsWith('http') && !finalUrl.startsWith('api/')) {
+                    finalUrl = 'api/' + finalUrl;
+                }
+                await handleSendMessage(undefined, { url: finalUrl, type });
             }
         } catch (error) {
             console.error("Error uploading chat file", error);
@@ -209,27 +213,35 @@ export default function ChatDetailPage() {
         return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const fixMediaUrl = (url?: string) => {
+        if (!url) return '';
+        if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/')) return url;
+        return 'api/' + url;
+    };
+
     const renderMessageContent = (msg: ChatMessage) => {
         switch (msg.mediaType) {
             case 'IMAGE':
+                const imgUrl = fixMediaUrl(msg.imageUrl);
                 return (
                     <div className="flex flex-col gap-2">
                         <img 
-                            src={msg.imageUrl} 
+                            src={imgUrl} 
                             className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
                             alt="Attached"
                             referrerPolicy="no-referrer"
-                            onClick={() => window.open(msg.imageUrl, '_blank')}
+                            onClick={() => window.open(imgUrl, '_blank')}
                         />
                         {msg.text && <span>{msg.text}</span>}
                     </div>
                 );
             case 'VIDEO':
+                const vidUrl = fixMediaUrl(msg.videoUrl);
                 return (
                     <div className="flex flex-col gap-2">
                         <div className="relative group rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
                             <video 
-                                src={msg.videoUrl} 
+                                src={vidUrl} 
                                 className="w-full h-full max-h-[300px] object-contain" 
                                 controls 
                             />
@@ -238,16 +250,18 @@ export default function ChatDetailPage() {
                     </div>
                 );
             case 'AUDIO':
+                const audUrl = fixMediaUrl(msg.audioUrl);
                 return (
                     <div className="flex flex-col gap-2 min-w-[200px]">
-                        <audio controls className="w-full h-8" src={msg.audioUrl} />
+                        <audio controls className="w-full h-8" src={audUrl} />
                         {msg.text && <span>{msg.text}</span>}
                     </div>
                 );
             case 'FILE':
+                const flUrl = fixMediaUrl(msg.fileUrl);
                 return (
                     <div 
-                        onClick={() => window.open(msg.fileUrl, '_blank')}
+                        onClick={() => window.open(flUrl, '_blank')}
                         className="flex items-center gap-3 p-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition-colors"
                     >
                         <div className="w-10 h-10 rounded bg-[var(--accent)] flex items-center justify-center text-white">
@@ -260,11 +274,12 @@ export default function ChatDetailPage() {
                     </div>
                 );
             default:
+                const legacyImgUrl = fixMediaUrl(msg.imageUrl);
                 return (
                     <>
                         {msg.imageUrl && (
                              <img 
-                                src={msg.imageUrl} 
+                                src={legacyImgUrl} 
                                 className="max-w-full rounded-lg mb-2" 
                                 alt="Legacy attachment" 
                                 referrerPolicy="no-referrer"

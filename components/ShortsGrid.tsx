@@ -35,7 +35,10 @@ export default function ShortsGrid({ shorts, isSingle }: ShortsGridProps) {
                 {shorts.map((short) => (
                     <div 
                         key={short.id}
-                        onClick={() => navigate(`/shorts?id=${short.id}`)}
+                        onClick={() => {
+                            sessionStorage.setItem('shorts_context_queue', JSON.stringify(shorts));
+                            navigate(`/shorts?id=${short.id}&from=grid`);
+                        }}
                         className={`relative bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)] ${
                             isSingle 
                             ? 'w-full max-w-[280px] aspect-[9/16] mx-auto' 

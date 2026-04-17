@@ -354,7 +354,7 @@ export default function Shorts() {
   };
 
   const handleInteraction = (videoId: string, type: 'LIKE' | 'DISLIKE' | 'WATCHED' | 'QUICK_SKIP') => {
-    if (!isUnseenMode) return; // Solo para contenido no visto
+    if (!isUnseenMode || isContextMode) return; // No reordenar si venimos de un grid o estamos en modo "visto"
 
     const video = videos.find(v => v.id === videoId);
     if (!video) return;
@@ -498,15 +498,44 @@ export default function Shorts() {
     return result;
   };
   
+  const [isContextMode, setIsContextMode] = useState(false);
+
   useEffect(() => {
     const hash = window.location.hash || '';
     const parts = hash.split('?');
     const params = new URLSearchParams(parts.length > 1 ? parts[1] : '');
     const initialId = params.get('id');
+    const fromGrid = params.get('from') === 'grid';
 
     const init = async () => {
         const s = await db.getSystemSettings();
         if (s && s.shortsPath) setShortsPath(s.shortsPath);
+
+        if (fromGrid && initialId) {
+            const queueRaw = sessionStorage.getItem('shorts_context_queue');
+            if (queueRaw) {
+                try {
+                    const queue = JSON.parse(queueRaw) as Video[];
+                    const startIndex = queue.findIndex(v => v.id === initialId);
+                    if (startIndex !== -1) {
+                        const remaining = queue.slice(startIndex);
+                        setVideos(remaining);
+                        remaining.forEach(v => loadedVideoIds.current.add(v.id));
+                        setIsContextMode(true);
+                        // No necesitamos cargar más inmediatamente si el grid ya nos dio una lista
+                        if (remaining.length < 5) {
+                            fetchShorts(0);
+                        } else {
+                            setLoading(false);
+                            setHasMore(true);
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Error parsing context queue", e);
+                }
+            }
+        }
 
         if (initialId && !loadedVideoIds.current.has(initialId)) {
             try {
@@ -514,7 +543,6 @@ export default function Shorts() {
                 if (video) {
                     setVideos([video]);
                     loadedVideoIds.current.add(video.id);
-                    // Fetch more shorts after the initial one
                     fetchShorts(0);
                     return;
                 }
