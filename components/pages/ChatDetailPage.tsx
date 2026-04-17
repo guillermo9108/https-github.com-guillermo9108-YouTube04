@@ -165,6 +165,8 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
+    const isOtherOnline = onlineUserIds.has(String(otherId)) || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300));
+
     const syncNewMessages = async () => {
         if (!user || !otherId) return;
         try {
@@ -199,6 +201,8 @@ export default function ChatDetailPage() {
                                 // Add and ensure order
                                 return [...prev, msg].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
                             });
+                            // Scroll to bottom when a new message is received
+                            setTimeout(() => scrollToBottom('smooth'), 100);
                         }
                     }
                     if (data.type === 'USER_STATUS' && String(data.payload.userId) === String(otherId)) {
@@ -217,8 +221,11 @@ export default function ChatDetailPage() {
     }, [socket, otherId, user?.id]);
 
     useEffect(() => {
-        if (offset === 0) scrollToBottom();
-    }, [messages, offset]);
+        if (!loading && offset > 0 && messages.length > 0) {
+            // Jump to bottom on first load
+            setTimeout(() => scrollToBottom('auto'), 50);
+        }
+    }, [loading]);
 
     const loadChatData = async (initial: boolean = false) => {
         if (!user || !otherId) return;
@@ -273,8 +280,8 @@ export default function ChatDetailPage() {
         }
     }, [onlineUserIds, otherId]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
     };
 
     const handleSendMessage = async (e?: React.FormEvent, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
@@ -524,11 +531,9 @@ export default function ChatDetailPage() {
                     <div className="flex flex-col overflow-hidden">
                         <h1 className="text-sm font-bold truncate tracking-tight leading-none">{otherUser?.username}</h1>
                         <p className={`text-[10px] font-bold uppercase mt-0.5 ${
-                            (otherUser as any)?.isOnline || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300))
-                            ? 'text-green-500'
-                            : 'text-gray-500'
+                            isOtherOnline ? 'text-green-500' : 'text-gray-500'
                         }`}>
-                            {(otherUser as any)?.isOnline || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300)) ? 'En línea' : 'Desconectado'}
+                            {isOtherOnline ? 'En línea' : 'Desconectado'}
                         </p>
                     </div>
                 </div>
