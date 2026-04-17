@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { getThumbnailUrl } from '../utils/image';
 import { generateThumbnail } from '../utils/videoGenerator';
+import ShareModal from './ShareModal';
 
 // Sistema de control global para no saturar el servidor
 let isAnyCardProcessing = false;
@@ -82,8 +83,6 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [currentAlbumIndex, setCurrentAlbumIndex] = useState(0);
   const [likerName, setLikerName] = useState<string | null>(null);
   const [sharesCount, setSharesCount] = useState(Number(video.shares || 0));
-  const [followers, setFollowers] = useState<User[]>([]);
-  const [loadingFollowers, setLoadingFollowers] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -101,40 +100,6 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         });
     }
   }, [video.id, video.likes, user?.id]);
-
-  // Cargar seguidores para el modal de compartir
-  const loadFollowers = async () => {
-    if (!user) return;
-    setLoadingFollowers(true);
-    try {
-        const res = await db.getUserFollowers(user.id);
-        setFollowers(res);
-    } catch (e) {
-        console.error("Failed to load followers:", e);
-    } finally {
-        setLoadingFollowers(false);
-    }
-  };
-
-  const handleShareToUser = async (targetUsername: string) => {
-    if (!user) return;
-    try {
-        await db.request('action=share_video', { 
-            method: 'POST', 
-            body: JSON.stringify({ 
-                senderId: user.id, 
-                targetUsername, 
-                videoId: video.id 
-            }) 
-        });
-        await db.incrementShare(video.id);
-        setSharesCount(prev => prev + 1);
-        toast.success(`Video compartido con @${targetUsername}`);
-        setShowShareModal(false);
-    } catch (e: any) {
-        toast.error(e.message || "Error al compartir");
-    }
-  };
 
   const isImage = useMemo(() => {
     if (video.category === 'IMAGES' || video.isAlbum) return true;
@@ -294,7 +259,6 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           return;
       }
       setShowShareModal(true);
-      loadFollowers();
       setShowMenu(false);
   };
 
@@ -831,69 +795,15 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
       {/* Share Modal */}
       {showShareModal && (
-          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-              <div className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-                  <div className="flex items-center justify-between p-4 border-b border-white/5">
-                      <h3 className="text-lg font-bold text-white">Compartir con</h3>
-                      <button onClick={() => setShowShareModal(false)} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/5">
-                          <X size={20} />
-                      </button>
-                  </div>
-                  
-                  <div className="p-4 max-h-[60vh] overflow-y-auto">
-                      {loadingFollowers ? (
-                          <div className="flex flex-col items-center justify-center py-12 gap-3">
-                              <RefreshCw size={32} className="text-indigo-500 animate-spin" />
-                              <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Cargando seguidores...</span>
-                          </div>
-                      ) : followers.length > 0 ? (
-                          <div className="grid grid-cols-1 gap-2">
-                              {followers.map(follower => (
-                                  <button 
-                                      key={follower.id}
-                                      onClick={() => handleShareToUser(follower.username)}
-                                      className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 transition-colors group"
-                                  >
-                                      <div className="w-12 h-12 rounded-full overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--divider)]">
-                                          {follower.avatarUrl ? (
-                                              <img src={getThumbnailUrl(follower.avatarUrl)} className="w-full h-full object-cover" alt={follower.username} referrerPolicy="no-referrer" />
-                                          ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-sm font-black text-white/20 uppercase">{follower.username[0]}</div>
-                                          )}
-                                      </div>
-                                      <div className="flex-1 text-left">
-                                          <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">@{follower.username}</div>
-                                          <div className="text-[10px] text-slate-500 font-medium">Seguidor</div>
-                                      </div>
-                                      <div className="p-2 bg-indigo-600/10 text-indigo-400 rounded-full group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                          <Share2 size={16} />
-                                      </div>
-                                  </button>
-                              ))}
-                          </div>
-                      ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center">
-                              <UserPlus size={48} className="text-slate-800 mb-4" />
-                              <p className="text-sm font-bold text-slate-400 mb-1">No tienes seguidores aún</p>
-                              <p className="text-[10px] text-slate-500 font-medium">Invita a tus amigos a seguirte para compartir contenido con ellos.</p>
-                          </div>
-                      )}
-                  </div>
-
-                  <div className="p-4 bg-slate-950/50 border-t border-white/5">
-                      <button 
-                        onClick={() => {
-                            const url = `${window.location.origin}/#${watchUrl}`;
-                            navigator.clipboard.writeText(url);
-                            toast.success("Enlace copiado al portapapeles");
-                        }}
-                        className="w-full py-3 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2"
-                      >
-                          <Layers size={14} /> Copiar enlace del video
-                      </button>
-                  </div>
-              </div>
-          </div>
+          <ShareModal 
+            video={video} 
+            user={user} 
+            onClose={() => setShowShareModal(false)}
+            onShareSuccess={(target) => {
+                setSharesCount(prev => prev + 1);
+                setShowShareModal(false);
+            }}
+          />
       )}
 
       {/* Purchase Modal for Download */}

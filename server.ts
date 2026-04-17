@@ -24,11 +24,20 @@ async function startServer() {
       try {
         const message = JSON.parse(data.toString());
 
-        if (message.type === "IDENTIFY") {
-          currentUserId = message.userId;
+        if (message.type === "IDENTIFY" || message.type === "HEARTBEAT") {
+          currentUserId = message.userId || message.payload?.userId;
           if (currentUserId) {
             clients.set(currentUserId, ws);
-            console.log(`User identified: ${currentUserId}`);
+            
+            // Broadcast that this user is online/active
+            wss.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: "USER_STATUS",
+                  payload: { userId: currentUserId, status: "online", timestamp: Date.now() }
+                }));
+              }
+            });
           }
         }
 
@@ -50,7 +59,19 @@ async function startServer() {
         }
 
         if (message.type === "CHAT_MESSAGE") {
-          const { receiverId, senderId, text, imageUrl, timestamp, id } = message.payload;
+          const { 
+            receiverId, 
+            senderId, 
+            text, 
+            imageUrl, 
+            videoUrl, 
+            audioUrl, 
+            fileUrl, 
+            mediaType, 
+            timestamp, 
+            id 
+          } = message.payload;
+          
           const targetWs = clients.get(receiverId);
 
           if (targetWs && targetWs.readyState === WebSocket.OPEN) {
@@ -62,6 +83,10 @@ async function startServer() {
                 receiverId,
                 text,
                 imageUrl,
+                videoUrl,
+                audioUrl,
+                fileUrl,
+                mediaType,
                 timestamp
               }
             }));

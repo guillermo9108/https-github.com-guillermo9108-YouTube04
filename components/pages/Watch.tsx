@@ -17,7 +17,7 @@ import { generateThumbnail } from '../../utils/videoGenerator';
 
 // Refactored Components
 import CommentSection from '../watch/CommentSection';
-import ShareModal from '../watch/ShareModal';
+import ShareModal from '../ShareModal';
 
 const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 

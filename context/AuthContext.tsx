@@ -12,6 +12,7 @@ interface AuthContextType {
   isLoading: boolean;
   isOffline: boolean;
   socket: WebSocket | null;
+  socketRef: React.RefObject<WebSocket | null>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -27,6 +28,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(db.getIsOffline());
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
   const userRef = useRef<User | null>(null); 
   const toast = useToast();
@@ -45,9 +47,11 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
 
       ws.onclose = () => {
         setSocket(null);
+        socketRef.current = null;
       };
 
       setSocket(ws);
+      socketRef.current = ws;
     } else if (!user && socket) {
       socket.close();
       setSocket(null);
@@ -134,6 +138,14 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
                         setUser(prev => prev ? ({ ...prev, ...updatedUser, balance: Number(updatedUser.balance) }) : null);
                     }
                 }
+                
+                // Real-time heartbeat via WebSocket
+                if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({ 
+                        type: 'HEARTBEAT', 
+                        payload: { userId: userRef.current.id } 
+                    }));
+                }
             } catch (e) {
                 // Interceptor handles 401
             }
@@ -213,7 +225,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline, socket }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline, socket, socketRef }}>
       {children}
     </AuthContext.Provider>
   );

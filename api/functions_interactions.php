@@ -270,12 +270,35 @@ function interact_get_transactions($pdo, $userId) {
 }
 
 function interact_share_video($pdo, $input) {
+    if (!$pdo) respond(false, null, "Database connection not found");
     $sid = $input['senderId']; $term = $input['targetUsername']; $vid = $input['videoId'];
+    if (!$sid || !$term || !$vid) respond(false, null, "Faltan parámetros");
+    
     $tid = $pdo->query("SELECT id FROM users WHERE username = '$term'")->fetchColumn();
     if (!$tid) respond(false, null, "Destinatario no existe");
     $u = $pdo->query("SELECT username FROM users WHERE id = '$sid'")->fetch();
-    $v = $pdo->query("SELECT title, thumbnailUrl FROM videos WHERE id = '$vid'")->fetch();
+    $v = $pdo->query("SELECT id, title, thumbnailUrl, category, is_audio FROM videos WHERE id = '$vid'")->fetch();
+    
+    if (!$v) respond(false, null, "Video no encontrado");
+
+    // Enviar notificación instantánea
     send_direct_notification($pdo, $tid, 'SYSTEM', "@{$u['username']} te recomendó un video", "/watch/{$vid}", $v['thumbnailUrl'], ['videoTitle' => $v['title']]);
+    
+    // Compartir en chat (Insertar mensaje)
+    $msgId = uniqid('MS');
+    $timestamp = time();
+    $text = "He compartido un video contigo: " . $v['title'];
+    
+    $isAudio = (int)$v['is_audio'] === 1;
+    $mediaType = $isAudio ? 'AUDIO' : 'VIDEO';
+    $mediaCol = $isAudio ? 'audioUrl' : 'videoUrl';
+    
+    // Usar la URL que el frontend pueda interpretar para el streamer
+    $streamUrl = "/api/stream.php?id=" . $vid;
+    
+    $stmt = $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, $mediaCol, mediaType, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$msgId, $sid, $tid, $text, $streamUrl, $mediaType, $timestamp]);
+    
     respond(true);
 }
 

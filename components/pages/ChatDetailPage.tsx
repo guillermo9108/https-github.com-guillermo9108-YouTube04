@@ -37,7 +37,13 @@ export default function ChatDetailPage() {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'CHAT_MESSAGE' && data.payload.senderId === otherId) {
-                        setMessages(prev => [...prev, data.payload]);
+                        setMessages(prev => {
+                            if (prev.some(m => m.id === data.payload.id)) return prev;
+                            return [...prev, data.payload];
+                        });
+                    }
+                    if (data.type === 'USER_STATUS' && data.payload.userId === otherId) {
+                        setOtherUser(prev => prev ? ({ ...prev, lastActive: Math.floor(Date.now() / 1000) }) : null);
                     }
                 } catch (e) {}
             };

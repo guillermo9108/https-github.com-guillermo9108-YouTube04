@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Link } from '../Router';
 import { useToast } from '../../context/ToastContext';
 import { getThumbnailUrl } from '../../utils/image';
+import ShareModal from '../ShareModal';
 
 interface ShortItemProps {
   video: Video;
@@ -318,9 +319,6 @@ export default function Shorts() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const [videoToShare, setVideoToShare] = useState<Video | null>(null);
-  const [shareSearch, setShareSearch] = useState('');
-  const [shareSuggestions, setShareSuggestions] = useState<any[]>([]);
-  const shareTimeout = useRef<any>(null);
 
   if (!isVip) {
     return (
@@ -576,31 +574,6 @@ export default function Shorts() {
     return () => observer.disconnect();
   }, [videos, page, hasMore, loading]);
 
-  const handleShareSearch = (val: string) => {
-    setShareSearch(val);
-    if (shareTimeout.current) clearTimeout(shareTimeout.current);
-    if (val.length < 2) { setShareSuggestions([]); return; }
-    shareTimeout.current = setTimeout(async () => {
-        if (!user) return;
-        const hits = await db.searchUsers(val);
-        setShareSuggestions(hits);
-    }, 300);
-  };
-
-  const sendVideoToUser = async (targetUsername: string) => {
-      if (!user || !videoToShare) return;
-      try {
-          await db.request(`action=share_video`, {
-              method: 'POST',
-              body: JSON.stringify({ videoId: videoToShare.id, senderId: user.id, targetUsername })
-          });
-          toast.success(`Short enviado a @${targetUsername}`);
-          setVideoToShare(null);
-          setShareSearch('');
-          setShareSuggestions([]);
-      } catch (e: any) { toast.error(e.message); }
-  };
-
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-scroll snap-y snap-mandatory bg-black scrollbar-hide relative">
       <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
@@ -672,40 +645,15 @@ export default function Shorts() {
       )}
 
       {videoToShare && (
-          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-              <div className="bg-slate-900 border border-slate-800 rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-                  <div className="p-6 bg-slate-950 border-b border-white/5 flex justify-between items-center">
-                      <h3 className="font-black text-white uppercase tracking-widest text-sm flex items-center gap-2"><Share2 size={18} className="text-indigo-400"/> Compartir Short</h3>
-                      <button onClick={() => setVideoToShare(null)} className="text-slate-500 hover:text-white"><X/></button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                      <div className="relative">
-                          <Search className="absolute left-4 top-3.5 text-slate-500" size={18}/>
-                          <input 
-                              type="text" value={shareSearch} onChange={e => handleShareSearch(e.target.value)}
-                              placeholder="Buscar usuario..."
-                              className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:border-indigo-500 outline-none transition-all"
-                          />
-                      </div>
-                      
-                      <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                          {shareSuggestions.map(s => (
-                              <button 
-                                  key={s.username} 
-                                  onClick={() => sendVideoToUser(s.username)}
-                                  className="w-full p-3 flex items-center gap-4 hover:bg-indigo-600 rounded-2xl transition-colors group"
-                              >
-                                  <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 shrink-0">
-                                      {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white/20">{s.username?.[0] || '?'}</div>}
-                                  </div>
-                                  <span className="text-sm font-bold text-white group-hover:text-white">@{s.username}</span>
-                                  <UserCheck size={16} className="ml-auto opacity-0 group-hover:opacity-100 text-white"/>
-                              </button>
-                          ))}
-                      </div>
-                  </div>
-              </div>
-          </div>
+          <ShareModal 
+            video={videoToShare} 
+            user={user} 
+            onClose={() => setVideoToShare(null)} 
+            onShareSuccess={(target) => {
+                toast.success(`Short compartido con @${target}`);
+                setVideoToShare(null);
+            }} 
+          />
       )}
     </div>
   );
