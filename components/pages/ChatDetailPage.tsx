@@ -6,6 +6,101 @@ import { db } from '../../services/db';
 import { ChatMessage, User, Video as VideoType } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
+const fixMediaUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/') || url.startsWith('/')) return url;
+    return 'api/' + url;
+};
+
+const SharedMediaItem: React.FC<{ 
+    type: 'VIDEO' | 'AUDIO', 
+    url: string, 
+    videoId?: string,
+    user: User | null,
+    onNavigate: (path: string) => void
+}> = ({ type, url, videoId, user, onNavigate }) => {
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [loading, setLoading] = useState(!!videoId);
+    const [videoData, setVideoData] = useState<VideoType | null>(null);
+
+    useEffect(() => {
+        if (!videoId || !user) {
+            setIsUnlocked(true);
+            setLoading(false);
+            return;
+        }
+
+        const checkAccess = async () => {
+            try {
+                const v = await db.getVideo(videoId);
+                if (!v) { setIsUnlocked(true); return; }
+                setVideoData(v);
+
+                const res = await db.hasPurchased(user.id, videoId);
+                const access = res;
+                const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
+                const isOwner = user.id === v.creatorId;
+                const isAdmin = user.role === 'ADMIN';
+
+                setIsUnlocked(Boolean(access || isAdmin || isVipActive || isOwner || v.price === 0));
+            } catch (e) {
+                setIsUnlocked(true); 
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkAccess();
+    }, [videoId, user?.id, user?.vipExpiry, user?.role]);
+
+    if (loading) return (
+        <div className="w-full h-32 bg-slate-800/50 animate-pulse rounded-xl flex items-center justify-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validando acceso...</p>
+        </div>
+    );
+
+    if (!isUnlocked && videoData) {
+        return (
+            <div className="p-6 bg-slate-950 border border-white/10 rounded-[24px] flex flex-col items-center gap-4 text-center shadow-xl">
+                <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-500">
+                    <Lock size={24} />
+                </div>
+                <div>
+                <h4 className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[150px]">{videoData.title}</h4>
+                <p className="text-[10px] text-indigo-400 font-black uppercase mt-1 tracking-widest">Contenido Premium (${videoData.price})</p>
+                </div>
+                <button 
+                onClick={() => onNavigate(`/watch/${videoId}`)}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-lg active:scale-95"
+                >
+                    Pagar para ver
+                </button>
+            </div>
+        );
+    }
+
+    const vidUrl = videoId ? db.getStreamerUrl(videoId) : fixMediaUrl(url); 
+    if (type === 'VIDEO') {
+        return (
+            <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl group relative">
+                <video src={vidUrl} className="w-full aspect-video object-contain" controls />
+                {!isUnlocked && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center">
+                        <Lock className="text-white/50 mb-2" size={32} />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-white">Contenido Bloqueado</p>
+                    </div>
+                )}
+            </div>
+        );
+    } else {
+        return (
+            <div className="w-full bg-slate-900 p-2 rounded-2xl border border-white/5 shadow-xl">
+                <audio src={vidUrl} className="w-full" controls />
+            </div>
+        );
+    }
+};
+
 export default function ChatDetailPage() {
     const { id: otherId } = useParams();
     const navigate = useNavigate();
@@ -29,7 +124,7 @@ export default function ChatDetailPage() {
         if (user && otherId) {
             loadChatData();
         }
-    }, [user, otherId]);
+    }, [user?.id, otherId]);
 
     useEffect(() => {
         if (socket) {
@@ -65,17 +160,18 @@ export default function ChatDetailPage() {
             socket.addEventListener('message', handleMessage);
             return () => socket.removeEventListener('message', handleMessage);
         }
-    }, [socket, otherId]);
+    }, [socket, otherId, user?.id]);
 
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
 
     const loadChatData = async () => {
+        if (!user || !otherId) return;
         try {
             const [userData, msgData] = await Promise.all([
-                db.getUser(otherId!),
-                db.getMessages(user!.id, otherId!)
+                db.getUser(otherId),
+                db.getMessages(user.id, otherId)
             ]);
             if (userData) {
                 userData.isOnline = onlineUserIds.has(String(otherId));
@@ -246,100 +342,6 @@ export default function ChatDetailPage() {
         return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    const SharedMediaItem: React.FC<{ 
-        type: 'VIDEO' | 'AUDIO', 
-        url: string, 
-        videoId?: string,
-        user: User | null 
-    }> = ({ type, url, videoId, user }) => {
-        const [isUnlocked, setIsUnlocked] = useState(false);
-        const [loading, setLoading] = useState(!!videoId);
-        const [videoData, setVideoData] = useState<VideoType | null>(null);
-
-        useEffect(() => {
-            if (!videoId || !user) {
-                setIsUnlocked(true);
-                setLoading(false);
-                return;
-            }
-
-            const checkAccess = async () => {
-                try {
-                    const v = await db.getVideo(videoId);
-                    if (!v) { setIsUnlocked(true); return; }
-                    setVideoData(v);
-
-                    const res = await db.hasPurchased(user.id, videoId);
-                    const access = res;
-                    const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
-                    const isOwner = user.id === v.creatorId;
-                    const isAdmin = user.role === 'ADMIN';
-
-                    setIsUnlocked(Boolean(access || isAdmin || isVipActive || isOwner || v.price === 0));
-                } catch (e) {
-                    setIsUnlocked(true); 
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            checkAccess();
-        }, [videoId, user]);
-
-        if (loading) return (
-            <div className="w-full h-32 bg-slate-800/50 animate-pulse rounded-xl flex items-center justify-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validando acceso...</p>
-            </div>
-        );
-
-        if (!isUnlocked && videoData) {
-            return (
-                <div className="p-6 bg-slate-950 border border-white/10 rounded-[24px] flex flex-col items-center gap-4 text-center shadow-xl">
-                    <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-500">
-                        <Lock size={24} />
-                    </div>
-                    <div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[150px]">{videoData.title}</h4>
-                    <p className="text-[10px] text-indigo-400 font-black uppercase mt-1 tracking-widest">Contenido Premium (${videoData.price})</p>
-                    </div>
-                    <button 
-                    onClick={() => navigate(`/watch/${videoId}`)}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-lg active:scale-95"
-                    >
-                        Pagar para ver
-                    </button>
-                </div>
-            );
-        }
-
-        const vidUrl = videoId ? db.getStreamerUrl(videoId) : fixMediaUrl(url); 
-        if (type === 'VIDEO') {
-            return (
-                <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl group relative">
-                    <video src={vidUrl} className="w-full aspect-video object-contain" controls />
-                    {!isUnlocked && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center">
-                            <Lock className="text-white/50 mb-2" size={32} />
-                            <p className="text-[10px] font-black uppercase tracking-widest text-white">Contenido Bloqueado</p>
-                        </div>
-                    )}
-                </div>
-            );
-        } else {
-            return (
-                <div className="w-full bg-slate-900 p-2 rounded-2xl border border-white/5 shadow-xl">
-                    <audio src={vidUrl} className="w-full" controls />
-                </div>
-            );
-        }
-    };
-
-    const fixMediaUrl = (url?: string) => {
-        if (!url) return '';
-        if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/') || url.startsWith('/')) return url;
-        return 'api/' + url;
-    };
-
     const renderMessageContent = (msg: ChatMessage) => {
         switch (msg.mediaType) {
             case 'IMAGE':
@@ -360,7 +362,7 @@ export default function ChatDetailPage() {
                 const vidUrl = fixMediaUrl(msg.videoUrl);
                 return (
                     <div className="flex flex-col gap-2 min-w-[200px]">
-                        <SharedMediaItem type="VIDEO" url={vidUrl} videoId={msg.videoId} user={user} />
+                        <SharedMediaItem type="VIDEO" url={vidUrl} videoId={msg.videoId} user={user} onNavigate={navigate} />
                         {msg.text && <span className="text-xs px-1">{msg.text}</span>}
                     </div>
                 );
@@ -368,7 +370,7 @@ export default function ChatDetailPage() {
                 const audUrl = fixMediaUrl(msg.audioUrl);
                 return (
                     <div className="flex flex-col gap-2 min-w-[200px]">
-                        <SharedMediaItem type="AUDIO" url={audUrl} videoId={msg.videoId} user={user} />
+                        <SharedMediaItem type="AUDIO" url={audUrl} videoId={msg.videoId} user={user} onNavigate={navigate} />
                         {msg.text && <span className="text-xs px-1">{msg.text}</span>}
                     </div>
                 );
