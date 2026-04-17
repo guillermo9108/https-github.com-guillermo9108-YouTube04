@@ -543,6 +543,7 @@ export default function Shorts() {
                 if (video) {
                     setVideos([video]);
                     loadedVideoIds.current.add(video.id);
+                    setCurrentFolder(getFolder(video));
                     fetchShorts(0);
                     return;
                 }

@@ -215,7 +215,7 @@ export default function ChatDetailPage() {
 
     const fixMediaUrl = (url?: string) => {
         if (!url) return '';
-        if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/')) return url;
+        if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/') || url.startsWith('/')) return url;
         return 'api/' + url;
     };
 

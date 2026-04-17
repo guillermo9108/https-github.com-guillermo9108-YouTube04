@@ -464,6 +464,9 @@ function interact_get_messages($pdo, $userId, $otherId) {
     
     foreach ($messages as &$m) {
         if ($m['imageUrl']) $m['imageUrl'] = fix_url($m['imageUrl']);
+        if ($m['videoUrl']) $m['videoUrl'] = fix_url($m['videoUrl']);
+        if ($m['audioUrl']) $m['audioUrl'] = fix_url($m['audioUrl']);
+        if ($m['fileUrl']) $m['fileUrl'] = fix_url($m['fileUrl']);
     }
     
     respond(true, $messages);
@@ -474,20 +477,32 @@ function interact_send_message($pdo, $input) {
     $receiverId = $input['receiverId'];
     $text = $input['text'] ?? '';
     $imageUrl = $input['imageUrl'] ?? null;
+    $videoUrl = $input['videoUrl'] ?? null;
+    $audioUrl = $input['audioUrl'] ?? null;
+    $fileUrl = $input['fileUrl'] ?? null;
+    $mediaType = $input['mediaType'] ?? 'TEXT';
+
     $id = uniqid('msg_');
     $now = time();
     
-    if (empty($text) && empty($imageUrl)) respond(false, null, "Mensaje vacío");
+    if (empty($text) && empty($imageUrl) && empty($videoUrl) && empty($audioUrl) && empty($fileUrl)) {
+        respond(false, null, "Mensaje vacío");
+    }
     
-    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, isRead, timestamp) VALUES (?, ?, ?, ?, ?, 0, ?)")
-        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $now]);
+    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, mediaType, isRead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
+        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $mediaType, $now]);
         
     respond(true, [
         'id' => $id,
         'senderId' => $senderId,
         'receiverId' => $receiverId,
         'text' => $text,
-        'imageUrl' => $imageUrl,
-        'timestamp' => $now
+        'imageUrl' => $imageUrl ? fix_url($imageUrl) : null,
+        'videoUrl' => $videoUrl ? fix_url($videoUrl) : null,
+        'audioUrl' => $audioUrl ? fix_url($audioUrl) : null,
+        'fileUrl' => $fileUrl ? fix_url($fileUrl) : null,
+        'mediaType' => $mediaType,
+        'timestamp' => $now,
+        'isRead' => 0
     ]);
 }

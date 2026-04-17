@@ -293,6 +293,10 @@ function getAppSchema() {
                 'receiverId' => 'VARCHAR(50)',
                 'text' => 'TEXT',
                 'imageUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'videoUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'audioUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'fileUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'mediaType' => "ENUM('TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'FILE') DEFAULT 'TEXT'",
                 'isRead' => 'TINYINT(1) DEFAULT 0',
                 'timestamp' => 'BIGINT'
             ],
