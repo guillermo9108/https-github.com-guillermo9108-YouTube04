@@ -145,6 +145,7 @@ export default function ChatDetailPage() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (user && otherId) {
@@ -165,10 +166,18 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
-    const isOtherOnline = onlineUserIds.has(String(otherId)) || 
-                         (otherUser && onlineUserIds.has(String(otherUser.id))) ||
-                         ((otherUser as any)?.isOnline === true) ||
-                         (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300));
+    const isOtherOnline = onlineUserIds.has(String(otherId).trim()) || 
+                         (otherUser && (onlineUserIds.has(String(otherUser.id).trim()) || (otherUser as any).isOnline === true));
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (messagesEndRef.current) {
+                scrollToBottom('auto');
+            }
+        };
+        window.visualViewport?.addEventListener('resize', handleResize);
+        return () => window.visualViewport?.removeEventListener('resize', handleResize);
+    }, []);
 
     const syncNewMessages = async () => {
         if (!user || !otherId) return;
@@ -280,14 +289,12 @@ export default function ChatDetailPage() {
     };
 
     useEffect(() => {
-        const uid = String(otherId);
-        const isOnlineNow = onlineUserIds.has(uid);
-        if (otherUser) {
-            if (isOnlineNow && !otherUser.isOnline) {
-                setOtherUser(prev => prev ? { ...prev, isOnline: true } : null);
-            } else if (!isOnlineNow && otherUser.isOnline) {
-                setOtherUser(prev => prev ? { ...prev, isOnline: false } : null);
-            }
+        if (!otherId || !otherUser) return;
+        const uid = String(otherId).trim();
+        const isOnlineNow = onlineUserIds.has(uid) || onlineUserIds.has(String(otherUser.id).trim());
+        
+        if (isOnlineNow !== !!otherUser.isOnline) {
+            setOtherUser(prev => prev ? { ...prev, isOnline: isOnlineNow } : null);
         }
     }, [onlineUserIds, otherId, otherUser?.id, otherUser?.isOnline]);
 
@@ -333,6 +340,9 @@ export default function ChatDetailPage() {
             const newMsg = await db.sendMessage(sendData);
             setMessages(prev => [...prev, newMsg]);
             
+            // Refocus input to keep keyboard up
+            setTimeout(() => inputRef.current?.focus(), 50);
+
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     type: 'CHAT_MESSAGE',
@@ -517,9 +527,9 @@ export default function ChatDetailPage() {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="flex flex-col h-screen max-h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] relative">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2">
+            <header className="absolute top-0 left-0 right-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2">
                 <button
                     onClick={() => navigate('/chat')}
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -658,6 +668,7 @@ export default function ChatDetailPage() {
                             
                             <div className="flex-1 bg-[var(--bg-tertiary)] rounded-full flex items-center px-4 border border-[var(--divider)] group focus-within:border-[var(--accent)] transition-all min-h-[40px]">
                                 <input 
+                                    ref={inputRef}
                                     type="text" 
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
