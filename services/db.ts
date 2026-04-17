@@ -2,7 +2,7 @@ import {
     User, Video, Transaction, VipPlan, Comment, UserInteraction, 
     Notification as AppNotification, VideoResult, ContentRequest, 
     MarketplaceItem, MarketplaceReview, BalanceRequest, VipRequest, 
-    SmartCleanerResult, FtpFile, SystemSettings, Category 
+    SmartCleanerResult, FtpFile, SystemSettings, Category, ChatMessage 
 } from '../types';
 
 interface VideoPagedResponse {
@@ -562,8 +562,8 @@ class DBService {
         return this.request<any[]>(`action=get_chats&userId=${userId}`);
     }
 
-    public async getMessages(userId: string, otherId: string): Promise<any[]> {
-        return this.request<any[]>(`action=get_messages&userId=${userId}&otherId=${otherId}`);
+    public async getMessages(userId: string, otherId: string, limit: number = 20, offset: number = 0): Promise<ChatMessage[]> {
+        return this.request<ChatMessage[]>(`action=get_messages&userId=${userId}&otherId=${otherId}&limit=${limit}&offset=${offset}`);
     }
 
     public async sendMessage(data: { userId: string, receiverId: string, text?: string, imageUrl?: string, videoUrl?: string, audioUrl?: string, fileUrl?: string, mediaType?: string }): Promise<any> {

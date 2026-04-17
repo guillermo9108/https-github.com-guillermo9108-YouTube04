@@ -20,13 +20,14 @@ const SharedMediaItem: React.FC<{
     onNavigate: (path: string) => void
 }> = ({ type, url, videoId, user, onNavigate }) => {
     const [isUnlocked, setIsUnlocked] = useState(false);
-    const [loading, setLoading] = useState(!!videoId);
+    const [isLoaded, setIsLoaded] = useState(false); // Lazy loading
+    const [isValidating, setIsValidating] = useState(!!videoId);
     const [videoData, setVideoData] = useState<VideoType | null>(null);
 
     useEffect(() => {
         if (!videoId || !user) {
             setIsUnlocked(true);
-            setLoading(false);
+            setIsValidating(false);
             return;
         }
 
@@ -46,56 +47,77 @@ const SharedMediaItem: React.FC<{
             } catch (e) {
                 setIsUnlocked(true); 
             } finally {
-                setLoading(false);
+                setIsValidating(false);
             }
         };
 
         checkAccess();
     }, [videoId, user?.id, user?.vipExpiry, user?.role]);
 
-    if (loading) return (
-        <div className="w-full h-32 bg-slate-800/50 animate-pulse rounded-xl flex items-center justify-center">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validando acceso...</p>
+    if (isValidating) return (
+        <div className="w-full h-24 bg-slate-800/30 animate-pulse rounded-xl flex items-center justify-center">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validando...</p>
         </div>
     );
 
     if (!isUnlocked && videoData) {
         return (
-            <div className="p-6 bg-slate-950 border border-white/10 rounded-[24px] flex flex-col items-center gap-4 text-center shadow-xl">
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-500">
-                    <Lock size={24} />
-                </div>
+            <div className="p-4 bg-slate-950 border border-white/10 rounded-[20px] flex flex-col items-center gap-3 text-center shadow-xl">
+                <Lock className="text-indigo-500" size={20} />
                 <div>
-                <h4 className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[150px]">{videoData.title}</h4>
-                <p className="text-[10px] text-indigo-400 font-black uppercase mt-1 tracking-widest">Contenido Premium (${videoData.price})</p>
+                    <h4 className="text-[10px] font-black text-white uppercase tracking-tight truncate max-w-[120px]">{videoData.title}</h4>
+                    <p className="text-[8px] text-indigo-400 font-bold uppercase mt-0.5 tracking-widest">${videoData.price}</p>
                 </div>
                 <button 
-                onClick={() => onNavigate(`/watch/${videoId}`)}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-lg active:scale-95"
+                    onClick={() => onNavigate(`/watch/${videoId}`)}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black uppercase rounded-xl transition-all shadow-lg active:scale-95"
                 >
-                    Pagar para ver
+                    Pagar
                 </button>
             </div>
         );
     }
 
     const vidUrl = videoId ? db.getStreamerUrl(videoId) : fixMediaUrl(url); 
+
+    if (!isLoaded) {
+        return (
+            <div 
+                onClick={() => setIsLoaded(true)}
+                className="w-full h-40 bg-slate-900 border border-white/5 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-800 transition-all group overflow-hidden relative shadow-lg"
+            >
+                {videoData?.thumbnailUrl && (
+                    <img 
+                        src={fixMediaUrl(videoData.thumbnailUrl)} 
+                        className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-500" 
+                        referrerPolicy="no-referrer"
+                    />
+                )}
+                <div className="z-10 w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center shadow-indigo-500/50 shadow-xl group-hover:scale-110 group-active:scale-95 transition-all">
+                    {type === 'VIDEO' ? <Play className="text-white fill-white ml-0.5" size={24} /> : <Music className="text-white" size={24} />}
+                </div>
+                <p className="z-10 text-[10px] font-black uppercase tracking-[0.2em] text-white drop-shadow-md">
+                    {type === 'VIDEO' ? 'Reproducir Video' : 'Escuchar Audio'}
+                </p>
+                {type === 'VIDEO' && videoData?.duration && (
+                    <div className="absolute bottom-3 right-3 px-2 py-0.5 bg-black/80 rounded-md text-[9px] font-bold text-white z-10">
+                        {Math.floor(videoData.duration / 60)}:{(videoData.duration % 60).toString().padStart(2, '0')}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     if (type === 'VIDEO') {
         return (
             <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl group relative">
-                <video src={vidUrl} className="w-full aspect-video object-contain" controls />
-                {!isUnlocked && (
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center">
-                        <Lock className="text-white/50 mb-2" size={32} />
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white">Contenido Bloqueado</p>
-                    </div>
-                )}
+                <video src={vidUrl} className="w-full aspect-video object-contain" controls autoPlay preload="auto" />
             </div>
         );
     } else {
         return (
             <div className="w-full bg-slate-900 p-2 rounded-2xl border border-white/5 shadow-xl">
-                <audio src={vidUrl} className="w-full" controls />
+                <audio src={vidUrl} className="w-full" controls autoPlay preload="auto" />
             </div>
         );
     }
@@ -109,6 +131,10 @@ export default function ChatDetailPage() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const limit = 20;
     const [isUploading, setIsUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
@@ -122,9 +148,36 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         if (user && otherId) {
-            loadChatData();
+            loadChatData(true);
         }
     }, [user?.id, otherId]);
+
+    // Safety Polling Fallback Every 15s when active/visible
+    useEffect(() => {
+        let interval: number | null = null;
+        if (user && otherId) {
+            interval = window.setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    syncNewMessages();
+                }
+            }, 15000);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [user?.id, otherId]);
+
+    const syncNewMessages = async () => {
+        if (!user || !otherId) return;
+        try {
+            // Fetch only most recent page to see if anything is new
+            const msgData = await db.getMessages(user.id, otherId, limit, 0);
+            setMessages(prev => {
+                const existingIds = new Set(prev.map(m => String(m.id)));
+                const newMessages = msgData.filter(m => !existingIds.has(String(m.id)));
+                if (newMessages.length === 0) return prev;
+                return [...prev, ...newMessages].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+            });
+        } catch(e){}
+    };
 
     useEffect(() => {
         if (socket) {
@@ -143,7 +196,8 @@ export default function ChatDetailPage() {
                         if (isFromOther || isFromMeToOther) {
                             setMessages(prev => {
                                 if (prev.some(m => String(m.id) === String(msg.id))) return prev;
-                                return [...prev, msg];
+                                // Add and ensure order
+                                return [...prev, msg].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
                             });
                         }
                     }
@@ -163,25 +217,51 @@ export default function ChatDetailPage() {
     }, [socket, otherId, user?.id]);
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        if (offset === 0) scrollToBottom();
+    }, [messages, offset]);
 
-    const loadChatData = async () => {
+    const loadChatData = async (initial: boolean = false) => {
         if (!user || !otherId) return;
+        if (initial) setLoading(true);
+        else setIsLoadingMore(true);
+
         try {
+            const currentOffset = initial ? 0 : offset;
             const [userData, msgData] = await Promise.all([
-                db.getUser(otherId),
-                db.getMessages(user.id, otherId)
+                initial ? db.getUser(otherId) : Promise.resolve(otherUser),
+                db.getMessages(user.id, otherId, limit, currentOffset)
             ]);
-            if (userData) {
+
+            if (initial && userData) {
                 userData.isOnline = onlineUserIds.has(String(otherId));
+                setOtherUser(userData);
             }
-            setOtherUser(userData);
-            setMessages(msgData);
+
+            if (initial) {
+                setMessages(msgData);
+                setOffset(msgData.length);
+            } else {
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => String(m.id)));
+                    const filtered = msgData.filter(m => !existingIds.has(String(m.id)));
+                    return [...filtered, ...prev].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+                });
+                setOffset(prev => prev + msgData.length);
+            }
+
+            setHasMore(msgData.length === limit);
         } catch (error) {
             console.error("Error loading chat data", error);
         } finally {
             setLoading(false);
+            setIsLoadingMore(false);
+        }
+    };
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const top = e.currentTarget.scrollTop;
+        if (top < 50 && !isLoadingMore && hasMore && !loading) {
+            loadChatData(false);
         }
     };
 
@@ -460,7 +540,20 @@ export default function ChatDetailPage() {
             </header>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto pt-20 pb-4 px-2 space-y-2 scrollbar-hide">
+            <div 
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto pt-20 pb-4 px-2 space-y-2 scrollbar-hide"
+            >
+                {hasMore && (
+                    <div className="py-4 text-center">
+                        {isLoadingMore ? (
+                            <Loader2 className="animate-spin text-[var(--accent)] mx-auto" size={20} />
+                        ) : (
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Desliza hacia arriba para ver más</p>
+                        )}
+                    </div>
+                )}
+                
                 <div className="flex flex-col items-center py-4 opacity-70">
                     <img src={otherUser?.avatarUrl} className="w-20 h-20 rounded-full mb-2 border-2 border-[var(--divider)] shadow-sm" referrerPolicy="no-referrer" />
                     <h2 className="text-lg font-bold tracking-tight">{otherUser?.username}</h2>

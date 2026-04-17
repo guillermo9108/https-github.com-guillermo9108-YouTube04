@@ -474,16 +474,37 @@ function interact_get_chats($pdo, $userId) {
     respond(true, $chats);
 }
 
-function interact_get_messages($pdo, $userId, $otherId) {
+function interact_get_messages($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    $otherId = $input['otherId'] ?? '';
+    $limit = isset($input['limit']) ? (int)$input['limit'] : 50;
+    $offset = isset($input['offset']) ? (int)$input['offset'] : 0;
+    
+    if (!$userId || !$otherId) respond(false, null, "Faltan IDs");
+
     // Marcar como leídos
     $pdo->prepare("UPDATE messages SET isRead = 1 WHERE senderId = ? AND receiverId = ?")->execute([$otherId, $userId]);
     
+    // Para paginación inversa (traer los últimos), traemos ordenados por timestamp DESC
+    // El frontend luego puede invertirlos para mostrar en orden cronológico
     $sql = "SELECT * FROM messages 
             WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) 
-            ORDER BY timestamp ASC";
+            ORDER BY timestamp DESC
+            LIMIT ? OFFSET ?";
+            
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$userId, $otherId, $otherId, $userId]);
+    $stmt->bindParam(1, $userId);
+    $stmt->bindParam(2, $otherId);
+    $stmt->bindParam(3, $otherId);
+    $stmt->bindParam(4, $userId);
+    $stmt->bindParam(5, $limit, PDO::PARAM_INT);
+    $stmt->bindParam(6, $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    
     $messages = $stmt->fetchAll();
+    
+    // Los devolvemos en orden ASC para el frontend (más fácil de manejar)
+    $messages = array_reverse($messages);
     
     foreach ($messages as &$m) {
         if ($m['imageUrl']) $m['imageUrl'] = fix_url($m['imageUrl']);

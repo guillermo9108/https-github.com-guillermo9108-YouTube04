@@ -260,7 +260,7 @@ try {
         case 'get_trending_videos': video_get_trending($pdo); break;
         case 'get_user_history': interact_get_history($pdo, $_GET['userId'] ?? ''); break;
         case 'get_chats': interact_get_chats($pdo, $_GET['userId'] ?? ''); break;
-        case 'get_messages': interact_get_messages($pdo, $_GET['userId'] ?? '', $_GET['otherId'] ?? ''); break;
+        case 'get_messages': interact_get_messages($pdo, $input); break;
         case 'send_message': interact_send_message($pdo, $input); break;
         case 'lock_video_for_processing': video_lock_for_processing($pdo, $input); break;
         case 'admin_bulk_edit_folder': admin_bulk_edit_folder($pdo, $input); break;
