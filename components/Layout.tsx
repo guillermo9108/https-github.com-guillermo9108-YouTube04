@@ -143,9 +143,6 @@ export default function Layout() {
             >
               <div className="relative">
                 <Home size={28} strokeWidth={location.pathname === '/' ? 2.5 : 2} />
-                <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                  15+
-                </span>
               </div>
             </Link>
             <Link to="/friends" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/friends' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
@@ -155,7 +152,7 @@ export default function Layout() {
               <div className="relative">
                 <MessageCircle size={28} strokeWidth={location.pathname === '/chat' ? 2.5 : 2} />
                 {chatUnreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-in zoom-in duration-300">
                     {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
                   </span>
                 )}
@@ -167,9 +164,6 @@ export default function Layout() {
             <Link to="/shorts" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <div className="relative">
                 <PlaySquare size={28} strokeWidth={location.pathname === '/shorts' ? 2.5 : 2} />
-                <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                  1
-                </span>
               </div>
             </Link>
             <Link to="/notifications" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/notifications' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>

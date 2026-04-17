@@ -398,7 +398,7 @@ function interact_get_history($pdo, $userId) {
             FROM interactions i 
             JOIN videos v ON i.videoId = v.id 
             LEFT JOIN users u ON v.creatorId = u.id 
-            WHERE i.userId = ? AND i.isWatched = 1 
+            WHERE i.userId = ? AND i.isWatched = 1 AND v.is_private = 0 
             ORDER BY i.watchedAt DESC 
             LIMIT 50";
     $stmt = $pdo->prepare($sql);

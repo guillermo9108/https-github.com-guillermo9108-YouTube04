@@ -133,6 +133,7 @@ export default function ChatDetailPage() {
             formData.append('title', `Chat ${type} ${Date.now()}`);
             formData.append('description', 'Chat attachment');
             formData.append('category', type === 'IMAGE' ? 'IMAGES' : 'GENERAL');
+            formData.append('is_private', '1');
 
             const res: any = await db.request('action=upload_video', {
                 method: 'POST',
@@ -339,11 +340,11 @@ export default function ChatDetailPage() {
             </header>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto pt-20 pb-4 px-4 space-y-4 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto pt-20 pb-4 px-2 space-y-2 scrollbar-hide">
                 <div className="flex flex-col items-center py-4 opacity-70">
-                    <img src={otherUser?.avatarUrl} className="w-20 h-20 rounded-full mb-2" referrerPolicy="no-referrer" />
-                    <h2 className="text-lg font-bold">{otherUser?.username}</h2>
-                    <p className="text-xs uppercase font-black tracking-widest text-[var(--accent)]">Amigo en StreamPay</p>
+                    <img src={otherUser?.avatarUrl} className="w-20 h-20 rounded-full mb-2 border-2 border-[var(--divider)] shadow-sm" referrerPolicy="no-referrer" />
+                    <h2 className="text-lg font-bold tracking-tight">{otherUser?.username}</h2>
+                    <p className="text-[10px] uppercase font-black tracking-widest text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 rounded-full">Amigo en StreamPay</p>
                 </div>
 
                 <AnimatePresence initial={false}>
@@ -356,18 +357,20 @@ export default function ChatDetailPage() {
                                 key={msg.id}
                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                                className={`flex ${isMe ? 'justify-end' : 'justify-start items-end gap-2'}`}
+                                className={`flex items-end ${isMe ? 'justify-end' : 'justify-start gap-1'}`}
                             >
                                 {!isMe && (
-                                    <div className="w-7 h-7 shrink-0">
+                                    <div className="w-7 h-7 shrink-0 mb-5">
                                         {showAvatar && (
-                                            <img src={otherUser?.avatarUrl} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                                            <img src={otherUser?.avatarUrl} className="w-full h-full rounded-full object-cover border border-[var(--divider)]" referrerPolicy="no-referrer" />
                                         )}
                                     </div>
                                 )}
-                                <div className={`max-w-[80%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                    <div className={`px-3 py-2 rounded-2xl text-[14px] shadow-sm ${
-                                        isMe ? 'bg-[var(--accent)] text-white rounded-br-sm' : 'bg-[var(--bg-tertiary)] rounded-bl-sm border border-[var(--divider)]'
+                                <div className={`max-w-[85%] flex flex-col ${isMe ? 'items-end ml-10' : 'items-start mr-10'}`}>
+                                    <div className={`px-3 py-2 rounded-2xl text-[14px] shadow-sm relative ${
+                                        isMe 
+                                        ? 'bg-[var(--accent)] text-white rounded-br-none' 
+                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-none border border-[var(--divider)]'
                                     }`}>
                                         {renderMessageContent(msg)}
                                     </div>
@@ -381,36 +384,37 @@ export default function ChatDetailPage() {
             </div>
 
             {/* Input Area */}
-            <div className="p-3 bg-[var(--bg-secondary)] border-t border-[var(--divider)] pb-safe">
+            <div className="p-2 bg-[var(--bg-secondary)] border-t border-[var(--divider)] pb-safe">
                 {audioBlob && !isRecording && (
-                    <div className="mb-3 p-2 bg-[var(--bg-tertiary)] rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white">
+                    <div className="mb-2 p-2 bg-[var(--bg-tertiary)] rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-[var(--divider)]">
+                        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
                             <Music size={16} />
                         </div>
                         <div className="flex-1">
-                            <p className="text-xs font-bold">Audio grabado</p>
+                            <p className="text-[10px] font-bold uppercase tracking-tight">Voz grabada</p>
                             <audio src={URL.createObjectURL(audioBlob)} controls className="h-6 mt-1 w-full" />
                         </div>
-                        <button onClick={() => setAudioBlob(null)} className="text-red-400 p-2"><Trash2 size={18} /></button>
+                        <button onClick={() => setAudioBlob(null)} className="text-red-400 p-2 hover:bg-red-400/10 rounded-full transition-colors"><Trash2 size={18} /></button>
                     </div>
                 )}
 
-                <div className="flex items-center gap-2 max-w-4xl mx-auto">
+                <div className="flex items-center gap-1.5 max-w-4xl mx-auto">
                     {isRecording ? (
                         <div className="flex-1 flex items-center h-10 bg-red-500/10 rounded-full px-4 text-red-500 gap-3 border border-red-500/20">
                             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                             <span className="flex-1 text-sm font-bold font-mono">{formatDuration(recordingTime)}</span>
-                            <button onClick={cancelRecording} className="text-red-500 px-2 font-bold text-xs uppercase">Cancelar</button>
-                            <button onClick={stopRecording} className="bg-red-500 text-white rounded-full p-1.5"><Mic size={16} /></button>
+                            <button onClick={cancelRecording} className="text-red-500 px-2 font-bold text-xs uppercase hover:bg-red-500/10 rounded-full py-1">Cancelar</button>
+                            <button onClick={stopRecording} className="bg-red-500 text-white rounded-full p-2.5 shadow-lg active:scale-90 transition-transform"><Mic size={18} /></button>
                         </div>
                     ) : (
                         <>
                             <div className="flex items-center">
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                    className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                    title="Adjuntar"
                                 >
-                                    <Plus size={22} className="rotate-45" />
+                                    <Plus size={24} />
                                 </button>
                                 <input 
                                     type="file" 
@@ -419,38 +423,31 @@ export default function ChatDetailPage() {
                                     className="hidden" 
                                     accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                                 />
-                                <button className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"><Video size={20} /></button>
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                                >
-                                    <ImageIcon size={20} />
-                                </button>
                             </div>
                             
-                            <div className="flex-1 bg-[var(--bg-tertiary)] rounded-full flex items-center px-4 border border-[var(--divider)] group focus-within:border-[var(--accent)] transition-colors">
+                            <div className="flex-1 bg-[var(--bg-tertiary)] rounded-full flex items-center px-4 border border-[var(--divider)] group focus-within:border-[var(--accent)] transition-all min-h-[40px]">
                                 <input 
                                     type="text" 
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
-                                    placeholder="Aa"
-                                    className="flex-1 h-10 bg-transparent text-sm focus:outline-none"
+                                    placeholder="Mensaje..."
+                                    className="flex-1 bg-transparent text-sm focus:outline-none py-2"
                                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                 />
-                                <button className="text-[var(--accent)]"><Plus size={18} /></button>
                             </div>
 
                             {inputText.trim() || audioBlob ? (
                                 <button 
                                     onClick={() => handleSendMessage()}
-                                    className="w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center shadow-lg transform active:scale-95 transition-all"
+                                    className="w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center shadow-md transform active:scale-95 transition-all shrink-0"
                                 >
-                                    <Send size={18} className="-mr-0.5 mt-0.5" />
+                                    <Send size={18} className="translate-x-0.5 -translate-y-0.5" />
                                 </button>
                             ) : (
                                 <button 
                                     onClick={startRecording}
-                                    className="w-10 h-10 text-[var(--accent)] flex items-center justify-center rounded-full hover:bg-[var(--bg-tertiary)] transition-colors"
+                                    className="w-10 h-10 text-[var(--accent)] flex items-center justify-center rounded-full hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+                                    title="Grabar voz"
                                 >
                                     <Mic size={22} />
                                 </button>

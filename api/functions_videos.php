@@ -176,9 +176,8 @@ function video_get_all($pdo) {
     $onlyUnseen = !empty($_GET['only_unseen']);
 
     $params = []; 
-    // Por defecto ocultar videos pendientes, EXCEPTO si estamos en modo Shorts y tenemos un shortsPath configurado
-    // Esto permite ver los videos mientras se procesan (aunque no tengan miniatura aún)
-    $where = ["v.category NOT IN ('PROCESSING', 'FAILED_METADATA')"];
+    // Por defecto ocultar videos pendientes y PRIVADOS
+    $where = ["v.category NOT IN ('PROCESSING', 'FAILED_METADATA')", "v.is_private = 0"];
     if (!$isShorts) {
         $where[] = "v.category != 'PENDING'";
     }
@@ -791,9 +790,10 @@ function video_upload($pdo, $post, $files) {
     }
 
     $collection = $post['collection'] ?? null;
+    $isPrivate = !empty($post['is_private']) ? 1 : 0;
 
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection, $isAudio]);
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
 
     require_once 'functions_interactions.php';
     // La notificación se enviará en video_organize_single cuando se procese el video
@@ -1360,7 +1360,7 @@ function video_get_trending($pdo) {
     $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl 
             FROM videos v 
             LEFT JOIN users u ON v.creatorId = u.id 
-            WHERE v.createdAt > ? 
+            WHERE v.createdAt > ? AND v.is_private = 0 
             ORDER BY (v.views + (v.likes * 5)) DESC 
             LIMIT 50";
             
