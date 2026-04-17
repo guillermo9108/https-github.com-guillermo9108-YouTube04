@@ -165,7 +165,10 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
-    const isOtherOnline = onlineUserIds.has(String(otherId)) || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300));
+    const isOtherOnline = onlineUserIds.has(String(otherId)) || 
+                         (otherUser && onlineUserIds.has(String(otherUser.id))) ||
+                         ((otherUser as any)?.isOnline === true) ||
+                         (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300));
 
     const syncNewMessages = async () => {
         if (!user || !otherId) return;
@@ -201,8 +204,6 @@ export default function ChatDetailPage() {
                                 // Add and ensure order
                                 return [...prev, msg].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
                             });
-                            // Scroll to bottom when a new message is received
-                            setTimeout(() => scrollToBottom('smooth'), 100);
                         }
                     }
                     if (data.type === 'USER_STATUS' && String(data.payload.userId) === String(otherId)) {
@@ -221,11 +222,17 @@ export default function ChatDetailPage() {
     }, [socket, otherId, user?.id]);
 
     useEffect(() => {
-        if (!loading && offset > 0 && messages.length > 0) {
-            // Jump to bottom on first load
-            setTimeout(() => scrollToBottom('auto'), 50);
+        if (!loading && messages.length > 0) {
+            // Se ejecuta al cargar inicialmente o al recibir mensaje nuevo
+            if (!isLoadingMore) {
+                // Si el offset es igual al largo, es la carga inicial o acabamos de resetear
+                // Usamos behavior 'auto' para que sea instantáneo al entrar
+                const isInitial = offset === messages.length;
+                const behavior: ScrollBehavior = isInitial ? 'auto' : 'smooth';
+                setTimeout(() => scrollToBottom(behavior), 50);
+            }
         }
-    }, [loading]);
+    }, [messages.length, loading, isLoadingMore]);
 
     const loadChatData = async (initial: boolean = false) => {
         if (!user || !otherId) return;
@@ -273,15 +280,21 @@ export default function ChatDetailPage() {
     };
 
     useEffect(() => {
-        if (otherUser && onlineUserIds.has(String(otherId))) {
-            setOtherUser(prev => prev && !prev.isOnline ? { ...prev, isOnline: true } : prev);
-        } else if (otherUser && !onlineUserIds.has(String(otherId))) {
-            setOtherUser(prev => prev && prev.isOnline ? { ...prev, isOnline: false } : prev);
+        const uid = String(otherId);
+        const isOnlineNow = onlineUserIds.has(uid);
+        if (otherUser) {
+            if (isOnlineNow && !otherUser.isOnline) {
+                setOtherUser(prev => prev ? { ...prev, isOnline: true } : null);
+            } else if (!isOnlineNow && otherUser.isOnline) {
+                setOtherUser(prev => prev ? { ...prev, isOnline: false } : null);
+            }
         }
-    }, [onlineUserIds, otherId]);
+    }, [onlineUserIds, otherId, otherUser?.id, otherUser?.isOnline]);
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-        messagesEndRef.current?.scrollIntoView({ behavior });
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+        }
     };
 
     const handleSendMessage = async (e?: React.FormEvent, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
@@ -319,7 +332,7 @@ export default function ChatDetailPage() {
 
             const newMsg = await db.sendMessage(sendData);
             setMessages(prev => [...prev, newMsg]);
-
+            
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     type: 'CHAT_MESSAGE',
