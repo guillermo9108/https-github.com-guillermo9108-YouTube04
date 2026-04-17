@@ -45,14 +45,21 @@ export default function Layout() {
   const { user, isOffline } = useAuth();
   const { settings } = useSettings();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     
     const checkNotifs = async () => {
         try {
-            const res = await db.getUnreadCount(user.id);
-            setUnreadCount(res.count);
+            const [notifRes, chatRes] = await Promise.all([
+                db.getUnreadCount(user.id),
+                db.getChats(user.id)
+            ]);
+            setUnreadCount(notifRes.count);
+            
+            const totalChatUnread = chatRes.reduce((acc, chat) => acc + (chat.unreadCount || 0), 0);
+            setChatUnreadCount(totalChatUnread);
         } catch(e) {}
     };
 
@@ -144,8 +151,15 @@ export default function Layout() {
             <Link to="/friends" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/friends' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <Users size={28} strokeWidth={location.pathname === '/friends' ? 2.5 : 2} />
             </Link>
-            <Link to="/chat" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/chat' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-              <MessageCircle size={28} strokeWidth={location.pathname === '/chat' ? 2.5 : 2} />
+            <Link to="/chat" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/chat' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <div className="relative">
+                <MessageCircle size={28} strokeWidth={location.pathname === '/chat' ? 2.5 : 2} />
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-[#f02849] border-2 border-[var(--bg-secondary)] rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
+                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                  </span>
+                )}
+              </div>
             </Link>
             <Link to="/trending" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/trending' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <TrendingUp size={28} strokeWidth={location.pathname === '/trending' ? 2.5 : 2} />

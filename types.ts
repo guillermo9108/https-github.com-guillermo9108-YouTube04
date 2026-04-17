@@ -347,6 +347,10 @@ export interface ChatMessage {
     receiverId: string;
     text: string;
     imageUrl?: string;
+    videoUrl?: string;
+    audioUrl?: string;
+    fileUrl?: string;
+    mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
     isRead: boolean;
     timestamp: number;
 }

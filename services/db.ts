@@ -566,7 +566,7 @@ class DBService {
         return this.request<any[]>(`action=get_messages&userId=${userId}&otherId=${otherId}`);
     }
 
-    public async sendMessage(data: { userId: string, receiverId: string, text?: string, imageUrl?: string }): Promise<any> {
+    public async sendMessage(data: { userId: string, receiverId: string, text?: string, imageUrl?: string, videoUrl?: string, audioUrl?: string, fileUrl?: string, mediaType?: string }): Promise<any> {
         return this.request<any>('action=send_message', {
             method: 'POST',
             body: JSON.stringify(data)
