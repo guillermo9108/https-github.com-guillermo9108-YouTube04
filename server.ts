@@ -14,8 +14,8 @@ async function startServer() {
   const wss = new WebSocketServer({ server });
   const PORT = 3000;
 
-  // Store connected clients: userId -> WebSocket
-  const clients = new Map<string, WebSocket>();
+  // Store connected clients: userId -> Set of WebSockets (allowing multiple tabs)
+  const userSockets = new Map<string, Set<WebSocket>>();
 
   wss.on("connection", (ws) => {
     let currentUserId: string | null = null;
@@ -25,17 +25,29 @@ async function startServer() {
         const message = JSON.parse(data.toString());
 
         if (message.type === "IDENTIFY" || message.type === "HEARTBEAT") {
-          currentUserId = message.userId || message.payload?.userId;
-          if (currentUserId) {
-            clients.set(currentUserId, ws);
+          const userId = message.userId || message.payload?.userId;
+          if (userId) {
+            const uid = String(userId);
+            // Unlink previous userId if it changed (unlikely in same socket)
+            if (currentUserId && currentUserId !== uid) {
+                userSockets.get(currentUserId)?.delete(ws);
+            }
             
-            // Broadcast that this user is online/active
+            currentUserId = uid;
+            if (!userSockets.has(uid)) {
+              userSockets.set(uid, new Set());
+            }
+            userSockets.get(uid)!.add(ws);
+            
+            // Broadcast that this user is online
+            const onlineMessage = JSON.stringify({
+              type: "USER_STATUS",
+              payload: { userId: uid, status: "online", timestamp: Date.now() }
+            });
+
             wss.clients.forEach(client => {
               if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({
-                  type: "USER_STATUS",
-                  payload: { userId: currentUserId, status: "online", timestamp: Date.now() }
-                }));
+                client.send(onlineMessage);
               }
             });
           }
@@ -43,10 +55,10 @@ async function startServer() {
 
         if (message.type === "SHARE_VIDEO") {
           const { targetUserId, videoTitle, senderName, videoId } = message.payload;
-          const targetWs = clients.get(targetUserId);
+          const sockets = userSockets.get(targetUserId);
 
-          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-            targetWs.send(JSON.stringify({
+          if (sockets) {
+            const notification = JSON.stringify({
               type: "NOTIFICATION",
               payload: {
                 id: Date.now().toString(),
@@ -54,7 +66,10 @@ async function startServer() {
                 videoId,
                 timestamp: Date.now()
               }
-            }));
+            });
+            sockets.forEach(s => {
+              if (s.readyState === WebSocket.OPEN) s.send(notification);
+            });
           }
         }
 
@@ -67,15 +82,16 @@ async function startServer() {
             videoUrl, 
             audioUrl, 
             fileUrl, 
+            videoId,
             mediaType, 
             timestamp, 
             id 
           } = message.payload;
           
-          const targetWs = clients.get(receiverId);
+          const sockets = userSockets.get(receiverId);
 
-          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-            targetWs.send(JSON.stringify({
+          if (sockets) {
+            const chatMsg = JSON.stringify({
               type: "CHAT_MESSAGE",
               payload: {
                 id,
@@ -86,10 +102,14 @@ async function startServer() {
                 videoUrl,
                 audioUrl,
                 fileUrl,
+                videoId,
                 mediaType,
                 timestamp
               }
-            }));
+            });
+            sockets.forEach(s => {
+              if (s.readyState === WebSocket.OPEN) s.send(chatMsg);
+            });
           }
         }
       } catch (err) {
@@ -99,7 +119,25 @@ async function startServer() {
 
     ws.on("close", () => {
       if (currentUserId) {
-        clients.delete(currentUserId);
+        const sockets = userSockets.get(currentUserId);
+        if (sockets) {
+          sockets.delete(ws);
+          if (sockets.size === 0) {
+            userSockets.delete(currentUserId);
+            
+            // Broadcast that this user is offline
+            const offlineMessage = JSON.stringify({
+              type: "USER_STATUS",
+              payload: { userId: currentUserId, status: "offline", timestamp: Date.now() }
+            });
+            
+            wss.clients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(offlineMessage);
+              }
+            });
+          }
+        }
         console.log(`User disconnected: ${currentUserId}`);
       }
     });

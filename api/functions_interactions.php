@@ -296,8 +296,8 @@ function interact_share_video($pdo, $input) {
     // Usar la URL que el frontend pueda interpretar para el streamer
     $streamUrl = "/api/stream.php?id=" . $vid;
     
-    $stmt = $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, $mediaCol, mediaType, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$msgId, $sid, $tid, $text, $streamUrl, $mediaType, $timestamp]);
+    $stmt = $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, $mediaCol, videoId, mediaType, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$msgId, $sid, $tid, $text, $streamUrl, $vid, $mediaType, $timestamp]);
     
     respond(true);
 }
@@ -503,6 +503,7 @@ function interact_send_message($pdo, $input) {
     $videoUrl = $input['videoUrl'] ?? null;
     $audioUrl = $input['audioUrl'] ?? null;
     $fileUrl = $input['fileUrl'] ?? null;
+    $videoId = $input['videoId'] ?? null;
     $mediaType = $input['mediaType'] ?? 'TEXT';
 
     $id = uniqid('msg_');
@@ -512,8 +513,8 @@ function interact_send_message($pdo, $input) {
         respond(false, null, "Mensaje vacío");
     }
     
-    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, mediaType, isRead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
-        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $mediaType, $now]);
+    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, videoId, mediaType, isRead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
+        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $videoId, $mediaType, $now]);
         
     respond(true, [
         'id' => $id,
@@ -524,6 +525,7 @@ function interact_send_message($pdo, $input) {
         'videoUrl' => $videoUrl ? fix_url($videoUrl) : null,
         'audioUrl' => $audioUrl ? fix_url($audioUrl) : null,
         'fileUrl' => $fileUrl ? fix_url($fileUrl) : null,
+        'videoId' => $videoId,
         'mediaType' => $mediaType,
         'timestamp' => $now,
         'isRead' => 0

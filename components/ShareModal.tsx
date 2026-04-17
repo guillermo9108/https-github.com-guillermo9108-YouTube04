@@ -70,7 +70,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ video, user, onClose, onShareSu
                 // Real-time chat message via WebSocket
                 if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                     const isAudio = Number(video.is_audio) === 1;
-                    const streamUrl = "/api/stream.php?id=" + video.id;
+                    const streamUrl = db.getStreamerUrl(video.id);
                     
                     socketRef.current.send(JSON.stringify({ 
                         type: 'CHAT_MESSAGE', 
@@ -81,7 +81,8 @@ const ShareModal: React.FC<ShareModalProps> = ({ video, user, onClose, onShareSu
                             text: `He compartido un video contigo: ${video.title}`,
                             videoUrl: !isAudio ? streamUrl : null,
                             audioUrl: isAudio ? streamUrl : null,
-                            mediaType: isAudio ? 'AUDIO' : 'VIDEO',
+                            videoId: video.id,
+                            mediaType: (isAudio ? 'AUDIO' : 'VIDEO') as any,
                             timestamp: Math.floor(Date.now() / 1000)
                         }
                     }));

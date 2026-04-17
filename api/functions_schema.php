@@ -297,6 +297,7 @@ function getAppSchema() {
                 'videoUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'audioUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'fileUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'videoId' => 'VARCHAR(50) DEFAULT NULL',
                 'mediaType' => "ENUM('TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'FILE') DEFAULT 'TEXT'",
                 'isRead' => 'TINYINT(1) DEFAULT 0',
                 'timestamp' => 'BIGINT'

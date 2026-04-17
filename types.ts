@@ -350,6 +350,7 @@ export interface ChatMessage {
     videoUrl?: string;
     audioUrl?: string;
     fileUrl?: string;
+    videoId?: string;
     mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
     isRead: boolean;
     timestamp: number;

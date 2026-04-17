@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus } from 'lucide-react';
+import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus, Lock } from 'lucide-react';
 import { useNavigate, useParams } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
-import { ChatMessage, User } from '../../types';
+import { ChatMessage, User, Video as VideoType } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ChatDetailPage() {
@@ -43,7 +43,12 @@ export default function ChatDetailPage() {
                         });
                     }
                     if (data.type === 'USER_STATUS' && data.payload.userId === otherId) {
-                        setOtherUser(prev => prev ? ({ ...prev, lastActive: Math.floor(Date.now() / 1000) }) : null);
+                        const isOnline = data.payload.status === 'online';
+                        setOtherUser(prev => prev ? ({ 
+                            ...prev, 
+                            lastActive: isOnline ? Math.floor(Date.now() / 1000) : (prev.lastActive || 0),
+                            isOnline: isOnline // Assuming we can use this virtual field
+                        }) : null);
                     }
                 } catch (e) {}
             };
@@ -220,6 +225,88 @@ export default function ChatDetailPage() {
         return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const SharedMediaItem: React.FC<{ 
+        type: 'VIDEO' | 'AUDIO', 
+        url: string, 
+        videoId?: string,
+        user: User | null 
+    }> = ({ type, url, videoId, user }) => {
+        const [isUnlocked, setIsUnlocked] = useState(false);
+        const [loading, setLoading] = useState(!!videoId);
+        const [videoData, setVideoData] = useState<VideoType | null>(null);
+
+        useEffect(() => {
+            if (!videoId || !user) {
+                setIsUnlocked(true);
+                setLoading(false);
+                return;
+            }
+
+            const checkAccess = async () => {
+                try {
+                    const v = await db.getVideo(videoId);
+                    if (!v) { setIsUnlocked(true); return; }
+                    setVideoData(v);
+
+                    const res = await db.hasPurchased(user.id, videoId);
+                    const access = res;
+                    const isVipActive = !!(user.vipExpiry && user.vipExpiry > Date.now() / 1000);
+                    const isOwner = user.id === v.creatorId;
+                    const isAdmin = user.role === 'ADMIN';
+
+                    setIsUnlocked(Boolean(access || isAdmin || isVipActive || isOwner || v.price === 0));
+                } catch (e) {
+                    setIsUnlocked(true); 
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            checkAccess();
+        }, [videoId, user]);
+
+        if (loading) return (
+            <div className="w-full h-32 bg-slate-800/50 animate-pulse rounded-xl flex items-center justify-center">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Validando acceso...</p>
+            </div>
+        );
+
+        if (!isUnlocked && videoData) {
+            return (
+                <div className="p-6 bg-slate-950 border border-white/10 rounded-[24px] flex flex-col items-center gap-4 text-center shadow-xl">
+                    <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-500">
+                        <Lock size={24} />
+                    </div>
+                    <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[150px]">{videoData.title}</h4>
+                    <p className="text-[10px] text-indigo-400 font-black uppercase mt-1 tracking-widest">Contenido Premium (${videoData.price})</p>
+                    </div>
+                    <button 
+                    onClick={() => navigate(`/watch/${videoId}`)}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-lg active:scale-95"
+                    >
+                        Pagar para ver
+                    </button>
+                </div>
+            );
+        }
+
+        const vidUrl = url; 
+        if (type === 'VIDEO') {
+            return (
+                <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl">
+                    <video src={vidUrl} className="w-full aspect-video object-contain" controls />
+                </div>
+            );
+        } else {
+            return (
+                <div className="w-full bg-slate-900 p-2 rounded-2xl border border-white/5 shadow-xl">
+                    <audio src={vidUrl} className="w-full" controls />
+                </div>
+            );
+        }
+    };
+
     const fixMediaUrl = (url?: string) => {
         if (!url) return '';
         if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/') || url.startsWith('/')) return url;
@@ -245,23 +332,17 @@ export default function ChatDetailPage() {
             case 'VIDEO':
                 const vidUrl = fixMediaUrl(msg.videoUrl);
                 return (
-                    <div className="flex flex-col gap-2">
-                        <div className="relative group rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-                            <video 
-                                src={vidUrl} 
-                                className="w-full h-full max-h-[300px] object-contain" 
-                                controls 
-                            />
-                        </div>
-                        {msg.text && <span>{msg.text}</span>}
+                    <div className="flex flex-col gap-2 min-w-[200px]">
+                        <SharedMediaItem type="VIDEO" url={vidUrl} videoId={msg.videoId} user={user} />
+                        {msg.text && <span className="text-xs px-1">{msg.text}</span>}
                     </div>
                 );
             case 'AUDIO':
                 const audUrl = fixMediaUrl(msg.audioUrl);
                 return (
                     <div className="flex flex-col gap-2 min-w-[200px]">
-                        <audio controls className="w-full h-8" src={audUrl} />
-                        {msg.text && <span>{msg.text}</span>}
+                        <SharedMediaItem type="AUDIO" url={audUrl} videoId={msg.videoId} user={user} />
+                        {msg.text && <span className="text-xs px-1">{msg.text}</span>}
                     </div>
                 );
             case 'FILE':
@@ -333,8 +414,12 @@ export default function ChatDetailPage() {
                     </div>
                     <div className="flex flex-col overflow-hidden">
                         <h1 className="text-sm font-bold truncate tracking-tight leading-none">{otherUser?.username}</h1>
-                        <p className="text-[10px] font-bold text-green-500 uppercase mt-0.5">
-                                {otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300) ? 'En línea' : 'Desconectado'}
+                        <p className={`text-[10px] font-bold uppercase mt-0.5 ${
+                            (otherUser as any)?.isOnline || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300))
+                            ? 'text-green-500'
+                            : 'text-gray-500'
+                        }`}>
+                            {(otherUser as any)?.isOnline || (otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300)) ? 'En línea' : 'Desconectado'}
                         </p>
                     </div>
                 </div>
@@ -372,11 +457,11 @@ export default function ChatDetailPage() {
                                         )}
                                     </div>
                                 )}
-                                <div className={`max-w-[85%] flex flex-col ${isMe ? 'items-end ml-10' : 'items-start mr-10'}`}>
-                                    <div className={`px-3 py-2 rounded-2xl text-[14px] shadow-sm relative ${
+                                <div className={`max-w-[85%] flex flex-col ${isMe ? 'items-end ml-1' : 'items-start mr-1'}`}>
+                                    <div className={`px-3 py-2 rounded-[24px] text-[14px] shadow-sm relative ${
                                         isMe 
-                                        ? 'bg-[var(--accent)] text-white rounded-br-none' 
-                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-none border border-[var(--divider)]'
+                                        ? 'bg-[var(--accent)] text-white rounded-br-none ml-2' 
+                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-none border border-[var(--divider)] mr-2'
                                     }`}>
                                         {renderMessageContent(msg)}
                                     </div>
