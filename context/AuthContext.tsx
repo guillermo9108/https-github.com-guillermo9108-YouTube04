@@ -13,6 +13,7 @@ interface AuthContextType {
   isOffline: boolean;
   socket: WebSocket | null;
   socketRef: React.RefObject<WebSocket | null>;
+  onlineUserIds: Set<string>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(db.getIsOffline());
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<WebSocket | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
   const userRef = useRef<User | null>(null); 
@@ -37,26 +39,72 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   useEffect(() => { userRef.current = user; }, [user]);
 
   useEffect(() => {
-    if (user && !socket) {
+    let reconnectTimer: number | null = null;
+    let ws: WebSocket | null = null;
+
+    const connect = () => {
+      if (!user) return;
+      
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${protocol}//${window.location.host}`);
+      const host = window.location.host;
+      ws = new WebSocket(`${protocol}//${host}`);
       
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'IDENTIFY', payload: { userId: user.id } }));
+        console.log("WebSocket connected");
+        if (ws) {
+            ws.send(JSON.stringify({ type: 'IDENTIFY', payload: { userId: user.id } }));
+            setSocket(ws);
+            socketRef.current = ws;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'NOTIFICATION') {
+                window.dispatchEvent(new CustomEvent('sp_notification', { detail: data.payload }));
+            }
+            if (data.type === 'USER_STATUS') {
+                const { userId, status } = data.payload;
+                const uid = String(userId);
+                setOnlineUserIds(prev => {
+                    const next = new Set(prev);
+                    if (status === 'online') next.add(uid);
+                    else next.delete(uid);
+                    return next;
+                });
+            }
+            if (data.type === 'ONLINE_USERS') {
+                const list = (data.payload as any[]).map(id => String(id));
+                setOnlineUserIds(new Set(list));
+            }
+        } catch (e) {}
       };
 
       ws.onclose = () => {
+        console.log("WebSocket disconnected, retrying in 3s...");
         setSocket(null);
         socketRef.current = null;
+        reconnectTimer = window.setTimeout(connect, 3000);
       };
 
-      setSocket(ws);
-      socketRef.current = ws;
-    } else if (!user && socket) {
-      socket.close();
-      setSocket(null);
+      ws.onerror = (err) => {
+        console.error("WebSocket error", err);
+        ws?.close();
+      };
+    };
+
+    if (user) {
+      connect();
+    } else if (ws) {
+      (ws as WebSocket).close();
     }
-  }, [user]);
+
+    return () => {
+      if (ws) ws.close();
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     const handleOffline = () => setIsOffline(true);
@@ -225,7 +273,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline, socket, socketRef }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isLoading, isOffline, socket, socketRef, onlineUserIds }}>
       {children}
     </AuthContext.Provider>
   );

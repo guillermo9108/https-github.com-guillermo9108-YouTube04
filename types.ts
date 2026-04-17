@@ -61,6 +61,7 @@ export interface User {
   is_verified_seller?: boolean | number;
   is_banned?: boolean | number;
   apkVersion?: string;
+  isOnline?: boolean;
 }
 
 export interface Story {

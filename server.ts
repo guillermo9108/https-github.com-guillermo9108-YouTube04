@@ -28,6 +28,8 @@ async function startServer() {
           const userId = message.userId || message.payload?.userId;
           if (userId) {
             const uid = String(userId);
+            if (message.type === "IDENTIFY") console.log(`User identified: ${uid}`);
+            
             // Unlink previous userId if it changed (unlikely in same socket)
             if (currentUserId && currentUserId !== uid) {
                 userSockets.get(currentUserId)?.delete(ws);
@@ -50,6 +52,15 @@ async function startServer() {
                 client.send(onlineMessage);
               }
             });
+
+            // If IDENTIFY, send back list of online users
+            if (message.type === "IDENTIFY") {
+                const onlineUsers = Array.from(userSockets.keys());
+                ws.send(JSON.stringify({
+                    type: "ONLINE_USERS",
+                    payload: onlineUsers
+                }));
+            }
           }
         }
 
@@ -74,41 +85,49 @@ async function startServer() {
         }
 
         if (message.type === "CHAT_MESSAGE") {
-          const { 
-            receiverId, 
-            senderId, 
-            text, 
-            imageUrl, 
-            videoUrl, 
-            audioUrl, 
-            fileUrl, 
-            videoId,
-            mediaType, 
-            timestamp, 
-            id 
-          } = message.payload;
+          // Normalize payload fields (handle both camelCase and snake_case)
+          const payload = message.payload || {};
+          const receiverId = String(payload.receiverId || payload.receiver_id || "");
+          const senderId = String(payload.senderId || payload.sender_id || "");
           
-          const sockets = userSockets.get(receiverId);
+          if (!receiverId) {
+            console.error("CHAT_MESSAGE missing receiverId", payload);
+            return;
+          }
 
-          if (sockets) {
-            const chatMsg = JSON.stringify({
-              type: "CHAT_MESSAGE",
-              payload: {
-                id,
-                senderId,
-                receiverId,
-                text,
-                imageUrl,
-                videoUrl,
-                audioUrl,
-                fileUrl,
-                videoId,
-                mediaType,
-                timestamp
-              }
-            });
-            sockets.forEach(s => {
+          // Ensure both casing versions exist for compatibility
+          const normalizedPayload = {
+            ...payload,
+            senderId,
+            receiverId,
+            sender_id: senderId,
+            receiver_id: receiverId
+          };
+
+          console.log(`Chat message from ${senderId} to ${receiverId}: ${payload.text?.substring(0, 20)}...`);
+          
+          const chatMsg = JSON.stringify({
+            type: "CHAT_MESSAGE",
+            payload: normalizedPayload
+          });
+
+          // Send to receiver
+          const receiverSockets = userSockets.get(receiverId);
+          if (receiverSockets && receiverSockets.size > 0) {
+            console.log(`Sending to ${receiverSockets.size} active sockets for receiver ${receiverId}`);
+            receiverSockets.forEach(s => {
               if (s.readyState === WebSocket.OPEN) s.send(chatMsg);
+            });
+          }
+
+          // Also sync to other sockets of the sender (multi-tab sync)
+          const senderSockets = userSockets.get(senderId);
+          if (senderSockets && senderSockets.size > 1) {
+            senderSockets.forEach(s => {
+              // Send to other sockets of the same user, excluding the current one
+              if (s !== ws && s.readyState === WebSocket.OPEN) {
+                s.send(chatMsg);
+              }
             });
           }
         }

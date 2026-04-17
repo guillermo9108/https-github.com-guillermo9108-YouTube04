@@ -294,7 +294,7 @@ function interact_share_video($pdo, $input) {
     $mediaCol = $isAudio ? 'audioUrl' : 'videoUrl';
     
     // Usar la URL que el frontend pueda interpretar para el streamer
-    $streamUrl = "/api/stream.php?id=" . $vid;
+    $streamUrl = "/api/index.php?action=stream&id=" . $vid;
     
     $stmt = $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, $mediaCol, videoId, mediaType, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$msgId, $sid, $tid, $text, $streamUrl, $vid, $mediaType, $timestamp]);

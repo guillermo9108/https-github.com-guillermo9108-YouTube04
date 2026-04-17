@@ -10,7 +10,7 @@ import { useToast } from '../../context/ToastContext';
 
 export default function ChatPage() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, socket, onlineUserIds } = useAuth();
     const toast = useToast();
     const [chats, setChats] = useState<Chat[]>([]);
     const [onlineFriends, setOnlineFriends] = useState<User[]>([]);
@@ -22,16 +22,73 @@ export default function ChatPage() {
     const [isSearching, setIsSearching] = useState(false);
 
     useEffect(() => {
+        if (socket) {
+            const handleMessage = (event: MessageEvent) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'CHAT_MESSAGE') {
+                        const newMsg = data.payload;
+                        const msgSenderId = String(newMsg.senderId || newMsg.sender_id || "");
+                        const msgReceiverId = String(newMsg.receiverId || newMsg.receiver_id || "");
+                        
+                        setChats(prev => {
+                            // Find the chat where the other user is either sender or receiver
+                            const existingChatIndex = prev.findIndex(c => {
+                                const chatUserId = String(c.user.id);
+                                return chatUserId === msgSenderId || chatUserId === msgReceiverId;
+                            });
+
+                            if (existingChatIndex > -1) {
+                                const newChats = [...prev];
+                                const chat = { ...newChats[existingChatIndex] };
+                                chat.lastMessage = newMsg;
+                                if (msgSenderId !== String(user?.id)) {
+                                    chat.unreadCount = (chat.unreadCount || 0) + 1;
+                                }
+                                // Mover al principio
+                                newChats.splice(existingChatIndex, 1);
+                                newChats.unshift(chat);
+                                return newChats;
+                            } else {
+                                // Reload chats if it's a new conversation
+                                loadChats();
+                                return prev;
+                            }
+                        });
+                    }
+                    // USER_STATUS and ONLINE_USERS are now handled by onlineUserIds effect
+                } catch (e) {}
+            };
+            socket.addEventListener('message', handleMessage);
+            return () => socket.removeEventListener('message', handleMessage);
+        }
+    }, [socket, user?.id]);
+
+    useEffect(() => {
         if (user) {
             loadChats();
             loadOnlineFriends();
         }
     }, [user]);
 
+    useEffect(() => {
+        setChats(prev => prev.map(chat => ({
+            ...chat,
+            user: { ...chat.user, isOnline: onlineUserIds.has(String(chat.user.id)) }
+        })));
+    }, [onlineUserIds]);
+
     const loadChats = async () => {
         try {
             const data = await db.getChats(user!.id);
-            setChats(data);
+            const enriched = data.map(chat => ({
+                ...chat,
+                user: {
+                    ...chat.user,
+                    isOnline: onlineUserIds.has(String(chat.user.id))
+                }
+            }));
+            setChats(enriched);
         } catch (error) {
             console.error("Error loading chats", error);
         } finally {
@@ -42,17 +99,22 @@ export default function ChatPage() {
     const loadOnlineFriends = async () => {
         if (!user) return;
         try {
-            // Usuarios seguidos que estén activos en los últimos 5 minutos
+            // Get all users and filter those who are in the onlineUserIds set
             const allUsers = await db.getAllUsers();
-            const now = Date.now() / 1000;
+            // In a real app, we might only want to show "friends" or "mutual follows"
+            // For now, we show anyone who is online and not us
             const online = allUsers.filter(u => 
                 u.id !== user.id && 
-                u.lastActive && 
-                (now - u.lastActive < 300)
+                onlineUserIds.has(String(u.id))
             );
             setOnlineFriends(online);
         } catch (error) {}
     };
+
+    // Refresh online friends when onlineUserIds changes
+    useEffect(() => {
+        if (user) loadOnlineFriends();
+    }, [onlineUserIds, user?.id]);
 
     const handleSearchNewChat = async (val: string) => {
         setNewChatSearch(val);
@@ -177,7 +239,7 @@ export default function ChatPage() {
                 ) : (
                     <div className="flex flex-col">
                         {filteredChats.map((chat, index) => {
-                            const isOnline = chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 300);
+                            const isOnline = chat.user.isOnline || (chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 300));
                             return (
                                 <button
                                     key={chat.user.id}

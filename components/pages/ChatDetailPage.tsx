@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function ChatDetailPage() {
     const { id: otherId } = useParams();
     const navigate = useNavigate();
-    const { user, socket } = useAuth();
+    const { user, socket, onlineUserIds } = useAuth();
     const [otherUser, setOtherUser] = useState<User | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
@@ -36,18 +36,28 @@ export default function ChatDetailPage() {
             const handleMessage = (event: MessageEvent) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'CHAT_MESSAGE' && data.payload.senderId === otherId) {
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === data.payload.id)) return prev;
-                            return [...prev, data.payload];
-                        });
+                    if (data.type === 'CHAT_MESSAGE') {
+                        const msg = data.payload;
+                        const msgSenderId = String(msg.senderId || msg.sender_id || "");
+                        const msgReceiverId = String(msg.receiverId || msg.receiver_id || "");
+                        
+                        // Check if message belongs to this conversation
+                        const isFromOther = msgSenderId === String(otherId);
+                        const isFromMeToOther = msgSenderId === String(user?.id) && msgReceiverId === String(otherId);
+                        
+                        if (isFromOther || isFromMeToOther) {
+                            setMessages(prev => {
+                                if (prev.some(m => String(m.id) === String(msg.id))) return prev;
+                                return [...prev, msg];
+                            });
+                        }
                     }
-                    if (data.type === 'USER_STATUS' && data.payload.userId === otherId) {
+                    if (data.type === 'USER_STATUS' && String(data.payload.userId) === String(otherId)) {
                         const isOnline = data.payload.status === 'online';
                         setOtherUser(prev => prev ? ({ 
                             ...prev, 
                             lastActive: isOnline ? Math.floor(Date.now() / 1000) : (prev.lastActive || 0),
-                            isOnline: isOnline // Assuming we can use this virtual field
+                            isOnline
                         }) : null);
                     }
                 } catch (e) {}
@@ -67,6 +77,9 @@ export default function ChatDetailPage() {
                 db.getUser(otherId!),
                 db.getMessages(user!.id, otherId!)
             ]);
+            if (userData) {
+                userData.isOnline = onlineUserIds.has(String(otherId));
+            }
             setOtherUser(userData);
             setMessages(msgData);
         } catch (error) {
@@ -75,6 +88,14 @@ export default function ChatDetailPage() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (otherUser && onlineUserIds.has(String(otherId))) {
+            setOtherUser(prev => prev && !prev.isOnline ? { ...prev, isOnline: true } : prev);
+        } else if (otherUser && !onlineUserIds.has(String(otherId))) {
+            setOtherUser(prev => prev && prev.isOnline ? { ...prev, isOnline: false } : prev);
+        }
+    }, [onlineUserIds, otherId]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -291,11 +312,17 @@ export default function ChatDetailPage() {
             );
         }
 
-        const vidUrl = url; 
+        const vidUrl = videoId ? db.getStreamerUrl(videoId) : fixMediaUrl(url); 
         if (type === 'VIDEO') {
             return (
-                <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl">
+                <div className="w-full bg-black rounded-2xl overflow-hidden border border-white/5 shadow-2xl group relative">
                     <video src={vidUrl} className="w-full aspect-video object-contain" controls />
+                    {!isUnlocked && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center">
+                            <Lock className="text-white/50 mb-2" size={32} />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white">Contenido Bloqueado</p>
+                        </div>
+                    )}
                 </div>
             );
         } else {
