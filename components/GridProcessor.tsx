@@ -112,8 +112,10 @@ export default function GridProcessor() {
             fd.append('clientIncompatible', isIncompatible ? '1' : '0');
             
             await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
+            console.log(`GridProcessor: Task completed for ${activeTask.id}`);
             completeTask(duration, null);
         } catch(e) {
+            console.error("GridProcessor: Error updating metadata", e);
             skipTask();
         } finally {
             if (currentBlobUrlRef.current) {

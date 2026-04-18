@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus, Lock } from 'lucide-react';
 import { useNavigate, useParams } from '../Router';
 import { useAuth } from '../../context/AuthContext';
@@ -378,23 +378,24 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
-    const isOtherOnline = onlineUserIds.has(String(otherId).trim()) || 
-                         (otherUser && (onlineUserIds.has(String(otherUser.id).trim()) || (otherUser as any).isOnline === true));
+    const isOtherOnline = onlineUserIds.has(String(otherId).trim());
 
     useEffect(() => {
         const handleResize = () => {
             if (messagesEndRef.current && window.visualViewport) {
-                // When keyboard shows, the viewport height decreases
-                // Scroll to bottom after a short delay to allow layout to settle
-                setTimeout(() => scrollToBottom('auto'), 100);
+                // Optimized scrolling
+                requestAnimationFrame(() => scrollToBottom('auto'));
             }
         };
-        window.visualViewport?.addEventListener('resize', handleResize);
-        window.visualViewport?.addEventListener('scroll', handleResize);
-        return () => {
-            window.visualViewport?.removeEventListener('resize', handleResize);
-            window.visualViewport?.removeEventListener('scroll', handleResize);
-        };
+        const vp = window.visualViewport;
+        if (vp) {
+            vp.addEventListener('resize', handleResize);
+            vp.addEventListener('scroll', handleResize);
+            return () => {
+                vp.removeEventListener('resize', handleResize);
+                vp.removeEventListener('scroll', handleResize);
+            };
+        }
     }, []);
 
     const syncNewMessages = async () => {
@@ -428,18 +429,9 @@ export default function ChatDetailPage() {
                         if (isFromOther || isFromMeToOther) {
                             setMessages(prev => {
                                 if (prev.some(m => String(m.id) === String(msg.id))) return prev;
-                                // Add and ensure order
                                 return [...prev, msg].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
                             });
                         }
-                    }
-                    if (data.type === 'USER_STATUS' && String(data.payload.userId) === String(otherId)) {
-                        const isOnline = data.payload.status === 'online';
-                        setOtherUser(prev => prev ? ({ 
-                            ...prev, 
-                            lastActive: isOnline ? Math.floor(Date.now() / 1000) : (prev.lastActive || 0),
-                            isOnline
-                        }) : null);
                     }
                 } catch (e) {}
             };
@@ -525,7 +517,7 @@ export default function ChatDetailPage() {
         }
     };
 
-    const handleSendMessage = async (text?: string, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
+    const handleSendMessage = useCallback(async (text?: string, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
         if (!text?.trim() && !mediaData && !audioBlob) return;
         if (!user || !otherId) return;
 
@@ -564,9 +556,9 @@ export default function ChatDetailPage() {
         } catch (error) {
             console.error("Error sending message", error);
         }
-    };
+    }, [user, otherId, audioBlob, socket]);
 
-    const uploadFile = async (file: File, explicitType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE') => {
+    const uploadFile = useCallback(async (file: File, explicitType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE') => {
         if (!user || !otherId) return;
         setIsUploading(true);
         try {
@@ -602,9 +594,9 @@ export default function ChatDetailPage() {
         } finally {
             setIsUploading(false);
         }
-    };
+    }, [user, otherId, handleSendMessage]);
 
-    const startRecording = async () => {
+    const startRecording = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const recorder = new MediaRecorder(stream);
@@ -629,24 +621,24 @@ export default function ChatDetailPage() {
             console.error("Error accessing microphone", err);
             alert("No se pudo acceder al micrófono.");
         }
-    };
+    }, []);
 
-    const stopRecording = () => {
+    const stopRecording = useCallback(() => {
         if (mediaRecorder && isRecording) {
             mediaRecorder.stop();
             setIsRecording(false);
             clearInterval(timerRef.current);
         }
-    };
+    }, [mediaRecorder, isRecording]);
 
-    const cancelRecording = () => {
+    const cancelRecording = useCallback(() => {
         if (mediaRecorder && isRecording) {
             mediaRecorder.stop();
             setIsRecording(false);
             clearInterval(timerRef.current);
             setAudioBlob(null);
         }
-    };
+    }, [mediaRecorder, isRecording]);
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -759,11 +751,16 @@ export default function ChatDetailPage() {
                     </div>
                     <div className="flex flex-col overflow-hidden">
                         <h1 className="text-sm font-bold truncate tracking-tight leading-none">{otherUser?.username}</h1>
-                        <p className={`text-[10px] font-bold uppercase mt-0.5 ${
-                            isOtherOnline ? 'text-green-500' : 'text-gray-500'
-                        }`}>
-                            {isOtherOnline ? 'En línea' : 'Desconectado'}
-                        </p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                            {isOtherOnline && (
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-500/50" />
+                            )}
+                            <p className={`text-[9px] font-black uppercase tracking-wider ${
+                                isOtherOnline ? 'text-green-500' : 'text-slate-500'
+                            }`}>
+                                {isOtherOnline ? 'ONLINE' : 'OFFLINE'}
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -817,7 +814,7 @@ export default function ChatDetailPage() {
 
             {/* Input Area */}
             <ChatInput 
-                onSend={(text) => handleSendMessage(text)}
+                onSend={handleSendMessage}
                 onUpload={uploadFile}
                 onStartRecording={startRecording}
                 onStopRecording={stopRecording}

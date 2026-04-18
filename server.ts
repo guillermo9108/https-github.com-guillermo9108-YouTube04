@@ -179,27 +179,40 @@ async function startServer() {
     });
   });
 
-  // API routes
+  // API Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
-  // Proxy API requests to PHP server
-  app.use("/api/*.php", createProxyMiddleware({
+  // Proxy for all PHP API requests
+  app.use('/api', createProxyMiddleware({
     target: "http://localhost:8000",
     changeOrigin: true,
+    pathFilter: (path) => {
+      // Exclude special paths handled by other proxies/express
+      if (path.includes('/uploads/') || path.includes('/video')) return false;
+      // All other /api calls should go to PHP
+      return path.startsWith('/api');
+    },
+    pathRewrite: (path) => {
+      // PHP server expects the full path including /api
+      return path.startsWith('/api') ? path : `/api${path}`;
+    },
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        // Raw requests (like FormData) are forwarded automatically by http-proxy-middleware 3.x
+      }
+    }
   }));
 
-  // Proxy streamer requests to Node streamer if they use /api/video
+  // Proxy streamer requests to Node streamer
   app.use("/api/video", createProxyMiddleware({
     target: "http://localhost:3001",
     changeOrigin: true,
-    pathRewrite: {
-      "^/api/video": "/video",
-    },
+    pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // Serve api/uploads as static
+  // Serve uploads as static
   app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));
 
   // Vite middleware for development

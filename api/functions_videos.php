@@ -589,13 +589,14 @@ function video_get_unprocessed($pdo, $params = []) {
     $lockId = uniqid('lock_', true);
     
     // Intentar bloquear los videos disponibles
-    // Se ordena por videoUrl para mantener el orden alfabético por carpeta
+    // Se ordena por intentos de procesamiento y luego aleatoriamente (o por fecha) 
+    // para evitar quedarse estancado siempre en el mismo video problemático
     $stmt = $pdo->prepare("UPDATE videos 
                            SET locked_at = :now, lock_id = :lockId 
                            WHERE category = 'PENDING' 
-                           AND processing_attempts < 3 
+                           AND processing_attempts < 5 
                            AND (locked_at < :time OR locked_at IS NULL)
-                           ORDER BY videoUrl ASC 
+                           ORDER BY processing_attempts ASC, RAND()
                            LIMIT :limit");
     $stmt->bindValue(':now', $now, PDO::PARAM_INT);
     $stmt->bindValue(':lockId', $lockId, PDO::PARAM_STR);
@@ -813,6 +814,8 @@ function video_update_metadata($pdo, $post, $files) {
     $success = ($post['success'] ?? '1') === '1';
     if (!$success) {
         $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
+        // Si ha fallado repetidamente, marcar como fallido para que no estanque el procesador
+        $pdo->prepare("UPDATE videos SET category = 'FAILED_METADATA' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
         respond(true); 
     }
     $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0", "lock_id = NULL"]; 
