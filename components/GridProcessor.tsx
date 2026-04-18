@@ -145,20 +145,25 @@ export default function GridProcessor() {
                     canvas.toBlob(async (blob) => {
                         if (!activeTask || processedRef.current) return;
                         
-                        const file = blob ? new File([blob], "thumb.webp", { type: "image/webp" }) : null;
-                        
-                        processedRef.current = true;
-                        setStatus('DONE');
+                        try {
+                            const file = blob ? new File([blob], "thumb.webp", { type: "image/webp" }) : null;
+                            
+                            processedRef.current = true;
+                            setStatus('DONE');
 
-                        const fd = new FormData();
-                        fd.append('id', activeTask.id);
-                        fd.append('duration', String(vid.duration));
-                        fd.append('success', '1');
-                        fd.append('clientIncompatible', '0');
-                        if (file) fd.append('thumbnail', file);
-                        
-                        await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
-                        completeTask(vid.duration, null);
+                            const fd = new FormData();
+                            fd.append('id', activeTask.id);
+                            fd.append('duration', String(vid.duration));
+                            fd.append('success', '1');
+                            fd.append('clientIncompatible', '0');
+                            if (file) fd.append('thumbnail', file);
+                            
+                            await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
+                            completeTask(vid.duration, null);
+                        } catch (err) {
+                            console.error("GridProcessor: Error in blob processing", err);
+                            handleFinishTask(vid.duration, vid.duration > 0, true);
+                        }
                     }, 'image/webp', 0.6);
                 } else {
                     handleFinishTask(vid.duration, vid.duration > 0, false);

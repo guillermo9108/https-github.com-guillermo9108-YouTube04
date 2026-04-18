@@ -192,16 +192,15 @@ async function startServer() {
     pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // 3. Catch-all PHP Proxy (Port 8000)
-  // We use an unmounted middleware with a filter to ensure the FULL path (including /api) is sent to PHP.
-  // This must be AFTER more specific routes like /api/uploads and /api/video.
-  app.use(createProxyMiddleware({
-    pathFilter: (path) => path.startsWith('/api'),
+  // 3. Catch-all PHP Backend Proxy (Standard mounted style)
+  // This must be AFTER specific routes like /api/uploads and /api/video
+  app.use("/api", createProxyMiddleware({
     target: "http://localhost:8000",
     changeOrigin: true,
+    pathRewrite: { "^/api": "/api" }, // Important: keep /api in the path sent to PHP
     on: {
       proxyReq: (proxyReq, req, res) => {
-        // For debugging: console.log(`Proxying ${req.method} ${req.url}`);
+        // Direct streaming for FormData/POST requests
       },
       error: (err, req, res) => {
         console.error("Proxy Error (PHP):", err);

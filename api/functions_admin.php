@@ -283,7 +283,7 @@ function admin_repair_broken_videos($pdo) {
         $thumb = $v['thumbnailUrl'];
         $physicalThumbMissing = true;
         
-        if (!empty($thumb) && strpos($thumb, 'default_video.png') === false && strpos($thumb, 'default.jpg') === false) {
+        if (!empty($thumb)) {
             $thumbPath = resolve_video_path($thumb);
             if ($thumbPath && file_exists($thumbPath) && filesize($thumbPath) > 0) {
                 $physicalThumbMissing = false;
@@ -694,7 +694,8 @@ function admin_skip_transcode($pdo, $vid) {
 
 function admin_process_next_transcode($pdo) {
     // Buscar binarios necesarios
-    $ffmpeg = 'ffmpeg'; 
+    $bins = get_ffmpeg_binaries($pdo);
+    $ffmpeg = $bins['ffmpeg']; 
     
     // Buscar el siguiente video en cola
     $stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' LIMIT 1");

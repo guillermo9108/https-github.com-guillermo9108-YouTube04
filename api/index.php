@@ -108,10 +108,11 @@ if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
 if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';
 if (file_exists('functions_payment.php')) require_once 'functions_payment.php';
 
-$action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 if (!is_array($input)) $input = [];
 $input = array_merge($_GET, $input);
+
+$action = $_GET['action'] ?? $input['action'] ?? '';
 
 // Extraer Token de Bearer si existe
 $headers = [];

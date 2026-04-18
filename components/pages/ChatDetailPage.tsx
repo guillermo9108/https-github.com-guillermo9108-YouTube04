@@ -383,19 +383,21 @@ export default function ChatDetailPage() {
     const isOtherOnline = onlineUserIds.has(String(otherId).trim());
 
     const [vh, setVh] = useState(window.innerHeight);
+    const [offsetTop, setOffsetTop] = useState(0);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
             if (window.visualViewport) {
                 const currentHeight = window.visualViewport.height;
+                const currentOffset = window.visualViewport.offsetTop;
                 setVh(currentHeight);
+                setOffsetTop(currentOffset);
                 
                 const keyboardActive = currentHeight < window.innerHeight * 0.85;
                 setIsKeyboardOpen(keyboardActive);
 
                 if (keyboardActive && messagesEndRef.current) {
-                    // Use a small timeout to let the browser finishing adjusting
                     setTimeout(() => scrollToBottom('auto'), 50);
                 }
             }
@@ -403,9 +405,10 @@ export default function ChatDetailPage() {
         const vp = window.visualViewport;
         if (vp) {
             vp.addEventListener('resize', handleResize);
-            // We NO LONGER listen to 'scroll' to avoid jitter during typing
+            vp.addEventListener('scroll', handleResize);
             return () => {
                 vp.removeEventListener('resize', handleResize);
+                vp.removeEventListener('scroll', handleResize);
             };
         }
     }, []);
@@ -738,8 +741,12 @@ export default function ChatDetailPage() {
 
     return (
         <div 
-            style={{ height: vh }}
-            className={`flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] fixed inset-0 overflow-hidden ${isKeyboardOpen ? 'keyboard-open' : ''}`}
+            style={{ 
+                height: vh,
+                top: offsetTop,
+                position: isKeyboardOpen ? 'absolute' : 'fixed'
+            }}
+            className={`flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] inset-0 overflow-hidden ${isKeyboardOpen ? 'keyboard-open' : ''}`}
         >
             {/* Header */}
             <header className="shrink-0 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2 relative z-50">
