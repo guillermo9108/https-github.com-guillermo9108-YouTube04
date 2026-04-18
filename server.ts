@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import { spawn } from "child_process";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +15,19 @@ async function startServer() {
   const server = createServer(app);
   const wss = new WebSocketServer({ server });
   const PORT = 3000;
+
+  // Start PHP server for API
+  console.log("Starting PHP server on port 8000...");
+  const php = spawn("php", ["-S", "0.0.0.0:8000", "-t", "."], {
+    stdio: "inherit"
+  });
+
+  // Start Streamer server on port 3001
+  console.log("Starting Streamer server on port 3001...");
+  const streamer = spawn("node", ["api/streamer.js"], {
+    stdio: "inherit",
+    env: { ...process.env, PORT: "3001" }
+  });
 
   // Store connected clients: userId -> Set of WebSockets (allowing multiple tabs)
   const userSockets = new Map<string, Set<WebSocket>>();
@@ -27,15 +42,17 @@ async function startServer() {
         if (message.type === "IDENTIFY" || message.type === "HEARTBEAT") {
           const userId = message.userId || message.payload?.userId;
           if (userId) {
-            const uid = String(userId);
-            if (message.type === "IDENTIFY") console.log(`User identified: ${uid}`);
+            const uid = String(userId).trim();
+            if (message.type === "IDENTIFY") console.log(`WebSocket: User ${uid} identified`);
             
-            // Unlink previous userId if it changed (unlikely in same socket)
+            // Unlink previous userId if it changed
             if (currentUserId && currentUserId !== uid) {
                 userSockets.get(currentUserId)?.delete(ws);
+                if (userSockets.get(currentUserId)?.size === 0) userSockets.delete(currentUserId);
             }
             
             currentUserId = uid;
+            (ws as any).userId = uid; // Tag the socket
             if (!userSockets.has(uid)) {
               userSockets.set(uid, new Set());
             }
@@ -166,6 +183,21 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+
+  // Proxy API requests to PHP server
+  app.use("/api/*.php", createProxyMiddleware({
+    target: "http://localhost:8000",
+    changeOrigin: true,
+  }));
+
+  // Proxy streamer requests to Node streamer if they use /api/video
+  app.use("/api/video", createProxyMiddleware({
+    target: "http://localhost:3001",
+    changeOrigin: true,
+    pathRewrite: {
+      "^/api/video": "/video",
+    },
+  }));
 
   // Serve api/uploads as static
   app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));

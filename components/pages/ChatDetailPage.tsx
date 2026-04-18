@@ -123,13 +123,227 @@ const SharedMediaItem: React.FC<{
     }
 };
 
+interface ChatInputProps {
+    onSend: (text: string) => void;
+    onUpload: (file: File) => void;
+    onStartRecording: () => void;
+    onStopRecording: () => void;
+    onCancelRecording: () => void;
+    isRecording: boolean;
+    recordingTime: number;
+    audioBlob: Blob | null;
+    setAudioBlob: (blob: Blob | null) => void;
+    isUploading: boolean;
+}
+
+const ChatInput: React.FC<ChatInputProps> = React.memo(({ 
+    onSend, onUpload, onStartRecording, onStopRecording, onCancelRecording, 
+    isRecording, recordingTime, audioBlob, setAudioBlob, isUploading 
+}) => {
+    const [inputText, setInputText] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleSend = () => {
+        const text = inputText.trim();
+        if (!text && !audioBlob) return;
+        onSend(text);
+        setInputText('');
+        // Focus usually stays but being safe
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const formatDuration = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="p-2 bg-[var(--bg-secondary)] border-t border-[var(--divider)] pb-safe shadow-lg z-50">
+            {audioBlob && !isRecording && (
+                <div className="mb-2 p-2 bg-[var(--bg-tertiary)] rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-[var(--divider)]">
+                    <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
+                        <Music size={16} />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[10px] font-bold uppercase tracking-tight">Voz grabada</p>
+                        <audio src={URL.createObjectURL(audioBlob)} controls className="h-6 mt-1 w-full" />
+                    </div>
+                    <button onClick={() => setAudioBlob(null)} className="text-red-400 p-2 hover:bg-red-400/10 rounded-full transition-colors"><Trash2 size={18} /></button>
+                </div>
+            )}
+
+            <div className="flex items-center gap-1.5 max-w-4xl mx-auto">
+                {isRecording ? (
+                    <div className="flex-1 flex items-center h-10 bg-red-500/10 rounded-full px-4 text-red-500 gap-3 border border-red-500/20">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="flex-1 text-sm font-bold font-mono">{formatDuration(recordingTime)}</span>
+                        <button onClick={onCancelRecording} className="text-red-500 px-2 font-bold text-xs uppercase hover:bg-red-500/10 rounded-full py-1">Cancelar</button>
+                        <button onClick={onStopRecording} className="bg-red-500 text-white rounded-full p-2.5 shadow-lg active:scale-90 transition-transform"><Mic size={18} /></button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex items-center">
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                title="Adjuntar"
+                                disabled={isUploading}
+                            >
+                                {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Plus size={24} />}
+                            </button>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) onUpload(file);
+                                    e.target.value = '';
+                                }} 
+                                className="hidden" 
+                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                            />
+                        </div>
+                        
+                        <div className="flex-1 bg-[var(--bg-tertiary)] rounded-full flex items-center px-4 border border-[var(--divider)] group focus-within:border-[var(--accent)] transition-all min-h-[40px]">
+                            <input 
+                                ref={inputRef}
+                                type="text" 
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                                placeholder="Mensaje..."
+                                className="flex-1 bg-transparent text-sm focus:outline-none py-2"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            />
+                        </div>
+
+                        {inputText.trim() || audioBlob ? (
+                            <button 
+                                onClick={handleSend}
+                                className="w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center shadow-lg shadow-[var(--accent)]/30 active:scale-90 transition-transform"
+                            >
+                                <Send size={20} className="ml-0.5" />
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={onStartRecording}
+                                className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-all"
+                            >
+                                <Mic size={22} />
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+});
+
+const MessageItem = React.memo(({ msg, isMe, showAvatar, otherUser, user, onNavigate }: { 
+    msg: ChatMessage, isMe: boolean, showAvatar: boolean, otherUser: User | null, user: User | null, onNavigate: (p: string) => void 
+}) => {
+    const formatTime = (timestamp: number) => {
+        return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const renderContent = () => {
+        switch (msg.mediaType) {
+            case 'IMAGE':
+                const imgUrl = fixMediaUrl(msg.imageUrl);
+                return (
+                    <div className="flex flex-col gap-2">
+                        <img 
+                            src={imgUrl} 
+                            className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                            alt="Attached"
+                            referrerPolicy="no-referrer"
+                            onClick={() => window.open(imgUrl, '_blank')}
+                        />
+                        {msg.text && <span>{msg.text}</span>}
+                    </div>
+                );
+            case 'VIDEO':
+                return (
+                    <div className="flex flex-col gap-2 min-w-[200px]">
+                        <SharedMediaItem type="VIDEO" url={fixMediaUrl(msg.videoUrl)} videoId={msg.videoId} user={user} onNavigate={onNavigate} />
+                        {msg.text && <span className="text-xs px-1">{msg.text}</span>}
+                    </div>
+                );
+            case 'AUDIO':
+                return (
+                    <div className="flex flex-col gap-2 min-w-[200px]">
+                        <SharedMediaItem type="AUDIO" url={fixMediaUrl(msg.audioUrl)} videoId={msg.videoId} user={user} onNavigate={onNavigate} />
+                        {msg.text && <span className="text-xs px-1">{msg.text}</span>}
+                    </div>
+                );
+            case 'FILE':
+                const flUrl = fixMediaUrl(msg.fileUrl);
+                return (
+                    <div 
+                        onClick={() => window.open(flUrl, '_blank')}
+                        className="flex items-center gap-3 p-2 bg-white/10 rounded-lg cursor-pointer hover:bg-white/20 transition-colors"
+                    >
+                        <div className="w-10 h-10 rounded bg-[var(--accent)] flex items-center justify-center text-white">
+                            <FileIcon size={20} />
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <p className="text-xs font-bold truncate">Archivo adjunto</p>
+                            <p className="text-[10px] opacity-70 uppercase">Descargar</p>
+                        </div>
+                    </div>
+                );
+            default:
+                const legacyImgUrl = fixMediaUrl(msg.imageUrl);
+                return (
+                    <>
+                        {msg.imageUrl && (
+                             <img 
+                                src={legacyImgUrl} 
+                                className="max-w-full rounded-lg mb-2" 
+                                alt="Legacy attachment" 
+                                referrerPolicy="no-referrer"
+                            />
+                        )}
+                        <span>{msg.text}</span>
+                    </>
+                );
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className={`flex items-end ${isMe ? 'justify-end' : 'justify-start gap-1'}`}
+        >
+            {!isMe && (
+                <div className="w-7 h-7 shrink-0 mb-5">
+                    {showAvatar && (
+                        <img src={otherUser?.avatarUrl} className="w-full h-full rounded-full object-cover border border-[var(--divider)]" referrerPolicy="no-referrer" alt="" />
+                    )}
+                </div>
+            )}
+            <div className={`max-w-[85%] flex flex-col ${isMe ? 'items-end ml-1' : 'items-start mr-1'}`}>
+                <div className={`px-3 py-2 rounded-[24px] text-[14px] shadow-sm relative ${
+                    isMe 
+                    ? 'bg-[var(--accent)] text-white rounded-br-none ml-2' 
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-none border border-[var(--divider)] mr-2'
+                }`}>
+                    {renderContent()}
+                </div>
+                <span className="text-[9px] font-bold opacity-50 mt-1 px-1">{formatTime(msg.timestamp)}</span>
+            </div>
+        </motion.div>
+    );
+});
+
 export default function ChatDetailPage() {
     const { id: otherId } = useParams();
     const navigate = useNavigate();
     const { user, socket, onlineUserIds } = useAuth();
     const [otherUser, setOtherUser] = useState<User | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [offset, setOffset] = useState(0);
@@ -144,8 +358,6 @@ export default function ChatDetailPage() {
     const timerRef = useRef<any>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (user && otherId) {
@@ -171,12 +383,18 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         const handleResize = () => {
-            if (messagesEndRef.current) {
-                scrollToBottom('auto');
+            if (messagesEndRef.current && window.visualViewport) {
+                // When keyboard shows, the viewport height decreases
+                // Scroll to bottom after a short delay to allow layout to settle
+                setTimeout(() => scrollToBottom('auto'), 100);
             }
         };
         window.visualViewport?.addEventListener('resize', handleResize);
-        return () => window.visualViewport?.removeEventListener('resize', handleResize);
+        window.visualViewport?.addEventListener('scroll', handleResize);
+        return () => {
+            window.visualViewport?.removeEventListener('resize', handleResize);
+            window.visualViewport?.removeEventListener('scroll', handleResize);
+        };
     }, []);
 
     const syncNewMessages = async () => {
@@ -232,16 +450,19 @@ export default function ChatDetailPage() {
 
     useEffect(() => {
         if (!loading && messages.length > 0) {
-            // Se ejecuta al cargar inicialmente o al recibir mensaje nuevo
+            // Be more aggressive with scrolling to bottom on new messages
             if (!isLoadingMore) {
-                // Si el offset es igual al largo, es la carga inicial o acabamos de resetear
-                // Usamos behavior 'auto' para que sea instantáneo al entrar
                 const isInitial = offset === messages.length;
+                // If it's the very first load or a new message arrived
                 const behavior: ScrollBehavior = isInitial ? 'auto' : 'smooth';
-                setTimeout(() => scrollToBottom(behavior), 50);
+                
+                // Double scroll to ensure it reaches the end in mobile browsers
+                scrollToBottom(behavior);
+                const timer = setTimeout(() => scrollToBottom(behavior), 150);
+                return () => clearTimeout(timer);
             }
         }
-    }, [messages.length, loading, isLoadingMore]);
+    }, [messages.length, loading, isLoadingMore, offset]);
 
     const loadChatData = async (initial: boolean = false) => {
         if (!user || !otherId) return;
@@ -304,45 +525,36 @@ export default function ChatDetailPage() {
         }
     };
 
-    const handleSendMessage = async (e?: React.FormEvent, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
-        e?.preventDefault();
-        if (!inputText.trim() && !mediaData && !audioBlob) return;
+    const handleSendMessage = async (text?: string, mediaData?: { url: string, type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' }) => {
+        if (!text?.trim() && !mediaData && !audioBlob) return;
         if (!user || !otherId) return;
 
-        const text = inputText.trim();
-        setInputText('');
-
         try {
-            let finalMedia = mediaData;
-
-            // Handle pending audio blob if it exists and we're clicking send
+            // Handle pending audio blob
             if (audioBlob && !mediaData) {
                 const audioFile = new File([audioBlob], `recording_${Date.now()}.webm`, { type: 'audio/webm' });
                 await uploadFile(audioFile, 'AUDIO');
                 setAudioBlob(null);
-                return; // uploadFile calls handleSendMessage again
+                return;
             }
 
             const sendData: any = {
                 userId: user.id,
                 receiverId: otherId,
-                text,
-                mediaType: finalMedia?.type
+                text: text || '',
+                mediaType: mediaData?.type
             };
 
-            if (finalMedia) {
-                if (finalMedia.type === 'IMAGE') sendData.imageUrl = finalMedia.url;
-                else if (finalMedia.type === 'VIDEO') sendData.videoUrl = finalMedia.url;
-                else if (finalMedia.type === 'AUDIO') sendData.audioUrl = finalMedia.url;
-                else sendData.fileUrl = finalMedia.url;
+            if (mediaData) {
+                if (mediaData.type === 'IMAGE') sendData.imageUrl = mediaData.url;
+                else if (mediaData.type === 'VIDEO') sendData.videoUrl = mediaData.url;
+                else if (mediaData.type === 'AUDIO') sendData.audioUrl = mediaData.url;
+                else sendData.fileUrl = mediaData.url;
             }
 
             const newMsg = await db.sendMessage(sendData);
             setMessages(prev => [...prev, newMsg]);
             
-            // Refocus input to keep keyboard up
-            setTimeout(() => inputRef.current?.focus(), 50);
-
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({
                     type: 'CHAT_MESSAGE',
@@ -389,13 +601,7 @@ export default function ChatDetailPage() {
             console.error("Error uploading chat file", error);
         } finally {
             setIsUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
         }
-    };
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) await uploadFile(file);
     };
 
     const startRecording = async () => {
@@ -594,30 +800,15 @@ export default function ChatDetailPage() {
                         const showAvatar = !isMe && (index === messages.length - 1 || messages[index + 1].senderId !== msg.senderId);
                         
                         return (
-                            <motion.div
+                            <MessageItem 
                                 key={msg.id}
-                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                className={`flex items-end ${isMe ? 'justify-end' : 'justify-start gap-1'}`}
-                            >
-                                {!isMe && (
-                                    <div className="w-7 h-7 shrink-0 mb-5">
-                                        {showAvatar && (
-                                            <img src={otherUser?.avatarUrl} className="w-full h-full rounded-full object-cover border border-[var(--divider)]" referrerPolicy="no-referrer" />
-                                        )}
-                                    </div>
-                                )}
-                                <div className={`max-w-[85%] flex flex-col ${isMe ? 'items-end ml-1' : 'items-start mr-1'}`}>
-                                    <div className={`px-3 py-2 rounded-[24px] text-[14px] shadow-sm relative ${
-                                        isMe 
-                                        ? 'bg-[var(--accent)] text-white rounded-br-none ml-2' 
-                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-bl-none border border-[var(--divider)] mr-2'
-                                    }`}>
-                                        {renderMessageContent(msg)}
-                                    </div>
-                                    <span className="text-[9px] font-bold opacity-50 mt-1 px-1">{formatTime(msg.timestamp)}</span>
-                                </div>
-                            </motion.div>
+                                msg={msg}
+                                isMe={isMe}
+                                showAvatar={showAvatar}
+                                otherUser={otherUser}
+                                user={user}
+                                onNavigate={navigate}
+                            />
                         );
                     })}
                 </AnimatePresence>
@@ -625,79 +816,18 @@ export default function ChatDetailPage() {
             </div>
 
             {/* Input Area */}
-            <div className="p-2 bg-[var(--bg-secondary)] border-t border-[var(--divider)] pb-safe">
-                {audioBlob && !isRecording && (
-                    <div className="mb-2 p-2 bg-[var(--bg-tertiary)] rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-[var(--divider)]">
-                        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
-                            <Music size={16} />
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-[10px] font-bold uppercase tracking-tight">Voz grabada</p>
-                            <audio src={URL.createObjectURL(audioBlob)} controls className="h-6 mt-1 w-full" />
-                        </div>
-                        <button onClick={() => setAudioBlob(null)} className="text-red-400 p-2 hover:bg-red-400/10 rounded-full transition-colors"><Trash2 size={18} /></button>
-                    </div>
-                )}
-
-                <div className="flex items-center gap-1.5 max-w-4xl mx-auto">
-                    {isRecording ? (
-                        <div className="flex-1 flex items-center h-10 bg-red-500/10 rounded-full px-4 text-red-500 gap-3 border border-red-500/20">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span className="flex-1 text-sm font-bold font-mono">{formatDuration(recordingTime)}</span>
-                            <button onClick={cancelRecording} className="text-red-500 px-2 font-bold text-xs uppercase hover:bg-red-500/10 rounded-full py-1">Cancelar</button>
-                            <button onClick={stopRecording} className="bg-red-500 text-white rounded-full p-2.5 shadow-lg active:scale-90 transition-transform"><Mic size={18} /></button>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="flex items-center">
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                                    title="Adjuntar"
-                                >
-                                    <Plus size={24} />
-                                </button>
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    onChange={handleFileChange} 
-                                    className="hidden" 
-                                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                                />
-                            </div>
-                            
-                            <div className="flex-1 bg-[var(--bg-tertiary)] rounded-full flex items-center px-4 border border-[var(--divider)] group focus-within:border-[var(--accent)] transition-all min-h-[40px]">
-                                <input 
-                                    ref={inputRef}
-                                    type="text" 
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                    placeholder="Mensaje..."
-                                    className="flex-1 bg-transparent text-sm focus:outline-none py-2"
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                />
-                            </div>
-
-                            {inputText.trim() || audioBlob ? (
-                                <button 
-                                    onClick={() => handleSendMessage()}
-                                    className="w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center shadow-md transform active:scale-95 transition-all shrink-0"
-                                >
-                                    <Send size={18} className="translate-x-0.5 -translate-y-0.5" />
-                                </button>
-                            ) : (
-                                <button 
-                                    onClick={startRecording}
-                                    className="w-10 h-10 text-[var(--accent)] flex items-center justify-center rounded-full hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-                                    title="Grabar voz"
-                                >
-                                    <Mic size={22} />
-                                </button>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
+            <ChatInput 
+                onSend={(text) => handleSendMessage(text)}
+                onUpload={uploadFile}
+                onStartRecording={startRecording}
+                onStopRecording={stopRecording}
+                onCancelRecording={cancelRecording}
+                isRecording={isRecording}
+                recordingTime={recordingTime}
+                audioBlob={audioBlob}
+                setAudioBlob={setAudioBlob}
+                isUploading={isUploading}
+            />
         </div>
     );
 }
