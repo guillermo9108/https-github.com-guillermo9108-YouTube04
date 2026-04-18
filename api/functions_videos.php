@@ -815,7 +815,7 @@ function video_update_metadata($pdo, $post, $files) {
     if (!$success) {
         $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
         // Si ha fallado repetidamente, marcar como fallido para que no estanque el procesador
-        $pdo->prepare("UPDATE videos SET category = 'FAILED_METADATA' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
+        $pdo->prepare("UPDATE videos SET category = 'FAILED_META' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
         respond(true); 
     }
     $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0", "lock_id = NULL"]; 
@@ -893,11 +893,11 @@ function smartParseFilename($path, $currentCategory, $categories) {
             // Evitar usar nombres de carpetas genéricos de sistema como categoría
             $systemFolders = ['videos', 'uploads', 'temp', 'thumbnails'];
             if (!in_array(strtolower($lastPart), $systemFolders)) {
-                $category = $lastPart;
+                $category = substr($lastPart, 0, 100);
             }
         }
         if (count($parts) > 0) {
-            $parent_category = array_pop($parts);
+            $parent_category = substr(array_pop($parts), 0, 100);
         }
     }
 

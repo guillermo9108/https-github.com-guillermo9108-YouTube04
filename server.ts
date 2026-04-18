@@ -179,41 +179,30 @@ async function startServer() {
     });
   });
 
-  // API Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
+  // Health check
+  app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
-  // Proxy for all PHP API requests
-  app.use('/api', createProxyMiddleware({
-    target: "http://localhost:8000",
-    changeOrigin: true,
-    pathFilter: (path) => {
-      // Exclude special paths handled by other proxies/express
-      if (path.includes('/uploads/') || path.includes('/video')) return false;
-      // All other /api calls should go to PHP
-      return path.startsWith('/api');
-    },
-    pathRewrite: (path) => {
-      // PHP server expects the full path including /api
-      return path.startsWith('/api') ? path : `/api${path}`;
-    },
-    on: {
-      proxyReq: (proxyReq, req, res) => {
-        // Raw requests (like FormData) are forwarded automatically by http-proxy-middleware 3.x
-      }
-    }
-  }));
+  // 1. Serve uploads as static
+  app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));
 
-  // Proxy streamer requests to Node streamer
+  // 2. Streamer Proxy (must be before the general API proxy)
   app.use("/api/video", createProxyMiddleware({
     target: "http://localhost:3001",
     changeOrigin: true,
     pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // Serve uploads as static
-  app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));
+  // 3. General PHP Proxy (mounted at root to preserve full /api/ prefix)
+  app.use(createProxyMiddleware({
+    pathFilter: (path) => path.startsWith('/api') && !path.includes('/uploads/') && !path.includes('/video'),
+    target: "http://localhost:8000",
+    changeOrigin: true,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        // http-proxy-middleware 3.x with changeOrigin usually handles everything fine
+      }
+    }
+  }));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

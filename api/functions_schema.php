@@ -37,9 +37,9 @@ function getAppSchema() {
                 'likes' => 'INT DEFAULT 0',
                 'dislikes' => 'INT DEFAULT 0',
                 'shares' => 'INT DEFAULT 0',
-                'category' => "VARCHAR(100) DEFAULT 'GENERAL'",
-                'parent_category' => "VARCHAR(100) DEFAULT NULL",
-                'collection' => "VARCHAR(100) DEFAULT NULL",
+                'category' => "VARCHAR(255) DEFAULT 'GENERAL'",
+                'parent_category' => "VARCHAR(255) DEFAULT NULL",
+                'collection' => "VARCHAR(255) DEFAULT NULL",
                 'duration' => 'INT DEFAULT 0',
                 'fileHash' => 'VARCHAR(32)',
                 'isLocal' => 'TINYINT(1) DEFAULT 0',
@@ -372,6 +372,13 @@ function syncTable($pdo, $tableName, $def) {
             $sql .= ") CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
             $pdo->exec($sql);
         } else {
+            // Patch para aumentar el tamaño de categoría si existe
+            try {
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255)");
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255)");
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN collection VARCHAR(255)");
+            } catch(Exception $e) {}
+
             $stmt = $pdo->query("SHOW COLUMNS FROM $tableName");
             $existingColumnsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $existingCols = array_map('strtolower', array_column($existingColumnsData, 'Field'));
