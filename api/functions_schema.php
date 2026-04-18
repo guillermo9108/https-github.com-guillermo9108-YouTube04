@@ -374,10 +374,12 @@ function syncTable($pdo, $tableName, $def) {
         } else {
             // Patch para aumentar el tamaño de categoría si existe
             try {
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255)");
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255)");
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN collection VARCHAR(255)");
-            } catch(Exception $e) {}
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255) DEFAULT 'GENERAL'");
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255) DEFAULT NULL");
+                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN collection VARCHAR(255) DEFAULT NULL");
+            } catch(Exception $e) {
+                // Si la columna no existe en esta tabla específica, fallará silenciosamente
+            }
 
             $stmt = $pdo->query("SHOW COLUMNS FROM $tableName");
             $existingColumnsData = $stmt->fetchAll(PDO::FETCH_ASSOC);

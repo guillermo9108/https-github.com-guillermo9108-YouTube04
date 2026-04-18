@@ -254,7 +254,7 @@ function admin_repair_broken_videos($pdo) {
     $bins = get_ffmpeg_binaries($pdo);
     $ffprobe = $bins['ffprobe'];
     
-    // 1. Identificar videos físicamente eliminados
+    // 1. Identificar videos físicamente eliminados para limpiar la BD
     $stmt = $pdo->query("SELECT id, videoUrl FROM videos WHERE isLocal = 1");
     $allVideos = $stmt->fetchAll();
     $deletedCount = 0;
@@ -267,9 +267,9 @@ function admin_repair_broken_videos($pdo) {
         }
     }
 
-    // 2. Identificar videos sin miniatura (que no sean audios)
-    // Y videos que se reproducen sin video (detectar si tienen stream de video)
-    $stmt = $pdo->query("SELECT id, videoUrl, is_audio FROM videos WHERE isLocal = 1 AND is_audio = 0");
+    // 2. Identificar videos sin miniatura física o con errores de detección
+    // Obtenemos thumbnailUrl directamente en la consulta principal para mayor eficiencia
+    $stmt = $pdo->query("SELECT id, videoUrl, thumbnailUrl, is_audio FROM videos WHERE isLocal = 1 AND is_audio = 0");
     $videos = $stmt->fetchAll();
     $requeueCount = 0;
     
@@ -279,33 +279,47 @@ function admin_repair_broken_videos($pdo) {
 
         $needsRepair = false;
 
-        // Caso A: Sin miniatura
-        $stmtThumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE id = ?");
-        $stmtThumb->execute([$v['id']]);
-        $thumb = $stmtThumb->fetchColumn();
-        if (empty($thumb) || strpos($thumb, 'default_video.png') !== false) {
+        // Comprobación de Miniatura Física
+        $thumb = $v['thumbnailUrl'];
+        $physicalThumbMissing = true;
+        
+        if (!empty($thumb) && strpos($thumb, 'default_video.png') === false && strpos($thumb, 'default.jpg') === false) {
+            $thumbPath = resolve_video_path($thumb);
+            if ($thumbPath && file_exists($thumbPath) && filesize($thumbPath) > 0) {
+                $physicalThumbMissing = false;
+            }
+        }
+
+        if ($physicalThumbMissing) {
             $needsRepair = true;
         }
 
-        // Caso B: Sin stream de video (reproduce solo audio)
-        if (!$needsRepair) {
-            $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
-            $hasVideo = trim(shell_exec($cmd) ?? '');
-            if ($hasVideo !== 'video') {
+        // Comprobación de Stream de Video (Solo si ffprobe es funcional y no detectamos falta de miniatura)
+        if (!$needsRepair && !empty($ffprobe)) {
+            $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path) . " 2>&1";
+            $probeResult = trim(@shell_exec($cmd) ?? '');
+            
+            // Si ffprobe nos dice EXPLÍCITAMENTE que es audio o algo inválido, lo re-encolamos.
+            // Si retorna vacío o error, ignoramos para evitar falsos positivos masivos por fallos del binario.
+            if (!empty($probeResult) && $probeResult !== 'video' && strpos($probeResult, 'error') === false) {
                 $needsRepair = true;
             }
         }
 
         if ($needsRepair) {
-            $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', thumbnailUrl = '' WHERE id = ?")->execute([$v['id']]);
-            $requeueCount++;
+            // Solo resetear si no está en proceso activo ('PROCESSING')
+            $stmtUpdate = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', thumbnailUrl = '', processing_attempts = 0 WHERE id = ? AND transcode_status != 'PROCESSING'");
+            $stmtUpdate->execute([$v['id']]);
+            if ($stmtUpdate->rowCount() > 0) {
+                $requeueCount++;
+            }
         }
     }
 
     respond(true, [
         'deleted' => $deletedCount,
         'requeued' => $requeueCount,
-        'message' => "Reparación completada: $deletedCount eliminados, $requeueCount enviados a re-procesar."
+        'message' => "Reparación completada: $deletedCount registros huérfanos eliminados, $requeueCount videos re-encolados por falta de miniatura física o error de stream."
     ]);
 }
 
@@ -507,8 +521,8 @@ function admin_reconstruct_thumbnails($pdo) {
         }
     }
 
-    // También resetear intentos de procesamiento para videos sin miniatura o con miniatura por defecto
-    $pdo->prepare("UPDATE videos SET processing_attempts = 0, locked_at = 0 WHERE thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg'")->execute();
+    // También resetear intentos para videos que EXPLÍCITAMENTE no tienen nada en DB (la reparación física se hace en la otra acción)
+    $pdo->prepare("UPDATE videos SET processing_attempts = 0, locked_at = 0 WHERE (thumbnailUrl IS NULL OR thumbnailUrl = '') AND transcode_status != 'PROCESSING'")->execute();
 
     respond(true, [
         'processed' => $processed,
@@ -676,6 +690,24 @@ function admin_remove_from_queue($pdo, $vid) {
 function admin_skip_transcode($pdo, $vid) {
     $pdo->prepare("UPDATE videos SET transcode_status = 'DONE' WHERE id = ?")->execute([$vid]);
     respond(true);
+}
+
+function admin_process_next_transcode($pdo) {
+    // Buscar binarios necesarios
+    $ffmpeg = 'ffmpeg'; 
+    
+    // Buscar el siguiente video en cola
+    $stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' LIMIT 1");
+    $video = $stmt->fetch();
+    
+    if (!$video) {
+        respond(true, "Cola vacía");
+    }
+    
+    // Ejecutar transcodificación (usa la función interna _admin_perform_transcode_single)
+    $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
+    
+    respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
 }
 
 // --- SMART CLEANER & ORPHAN SYNC ---

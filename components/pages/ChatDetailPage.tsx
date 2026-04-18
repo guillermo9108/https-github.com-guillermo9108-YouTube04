@@ -134,11 +134,13 @@ interface ChatInputProps {
     audioBlob: Blob | null;
     setAudioBlob: (blob: Blob | null) => void;
     isUploading: boolean;
+    isKeyboardOpen?: boolean;
 }
 
 const ChatInput: React.FC<ChatInputProps> = React.memo(({ 
     onSend, onUpload, onStartRecording, onStopRecording, onCancelRecording, 
-    isRecording, recordingTime, audioBlob, setAudioBlob, isUploading 
+    isRecording, recordingTime, audioBlob, setAudioBlob, isUploading,
+    isKeyboardOpen
 }) => {
     const [inputText, setInputText] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -160,7 +162,7 @@ const ChatInput: React.FC<ChatInputProps> = React.memo(({
     };
 
     return (
-        <div className="p-2 bg-[var(--bg-secondary)] border-t border-[var(--divider)] pb-safe shadow-lg z-50">
+        <div className={`p-2 bg-[var(--bg-secondary)] border-t border-[var(--divider)] ${isKeyboardOpen ? 'pb-2' : 'pb-safe'} shadow-lg z-50`}>
             {audioBlob && !isRecording && (
                 <div className="mb-2 p-2 bg-[var(--bg-tertiary)] rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 border border-[var(--divider)]">
                     <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
@@ -380,20 +382,30 @@ export default function ChatDetailPage() {
 
     const isOtherOnline = onlineUserIds.has(String(otherId).trim());
 
+    const [vh, setVh] = useState(window.innerHeight);
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
     useEffect(() => {
         const handleResize = () => {
-            if (messagesEndRef.current && window.visualViewport) {
-                // Optimized scrolling
-                requestAnimationFrame(() => scrollToBottom('auto'));
+            if (window.visualViewport) {
+                const currentHeight = window.visualViewport.height;
+                setVh(currentHeight);
+                
+                const keyboardActive = currentHeight < window.innerHeight * 0.85;
+                setIsKeyboardOpen(keyboardActive);
+
+                if (keyboardActive && messagesEndRef.current) {
+                    // Use a small timeout to let the browser finishing adjusting
+                    setTimeout(() => scrollToBottom('auto'), 50);
+                }
             }
         };
         const vp = window.visualViewport;
         if (vp) {
             vp.addEventListener('resize', handleResize);
-            vp.addEventListener('scroll', handleResize);
+            // We NO LONGER listen to 'scroll' to avoid jitter during typing
             return () => {
                 vp.removeEventListener('resize', handleResize);
-                vp.removeEventListener('scroll', handleResize);
             };
         }
     }, []);
@@ -725,9 +737,12 @@ export default function ChatDetailPage() {
     }
 
     return (
-        <div className="flex flex-col h-screen max-h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] relative">
+        <div 
+            style={{ height: vh }}
+            className={`flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] fixed inset-0 overflow-hidden ${isKeyboardOpen ? 'keyboard-open' : ''}`}
+        >
             {/* Header */}
-            <header className="absolute top-0 left-0 right-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2">
+            <header className="shrink-0 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2 relative z-50">
                 <button
                     onClick={() => navigate('/chat')}
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-tertiary)] transition-colors"
@@ -751,14 +766,14 @@ export default function ChatDetailPage() {
                     </div>
                     <div className="flex flex-col overflow-hidden">
                         <h1 className="text-sm font-bold truncate tracking-tight leading-none">{otherUser?.username}</h1>
-                        <div className="flex items-center gap-1 mt-0.5">
-                            {isOtherOnline && (
-                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-sm shadow-green-500/50" />
-                            )}
-                            <p className={`text-[9px] font-black uppercase tracking-wider ${
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <div className={`w-2 h-2 rounded-full ${
+                                isOtherOnline ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-slate-500'
+                            }`} />
+                            <p className={`text-[10px] font-black uppercase tracking-wider ${
                                 isOtherOnline ? 'text-green-500' : 'text-slate-500'
                             }`}>
-                                {isOtherOnline ? 'ONLINE' : 'OFFLINE'}
+                                {isOtherOnline ? 'EN LÍNEA' : 'DESCONECTADO'}
                             </p>
                         </div>
                     </div>
@@ -773,7 +788,7 @@ export default function ChatDetailPage() {
             {/* Messages Area */}
             <div 
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto pt-20 pb-4 px-2 space-y-2 scrollbar-hide"
+                className="flex-1 overflow-y-auto pt-4 pb-4 px-2 space-y-2 scrollbar-hide"
             >
                 {hasMore && (
                     <div className="py-4 text-center">
@@ -824,6 +839,7 @@ export default function ChatDetailPage() {
                 audioBlob={audioBlob}
                 setAudioBlob={setAudioBlob}
                 isUploading={isUploading}
+                isKeyboardOpen={isKeyboardOpen}
             />
         </div>
     );

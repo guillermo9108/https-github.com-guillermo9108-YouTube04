@@ -893,11 +893,11 @@ function smartParseFilename($path, $currentCategory, $categories) {
             // Evitar usar nombres de carpetas genéricos de sistema como categoría
             $systemFolders = ['videos', 'uploads', 'temp', 'thumbnails'];
             if (!in_array(strtolower($lastPart), $systemFolders)) {
-                $category = substr($lastPart, 0, 100);
+                $category = substr($lastPart, 0, 250);
             }
         }
         if (count($parts) > 0) {
-            $parent_category = substr(array_pop($parts), 0, 100);
+            $parent_category = substr(array_pop($parts), 0, 250);
         }
     }
 
@@ -1089,7 +1089,8 @@ function video_reorganize_all($pdo) {
 }
 
 function video_fix_metadata($pdo) {
-    $stmt = $pdo->query("UPDATE videos SET category = 'PENDING', locked_at = 0 WHERE duration = 0 OR thumbnailUrl IS NULL");
+    // Solo resetear videos que EXPLÍCITAMENTE no tengan duración ni miniatura y no estén siendo procesados
+    $stmt = $pdo->query("UPDATE videos SET category = 'PENDING', locked_at = 0 WHERE (duration = 0 OR thumbnailUrl IS NULL OR thumbnailUrl = '') AND transcode_status != 'PROCESSING'");
     respond(true, ['fixedBroken' => $stmt->rowCount()]);
 }
 

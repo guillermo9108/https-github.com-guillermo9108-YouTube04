@@ -185,21 +185,30 @@ async function startServer() {
   // 1. Serve uploads as static
   app.use("/api/uploads", express.static(path.join(__dirname, "api", "uploads")));
 
-  // 2. Streamer Proxy (must be before the general API proxy)
+  // 2. Streamer Proxy (Port 3001)
   app.use("/api/video", createProxyMiddleware({
     target: "http://localhost:3001",
     changeOrigin: true,
     pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // 3. General PHP Proxy (mounted at root to preserve full /api/ prefix)
+  // 3. Catch-all PHP Proxy (Port 8000)
+  // We use an unmounted middleware with a filter to ensure the FULL path (including /api) is sent to PHP.
+  // This must be AFTER more specific routes like /api/uploads and /api/video.
   app.use(createProxyMiddleware({
-    pathFilter: (path) => path.startsWith('/api') && !path.includes('/uploads/') && !path.includes('/video'),
+    pathFilter: (path) => path.startsWith('/api'),
     target: "http://localhost:8000",
     changeOrigin: true,
     on: {
       proxyReq: (proxyReq, req, res) => {
-        // http-proxy-middleware 3.x with changeOrigin usually handles everything fine
+        // For debugging: console.log(`Proxying ${req.method} ${req.url}`);
+      },
+      error: (err, req, res) => {
+        console.error("Proxy Error (PHP):", err);
+        const response = res as any;
+        if (response && response.status && !response.headersSent) {
+          response.status(502).json({ success: false, error: "PHP Gateway Error" });
+        }
       }
     }
   }));
