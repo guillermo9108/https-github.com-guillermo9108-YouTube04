@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, X, Upload, Image as ImageIcon, Send, Loader2, Globe, ChevronDown, User, Plus } from 'lucide-react';
+import { ArrowLeft, X, Upload, Image as ImageIcon, Send, Loader2, Globe, ChevronDown, User, Plus, Play } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
