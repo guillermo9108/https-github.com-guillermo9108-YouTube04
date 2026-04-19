@@ -105,16 +105,8 @@ export default function GridProcessor() {
         }
         
         try {
-            const fd = new FormData();
-            fd.append('id', activeTask.id);
-            fd.append('duration', String(duration));
-            fd.append('success', isSuccess ? '1' : '0');
-            fd.append('clientIncompatible', isIncompatible ? '1' : '0');
-            if (thumbnail) fd.append('thumbnail', thumbnail);
-            
-            await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
+            await completeTask(duration, thumbnail, isSuccess, isIncompatible);
             console.log(`GridProcessor: Task completed for ${activeTask.id}`);
-            await completeTask(duration, null);
         } catch(e) {
             console.error("GridProcessor: Error updating metadata", e);
             skipTask();

@@ -41,7 +41,7 @@ function admin_update_settings($pdo, $input) {
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
         'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory',
-        'shortsPath'
+        'shortsPath', 'collaboration_enabled'
     ];
     
     $fields = []; $params = [];

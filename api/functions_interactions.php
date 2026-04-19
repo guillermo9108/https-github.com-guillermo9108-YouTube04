@@ -461,7 +461,7 @@ function interact_get_chats($pdo, $userId) {
         // No leídos
         $stmtUnread = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE senderId = ? AND receiverId = ? AND isRead = 0");
         $stmtUnread->execute([$otherId, $userId]);
-        $unreadCount = $stmtUnread->fetchColumn();
+        $unreadCount = (int)$stmtUnread->fetchColumn();
         
         $otherUser['avatarUrl'] = fix_url($otherUser['avatarUrl']);
         $chats[] = [

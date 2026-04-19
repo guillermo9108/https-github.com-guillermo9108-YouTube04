@@ -194,9 +194,8 @@ async function startServer() {
 
   // 3. Catch-all PHP Backend Proxy
   app.use("/api", createProxyMiddleware({
-    target: "http://localhost:8000",
+    target: "http://localhost:8000/api",
     changeOrigin: true,
-    pathRewrite: { "^/": "/api/" }, // Prepend /api/ because app.use("/api") strips it
     on: {
       proxyReq: (proxyReq, req, res) => {
         // Direct streaming for FormData/POST requests

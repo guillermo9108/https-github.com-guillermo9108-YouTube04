@@ -812,10 +812,16 @@ function video_unlock($pdo, $input) {
 function video_update_metadata($pdo, $post, $files) {
     $id = $post['id']; 
     $success = ($post['success'] ?? '1') === '1';
+    $clientIncompatible = ($post['clientIncompatible'] ?? '0') === '1';
+
     if (!$success) {
         $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
-        // Si ha fallado repetidamente, marcar como fallido para que no estanque el procesador
-        $pdo->prepare("UPDATE videos SET category = 'FAILED_META' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
+        // Si ha fallado repetidamente o es incompatible, marcar como fallido para que no estanque el procesador
+        if ($clientIncompatible) {
+            $pdo->prepare("UPDATE videos SET category = 'INCOMPATIBLE', transcode_status = 'FAILED' WHERE id = ?")->execute([$id]);
+        } else {
+            $pdo->prepare("UPDATE videos SET category = 'FAILED_META' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
+        }
         respond(true); 
     }
     $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0", "lock_id = NULL"]; 
@@ -896,6 +902,12 @@ function smartParseFilename($path, $currentCategory, $categories) {
                 $category = substr($lastPart, 0, 250);
             }
         }
+        
+        // Si sigue siendo PENDING o vacío, forzar GENERAL para que no se repita el proceso infinitamente
+        if ($category === 'PENDING' || empty($category)) {
+            $category = 'GENERAL';
+        }
+
         if (count($parts) > 0) {
             $parent_category = substr(array_pop($parts), 0, 250);
         }

@@ -460,8 +460,9 @@ class DBService {
 
     public async scanLocalLibrary(path: string): Promise<any> { return this.request<any>(`action=scan_local_library`, { method: 'POST', body: JSON.stringify({ path }) }); }
     public async processScanBatch(): Promise<any> { return this.request<any>(`action=process_scan_batch`, { method: 'POST' }); }
-    public async updateVideoMetadata(id: string, duration: number, thumb: File | null, success: boolean = true): Promise<void> {
+    public async updateVideoMetadata(id: string, duration: number, thumb: File | null, success: boolean = true, clientIncompatible: boolean = false): Promise<void> {
         const fd = new FormData(); fd.append('id', id); fd.append('duration', String(duration)); fd.append('success', success ? '1' : '0');
+        if (clientIncompatible) fd.append('clientIncompatible', '1');
         if (thumb) fd.append('thumbnail', thumb);
         return this.request<void>(`action=update_video_metadata`, { method: 'POST', body: fd });
     }

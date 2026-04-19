@@ -5,7 +5,7 @@ import { Video } from '../types';
 
 interface GridContextType {
     activeTask: Video | null;
-    completeTask: (duration: number, thumbnail: File | null) => Promise<void>;
+    completeTask: (duration: number, thumbnail: File | null, isSuccess?: boolean, isIncompatible?: boolean) => Promise<void>;
     skipTask: () => void;
     isIdle: boolean;
     setThrottled: (isThrottled: boolean) => void;
@@ -56,11 +56,11 @@ export const GridProvider = ({ children }: { children?: React.ReactNode }) => {
         }
     };
 
-    const completeTask = async (duration: number, thumbnail: File | null) => {
+    const completeTask = async (duration: number, thumbnail: File | null, isSuccess: boolean = true, isIncompatible: boolean = false) => {
         if (!activeTask) return;
         
         try {
-            await db.updateVideoMetadata(activeTask.id, duration, thumbnail);
+            await db.updateVideoMetadata(activeTask.id, duration, thumbnail, isSuccess, isIncompatible);
             await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (e) {
             console.error("Task submission failed", e);
