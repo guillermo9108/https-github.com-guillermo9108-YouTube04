@@ -776,19 +776,19 @@ function video_upload($pdo, $post, $files) {
     if (!is_dir($thumbDir)) mkdir($thumbDir, 0777, true);
 
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
-        $thumbName = "t_{$id}.jpg"; 
+        $thumbName = "{$id}.jpg"; 
         $dest = $thumbDir . $thumbName;
         if (move_uploaded_file($files['thumbnail']['tmp_name'], $dest)) {
             $thumbPath = 'api/' . $dest;
-            create_thumbnail($dest);
+            create_thumbnail($dest); // Genera _thumb.jpg automáticamente
         }
     } else if ($videoPath) {
         $bins = get_ffmpeg_binaries($pdo);
-        $thumbName = "t_{$id}.jpg";
+        $thumbName = "{$id}.jpg";
         $thumbDest = $thumbDir . $thumbName;
         if (extract_video_thumbnail($videoPath, $thumbDest, $bins['ffmpeg'])) {
             $thumbPath = 'api/' . $thumbDest;
-            create_thumbnail($thumbDest); // Asegurar tamaño estándar
+            create_thumbnail($thumbDest); // Genera _thumb.jpg automáticamente
         }
     }
 
@@ -894,9 +894,10 @@ function video_organize_single($pdo, $id, $settings) {
         empty($v['title']) || 
         strpos($v['title'], 'v_') === 0 || 
         strpos($v['title'], 'vid_') === 0 || 
-        strpos($v['title'], 'img_') === 0
+        strpos($v['title'], 'img_') === 0 ||
+        strpos($v['title'], 'Video v_') === 0
     );
-    if ($isGenericTitle && !empty($meta['title'])) {
+    if ($isGenericTitle && !empty($meta['title']) && strpos($meta['title'], 'v_') !== 0) {
         $newTitle = $meta['title'];
     }
 

@@ -113,7 +113,7 @@ for ($i = 0; $i < $batchSize; $i++) {
         $thumbUrl = 'api/uploads/thumbnails/defaultaudio.jpg';
         echo "[INFO] Audio: Usando carátula genérica.\n";
     } else {
-        $thumbName = "t_{$video['id']}.jpg";
+        $thumbName = "{$video['id']}.jpg";
         $thumbFile = 'uploads/thumbnails/' . $thumbName;
         $fullThumbPath = __DIR__ . '/' . $thumbFile;
         if (!is_dir(dirname($fullThumbPath))) mkdir(dirname($fullThumbPath), 0777, true);

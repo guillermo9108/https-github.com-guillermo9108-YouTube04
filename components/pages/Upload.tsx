@@ -25,6 +25,7 @@ export default function Upload() {
   
   const [files, setFiles] = useState<File[]>([]);
   const [titles, setTitles] = useState<string[]>([]);
+  const [descriptions, setDescriptions] = useState<string[]>([]);
   const [thumbnails, setThumbnails] = useState<(File | null)[]>([]);
   const [durations, setDurations] = useState<number[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -84,6 +85,7 @@ export default function Upload() {
 
       setFiles(prev => [...prev, ...newFiles]);
       setTitles(prev => [...prev, ...newTitles]);
+      setDescriptions(prev => [...prev, ...new Array(newFiles.length).fill('')]);
       setThumbnails(prev => [...prev, ...new Array(newFiles.length).fill(null)]);
       setDurations(prev => [...prev, ...new Array(newFiles.length).fill(0)]);
       setCategories(prev => [...prev, ...newCategories]);
@@ -135,10 +137,11 @@ export default function Upload() {
   const removeFile = (i: number) => {
     if (isProcessingQueue) { toast.error("Espera a que termine el análisis"); return; }
     const f = (_: any, idx: number) => idx !== i;
-    setFiles(prev => prev.filter(f)); setTitles(prev => prev.filter(f)); setThumbnails(prev => prev.filter(f)); setDurations(prev => prev.filter(f)); setCategories(prev => prev.filter(f)); setPrices(prev => prev.filter(f));
+    setFiles(prev => prev.filter(f)); setTitles(prev => prev.filter(f)); setDescriptions(prev => prev.filter(f)); setThumbnails(prev => prev.filter(f)); setDurations(prev => prev.filter(f)); setCategories(prev => prev.filter(f)); setPrices(prev => prev.filter(f));
   };
 
   const updateTitle = (i: number, v: string) => setTitles(p => { const n = [...p]; n[i] = v; return n; });
+  const updateDescription = (i: number, v: string) => setDescriptions(p => { const n = [...p]; n[i] = v; return n; });
   const updateCategory = (i: number, v: string) => { setCategories(p => { const n = [...p]; n[i] = v; return n; }); updatePrice(i, getPriceForCategory(v)); };
   const updatePrice = (i: number, v: number) => setPrices(p => { const n = [...p]; n[i] = v; return n; });
   const updateDuration = (i: number, v: number) => setDurations(p => { const n = [...p]; n[i] = v; return n; });
@@ -149,6 +152,7 @@ export default function Upload() {
           setCategories(p => p.map(() => bulkCategory));
           if (bulkPrice === '') setPrices(p => p.map(() => getPriceForCategory(bulkCategory)));
       }
+      if (bulkDesc) setDescriptions(p => p.map(() => bulkDesc));
       if (bulkPrice !== '') { const pVal = parseFloat(bulkPrice); if (!isNaN(pVal)) setPrices(p => p.map(() => pVal)); }
       toast.success("Cambios aplicados");
   };
@@ -159,7 +163,7 @@ export default function Upload() {
     
     const queue = files.map((f, i) => ({ 
         title: titles[i], 
-        description: bulkDesc, 
+        description: descriptions[i] || bulkDesc, 
         price: prices[i], 
         category: categories[i] as any, 
         duration: durations[i] || 0, 
@@ -297,6 +301,13 @@ export default function Upload() {
                                 <X size={20} />
                             </button>
                         </div>
+
+                        <textarea 
+                            value={descriptions[idx]}
+                            onChange={e => updateDescription(idx, e.target.value)}
+                            className="w-full bg-[#1c1e21] border border-[#3e4042] rounded-md px-3 py-1.5 text-[10px] text-[#b0b3b8] outline-none focus:border-[#2e89ff] resize-none h-12"
+                            placeholder="Descripción opcional para este archivo..."
+                        />
                         
                         <div className="grid grid-cols-2 gap-2">
                             <div className="flex items-center gap-2 bg-[#1c1e21] px-2 py-1.5 rounded border border-[#3e4042]">

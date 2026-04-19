@@ -196,7 +196,13 @@ function market_create_listing($pdo, $post, $files) {
             create_thumbnail($target, str_replace('.jpg', '_thumb.jpg', $target), 400, 400, 75);
         }
     }
-    $isFlashSale = (isset($post['isFlashSale']) && ($post['isFlashSale'] === 'true' || $post['isFlashSale'] === '1')) ? 1 : 0;
+    $isFlashSale = 0;
+    if (isset($post['isFlashSale'])) {
+        $val = strtolower((string)$post['isFlashSale']);
+        if ($val === 'true' || $val === '1' || $val === 'on') {
+            $isFlashSale = 1;
+        }
+    }
     $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, stock, images, sellerId, category, itemCondition, isFlashSale, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         ->execute([$id, $post['title'], $post['description'], floatval($post['price']), floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], $isFlashSale, $post['tags'] ?? '[]', time()]);
     
