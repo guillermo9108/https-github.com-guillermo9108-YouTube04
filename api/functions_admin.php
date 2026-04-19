@@ -48,6 +48,7 @@ function admin_update_settings($pdo, $input) {
     foreach ($input as $k => $v) {
         if (in_array($k, $allowed)) {
             $fields[] = "$k = ?";
+            if (is_bool($v)) $v = $v ? 1 : 0;
             $params[] = is_array($v) ? json_encode($v) : $v;
         }
     }
