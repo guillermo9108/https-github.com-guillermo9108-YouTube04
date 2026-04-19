@@ -1181,6 +1181,7 @@ function upload_channel_images($pdo, $post, $files) {
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
                 $category = $isVid ? 'PERSONAL' : 'IMAGES';
                 $thumbnail = $target;
+                $duration = intval($post["duration_$i"] ?? 0);
 
                 if (!$isVid) {
                     // Crear miniatura para la imagen del canal
@@ -1204,9 +1205,10 @@ function upload_channel_images($pdo, $post, $files) {
                 
                 $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $id = uniqid();
+                $itemTitle = ($count > 1) ? $title . " (" . ($i + 1) . "/$count)" : $title;
                 $stmt->execute([
                     $id,
-                    $title . ($count > 1 ? " (" . ($i + 1) . "/$count)" : ""),
+                    $itemTitle,
                     $description,
                     $target,
                     $thumbnail, 
@@ -1214,7 +1216,7 @@ function upload_channel_images($pdo, $post, $files) {
                     time(),
                     $category,
                     0,
-                    0,
+                    $duration,
                     $collectionId
                 ]);
                 

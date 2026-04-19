@@ -14,6 +14,7 @@ export default function CreatePost() {
     const [previews, setPreviews] = useState<string[]>([]);
     const [description, setDescription] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [durations, setDurations] = useState<number[]>([]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -22,15 +23,48 @@ export default function CreatePost() {
             
             const newPreviews = newFiles.map(file => URL.createObjectURL(file));
             setPreviews(prev => [...prev, ...newPreviews]);
+
+            // Extract durations
+            newFiles.forEach((file, index) => {
+                if (file.type.startsWith('video/')) {
+                    const video = document.createElement('video');
+                    video.preload = 'metadata';
+                    video.onloadedmetadata = () => {
+                        window.URL.revokeObjectURL(video.src);
+                        const duration = Math.round(video.duration);
+                        setDurations(prev => {
+                            const updated = [...prev];
+                            // Using a temporary length since setFiles hasn't updated yet in this tick
+                            updated[files.length + index] = duration;
+                            return updated;
+                        });
+                    };
+                    video.src = URL.createObjectURL(file);
+                } else {
+                    setDurations(prev => {
+                        const updated = [...prev];
+                        updated[files.length + index] = 0;
+                        return updated;
+                    });
+                }
+            });
         }
     };
 
     const removeFile = (index: number) => {
         setFiles(prev => prev.filter((_, i) => i !== index));
+        setDurations(prev => prev.filter((_, i) => i !== index));
         setPreviews(prev => {
             URL.revokeObjectURL(prev[index]);
             return prev.filter((_, i) => i !== index);
         });
+    };
+
+    const formatDuration = (seconds: number) => {
+        if (!seconds) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.round(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
     const handleUpload = async () => {
@@ -49,6 +83,7 @@ export default function CreatePost() {
             
             files.forEach((file, i) => {
                 fd.append(`image_${i}`, file);
+                if (durations[i]) fd.append(`duration_${i}`, String(durations[i]));
             });
             fd.append('count', String(files.length));
 
@@ -125,6 +160,11 @@ export default function CreatePost() {
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                                             <Play className="text-white opacity-80" size={48} />
                                         </div>
+                                        {durations[i] > 0 && (
+                                            <div className="absolute bottom-2 right-2 bg-black/60 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
+                                                {formatDuration(durations[i])}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <img src={src} className="w-full h-full object-cover" alt="" />

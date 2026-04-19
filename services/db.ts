@@ -369,7 +369,12 @@ class DBService {
             if (thumb) fd.append('thumbnail', thumb);
             if (collection) fd.append('collection', collection);
             xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded, e.total); };
-            xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(); };
+            xhr.onload = () => { 
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    this.invalidateCache('sp_cache_videos');
+                    resolve(); 
+                } else reject(); 
+            };
             xhr.onerror = () => reject(); xhr.open('POST', '/api/index.php?action=upload_video'); xhr.send(fd);
         });
     }
@@ -478,10 +483,16 @@ class DBService {
     public async adminSuspendSeller(userId: string): Promise<void> { return this.request<void>(`action=admin_suspend_seller`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async adminFeatureListing(itemId: string, isFeatured: boolean): Promise<void> { return this.request<void>(`action=admin_feature_listing`, { method: 'POST', body: JSON.stringify({ itemId, isFeatured }) }); }
     public async adminDeepCleanup(): Promise<any> { return this.request<any>(`action=admin_deep_cleanup`, { method: 'POST' }); }
-    public invalidateCache(key?: string) {
-        if (!key || key.includes('get_videos')) {
+    public invalidateCache(prefix?: string) {
+        if (!prefix) {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('sp_cache_')) localStorage.removeItem(key);
+            });
+            return;
         }
-        if (!key || key.includes('marketplace')) localStorage.removeItem('sp_cache_market');
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith(prefix)) localStorage.removeItem(key);
+        });
     }
     public setHomeDirty() { this.homeDirty = true; }
     public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> { 
@@ -511,10 +522,12 @@ class DBService {
     }
 
     public async uploadChannelImages(formData: FormData): Promise<any> {
-        return this.request<any>('action=upload_channel_images', {
+        const res = await this.request<any>('action=upload_channel_images', {
             method: 'POST',
             body: formData
         });
+        this.invalidateCache('sp_cache_videos');
+        return res;
     }
 
     public async uploadStory(formData: FormData): Promise<any> {

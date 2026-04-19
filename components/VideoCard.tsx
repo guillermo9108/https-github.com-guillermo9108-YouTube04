@@ -507,9 +507,12 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       <div className="px-3 pb-3">
         <div className="relative">
             <div className={`text-[15px] font-normal text-[var(--text-primary)] leading-snug ${!showFullTitle ? 'line-clamp-4' : ''}`}>
-              <span className="font-bold">{video.title}</span>
+              {/* No mostrar título si es idéntico al inicio de la descripción (ignorando sufijos de álbum como " (1/2)") */}
+              {!(video.description?.startsWith(video.title) || (video.title && video.description?.startsWith(video.title.replace(/\s\(\d+\/\d+\)$/, '')))) && (
+                <span className="font-bold mr-1">{video.title}</span>
+              )}
               {video.description && (
-                  <span className="text-[var(--text-primary)] ml-1">
+                  <span className="text-[var(--text-primary)]">
                       {video.description}
                   </span>
               )}
