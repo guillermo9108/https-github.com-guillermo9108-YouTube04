@@ -194,13 +194,20 @@ export default function Home() {
     // 2. Cargador de Videos (Paginado)
     const isInitialMount = useRef(true);
 
-    // Auto-refresh when home is dirty
+    // Auto-refresh when home is dirty or event fired
     useEffect(() => {
-        if (db.isHomeDirty()) {
+        const handleHomeDirty = () => {
             db.resetHomeDirty();
             fetchVideos(0, true);
+        };
+        
+        if (db.isHomeDirty()) {
+            handleHomeDirty();
         }
-    }, [location.pathname]);
+
+        window.addEventListener('sp_home_dirty', handleHomeDirty);
+        return () => window.removeEventListener('sp_home_dirty', handleHomeDirty);
+    }, [location.pathname, searchQuery, selectedCategory, navigationPath]);
 
     const fetchVideos = async (p: number, reset: boolean = false) => {
         if (loading || (loadingMore && !reset)) return;
@@ -217,8 +224,11 @@ export default function Home() {
         }
 
         try {
+            // Si hay búsqueda y no hay orden de usuario, forzar ALPHA por defecto como pidió el usuario
+            const effectiveSort = (searchQuery && !userSortOrder) ? 'ALPHA' : userSortOrder;
+            
             // Petición principal de videos y carpetas
-            const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, userSortOrder, user?.id);
+            const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, effectiveSort, user?.id);
             
             if (reset) {
                 let finalVideos = res.videos;

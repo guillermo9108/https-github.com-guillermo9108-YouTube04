@@ -754,66 +754,80 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
 }
 
 function video_upload($pdo, $post, $files) {
+    if (!isset($files['video']) || $files['video']['error'] !== UPLOAD_ERR_OK) {
+        respond(false, null, "Error en el archivo de video: " . ($files['video']['error'] ?? 'No enviado'));
+    }
+
     $id = 'v_' . uniqid();
     $videoPath = null; 
-    if (isset($files['video']) && $files['video']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($files['video']['name'], PATHINFO_EXTENSION); 
-        $videoName = "{$id}.{$ext}";
-        if (!is_dir('uploads/videos/')) mkdir('uploads/videos/', 0777, true);
-        move_uploaded_file($files['video']['tmp_name'], 'uploads/videos/' . $videoName);
-        $videoPath = 'uploads/videos/' . $videoName;
+    
+    $ext = pathinfo($files['video']['name'], PATHINFO_EXTENSION); 
+    $videoName = "{$id}.{$ext}";
+    $videoDir = 'uploads/videos/';
+    if (!is_dir($videoDir)) mkdir($videoDir, 0777, true);
+    
+    if (!move_uploaded_file($files['video']['tmp_name'], $videoDir . $videoName)) {
+        respond(false, null, "Error al guardar el video en el servidor");
     }
+    $videoPath = $videoDir . $videoName;
+
     $thumbPath = 'api/uploads/thumbnails/default.jpg'; 
+    $thumbDir = 'uploads/thumbnails/';
+    if (!is_dir($thumbDir)) mkdir($thumbDir, 0777, true);
+
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "t_{$id}.jpg"; 
-        if (!is_dir('uploads/thumbnails/')) mkdir('uploads/thumbnails/', 0777, true);
-        $dest = 'uploads/thumbnails/' . $thumbName;
-        move_uploaded_file($files['thumbnail']['tmp_name'], $dest);
-        $thumbPath = 'api/uploads/thumbnails/' . $thumbName;
-        
-        // Crear miniatura optimizada
-        create_thumbnail($dest);
+        $dest = $thumbDir . $thumbName;
+        if (move_uploaded_file($files['thumbnail']['tmp_name'], $dest)) {
+            $thumbPath = 'api/' . $dest;
+            create_thumbnail($dest);
+        }
     } else if ($videoPath) {
-        // Intentar extraer miniatura si no se envió una
         $bins = get_ffmpeg_binaries($pdo);
         $thumbName = "t_{$id}.jpg";
-        if (!is_dir('uploads/thumbnails/')) mkdir('uploads/thumbnails/', 0777, true);
-        $thumbDest = 'uploads/thumbnails/' . $thumbName;
-        
+        $thumbDest = $thumbDir . $thumbName;
         if (extract_video_thumbnail($videoPath, $thumbDest, $bins['ffmpeg'])) {
             $thumbPath = 'api/' . $thumbDest;
+            create_thumbnail($thumbDest); // Asegurar tamaño estándar
         }
     }
-    $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
+
+    $settings = get_system_settings($pdo);
     $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
 
     $price = floatval($post['price'] ?? 0);
-    if ($price <= 0) $price = 1.00;
+    // Permitir videos gratis (0) o forzar 1.0 si es lo deseado, pero mejor permitir flexibilidad
+    // $price = $price <= 0 ? 1.00 : $price; 
 
     $transcodeStatus = 'NONE';
-    $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
+    $extLower = strtolower($ext);
     $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
-    $isAudio = in_array($ext, $audioExts) ? 1 : 0;
-    
-    // Si es MP4, forzar que NO sea audio a menos que se especifique lo contrario
-    if ($ext === 'mp4') $isAudio = 0;
+    $isAudio = in_array($extLower, $audioExts) ? 1 : 0;
+    if ($extLower === 'mp4') $isAudio = 0;
 
-    if ($autoTranscode === 1) {
-        if ($ext !== 'mp4' && $ext !== 'mp3') {
-            $transcodeStatus = 'WAITING';
-        }
+    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3') {
+        $transcodeStatus = 'WAITING';
     }
 
+    $category = $post['category'] ?? 'PERSONAL';
     $collection = $post['collection'] ?? null;
     $isPrivate = !empty($post['is_private']) ? 1 : 0;
+    $duration = intval($post['duration'] ?? 0);
+    $title = !empty($post['title']) ? $post['title'] : "Video $id";
+    $desc = $post['description'] ?? '';
+    // Usar el userId del token preferiblemente si functions_auth define una forma de obtenerlo, 
+    // pero por ahora usamos el enviado (asumiendo que DBService añadió el Bearer)
+    $creatorId = $post['userId'] ?? 'anonymous';
 
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
-
-    // Procesar metadatos finales y notificar
-    video_organize_single($pdo, $id, $settings);
-
-    respond(true, ['id' => $id, 'url' => $videoPath]);
+    try {
+        $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $title, $desc, $price, $category, $duration, $videoPath, $thumbPath, $creatorId, time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
+        
+        video_organize_single($pdo, $id, $settings);
+        respond(true, ['id' => $id, 'url' => $videoPath]);
+    } catch (Exception $e) {
+        respond(false, null, "Error en base de datos: " . $e->getMessage());
+    }
 }
 
 function video_unlock($pdo, $input) {
@@ -1150,7 +1164,11 @@ function get_channel_content($pdo, $input) {
         $where[] = "(videoUrl LIKE '%.jpg' OR videoUrl LIKE '%.png' OR videoUrl LIKE '%.jpeg')";
     }
     
-    $sql = "SELECT * FROM videos WHERE " . implode(' AND ', $where) . " ORDER BY createdAt DESC";
+    $sql = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl 
+            FROM videos v 
+            LEFT JOIN users u ON v.creatorId = u.id 
+            WHERE " . implode(' AND ', $where) . " 
+            ORDER BY v.createdAt DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $items = $stmt->fetchAll();

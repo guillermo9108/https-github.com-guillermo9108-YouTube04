@@ -370,15 +370,31 @@ class DBService {
             fd.append('category', cat); fd.append('duration', String(dur)); fd.append('userId', user.id); fd.append('video', file);
             if (thumb) fd.append('thumbnail', thumb);
             if (collection) fd.append('collection', collection);
-            xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded, e.total); };
+            const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
+            xhr.open('POST', '/api/index.php'); 
+            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+            xhr.upload.onprogress = (e) => { 
+                if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded, e.total); 
+            };
             xhr.onload = () => { 
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    this.invalidateCache('sp_cache_videos');
-                    this.setHomeDirty();
-                    resolve(); 
-                } else reject(); 
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+                        if (res.success) {
+                            this.invalidateCache('sp_cache_videos');
+                            this.setHomeDirty();
+                            resolve();
+                        } else {
+                            reject(new Error(res.error || 'Upload failed'));
+                        }
+                    } catch (e) {
+                        reject(new Error("Invalid server response"));
+                    }
+                } else reject(new Error(`Server returned ${xhr.status}`)); 
             };
-            xhr.onerror = () => reject(); xhr.open('POST', '/api/index.php?action=upload_video'); xhr.send(fd);
+            xhr.onerror = () => reject(new Error("Network error during upload"));
+            xhr.send(fd);
         });
     }
 
@@ -497,7 +513,10 @@ class DBService {
             if (key.startsWith(prefix)) localStorage.removeItem(key);
         });
     }
-    public setHomeDirty() { this.homeDirty = true; }
+    public setHomeDirty() { 
+        this.homeDirty = true; 
+        window.dispatchEvent(new CustomEvent('sp_home_dirty'));
+    }
     public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> { 
         return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}&limit=${limit}`); 
     }

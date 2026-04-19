@@ -22,7 +22,7 @@ export default function Marketplace() {
     // Filters
     const [search, setSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('TODOS');
-    const [sortOrder, setSortOrder] = useState<'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC'>('NEWEST');
+    const [sortOrder, setSortOrder] = useState<'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC' | 'ALPHA'>('NEWEST');
     const [priceRange, setPriceRange] = useState({ min: 0, max: 100000 });
     const [condition, setCondition] = useState('TODOS');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -69,8 +69,12 @@ export default function Marketplace() {
 
         return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesSection && matchesTags;
     }).sort((a: MarketplaceItem, b: MarketplaceItem) => {
-        if (sortOrder === 'PRICE_ASC') return a.price - b.price;
-        if (sortOrder === 'PRICE_DESC') return b.price - a.price;
+        // Si hay búsqueda y no hay un orden específico seleccionado (o es NEWEST por defecto), forzar ALPHA
+        const effectiveSort = (search && sortOrder === 'NEWEST') ? 'ALPHA' : sortOrder;
+
+        if (effectiveSort === 'PRICE_ASC') return a.price - b.price;
+        if (effectiveSort === 'PRICE_DESC') return b.price - a.price;
+        if (effectiveSort === 'ALPHA') return a.title.localeCompare(b.title);
         return b.createdAt - a.createdAt; // NEWEST
     });
 

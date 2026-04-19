@@ -36,10 +36,13 @@ export default function MarketplaceItemView() {
                 if (data) {
                     setItem(data);
                     if (user) {
-                        db.checkSubscription(user.id, data.sellerId).then(setIsSubscribed);
-                        db.checkPriceAlert(user.id, id).then(res => setHasPriceAlert(res.active));
+                        db.checkSubscription(user.id, data.sellerId).then(setIsSubscribed).catch(() => {});
+                        db.checkPriceAlert(user.id, id).then(res => setHasPriceAlert(res.active)).catch(() => {});
                     }
                 }
+                setLoading(false);
+            }).catch(err => {
+                console.error("Error loading item:", err);
                 setLoading(false);
             });
             db.getReviews(id).then(setReviews);
