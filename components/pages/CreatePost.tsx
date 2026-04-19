@@ -118,10 +118,19 @@ export default function CreatePost() {
                 {previews.length > 0 && (
                     <div className={`grid gap-1 ${previews.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                         {previews.map((src, i) => (
-                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden group">
-                                <img src={src} className="w-full h-full object-cover" />
+                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden group bg-slate-800">
+                                {files[i]?.type.startsWith('video/') ? (
+                                    <div className="w-full h-full flex items-center justify-center relative">
+                                        <video src={src} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                            <Play className="text-white opacity-80" size={48} />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <img src={src} className="w-full h-full object-cover" alt="" />
+                                )}
                                 <button 
-                                    onClick={() => removeFile(i)}
+                                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                                     className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full"
                                 >
                                     <X size={16} />

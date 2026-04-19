@@ -16,6 +16,15 @@ function admin_get_settings($pdo) {
         $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
         $res['batteryConfig'] = json_decode($res['batteryConfig'] ?? 'null', true);
         $res['batteryHistory'] = json_decode($res['batteryHistory'] ?? '[]', true);
+        
+        // Cast boolean fields
+        $res['collaboration_enabled'] = (bool)($res['collaboration_enabled'] ?? true);
+        $res['autoTranscode'] = (bool)($res['autoTranscode'] ?? false);
+        $res['isQueuePaused'] = (bool)($res['isQueuePaused'] ?? false);
+        $res['enableYoutube'] = (bool)($res['enableYoutube'] ?? false);
+        $res['autoGroupFolders'] = (bool)($res['autoGroupFolders'] ?? true);
+        $res['is_transcoder_active'] = (bool)($res['is_transcoder_active'] ?? false);
+        $res['enableDebugLog'] = (bool)($res['enableDebugLog'] ?? true);
     } else {
         $res = [
             'categories' => [],

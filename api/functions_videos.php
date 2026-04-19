@@ -769,6 +769,16 @@ function video_upload($pdo, $post, $files) {
         
         // Crear miniatura optimizada
         create_thumbnail($dest);
+    } else if ($videoPath) {
+        // Intentar extraer miniatura si no se envió una
+        $bins = get_ffmpeg_binaries($pdo);
+        $thumbName = "t_{$id}.jpg";
+        if (!is_dir('uploads/thumbnails/')) mkdir('uploads/thumbnails/', 0777, true);
+        $thumbDest = 'uploads/thumbnails/' . $thumbName;
+        
+        if (extract_video_thumbnail($videoPath, $thumbDest, $bins['ffmpeg'])) {
+            $thumbPath = 'api/' . $thumbDest;
+        }
     }
     $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
     $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
@@ -860,10 +870,22 @@ function video_organize_single($pdo, $id, $settings) {
         $newCategory = $meta['category'];
     }
 
+    // Solo actualizar título si está vacío o es un nombre genérico (ID o UUID)
+    $newTitle = $v['title'];
+    $isGenericTitle = (
+        empty($v['title']) || 
+        strpos($v['title'], 'v_') === 0 || 
+        strpos($v['title'], 'vid_') === 0 || 
+        strpos($v['title'], 'img_') === 0
+    );
+    if ($isGenericTitle && !empty($meta['title'])) {
+        $newTitle = $meta['title'];
+    }
+
     $catPrice = getPriceForCategory($newCategory, $settings, $meta['parent_category']);
     $price = (floatval($v['price'] ?? 0) > 0) ? $v['price'] : $catPrice;
 
-    $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$meta['title'], $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
+    $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$newTitle, $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
 
     // Notificar solo si pasa de PENDING a una categoría real, o si es un upload manual que acaba de procesarse
     $isNewUpload = (time() - $v['createdAt']) < 60; // Consider it new if created in the last minute
@@ -1163,10 +1185,21 @@ function upload_channel_images($pdo, $post, $files) {
                 if (!$isVid) {
                     // Crear miniatura para la imagen del canal
                     create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 600, 600, 75);
+                    $thumbnailPath = str_replace('.' . $ext, '_thumb.jpg', $target); 
+                    // No necesitamos el target original como miniatura si creamos una
+                    $thumbnail = 'api/' . $thumbnailPath;
                 } else {
-                    // Si es video, el procesador de colaboración o el administrador lo procesará
-                    // Opcionalmente podemos intentar extraer miniatura aquí si tenemos ffmpeg
-                    $thumbnail = 'api/uploads/thumbnails/default.jpg';
+                    // Si es video, intentar extraer miniatura
+                    $bins = get_ffmpeg_binaries($pdo);
+                    $thumbName = str_replace('.' . $ext, '_thumb.jpg', $filename);
+                    if (!is_dir('uploads/thumbnails/')) mkdir('uploads/thumbnails/', 0777, true);
+                    $thumbDest = 'uploads/thumbnails/' . $thumbName;
+                    
+                    if (extract_video_thumbnail($target, $thumbDest, $bins['ffmpeg'])) {
+                        $thumbnail = 'api/' . $thumbDest;
+                    } else {
+                        $thumbnail = 'api/uploads/thumbnails/default.jpg';
+                    }
                 }
                 
                 $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
