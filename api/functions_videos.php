@@ -241,7 +241,11 @@ function video_get_all($pdo) {
     // CLAVE: Determinar el orden a usar
     $effectiveSort = $userSort;
     if (empty($effectiveSort)) {
-        $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
+        if (!empty($search)) {
+            $effectiveSort = 'ALPHA';
+        } else {
+            $effectiveSort = get_folder_sort_order($pdo, $folder, $category);
+        }
     }
     $orderParams = [];
     $randClause = "RAND()";

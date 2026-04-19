@@ -63,10 +63,10 @@ export default function Home() {
 
     // Filtros Persistentes - Leer desde configuración
     const mediaFilter: 'ALL' | 'VIDEO' | 'AUDIO' = (localStorage.getItem('sp_media_filter') as any) || 'ALL';
-    const userSortOrder: string = localStorage.getItem('sp_user_sort') || '';
     const showFoldersGrid: boolean = localStorage.getItem('sp_show_folders') === 'true' || localStorage.getItem('sp_show_folders') === null;
 
     // Data State
+    const [userSortOrder, setUserSortOrder] = useState<string>(localStorage.getItem('sp_user_sort') || '');
     const [videos, setVideos] = useState<Video[]>([]);
     const [folders, setFolders] = useState<{ name: string; count: number; thumbnailUrl: string; relativePath: string; sortOrder?: string }[]>([]);
     const [appliedSortOrder, setAppliedSortOrder] = useState<string>('');
@@ -193,6 +193,14 @@ export default function Home() {
 
     // 2. Cargador de Videos (Paginado)
     const isInitialMount = useRef(true);
+
+    // Auto-refresh when home is dirty
+    useEffect(() => {
+        if (db.isHomeDirty()) {
+            db.resetHomeDirty();
+            fetchVideos(0, true);
+        }
+    }, [location.pathname]);
 
     const fetchVideos = async (p: number, reset: boolean = false) => {
         if (loading || (loadingMore && !reset)) return;
@@ -852,13 +860,33 @@ export default function Home() {
                             {searchQuery && ( 
                                 <div className="flex items-center justify-between p-3 border-b border-[var(--divider)]">
                                     <h2 className="text-sm font-bold text-[var(--text-primary)]">Resultados: {searchQuery}</h2>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 relative">
                                         <button 
                                             onClick={() => setShowSortMenu(!showSortMenu)} 
                                             className={`p-1.5 rounded border text-[10px] font-bold uppercase ${userSortOrder ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--bg-primary)] border-[var(--divider)] text-[var(--text-secondary)]'}`}
                                         >
                                             {userSortOrder ? sortOptions.find(o => o.id === userSortOrder)?.label : 'Ordenar'}
                                         </button>
+
+                                        {showSortMenu && (
+                                            <div ref={sortMenuRef} className="absolute right-0 top-full mt-1 w-40 bg-[var(--bg-secondary)] border border-[var(--divider)] rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
+                                                {sortOptions.map(opt => (
+                                                    <button
+                                                        key={opt.id}
+                                                        onClick={() => {
+                                                            setUserSortOrder(opt.id);
+                                                            setShowSortMenu(false);
+                                                            fetchVideos(0, true);
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 p-3 text-xs font-bold transition-colors ${userSortOrder === opt.id ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'}`}
+                                                    >
+                                                        <opt.icon size={14} />
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
                                         <button onClick={() => { updateUrl({ q: '' }); fetchVideos(0, true); }} className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                                             <X size={14}/>
                                         </button>

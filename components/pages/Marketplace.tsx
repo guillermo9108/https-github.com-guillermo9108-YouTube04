@@ -4,7 +4,7 @@ import { db } from '../../services/db';
 import { MarketplaceItem } from '../../types';
 import { Link, useNavigate } from '../Router';
 import { useCart } from '../../context/CartContext';
-import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell } from 'lucide-react';
+import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell, Plus } from 'lucide-react';
 import { getThumbnailUrl } from '../../utils/image';
 import { useAuth } from '../../context/AuthContext';
 
@@ -94,6 +94,13 @@ export default function Marketplace() {
                             className="w-full bg-[#3a3b3c] border border-[var(--divider)] rounded-full pl-9 pr-4 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                         />
                     </div>
+                    <Link 
+                        to="/marketplace/create"
+                        className="bg-[var(--accent)] text-white px-4 py-1.5 rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap"
+                    >
+                        <Plus size={16}/>
+                        <span className="text-xs font-bold">Vender</span>
+                    </Link>
                     <button 
                         onClick={() => setShowFilters(true)}
                         className="bg-[#3a3b3c] border border-[var(--divider)] text-[var(--text-primary)] px-3 py-1.5 rounded-full flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"

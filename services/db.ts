@@ -16,6 +16,8 @@ interface VideoPagedResponse {
 
 class DBService {
     private homeDirty = false;
+    public isHomeDirty() { return this.homeDirty; }
+    public resetHomeDirty() { this.homeDirty = false; }
     private isOffline = false;
     private lastErrorTime = 0;
 
@@ -372,6 +374,7 @@ class DBService {
             xhr.onload = () => { 
                 if (xhr.status >= 200 && xhr.status < 300) {
                     this.invalidateCache('sp_cache_videos');
+                    this.setHomeDirty();
                     resolve(); 
                 } else reject(); 
             };
@@ -527,6 +530,7 @@ class DBService {
             body: formData
         });
         this.invalidateCache('sp_cache_videos');
+        this.setHomeDirty();
         return res;
     }
 

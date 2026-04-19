@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload as UploadIcon, FileVideo, X, Plus, Image as ImageIcon, Tag, Layers, Loader2, DollarSign, Settings, Save, Edit3, Wand2, Clock, Music } from 'lucide-react';
+import { Upload as UploadIcon, FileVideo, X, Plus, Image as ImageIcon, Tag, Layers, Loader2, DollarSign, Settings, Save, Edit3, Wand2, Clock, Music, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUpload } from '../../context/UploadContext';
 import { useNavigate } from '../Router';
@@ -14,7 +14,7 @@ const ThumbnailPreview = ({ file }: { file: File }) => {
         const url = URL.createObjectURL(file); setSrc(url);
         return () => URL.revokeObjectURL(url);
     }, [file]);
-    return <img src={src} alt="Thumb" className="w-full h-full object-cover transition-opacity duration-500 animate-in fade-in" />;
+    return <img src={src} alt="Thumb" className="w-full h-full object-cover" />;
 };
 
 export default function Upload() {
@@ -127,7 +127,6 @@ export default function Upload() {
           } catch (e) {
               console.error("Error procesando archivo en cola:", e);
           }
-          // Pequeña pausa para no bloquear el hilo principal
           await new Promise(r => setTimeout(r, 50)); 
           processQueue();
       }
@@ -174,92 +173,177 @@ export default function Upload() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-2 pb-20 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-black flex items-center gap-2 text-white uppercase italic tracking-tighter"><UploadIcon className="text-indigo-500" /> Subir Contenido</h2>
-      </div>
+    <div className="flex flex-col min-h-screen bg-[#1c1e21]">
+      {/* Facebook Lite Style Header */}
+      <header className="sticky top-0 z-50 bg-[#3b5998] text-white px-4 h-12 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-1 rounded-full transition-colors">
+            <ArrowLeft size={22} />
+          </button>
+          <span className="font-bold text-lg">Subir archivos</span>
+        </div>
+        <div className="flex items-center gap-2">
+            {isProcessingQueue && <Loader2 size={18} className="animate-spin text-white/70" />}
+            <span className="text-[10px] uppercase font-bold text-white/70">
+                {files.length} seleccionados
+            </span>
+        </div>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-4">
-           <div className={`relative border-2 border-dashed border-slate-700 rounded-3xl p-6 text-center hover:bg-slate-800/50 transition-all group cursor-pointer h-44 flex flex-col items-center justify-center bg-slate-900/50 ${isProcessingQueue ? 'pointer-events-none opacity-50' : ''}`}>
-            <input type="file" accept="video/*,audio/*" multiple onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" disabled={isProcessingQueue} />
-            <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
-                {isProcessingQueue ? (
-                    <>
-                        <Loader2 size={32} className="text-indigo-500 animate-spin" />
-                        <span className="text-slate-400 text-[10px] mt-2 font-black uppercase tracking-widest">Analizando...</span>
-                        <div className="w-40 h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden border border-white/5"><div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${queueProgress.total > 0 ? (queueProgress.current / queueProgress.total) * 100 : 0}%`}}></div></div>
-                    </>
-                ) : (
-                    <>
-                        <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all shadow-2xl border border-white/5"><Plus size={28} className="text-indigo-400" /></div>
-                        <span className="text-slate-400 text-xs font-black uppercase tracking-widest mt-2">Seleccionar Archivos</span>
-                    </>
-                )}
-            </div>
-          </div>
-          
-          <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 bg-slate-950/50 flex items-center gap-2"><Edit3 size={18} className="text-indigo-400"/><h3 className="font-black text-xs text-white uppercase tracking-widest">Edición Masiva</h3></div>
-            <div className="p-5 space-y-4">
-                <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Descripción</label><textarea rows={3} value={bulkDesc} onChange={e => setBulkDesc(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:border-indigo-500 outline-none text-white resize-none shadow-inner" placeholder="Escribe para todos..." /></div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Categoría</label>
-                        <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:border-indigo-500 outline-none cursor-pointer">
+      <main className="flex-1 p-2 space-y-3 max-w-2xl mx-auto w-full pb-24">
+        {/* Selection Area */}
+        <div className="bg-[#242526] rounded-sm border border-[#3e4042] p-4">
+            <label className={`block text-center p-6 border-2 border-dashed border-[#3e4042] rounded-md cursor-pointer hover:bg-[#303031] transition-colors ${isProcessingQueue ? 'opacity-50 pointer-events-none' : ''}`}>
+                <input type="file" accept="video/*,audio/*,image/*" multiple onChange={handleFileChange} className="hidden" />
+                <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 rounded-full bg-[#3a3b3c] flex items-center justify-center">
+                        <Plus size={24} className="text-[#2e89ff]" />
+                    </div>
+                    <span className="text-sm font-bold text-[#e4e6eb]">Agregar fotos o videos</span>
+                    <span className="text-xs text-[#b0b3b8]">O arrastra aquí los archivos</span>
+                </div>
+            </label>
+            {isProcessingQueue && (
+                <div className="mt-3">
+                    <div className="flex justify-between text-[10px] font-bold text-[#b0b3b8] uppercase mb-1">
+                        <span>Analizando archivos...</span>
+                        <span>{queueProgress.current}/{queueProgress.total}</span>
+                    </div>
+                    <div className="h-1 bg-[#3a3b3c] rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-[#2e89ff] transition-all duration-300"
+                            style={{ width: `${(queueProgress.current / queueProgress.total) * 100}%` }}
+                        ></div>
+                    </div>
+                </div>
+            )}
+        </div>
+
+        {/* Bulk Editing Card */}
+        {files.length > 0 && (
+            <div className="bg-[#242526] rounded-sm border border-[#3e4042] overflow-hidden">
+                <div className="px-4 py-2 bg-[#303031] border-b border-[#3e4042] flex items-center gap-2">
+                    <Edit3 size={16} className="text-[#2e89ff]" />
+                    <span className="text-xs font-bold text-[#e4e6eb] uppercase tracking-wide">Configuración rápida</span>
+                </div>
+                <div className="p-4 space-y-4">
+                    <div>
+                        <textarea 
+                            value={bulkDesc}
+                            onChange={e => setBulkDesc(e.target.value)}
+                            placeholder="Añade una descripción para todos..."
+                            className="w-full bg-[#3a3b3c] border border-[#3e4042] rounded-md px-3 py-2 text-sm text-[#e4e6eb] outline-none focus:border-[#2e89ff] resize-none h-20"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <select 
+                            value={bulkCategory}
+                            onChange={e => setBulkCategory(e.target.value)}
+                            className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-2 text-xs text-[#e4e6eb] font-bold outline-none"
+                        >
                             {availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
                         </select>
+                        <input 
+                            type="number" 
+                            value={bulkPrice}
+                            onChange={e => setBulkPrice(e.target.value)}
+                            placeholder="Precio ($)"
+                            className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-2 text-xs text-[#e4e6eb] font-bold outline-none"
+                        />
                     </div>
-                    <div><label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5 ml-1">Precio ($)</label><input type="number" min="0" step="0.1" value={bulkPrice} onChange={e => setBulkPrice(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:border-indigo-500 outline-none" placeholder="0.00"/></div>
+                    <button 
+                        onClick={applyBulkChanges}
+                        className="w-full bg-[#3a3b3c] text-[#e4e6eb] py-2 rounded-md font-bold text-xs hover:bg-[#4e4f50] transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Wand2 size={14} /> Aplicar a la lista
+                    </button>
                 </div>
-                <button type="button" onClick={applyBulkChanges} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 mt-2"><Wand2 size={16}/> Aplicar Cambios</button>
             </div>
-          </div>
-        </div>
+        )}
 
-        <div className="lg:col-span-2">
-           <form onSubmit={handleSubmit} className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col h-full max-h-[75vh]">
-              <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/50"><h3 className="font-black text-white text-xs uppercase tracking-widest">Cola ({files.length})</h3>
-                 {files.length > 0 && !isProcessingQueue && (
-                     <button type="button" onClick={() => { setFiles([]); setTitles([]); setThumbnails([]); setDurations([]); setCategories([]); setPrices([]); }} className="text-[10px] text-red-400 hover:text-red-300 font-black uppercase tracking-widest bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Limpiar Lista</button>
-                 )}
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-950/30 custom-scrollbar">
-                {files.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-700 py-20"><FileVideo size={64} className="mb-4 opacity-20" /><p className="text-xs font-black uppercase tracking-[0.2em] opacity-30">No hay contenido</p></div>
-                ) : (
-                  files.map((f, idx) => (
-                    <div key={`${f.name}-${idx}`} className="flex flex-col md:flex-row gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 items-start md:items-center group hover:border-slate-600 transition-all animate-in slide-in-from-right-4">
-                       <div className="w-full md:w-32 aspect-video rounded-xl bg-black shrink-0 overflow-hidden relative border border-slate-700 shadow-inner">
-                         {thumbnails[idx] ? <ThumbnailPreview file={thumbnails[idx]!} /> : (
-                             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-800">
-                                {f.type.startsWith('audio') ? <Music size={32} className="opacity-20 animate-pulse"/> : <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />}
-                             </div>
-                         )}
-                         <div className="absolute bottom-1 right-1 bg-black/80 backdrop-blur-md text-[9px] px-2 py-0.5 rounded-md text-white font-mono font-bold border border-white/10">{Math.floor((durations[idx]||0)/60)}:{((durations[idx]||0)%60).toFixed(0).padStart(2,'0')}</div>
-                       </div>
-                       <div className="flex-1 min-w-0 w-full space-y-3">
-                          <div className="flex items-center gap-2">
-                              <input type="text" value={titles[idx]} onChange={(e) => updateTitle(idx, e.target.value)} className="flex-1 bg-transparent border-b border-white/5 focus:border-indigo-500 outline-none text-sm font-black text-white p-1 transition-all placeholder:text-slate-700" placeholder="Título" required />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              <div className="relative"><Tag size={12} className="absolute left-3 top-3 text-slate-500"/><select value={categories[idx]} onChange={(e) => updateCategory(idx, e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 py-2.5 pl-9 pr-3 outline-none focus:border-indigo-500 uppercase font-black appearance-none cursor-pointer">{availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}</select></div>
-                              <div className="relative"><DollarSign size={12} className="absolute left-3 top-3 text-amber-500"/><input type="number" min="0" step="0.1" value={prices[idx]} onChange={(e) => updatePrice(idx, parseFloat(e.target.value))} className="w-full bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-amber-400 font-black py-2.5 pl-9 pr-3 outline-none focus:border-indigo-500 shadow-inner" /></div>
-                              <div className="relative"><Clock size={12} className="absolute left-3 top-3 text-slate-500"/><input type="number" min="0" value={durations[idx]} onChange={(e) => updateDuration(idx, parseInt(e.target.value) || 0)} className="w-full bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 font-mono py-2.5 pl-9 pr-3 outline-none focus:border-indigo-500 shadow-inner" /></div>
-                          </div>
-                       </div>
-                       <button type="button" onClick={() => removeFile(idx)} disabled={isProcessingQueue} className="text-slate-600 hover:text-red-400 p-2 rounded-full transition-all self-end md:self-center"><X size={22} /></button>
+        {/* List of Files */}
+        <form onSubmit={handleSubmit} className="space-y-3 pb-20">
+            {files.map((f, idx) => (
+                <div key={`${f.name}-${idx}`} className="bg-[#242526] rounded-sm border border-[#3e4042] overflow-hidden flex flex-col sm:flex-row gap-3 p-3">
+                    <div className="w-full sm:w-28 aspect-video bg-black rounded-md overflow-hidden relative border border-[#3e4042] shrink-0">
+                        {thumbnails[idx] ? <ThumbnailPreview file={thumbnails[idx]!} /> : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                {f.type.startsWith('audio') ? <Music className="text-[#2e89ff]/50" /> : <Loader2 className="animate-spin text-[#2e89ff]/50" size={18} />}
+                            </div>
+                        )}
+                        {durations[idx] > 0 && (
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] px-1 py-0.5 rounded text-white font-bold">
+                                {Math.floor(durations[idx]/60)}:{(durations[idx]%60).toString().padStart(2,'0')}
+                            </div>
+                        )}
                     </div>
-                  ))
-                )}
-              </div>
-              <div className="p-5 bg-slate-900 border-t border-slate-800">
-                <button type="submit" disabled={isProcessingQueue || files.length === 0} className={`w-full py-4 rounded-2xl font-black text-sm text-white shadow-2xl transition-all flex justify-center items-center gap-3 uppercase tracking-widest ${isProcessingQueue || files.length === 0 ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 shadow-indigo-500/20'}`}>
-                  {isProcessingQueue ? <><Loader2 className="animate-spin" size={20} /> Procesando...</> : <><UploadIcon size={20}/> Publicar {files.length} Archivos</>}
-                </button>
-              </div>
-           </form>
-        </div>
-      </div>
+                    
+                    <div className="flex-1 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                            <input 
+                                type="text"
+                                value={titles[idx]}
+                                onChange={e => updateTitle(idx, e.target.value)}
+                                className="flex-1 bg-transparent border-b border-[#3e4042] focus:border-[#2e89ff] outline-none text-sm font-bold text-[#e4e6eb] pb-1 transition-all"
+                                placeholder="Título del archivo"
+                                required
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => removeFile(idx)}
+                                disabled={isProcessingQueue}
+                                className="text-[#b0b3b8] hover:text-white"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="flex items-center gap-2 bg-[#1c1e21] px-2 py-1.5 rounded border border-[#3e4042]">
+                                <Tag size={12} className="text-[#b0b3b8]" />
+                                <select 
+                                    value={categories[idx]}
+                                    onChange={e => updateCategory(idx, e.target.value)}
+                                    className="bg-transparent text-[10px] text-[#e4e6eb] font-bold outline-none flex-1 truncate uppercase"
+                                >
+                                    {availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-2 bg-[#1c1e21] px-2 py-1.5 rounded border border-[#3e4042]">
+                                <DollarSign size={12} className="text-green-500" />
+                                <input 
+                                    type="number"
+                                    step="0.1"
+                                    value={prices[idx]}
+                                    onChange={e => updatePrice(idx, parseFloat(e.target.value))}
+                                    className="bg-transparent text-[10px] text-[#e4e6eb] font-bold outline-none flex-1"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ))}
+
+            {files.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#242526] border-t border-[#3e4042] z-40">
+                    <button 
+                        type="submit"
+                        disabled={isProcessingQueue || files.length === 0}
+                        className="w-full bg-[#2e89ff] hover:bg-[#4195ff] text-white font-bold py-3 rounded-md transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                        {isProcessingQueue ? 'Analizando archivos...' : `Publicar ${files.length} archivos`}
+                    </button>
+                </div>
+            )}
+        </form>
+
+        {files.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-[#b0b3b8]">
+                <FileVideo size={48} className="mb-2 opacity-20" />
+                <p className="text-xs">No hay archivos para subir</p>
+            </div>
+        )}
+      </main>
     </div>
   );
 }
