@@ -352,6 +352,37 @@ export default function AdminConfig() {
                 </div>
             )}
 
+            <SectionHeader id="COLLABORATION" label="Colaboración (Miniaturas)" icon={Zap} color="text-yellow-400" />
+            {activeSection === 'COLLABORATION' && (
+                <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-5 animate-in slide-in-from-top-2">
+                    <div className="flex justify-between items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 shadow-xl group">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-xl bg-slate-900 text-yellow-400 shadow-inner group-hover:scale-110 transition-transform`}><Zap size={18}/></div>
+                            <div>
+                                <span className="text-[10px] font-black text-white uppercase tracking-widest block">Activar Colaboración</span>
+                                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Permite que los usuarios ayuden a extraer miniaturas.</p>
+                            </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={settings?.collaboration_enabled} 
+                                onChange={e => updateValue('collaboration_enabled', e.target.checked)} 
+                                className="sr-only peer"
+                            />
+                            <div className="w-10 h-5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-500 shadow-inner"></div>
+                        </label>
+                    </div>
+                    
+                    <div className="p-4 bg-yellow-500/5 rounded-2xl border border-yellow-500/10 flex items-start gap-3">
+                        <Info size={16} className="text-yellow-400 mt-0.5 shrink-0"/>
+                        <p className="text-[9px] text-slate-400 leading-relaxed italic">
+                            Si esta opción está desactivada, el servidor (o el administrador manualmente) deberá procesar las miniaturas de los videos locales.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <SectionHeader id="SYSTEM" label="Almacenamiento & NAS" icon={Database} color="text-blue-400" />
             {activeSection === 'SYSTEM' && (
                 <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-6 animate-in slide-in-from-top-2">

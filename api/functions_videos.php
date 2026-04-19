@@ -832,7 +832,7 @@ function video_update_metadata($pdo, $post, $files) {
         $params[] = 'api/' . $target;
     }
     $params[] = $id; 
-    $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . " WHERE id = ?")->execute($params);
+    $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . ", transcode_status = 'DONE' WHERE id = ?")->execute($params);
     $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
     video_organize_single($pdo, $id, $settings); 
     respond(true);
@@ -1098,7 +1098,7 @@ function get_channel_content($pdo, $input) {
     $userId = $input['userId'];
     $filter = $input['filter'] ?? 'ALL';
     
-    $where = ["creatorId = ?"];
+    $where = ["creatorId = ?", "is_private = 0"];
     $params = [$userId];
     
     if ($filter === 'VIDEOS') {

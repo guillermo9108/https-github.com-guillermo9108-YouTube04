@@ -36,10 +36,15 @@ export const GridProvider = ({ children }: { children?: React.ReactNode }) => {
         if (isThrottled || activeTask || processingRef.current || Date.now() < nextFetchTimeRef.current) return;
         
         try {
+            const settings = await db.getSystemSettings();
+            if (settings && !settings.collaboration_enabled) {
+                setIsIdle(true);
+                return;
+            }
+
             const pending = await db.getUnprocessedVideos(1, 'normal');
             
-            if (pending && pending.length > 0) {
-                processingRef.current = true;
+            if (pending && pending.length > 0) {                processingRef.current = true;
                 setIsIdle(false);
                 setActiveTask(pending[0]);
             } else {

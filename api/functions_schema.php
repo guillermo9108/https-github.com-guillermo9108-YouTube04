@@ -240,6 +240,7 @@ function getAppSchema() {
                 'defaultVideoThumb' => 'VARCHAR(255) DEFAULT NULL',
                 'defaultAudioThumb' => 'VARCHAR(255) DEFAULT NULL',
                 'defaultAvatar' => 'VARCHAR(255) DEFAULT NULL',
+                'collaboration_enabled' => 'TINYINT(1) DEFAULT 1',
                 'vapidPublicKey' => 'TEXT DEFAULT NULL',
                 'vapidPrivateKey' => 'TEXT DEFAULT NULL',
                 'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'",

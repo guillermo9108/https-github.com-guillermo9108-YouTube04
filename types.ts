@@ -190,6 +190,7 @@ export interface SystemSettings {
   vapidPublicKey?: string;
   vapidPrivateKey?: string;
   latestApkVersion?: string;
+  collaboration_enabled?: boolean;
   batteryConfig?: any;
   shortsPath?: string;
 }

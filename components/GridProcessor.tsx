@@ -53,17 +53,13 @@ export default function GridProcessor() {
         
         const playPromise = vid.play();
         if (playPromise !== undefined) {
-            playPromise
-                .then(() => {
-                    if (videoRef.current) setStatus('CAPTURING');
-                })
-                .catch(() => {});
+            playPromise.catch(() => {});
         }
 
         safetyTimeoutRef.current = window.setTimeout(() => {
             if (!processedRef.current && activeTask) {
                 const dur = (vid.duration && isFinite(vid.duration)) ? vid.duration : 0;
-                handleFinishTask(dur, dur > 0, true);
+                handleFinishTask(dur, false, true); // Mark as error/incompatible if timeout
             }
         }, 15000);
 
@@ -77,7 +73,6 @@ export default function GridProcessor() {
                 vid.removeAttribute('src');
                 vid.load();
             }
-            // Cleanup references
             if (currentBlobUrlRef.current) {
                 URL.revokeObjectURL(currentBlobUrlRef.current);
                 currentBlobUrlRef.current = null;
@@ -99,10 +94,15 @@ export default function GridProcessor() {
         }
     };
 
-    const handleFinishTask = async (duration: number, isSuccess: boolean, isIncompatible: boolean) => {
+    const handleFinishTask = async (duration: number, isSuccess: boolean, isIncompatible: boolean, thumbnail: File | null = null) => {
         if (processedRef.current || !activeTask) return;
         processedRef.current = true;
         setStatus(isSuccess ? 'DONE' : 'ERROR');
+        
+        // Stop video immediately
+        if (videoRef.current) {
+            videoRef.current.pause();
+        }
         
         try {
             const fd = new FormData();
@@ -110,10 +110,11 @@ export default function GridProcessor() {
             fd.append('duration', String(duration));
             fd.append('success', isSuccess ? '1' : '0');
             fd.append('clientIncompatible', isIncompatible ? '1' : '0');
+            if (thumbnail) fd.append('thumbnail', thumbnail);
             
             await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
             console.log(`GridProcessor: Task completed for ${activeTask.id}`);
-            completeTask(duration, null);
+            await completeTask(duration, null);
         } catch(e) {
             console.error("GridProcessor: Error updating metadata", e);
             skipTask();
@@ -142,28 +143,11 @@ export default function GridProcessor() {
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.drawImage(vid, 0, 0);
-                    canvas.toBlob(async (blob) => {
+                    canvas.toBlob((blob) => {
                         if (!activeTask || processedRef.current) return;
                         
-                        try {
-                            const file = blob ? new File([blob], "thumb.webp", { type: "image/webp" }) : null;
-                            
-                            processedRef.current = true;
-                            setStatus('DONE');
-
-                            const fd = new FormData();
-                            fd.append('id', activeTask.id);
-                            fd.append('duration', String(vid.duration));
-                            fd.append('success', '1');
-                            fd.append('clientIncompatible', '0');
-                            if (file) fd.append('thumbnail', file);
-                            
-                            await db.request(`action=update_video_metadata`, { method: 'POST', body: fd });
-                            completeTask(vid.duration, null);
-                        } catch (err) {
-                            console.error("GridProcessor: Error in blob processing", err);
-                            handleFinishTask(vid.duration, vid.duration > 0, true);
-                        }
+                        const file = blob ? new File([blob], "thumb.webp", { type: "image/webp" }) : null;
+                        handleFinishTask(vid.duration, true, false, file);
                     }, 'image/webp', 0.6);
                 } else {
                     handleFinishTask(vid.duration, vid.duration > 0, false);

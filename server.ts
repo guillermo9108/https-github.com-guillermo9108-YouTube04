@@ -192,12 +192,11 @@ async function startServer() {
     pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // 3. Catch-all PHP Backend Proxy (Standard mounted style)
-  // This must be AFTER specific routes like /api/uploads and /api/video
+  // 3. Catch-all PHP Backend Proxy
   app.use("/api", createProxyMiddleware({
     target: "http://localhost:8000",
     changeOrigin: true,
-    pathRewrite: { "^/api": "/api" }, // Important: keep /api in the path sent to PHP
+    pathRewrite: { "^/": "/api/" }, // Prepend /api/ because app.use("/api") strips it
     on: {
       proxyReq: (proxyReq, req, res) => {
         // Direct streaming for FormData/POST requests

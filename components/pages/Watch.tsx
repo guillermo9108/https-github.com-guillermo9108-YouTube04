@@ -344,7 +344,8 @@ export default function Watch() {
                     canvas.toBlob(async (blob) => {
                         if (blob) {
                             const file = new File([blob], "thumb_auto.jpg", { type: "image/jpeg" });
-                            await db.updateVideoMetadata(video.id, Math.floor(el.duration), file);
+                            const duration = Math.floor(el.duration) || video.duration || 0;
+                            await db.updateVideoMetadata(video.id, duration, file);
                             setVideo(prev => prev ? { ...prev, thumbnailUrl: URL.createObjectURL(blob) } : null);
                         }
                     }, 'image/jpeg', 0.8);
