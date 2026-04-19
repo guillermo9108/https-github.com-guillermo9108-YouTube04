@@ -754,10 +754,10 @@ export default function Home() {
                                 onClick={() => navigate(`/stories?userId=${story.userId}`)}
                                 className="relative w-[105px] h-44 bg-[var(--bg-tertiary)] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
                             >
-                                {story.type === 'IMAGE' ? (
+                                {story.type === 'IMAGE' || story.type === 'VIDEO' ? (
                                     <img src={getThumbnailUrl(story.contentUrl) || ''} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
                                 ) : (
-                                    <video src={story.contentUrl} className="w-full h-full object-cover opacity-90" muted />
+                                    <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Play size={24} className="text-white opacity-20"/></div>
                                 )}
                                 <div className="absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] border-[#1877f2] p-0.5 overflow-hidden bg-indigo-600">
                                     {story.avatarUrl ? (

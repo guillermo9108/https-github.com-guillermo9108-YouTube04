@@ -796,9 +796,8 @@ function video_upload($pdo, $post, $files) {
     $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$id, $post['title'], $post['description'], $price, $post['category'], intval($post['duration']), $videoPath, $thumbPath, $post['userId'], time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
 
-    require_once 'functions_interactions.php';
-    // La notificación se enviará en video_organize_single cuando se procese el video
-    // interact_notify_subscribers($pdo, $post['userId'], 'UPLOAD', "Nuevo contenido: {$post['title']}", "/watch/{$id}", $thumbPath);
+    // Procesar metadatos finales y notificar
+    video_organize_single($pdo, $id, $settings);
 
     respond(true, ['id' => $id, 'url' => $videoPath]);
 }
@@ -867,7 +866,9 @@ function video_organize_single($pdo, $id, $settings) {
     $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$meta['title'], $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
 
     // Notificar solo si pasa de PENDING a una categoría real, o si es un upload manual que acaba de procesarse
-    if ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING') {
+    $isNewUpload = (time() - $v['createdAt']) < 60; // Consider it new if created in the last minute
+    if ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING' || $isNewUpload) {
+        if ($v['is_private']) return; // Don't notify private content
         require_once 'functions_interactions.php';
         interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$meta['title']}", "/watch/{$id}", $v['thumbnailUrl']);
     }
@@ -1148,13 +1149,25 @@ function upload_channel_images($pdo, $post, $files) {
     for ($i = 0; $i < $count; $i++) {
         $key = "image_$i";
         if (isset($files[$key]) && $files[$key]['error'] === UPLOAD_ERR_OK) {
-            $ext = pathinfo($files[$key]['name'], PATHINFO_EXTENSION);
-            $filename = uniqid('img_') . '.' . $ext;
+            $ext = strtolower(pathinfo($files[$key]['name'], PATHINFO_EXTENSION));
+            $videoExts = ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'];
+            $isVid = in_array($ext, $videoExts);
+            
+            $filename = uniqid($isVid ? 'vid_' : 'img_') . '.' . $ext;
             $target = 'uploads/videos/' . $filename; 
             
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
-                // Crear miniatura para la imagen del canal
-                create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 600, 600, 75);
+                $category = $isVid ? 'PERSONAL' : 'IMAGES';
+                $thumbnail = $target;
+
+                if (!$isVid) {
+                    // Crear miniatura para la imagen del canal
+                    create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 600, 600, 75);
+                } else {
+                    // Si es video, el procesador de colaboración o el administrador lo procesará
+                    // Opcionalmente podemos intentar extraer miniatura aquí si tenemos ffmpeg
+                    $thumbnail = 'api/uploads/thumbnails/default.jpg';
+                }
                 
                 $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $id = uniqid();
@@ -1163,14 +1176,21 @@ function upload_channel_images($pdo, $post, $files) {
                     $title . ($count > 1 ? " (" . ($i + 1) . "/$count)" : ""),
                     $description,
                     $target,
-                    $target, 
+                    $thumbnail, 
                     $userId,
                     time(),
-                    'IMAGES',
+                    $category,
                     0,
                     0,
                     $collectionId
                 ]);
+                
+                // Si es video, activar procesamiento
+                if ($isVid) {
+                    $settings = get_system_settings($pdo);
+                    video_organize_single($pdo, $id, $settings);
+                }
+
                 $uploadedIds[] = $id;
             }
         }
@@ -1306,6 +1326,10 @@ function upload_story($pdo, $post, $files) {
         // Crear miniatura si es una imagen
         if ($type === 'IMAGE') {
             create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 400, 700, 70);
+        } else if ($type === 'VIDEO') {
+            // Extraer miniatura del video para la historia
+            $bins = get_ffmpeg_binaries($pdo);
+            extract_video_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), $bins['ffmpeg']);
         }
         
         $now = time();

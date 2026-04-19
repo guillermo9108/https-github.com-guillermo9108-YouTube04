@@ -470,3 +470,15 @@ function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $max
     
     return $result;
 }
+
+function extract_video_thumbnail($videoPath, $targetPath, $ffmpeg) {
+    if (!file_exists($videoPath)) return false;
+    // Extraer fotograma en el segundo 1
+    $cmd = "$ffmpeg -ss 00:00:01 -i " . escapeshellarg($videoPath) . " -vframes 1 -q:v 2 " . escapeshellarg($targetPath) . " 2>&1";
+    $output = shell_exec($cmd);
+    if (file_exists($targetPath)) {
+        return true;
+    }
+    write_log("FFMPEG fail extracting thumb: " . $output, 'ERROR');
+    return false;
+}
