@@ -55,8 +55,12 @@ import { ToastProvider } from './context/ToastContext';
 import { GridProvider } from './context/GridContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { DownloadProvider } from './context/DownloadContext';
 import { db } from './services/db';
 import { Loader2, WifiOff } from 'lucide-react';
+
+// New page
+import DownloadQueuePage from './components/pages/DownloadQueuePage';
 
 const OfflineBanner = () => {
     const [online, setOnline] = useState(navigator.onLine);
@@ -278,6 +282,7 @@ export default function App() {
       <AuthProvider>
         <NotificationProvider>
           <UploadProvider>
+            <DownloadProvider>
             <ServerTaskProvider>
                 <CartProvider>
                     <GridProvider>
@@ -321,6 +326,7 @@ export default function App() {
                                 <Route path="/seller-dashboard" element={<SetupGuard><ProtectedRoute><SellerDashboard /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/categories" element={<SetupGuard><ProtectedRoute><CategoriesPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/folders" element={<SetupGuard><ProtectedRoute><FolderExplorerPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/download-queue" element={<SetupGuard><ProtectedRoute><DownloadQueuePage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/settings" element={<SetupGuard><ProtectedRoute><SettingsPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/liked" element={<SetupGuard><ProtectedRoute><LikedPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/history" element={<SetupGuard><ProtectedRoute><HistoryPage /></ProtectedRoute></SetupGuard>} />
@@ -357,6 +363,7 @@ export default function App() {
                     </GridProvider>
                 </CartProvider>
             </ServerTaskProvider>
+          </DownloadProvider>
         </UploadProvider>
       </NotificationProvider>
     </AuthProvider>
