@@ -14,6 +14,7 @@ export default function ChatPage() {
     const toast = useToast();
     const [chats, setChats] = useState<Chat[]>([]);
     const [onlineFriends, setOnlineFriends] = useState<User[]>([]);
+    const [allKnownUsers, setAllKnownUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -67,54 +68,52 @@ export default function ChatPage() {
     useEffect(() => {
         if (user) {
             loadChats();
-            loadOnlineFriends();
+            fetchAllUsers();
         }
     }, [user]);
 
+    const fetchAllUsers = async () => {
+        try {
+            const users = await db.getAllUsers();
+            setAllKnownUsers(users || []);
+        } catch (e) {}
+    };
+
     useEffect(() => {
-        setChats(prev => prev.map(chat => ({
-            ...chat,
-            user: { ...chat.user, isOnline: onlineUserIds.has(String(chat.user.id)) }
-        })));
-    }, [onlineUserIds]);
+        if (!user) return;
+        const now = Date.now() / 1000;
+        
+        // 1. Get online users from known users
+        const onlineFromKnown = allKnownUsers.filter(u => 
+            u.id !== user.id && 
+            (onlineUserIds.has(String(u.id)) || (u.lastActive && (now - Number(u.lastActive) < 300)))
+        );
+
+        // 2. Get online users from active chats
+        const onlineFromChats = chats
+            .filter(c => 
+                c.user.id !== user.id && 
+                (onlineUserIds.has(String(c.user.id)) || (c.user.lastActive && (now - Number(c.user.lastActive) < 300)))
+            )
+            .map(c => c.user);
+
+        // Merge and deduplicate
+        const combined = [...onlineFromChats, ...onlineFromKnown];
+        const unique = Array.from(new Map(combined.map(u => [u.id, u])).values());
+        
+        setOnlineFriends(unique.sort((a, b) => Number(b.lastActive || 0) - Number(a.lastActive || 0)));
+    }, [allKnownUsers, chats, onlineUserIds, user?.id]);
 
     const loadChats = async () => {
         try {
             const data = await db.getChats(user!.id);
-            const enriched = data.map(chat => ({
-                ...chat,
-                user: {
-                    ...chat.user,
-                    isOnline: onlineUserIds.has(String(chat.user.id))
-                }
-            }));
-            setChats(enriched);
+            setChats(data || []);
         } catch (error) {
             console.error("Error loading chats", error);
         } finally {
             setLoading(false);
         }
     };
-
-    const loadOnlineFriends = async () => {
-        if (!user) return;
-        try {
-            // Get all users and filter those who are in the onlineUserIds set
-            const allUsers = await db.getAllUsers();
-            // In a real app, we might only want to show "friends" or "mutual follows"
-            // For now, we show anyone who is online and not us
-            const online = allUsers.filter(u => 
-                u.id !== user.id && 
-                onlineUserIds.has(String(u.id))
-            );
-            setOnlineFriends(online);
-        } catch (error) {}
-    };
-
-    // Refresh online friends when onlineUserIds changes
-    useEffect(() => {
-        if (user) loadOnlineFriends();
-    }, [onlineUserIds, user?.id]);
 
     const handleSearchNewChat = async (val: string) => {
         setNewChatSearch(val);
