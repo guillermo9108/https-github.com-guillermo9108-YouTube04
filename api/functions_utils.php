@@ -64,25 +64,30 @@ function get_ffmpeg_binaries($pdo) {
 }
 
 function get_media_duration($path, $ffprobe) {
+    // Asegurar que el path sea absoluto si es posible
+    $realPath = realpath($path) ?: $path;
+    
     // 1. Intentar obtener duración del formato (más rápido)
-    $cmd = "$ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+    $cmd = "$ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($realPath) . " 2>&1";
     $duration = trim(shell_exec($cmd) ?? '');
     
-    if (floatval($duration) > 0) return floatval($duration);
+    if (is_numeric($duration) && floatval($duration) > 0) return floatval($duration);
 
-    // 2. Intentar obtener duración del stream de audio (común en MP3)
-    $cmd = "$ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+    // 2. Intentar obtener duración del stream de audio
+    $cmd = "$ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($realPath) . " 2>&1";
     $duration = trim(shell_exec($cmd) ?? '');
     
-    if (floatval($duration) > 0) return floatval($duration);
+    if (is_numeric($duration) && floatval($duration) > 0) return floatval($duration);
 
     // 3. Intentar obtener duración del stream de video
-    $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+    $cmd = "$ffprobe -v error -select_streams v:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($realPath) . " 2>&1";
     $duration = trim(shell_exec($cmd) ?? '');
     
-    $val = floatval($duration);
+    $val = is_numeric($duration) ? floatval($duration) : 0;
     if ($val <= 0) {
-        write_log("FFPROBE Error: No se pudo obtener duración para $path. Comando: $cmd", 'ERROR');
+        // Loguear el error real de ffprobe si la salida no es numérica
+        $errorContext = !is_numeric($duration) ? " | FFprobe Output: $duration" : "";
+        write_log("FFPROBE Error: No se pudo obtener duración para $realPath$errorContext. Comando ejecutado: $cmd", 'ERROR');
     }
     return $val;
 }

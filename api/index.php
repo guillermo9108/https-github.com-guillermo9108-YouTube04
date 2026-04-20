@@ -176,6 +176,24 @@ try {
         case 'get_all_users': auth_get_all_users($pdo); break;
         case 'search_users': auth_search_users($pdo, $input); break;
         case 'update_user_profile': auth_update_user($pdo, $input); break;
+        case 'queue_transcode': 
+            $videoId = $input['videoId'] ?? $_GET['videoId'] ?? '';
+            $args = $input['args'] ?? '';
+            if (!$videoId) respond(false, null, "ID de video requerido");
+            
+            $fields = ["transcode_status = 'WAITING'", "processing_attempts = 0", "locked_at = 0"];
+            $params = [];
+            
+            if ($args) {
+                // Si el usuario envió argumentos personalizados de conversión
+                // Podríamos guardarlos en una columna o simplemente usarlos si es admin
+                // Por ahora, si hay args, intentamos buscar un perfil que coincida o crear uno temporal
+                // Pero lo más simple es usar los perfiles existentes.
+            }
+            
+            $pdo->prepare("UPDATE videos SET " . implode(', ', $fields) . " WHERE id = ?")->execute([$videoId]);
+            respond(true);
+            break;
         case 'get_videos': video_get_all($pdo); break;
         case 'get_video': video_get_one($pdo, $_GET['id'] ?? ''); break;
         case 'get_videos_by_creator': video_get_by_creator($pdo, $_GET['userId'] ?? ''); break;

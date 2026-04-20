@@ -1483,20 +1483,30 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     exec($cmd, $output, $returnVar);
 
     if ($returnVar === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
-        // Éxito
-        $newFilename = basename($outputPath);
-        $newUrl = dirname($videoUrl) . '/' . $newFilename;
-        if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
+        // Éxito - Reemplazar el original por el convertido para mantener rutas y ahorrar espacio
+        $finalPath = $inputPath;
+        if ($outputExt !== $ext) {
+            // Si la extensión cambió, actualizar el nombre del archivo original
+            $finalPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '.' . $outputExt;
+            @unlink($inputPath);
+        }
         
-        // Actualizar base de datos
-        $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', locked_at = 0 WHERE id = ?")
-            ->execute([$newUrl, $videoId]);
-        
-        // Opcional: Eliminar el original para ahorrar espacio si se desea
-        // @unlink($inputPath);
-        
-        write_log("Transcode: Éxito $videoId -> $newUrl");
-        return true;
+        // Mover el archivo transcodificado a la posición final (reemplazando si es necesario)
+        if (rename($outputPath, $finalPath)) {
+            $newFilename = basename($finalPath);
+            $newUrl = dirname($videoUrl) . '/' . $newFilename;
+            if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
+            
+            // Actualizar base de datos
+            $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', locked_at = 0 WHERE id = ?")
+                ->execute([$newUrl, $videoId]);
+            
+            write_log("Transcode: Reemplazo exitoso $videoId -> $newUrl");
+            return true;
+        } else {
+            write_log("Transcode: Error al mover archivo final para $videoId", 'ERROR');
+            return false;
+        }
     } else {
         // Fallo
         $errorMsg = implode(" | ", array_slice($output, -3));

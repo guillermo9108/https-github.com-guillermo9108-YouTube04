@@ -297,6 +297,17 @@ export default function FolderExplorerPage() {
                                                 showDownload={true}
                                                 onDownload={() => addToQueue(v)}
                                                 onView={() => navigate(`/watch/${v.id}`)}
+                                                onConvert={isAdmin ? async () => {
+                                                    try {
+                                                        await db.request('action=queue_transcode', {
+                                                            method: 'POST',
+                                                            body: JSON.stringify({ videoId: v.id })
+                                                        });
+                                                        toast.success("Añadido a la cola de conversión");
+                                                    } catch (e: any) {
+                                                        toast.error(e.message || "Fallo al encolar");
+                                                    }
+                                                } : undefined}
                                             />
                                         </div>
                                     ))}

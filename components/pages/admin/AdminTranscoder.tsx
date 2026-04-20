@@ -4,7 +4,7 @@ import {
     Cpu, RefreshCw, Play, CheckCircle2, Terminal, Layers, Clock, Zap, Pause, 
     Filter, History, AlertCircle, Activity, Box, Radio, Trash2, Settings2, 
     Plus, X, ChevronRight, FileVideo, AlertTriangle, RotateCcw, ShieldAlert, 
-    FileText, ScrollText, Copy, FastForward, Save, PlusCircle, Loader2, Gauge, HardDrive, Edit3, ToggleLeft, ToggleRight,
+    FileText, ScrollText, Copy, FastForward, Save, PlusCircle, Loader2, Gauge, HardDrive, Edit3, ToggleLeft, ToggleRight, Wand2,
     Image as ImageIcon
 } from 'lucide-react';
 import { useToast } from '../../../context/ToastContext';
@@ -30,6 +30,27 @@ export default function AdminTranscoder() {
         command_args: '-c:v libx264 -preset ultrafast -profile:v baseline -level 3.0 -s 1280x720 -aspect 16:9 -r 30 -b:v 1500k -pix_fmt yuv420p -vtag avc1 -c:a aac -strict experimental -ac 2 -ar 44100 -ab 128k', 
         description: '' 
     });
+
+    const SUGGESTED_PROFILES = [
+        {
+            name: 'Webview Compatible (HD)',
+            ext: 'mp4',
+            args: '-c:v libx264 -preset ultrafast -crf 28 -profile:v baseline -level 3.1 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart',
+            desc: 'H.264 Baseline compatible con la mayoría de WebViews y dispositivos móviles'
+        },
+        {
+            name: 'Webview Compatible (SD)',
+            ext: 'mp4',
+            args: '-c:v libx264 -preset ultrafast -crf 30 -s 720x406 -profile:v baseline -level 3.0 -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart',
+            desc: 'Baja resolución para conexiones lentas'
+        },
+        {
+            name: 'Solo Audio (MP3)',
+            ext: 'mp3',
+            args: '-c:a libmp3lame -b:a 128k',
+            desc: 'Convierte el flujo de audio a MP3 estandarizado'
+        }
+    ];
 
     const [filters, setFilters] = useState({ 
         onlyNonMp4: true, 
@@ -386,6 +407,25 @@ export default function AdminTranscoder() {
                             <button onClick={() => setShowProfileEditor(false)} className="p-2 text-slate-500 hover:text-white"><X/></button>
                         </div>
                         <div className="space-y-4">
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-700/50 mb-4">
+                                <label className="text-[9px] font-black text-slate-500 uppercase block mb-3 tracking-widest">Ajustes Sugeridos (Webview)</label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {SUGGESTED_PROFILES.map((p, i) => (
+                                        <button 
+                                            key={i}
+                                            onClick={() => setEditingProfile({ extension: p.ext, command_args: p.args, description: p.name })}
+                                            className="text-left p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800 transition-all group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-bold text-white group-hover:text-indigo-400">{p.name}</span>
+                                                <span className="text-[10px] font-mono text-slate-500">.{p.ext}</span>
+                                            </div>
+                                            <div className="text-[9px] text-slate-600 font-medium mt-1 leading-tight">{p.desc}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Extensión (ej: mkv)</label>
                                 <input type="text" value={editingProfile.extension} onChange={e => setEditingProfile({...editingProfile, extension: e.target.value.toLowerCase()})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-mono text-sm outline-none focus:border-indigo-500" placeholder="ts" />

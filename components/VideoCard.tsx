@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon, Wand2 } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -36,6 +36,7 @@ interface VideoCardProps {
   showDownload?: boolean;
   onDownload?: () => void;
   onView?: () => void;
+  onConvert?: () => void;
   context?: { query?: string, category?: string, folder?: string, page?: number, sort_order?: string };
 }
 
@@ -63,7 +64,7 @@ const formatDuration = (seconds: any) => {
     return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, showDownload, onDownload, onView, context }) => {
+const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, showDownload, onDownload, onView, onConvert, context }) => {
   const { user, refreshUser } = useAuth();
   const { settings } = useSettings();
   const toast = useToast();
@@ -616,6 +617,15 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                         title="Ver contenido"
                    >
                        <Eye size={14} />
+                   </button>
+               )}
+               {onConvert && (
+                   <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConvert(); }}
+                        className="bg-amber-600 text-white p-1 rounded-md shadow-lg hover:bg-amber-500 transition-colors"
+                        title="Convertir Video (Transcodificar)"
+                   >
+                       <Wand2 size={14} />
                    </button>
                )}
                <div className="bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">

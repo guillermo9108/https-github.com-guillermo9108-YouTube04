@@ -1300,17 +1300,18 @@ function video_delete($pdo, $input) {
     $stmt->execute([$id]); 
     $v = $stmt->fetch();
     if ($v) { 
-        if (strpos($v['videoUrl'], 'uploads/') !== false) {
-            @unlink($v['videoUrl']);
+        $vPath = resolve_video_path($v['videoUrl']);
+        if ($vPath && file_exists($vPath)) {
+            @unlink($vPath);
             // También intentar borrar miniatura si existe
-            $ext = pathinfo($v['videoUrl'], PATHINFO_EXTENSION);
-            @unlink(str_replace('.' . $ext, '_thumb.jpg', $v['videoUrl']));
+            $ext = pathinfo($vPath, PATHINFO_EXTENSION);
+            $thumb = str_replace('.' . $ext, '_thumb.jpg', $vPath);
+            if (file_exists($thumb)) @unlink($thumb);
         } 
-        if (strpos($v['thumbnailUrl'], 'uploads/') !== false) {
-            @unlink($v['thumbnailUrl']);
-            // También intentar borrar miniatura si existe
-            $ext = pathinfo($v['thumbnailUrl'], PATHINFO_EXTENSION);
-            @unlink(str_replace('.' . $ext, '_thumb.jpg', $v['thumbnailUrl']));
+        
+        $tPath = resolve_video_path($v['thumbnailUrl']);
+        if ($tPath && file_exists($tPath)) {
+            @unlink($tPath);
         } 
     }
     $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$id]); 
