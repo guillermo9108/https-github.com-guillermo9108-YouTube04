@@ -33,7 +33,7 @@ class DBService {
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // Reducido a 15s para detectar offline más rápido
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // Aumentado a 30s para evitar abortos prematuros
 
         const url = endpoint.startsWith('http') ? endpoint : `/api/index.php?${endpoint}`;
         const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');

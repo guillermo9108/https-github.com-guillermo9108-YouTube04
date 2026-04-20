@@ -1001,6 +1001,17 @@ export default function Home() {
                                                     onCategoryClick={() => handleCategoryClick(v.category)}
                                                     showDownload={!selectionMode && !isAdmin}
                                                     onDownload={() => addToQueue(v)}
+                                                    onConvert={isAdmin ? async () => {
+                                                        try {
+                                                            await db.request('action=queue_transcode', {
+                                                                method: 'POST',
+                                                                body: JSON.stringify({ videoId: v.id })
+                                                            });
+                                                            toast.success("Añadido a la cola de conversión");
+                                                        } catch (e: any) {
+                                                            toast.error(e.message || "Fallo al encolar");
+                                                        }
+                                                    } : undefined}
                                                     context={{ 
                                                         query: searchQuery, 
                                                         category: selectedCategory, 

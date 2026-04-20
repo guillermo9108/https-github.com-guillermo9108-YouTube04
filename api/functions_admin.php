@@ -478,37 +478,46 @@ function admin_get_local_stats($pdo) {
 
     // Detectar procesos FFmpeg activos
     $active_processes = [];
-    $ps = shell_exec('ps aux | grep ffmpeg | grep -v grep');
+    $ps = @shell_exec('ps auxww | grep ffmpeg | grep -v grep');
     if ($ps) {
         $lines = explode("\n", trim($ps));
+        $seenVideoIds = [];
         foreach ($lines as $line) {
             if (empty(trim($line))) continue;
             
+            // Si la línea contiene "sh -c", es probable que sea el shell lanzador
+            if (strpos($line, 'sh -c') !== false) continue;
+
             // Extraer PID e info
             $parts = preg_split('/\s+/', $line);
+            if (count($parts) < 2) continue;
             $pid = $parts[1];
             
             // Intentar encontrar qué video se está procesando buscando el ID en los argumentos
             $videoId = '';
-            // Si el worker usa -metadata title="VIDEO_ID", podemos extraerlo
-            if (preg_match('/-metadata title="([^"]+)"/', $line, $metaMatches)) {
+            if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $line, $metaMatches)) {
                 $videoId = $metaMatches[1];
             }
             
+            // Si ya vimos este video (por otro PID), ignorar duplicados
+            if ($videoId && isset($seenVideoIds[$videoId])) continue;
+            if ($videoId) $seenVideoIds[$videoId] = true;
+
             // Buscar video en DB si tenemos ID
             $videoInfo = null;
             if ($videoId) {
                 $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
                 $stmtV->execute([$videoId]);
-                $videoInfo = $stmtV->fetch();
-                if ($videoInfo) {
-                    video_process_rows($videoInfo); // Formatea pesos etc
+                $videoData = $stmtV->fetch();
+                if ($videoData) {
+                    $rows = [$videoData];
+                    video_process_rows($rows); // Espera un array
+                    $videoInfo = $rows[0];
                 }
             }
 
             $active_processes[] = [
                 'pid' => $pid,
-                'command' => $line,
                 'videoId' => $videoId,
                 'title' => $videoInfo['title'] ?? ($videoId ? "Video ID: $videoId" : "Instancia FFmpeg"),
                 'size_fmt' => $videoInfo['size_fmt'] ?? null,
