@@ -74,7 +74,7 @@ export default function MarketplaceCreate() {
             formData.append('category', category);
             formData.append('condition', condition);
             formData.append('sellerId', user.id);
-            formData.append('isFlashSale', String(isFlashSale));
+            formData.append('isFlashSale', isFlashSale ? '1' : '0');
             formData.append('tags', JSON.stringify(tags));
             images.forEach(img => formData.append('images[]', img));
             

@@ -1183,11 +1183,13 @@ function get_channel_content($pdo, $input) {
 }
 
 function upload_channel_images($pdo, $post, $files) {
-    $userId = $post['userId'];
-    $title = $post['title'];
-    $description = $post['description'] ?? '';
+    $userId = $post['userId'] ?? '';
+    $batchTitle = $post['title'] ?? 'Publicación';
+    $batchDescription = $post['description'] ?? '';
     $type = $post['type'] ?? 'INDEPENDENT';
     $count = (int)($post['count'] ?? 0);
+
+    if (!$userId) respond(false, null, "ID de usuario faltante");
 
     $uploadedIds = [];
     $collectionId = $count > 1 ? 'album_' . uniqid() : null;
@@ -1202,16 +1204,22 @@ function upload_channel_images($pdo, $post, $files) {
             $target = 'uploads/videos/' . $filename; 
             
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
-                $category = $isVid ? 'PERSONAL' : 'IMAGES';
-                $thumbnail = $target;
+                // Individual metadata or fallback to batch
+                $title = $post["title_$i"] ?? $batchTitle;
+                if ($count > 1 && !isset($post["title_$i"])) {
+                    $title = $batchTitle . " (" . ($i + 1) . "/$count)";
+                }
+                $description = $post["description_$i"] ?? $batchDescription;
+                $category = $post["category_$i"] ?? ($isVid ? 'PERSONAL' : 'IMAGES');
+                $price = floatval($post["price_$i"] ?? 0);
+                $isPrivate = !empty($post["is_private_$i"]) ? 1 : 0;
                 $duration = intval($post["duration_$i"] ?? 0);
 
+                $thumbnail = $target;
                 if (!$isVid) {
                     // Crear miniatura para la imagen del canal
                     create_thumbnail($target, str_replace('.' . $ext, '_thumb.jpg', $target), 600, 600, 75);
-                    $thumbnailPath = str_replace('.' . $ext, '_thumb.jpg', $target); 
-                    // No necesitamos el target original como miniatura si creamos una
-                    $thumbnail = 'api/' . $thumbnailPath;
+                    $thumbnail = 'api/' . str_replace('.' . $ext, '_thumb.jpg', $target);
                 } else {
                     // Si es video, intentar extraer miniatura
                     $bins = get_ffmpeg_binaries($pdo);
@@ -1226,21 +1234,22 @@ function upload_channel_images($pdo, $post, $files) {
                     }
                 }
                 
-                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, is_audio, duration, collection, price, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $id = uniqid();
-                $itemTitle = ($count > 1) ? $title . " (" . ($i + 1) . "/$count)" : $title;
                 $stmt->execute([
                     $id,
-                    $itemTitle,
+                    $title,
                     $description,
                     $target,
                     $thumbnail, 
                     $userId,
                     time(),
                     $category,
-                    0,
+                    0, // is_audio (TODO: Detectar audio real si se sube audio)
                     $duration,
-                    $collectionId
+                    $collectionId,
+                    $price,
+                    $isPrivate
                 ]);
                 
                 // Si es video, activar procesamiento
@@ -1255,7 +1264,7 @@ function upload_channel_images($pdo, $post, $files) {
     }
 
     if (empty($uploadedIds)) {
-        respond(false, null, "No se pudieron subir las imágenes");
+        respond(false, null, "No se pudieron subir los archivos. Verifica los límites de tamaño o errores de red.");
     }
 
     respond(true, ['ids' => $uploadedIds]);

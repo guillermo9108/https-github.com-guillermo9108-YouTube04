@@ -398,6 +398,43 @@ class DBService {
         });
     }
 
+    public async uploadBatch(formData: FormData, onProgress?: (p: number, l: number, t: number) => void): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/index.php?action=upload_channel_images');
+            const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
+            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            
+            if (onProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        onProgress(percent, e.loaded, e.total);
+                    }
+                };
+            }
+
+            xhr.onload = () => { 
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+                        if (res.success) {
+                            this.invalidateCache('sp_cache_videos');
+                            this.setHomeDirty();
+                            resolve(res);
+                        } else {
+                            reject(new Error(res.error || 'Batch upload failed'));
+                        }
+                    } catch (e) {
+                        reject(new Error("Invalid server response"));
+                    }
+                } else reject(new Error(`Server returned ${xhr.status}`)); 
+            };
+            xhr.onerror = () => reject(new Error("Network error during batch upload"));
+            xhr.send(formData);
+        });
+    }
+
     public async getRequests(status: string = 'ALL'): Promise<ContentRequest[]> { return this.request<ContentRequest[]>(`action=get_requests&status=${status}`); }
     public async requestContent(userId: string, query: string, isVip: boolean): Promise<void> { return this.request<void>(`action=request_content`, { method: 'POST', body: JSON.stringify({ userId, query, isVip }) }); }
     public async updateRequestStatus(id: string, status: string): Promise<void> { return this.request<void>(`action=update_request_status`, { method: 'POST', body: JSON.stringify({ id, status }) }); }
