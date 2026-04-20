@@ -15,8 +15,8 @@ import VideoCard from '../VideoCard';
 interface FolderItem {
     name: string;
     count: number;
-    thumbnailUrl: string;
-    relativePath: string;
+    thumbnailUrl?: string;
+    relativePath?: string;
 }
 
 export default function FolderExplorerPage() {
@@ -52,16 +52,13 @@ export default function FolderExplorerPage() {
             setLoading(true);
             const folderPath = navigationPath.join('/');
             
-            // Parallel load folders and videos in this folder
-            const [folderRes, videoRes] = await Promise.all([
-                db.getFolders(folderPath),
-                db.getVideos(0, 100, folderPath, '', 'TODOS', 'ALL', 'LATEST')
-            ]);
+            // Single load for both folders and videos
+            const result = await db.getVideos(0, 100, folderPath, '', 'TODOS', 'ALL', 'LATEST');
             
-            setFolders(folderRes);
-            setVideos(videoRes.videos);
+            setFolders(result.folders || []);
+            setVideos(result.videos || []);
         } catch (err) {
-            console.error('Error loading folders:', err);
+            console.error('Error loading folder content:', err);
             toast.error("Error al cargar contenido");
         } finally {
             setLoading(false);
@@ -81,12 +78,14 @@ export default function FolderExplorerPage() {
     };
 
     const handleDownloadAll = async (folder: FolderItem) => {
+        if (!folder.relativePath) return;
         toast.info(`Añadiendo ${folder.count} archivos a la cola...`);
         await addFolderToQueue(folder.relativePath);
         toast.success("Archivos añadidos a la cola de descarga");
     };
 
     const handleViewOnHome = (folder: FolderItem) => {
+        if (!folder.relativePath) return;
         navigate(`/?folder=${encodeURIComponent(folder.relativePath)}`);
     };
 
@@ -106,7 +105,7 @@ export default function FolderExplorerPage() {
     };
 
     const handleBulkEditFolder = async (price: number, sortOrder: string) => {
-        if (!editingFolder) return;
+        if (!editingFolder || !editingFolder.relativePath) return;
         try {
             await db.request('action=admin_bulk_edit_folder', {
                 method: 'POST',
@@ -227,7 +226,7 @@ export default function FolderExplorerPage() {
                                 <h2 className="px-2 text-[10px] font-bold text-[#b0b3b8] uppercase tracking-wider">Subcarpetas</h2>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {folders.map((folder) => (
-                                        <div key={folder.relativePath} className="bg-[#242526] border border-[#3e4042] rounded-xl overflow-hidden group hover:border-[#4e4f50] transition-all">
+                                        <div key={folder.relativePath || folder.name} className="bg-[#242526] border border-[#3e4042] rounded-xl overflow-hidden group hover:border-[#4e4f50] transition-all">
                                             <div className="flex p-2 gap-3">
                                                 <div 
                                                     onClick={() => handleFolderClick(folder)}

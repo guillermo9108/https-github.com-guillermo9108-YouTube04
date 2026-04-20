@@ -188,6 +188,7 @@ try {
         case 'update_video': video_update($pdo, $input); break;
         case 'delete_video': video_delete($pdo, $input); break;
         case 'increment_share': video_increment_share($pdo, $_GET['id'] ?? ''); break;
+        case 'get_folders': respond(true, video_discover_subfolders($pdo, $_GET['path'] ?? '')); break;
         case 'get_scan_folders': video_get_scan_folders($pdo); break;
         case 'get_admin_library_stats': video_get_admin_stats($pdo); break;
         case 'scan_local_library': video_scan_local($pdo, $input); break;
