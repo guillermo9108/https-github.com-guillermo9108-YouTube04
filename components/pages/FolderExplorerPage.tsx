@@ -243,11 +243,11 @@ export default function FolderExplorerPage() {
                                                     <div className="text-[11px] text-[#b0b3b8] font-medium">{folder.count} archivos</div>
                                                 </div>
                                                 <div className="flex flex-col gap-1">
+                                                    <button onClick={() => handleViewOnHome(folder)} className="p-2 text-[#2d88ff] hover:bg-[#2d88ff]/10 rounded-full bg-[#2d88ff]/5" title="Ver contenido">
+                                                        <Eye size={18} />
+                                                    </button>
                                                     <button onClick={() => handleDownloadAll(folder)} className="p-2 text-[#b0b3b8] hover:text-white hover:bg-white/10 rounded-full" title="Descargar todo">
                                                         <Download size={16} />
-                                                    </button>
-                                                    <button onClick={() => handleViewOnHome(folder)} className="p-2 text-[#b0b3b8] hover:text-white hover:bg-white/10 rounded-full" title="Ver en Home">
-                                                        <Eye size={16} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -296,6 +296,7 @@ export default function FolderExplorerPage() {
                                                 isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000) || Number(v.price || 0) <= 0}
                                                 showDownload={true}
                                                 onDownload={() => addToQueue(v)}
+                                                onView={() => navigate(`/watch/${v.id}`)}
                                             />
                                         </div>
                                     ))}

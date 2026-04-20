@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -35,6 +35,7 @@ interface VideoCardProps {
   onCategoryClick?: () => void;
   showDownload?: boolean;
   onDownload?: () => void;
+  onView?: () => void;
   context?: { query?: string, category?: string, folder?: string, page?: number, sort_order?: string };
 }
 
@@ -62,7 +63,7 @@ const formatDuration = (seconds: any) => {
     return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, showDownload, onDownload, context }) => {
+const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, showDownload, onDownload, onView, context }) => {
   const { user, refreshUser } = useAuth();
   const { settings } = useSettings();
   const toast = useToast();
@@ -607,22 +608,33 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         )}
 
         {!isImage && (
-            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
-               {showDownload && (
+            <div className="absolute bottom-2 right-2 flex items-center gap-2">
+               {onView && (
                    <button 
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
-                        className="text-[#2d88ff] hover:text-white transition-colors"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onView(); }}
+                        className="bg-[#2d88ff] text-white p-1 rounded-md shadow-lg hover:bg-[#2d88ff]/80 transition-colors"
+                        title="Ver contenido"
                    >
-                       <Download size={12} />
+                       <Eye size={14} />
                    </button>
                )}
-               <div className="h-3 w-[1px] bg-white/20"></div>
-               {isProcessing ? (
-                   <div className="flex items-center gap-1">
-                       <RefreshCw size={10} className="animate-spin text-indigo-400" />
-                       <span>PROCESANDO</span>
-                   </div>
-               ) : formatDuration(video.duration)}
+               <div className="bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
+                {showDownload && (
+                    <button 
+                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
+                         className="text-[#2d88ff] hover:text-white transition-colors"
+                    >
+                        <Download size={12} />
+                    </button>
+                )}
+                <div className="h-3 w-[1px] bg-white/20"></div>
+                {isProcessing ? (
+                    <div className="flex items-center gap-1">
+                        <RefreshCw size={10} className="animate-spin text-indigo-400" />
+                        <span>PROCESANDO</span>
+                    </div>
+                ) : formatDuration(video.duration)}
+               </div>
             </div>
         )}
 

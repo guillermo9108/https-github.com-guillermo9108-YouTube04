@@ -159,6 +159,10 @@ function streamSubtitle($id, $ext, $pdo) {
 }
 
 function streamVideo($id, $pdo) {
+    // Desactivar visualización de errores para no corromper el binario
+    @ini_set('display_errors', '0');
+    @error_reporting(0);
+    
     // Limpiar cualquier salida previa para evitar corrupción del stream
     while (ob_get_level()) ob_end_clean();
     

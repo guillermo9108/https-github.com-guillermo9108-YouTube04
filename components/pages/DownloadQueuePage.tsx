@@ -2,17 +2,19 @@ import React from 'react';
 import { useNavigate } from '../Router';
 import { 
     ChevronLeft, Download, Trash2, Play, CheckCircle, 
-    AlertCircle, Loader2, X, Music, Image as ImageIcon
+    AlertCircle, Loader2, X, Music, Image as ImageIcon,
+    Zap, ZapOff
 } from 'lucide-react';
 import { useDownload } from '../../context/DownloadContext';
 
 export default function DownloadQueuePage() {
     const navigate = useNavigate();
-    const { queue, removeFromQueue, clearQueue, startDownload } = useDownload();
+    const { queue, removeFromQueue, clearQueue, startDownload, isAutoDownload, setIsAutoDownload } = useDownload();
 
     const pending = queue.filter(i => i.status === 'PENDING').length;
     const completed = queue.filter(i => i.status === 'COMPLETED').length;
     const downloading = queue.filter(i => i.status === 'DOWNLOADING').length;
+    const errors = queue.filter(i => i.status === 'ERROR').length;
 
     return (
         <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
@@ -24,11 +26,22 @@ export default function DownloadQueuePage() {
                     </button>
                     <h1 className="text-sm font-bold">Cola de descarga</h1>
                 </div>
-                {queue.length > 0 && (
-                    <button onClick={clearQueue} className="text-[#fa3e3e] text-[10px] font-bold uppercase tracking-wider p-2 hover:bg-red-500/10 rounded-lg">
-                        Limpiar cola
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setIsAutoDownload(!isAutoDownload)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
+                            isAutoDownload ? 'bg-[#2e89ff] text-white shadow-lg' : 'bg-[#3a3b3c] text-[#b0b3b8]'
+                        }`}
+                    >
+                        {isAutoDownload ? <Zap size={14} className="fill-white" /> : <ZapOff size={14} />}
+                        {isAutoDownload ? 'Auto: ON' : 'Auto: OFF'}
                     </button>
-                )}
+                    {queue.length > 0 && (
+                        <button onClick={clearQueue} className="text-[#fa3e3e] text-[10px] font-bold uppercase tracking-wider p-2 hover:bg-red-500/10 rounded-lg">
+                            Limpiar
+                        </button>
+                    )}
+                </div>
             </header>
 
             {/* Stats Bar */}
@@ -46,6 +59,12 @@ export default function DownloadQueuePage() {
                         <span className="text-[10px] font-bold text-[#b0b3b8] uppercase">Listos</span>
                         <span className="text-sm font-bold text-[#45bd62]">{completed}</span>
                     </div>
+                    {errors > 0 && (
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-[#fa3e3e] uppercase">Errores</span>
+                            <span className="text-sm font-bold text-[#fa3e3e]">{errors}</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -81,26 +100,34 @@ export default function DownloadQueuePage() {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[13px] font-bold truncate leading-tight mb-1">{item.video.title}</div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                                            item.status === 'COMPLETED' ? 'text-[#45bd62]' : 
-                                            item.status === 'DOWNLOADING' ? 'text-[#2e89ff]' : 
-                                            item.status === 'ERROR' ? 'text-[#fa3e3e]' : 'text-[#b0b3b8]'
-                                        }`}>
-                                            {item.status === 'PENDING' ? 'Pendiente' : 
-                                             item.status === 'DOWNLOADING' ? 'Descargando...' : 
-                                             item.status === 'COMPLETED' ? 'Completado' : 'Error'}
-                                        </span>
-                                        {item.status === 'DOWNLOADING' && (
-                                            <div className="flex-1 h-1 bg-[#3a3b3c] rounded-full overflow-hidden">
-                                                <div className="h-full bg-[#2e89ff] animate-pulse" style={{ width: '100%' }}></div>
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                item.status === 'COMPLETED' ? 'text-[#45bd62]' : 
+                                                item.status === 'DOWNLOADING' ? 'text-[#2e89ff]' : 
+                                                item.status === 'ERROR' ? 'text-[#fa3e3e]' : 'text-[#b0b3b8]'
+                                            }`}>
+                                                {item.status === 'PENDING' ? 'Pendiente' : 
+                                                 item.status === 'DOWNLOADING' ? 'Descargando...' : 
+                                                 item.status === 'COMPLETED' ? 'Completado' : 'Error'}
+                                            </span>
+                                            {item.status === 'DOWNLOADING' && (
+                                                <div className="flex-1 h-1 bg-[#3a3b3c] rounded-full overflow-hidden">
+                                                    <div className="h-full bg-[#2e89ff] animate-pulse" style={{ width: '100%' }}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {item.status === 'ERROR' && item.error && (
+                                            <div className="flex items-center gap-1 text-[11px] text-[#fa3e3e] font-medium leading-none">
+                                                <AlertCircle size={10} />
+                                                {item.error}
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-1">
-                                    {item.status === 'PENDING' && (
+                                    {(item.status === 'PENDING' || item.status === 'ERROR') && (
                                         <button 
                                             onClick={() => startDownload(item.video.id)}
                                             className="p-2 text-[#2e89ff] hover:bg-[#2d88ff]/10 rounded-full transition-colors"

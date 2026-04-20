@@ -206,18 +206,22 @@ export default function ChatPage() {
                     <button
                         key={f.id}
                         onClick={() => handleChatClick(f.id)}
-                        className="flex flex-col items-center gap-1.5 shrink-0"
+                        className="flex flex-col items-center gap-1.5 shrink-0 group active:scale-95 transition-transform"
                     >
                         <div className="relative">
-                            <img
-                                src={f.avatarUrl || `https://picsum.photos/seed/${f.id}/200/200`}
-                                className="w-[60px] h-[60px] rounded-full object-cover"
-                                alt={f.username}
-                                referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute bottom-0 right-1 w-4 h-4 bg-green-500 border-[3px] border-[#111] rounded-full" />
+                            <div className="w-[64px] h-[64px] rounded-full p-[2px] border-2 border-[#2e89ff]/50 group-hover:border-[#2e89ff] transition-colors">
+                                <div className="w-full h-full rounded-full overflow-hidden border-2 border-black/20">
+                                    <img
+                                        src={f.avatarUrl || `https://picsum.photos/seed/${f.id}/200/200`}
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                        alt={f.username}
+                                        referrerPolicy="no-referrer"
+                                    />
+                                </div>
+                            </div>
+                            <div className="absolute bottom-0 right-1 w-[16px] h-[16px] bg-[#45bd62] border-[3px] border-[#18191a] rounded-full shadow-lg" />
                         </div>
-                        <span className="text-[11px] text-white/80 font-medium truncate w-[60px] text-center">
+                        <span className="text-[11px] text-[#e4e6eb] font-medium truncate w-[64px] text-center">
                             {f.username.split(' ')[0]}
                         </span>
                     </button>
