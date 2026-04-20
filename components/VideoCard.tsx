@@ -33,6 +33,8 @@ interface VideoCardProps {
   isUnlocked: boolean;
   isWatched?: boolean;
   onCategoryClick?: () => void;
+  showDownload?: boolean;
+  onDownload?: () => void;
   context?: { query?: string, category?: string, folder?: string, page?: number, sort_order?: string };
 }
 
@@ -60,7 +62,7 @@ const formatDuration = (seconds: any) => {
     return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, context }) => {
+const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isWatched, onCategoryClick, showDownload, onDownload, context }) => {
   const { user, refreshUser } = useAuth();
   const { settings } = useSettings();
   const toast = useToast();
@@ -469,7 +471,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                             <Share2 size={16} className="text-[var(--text-secondary)]" />
                             <span className="text-sm">Compartir</span>
                         </button>
-                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownload(e); }} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); if(onDownload) onDownload(); else handleDownload(e); }} className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left">
                             <Download size={16} className="text-[var(--text-secondary)]" />
                             <span className="text-sm">Descargar</span>
                         </button>
@@ -605,7 +607,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         )}
 
         {!isImage && (
-            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5 pointer-events-none">
+            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
+               {showDownload && (
+                   <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
+                        className="text-[#2d88ff] hover:text-white transition-colors"
+                   >
+                       <Download size={12} />
+                   </button>
+               )}
+               <div className="h-3 w-[1px] bg-white/20"></div>
                {isProcessing ? (
                    <div className="flex items-center gap-1">
                        <RefreshCw size={10} className="animate-spin text-indigo-400" />
@@ -617,6 +628,14 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
 
         {isImage && (
             <div className="absolute top-3 right-3 z-10 flex gap-2">
+                 {showDownload && (
+                     <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
+                        className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg hover:bg-[#2d88ff]"
+                     >
+                         <Download size={14} />
+                     </button>
+                 )}
                  {video.isAlbum && (
                      <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-lg flex items-center gap-1">
                          <Layers size={14} />

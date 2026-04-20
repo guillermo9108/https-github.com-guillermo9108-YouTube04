@@ -183,9 +183,9 @@ export default function Upload() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f0f2f5] text-[#1c1e21]">
-      {/* Facebook Lite Style Header */}
-      <header className="sticky top-0 z-50 bg-[#3b5998] text-white px-4 h-12 flex items-center justify-between shadow-md">
+    <div className="flex flex-col min-h-screen bg-[#18191a] text-[#e4e6eb]">
+      {/* Dark Facebook Style Header */}
+      <header className="sticky top-0 z-50 bg-[#242526] text-white px-4 h-12 flex items-center justify-between shadow-md border-b border-[#3e4042]">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="hover:bg-white/10 p-1 rounded-full transition-colors">
             <ArrowLeft size={22} />
@@ -193,50 +193,50 @@ export default function Upload() {
           <span className="font-bold text-[15px]">Crear publicación</span>
         </div>
         <div className="flex items-center gap-2">
-            {isProcessingQueue && <Loader2 size={16} className="animate-spin text-white/70" />}
-            <span className="text-[10px] uppercase font-bold text-white/70">
+            {isProcessingQueue && <Loader2 size={16} className="animate-spin text-[#2e89ff]" />}
+            <span className="text-[10px] uppercase font-bold text-[#b0b3b8]">
                 {files.length} ITEMS
             </span>
         </div>
       </header>
 
       <main className="flex-1 p-0 space-y-2 max-w-2xl mx-auto w-full pb-24">
-        {/* User Info Bar (Social Style) */}
+        {/* User Info Bar (Social Style Dark) */}
         {user && (
-            <div className="bg-white p-3 flex items-center gap-3 border-b border-[#dddfe2]">
-                <div className="w-10 h-10 rounded-full bg-[#f0f2f5] overflow-hidden border border-[#dddfe2]">
-                    {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-[#3b5998]">{user.username[0]}</div>}
+            <div className="bg-[#242526] p-3 flex items-center gap-3 border-b border-[#3e4042]">
+                <div className="w-10 h-10 rounded-full bg-[#3a3b3c] overflow-hidden border border-[#3e4042]">
+                    {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-[#2e89ff]">{user.username[0]}</div>}
                 </div>
                 <div>
-                   <div className="font-bold text-[14px]">{user.username}</div>
-                   <div className="flex items-center gap-1 text-[11px] text-[#606770] font-medium">
+                   <div className="font-bold text-[14px] text-[#e4e6eb]">{user.username}</div>
+                   <div className="flex items-center gap-1 text-[11px] text-[#b0b3b8] font-medium">
                        <Layers size={10} /> Público
                    </div>
                 </div>
             </div>
         )}
 
-        {/* Selection Area improved */}
-        <div className="bg-white p-4 border-b border-[#dddfe2]">
-            <label className={`block text-center p-8 border-2 border-dashed border-[#dddfe2] rounded-lg cursor-pointer hover:bg-[#f5f6f7] transition-colors ${isProcessingQueue ? 'opacity-50 pointer-events-none' : ''}`}>
+        {/* Selection Area Dark */}
+        <div className="bg-[#242526] p-4 border-b border-[#3e4042]">
+            <label className={`block text-center p-8 border-2 border-dashed border-[#3e4042] rounded-lg cursor-pointer hover:bg-[#303031] transition-colors ${isProcessingQueue ? 'opacity-50 pointer-events-none' : ''}`}>
                 <input type="file" accept="video/*,audio/*,image/*" multiple onChange={handleFileChange} className="hidden" />
                 <div className="flex flex-col items-center gap-2">
-                    <div className="w-14 h-14 rounded-full bg-[#e7f3ff] flex items-center justify-center">
-                        <UploadIcon size={28} className="text-[#1877f2]" />
+                    <div className="w-14 h-14 rounded-full bg-[#2d88ff]/10 flex items-center justify-center">
+                        <UploadIcon size={28} className="text-[#2d88ff]" />
                     </div>
-                    <span className="text-[14px] font-bold text-[#1c1e21]">Añadir fotos o videos</span>
-                    <span className="text-[12px] text-[#606770]">Selecciona varios archivos a la vez</span>
+                    <span className="text-[14px] font-bold text-[#e4e6eb]">Añadir fotos o videos</span>
+                    <span className="text-[12px] text-[#b0b3b8]">Selecciona varios archivos a la vez</span>
                 </div>
             </label>
             {isProcessingQueue && (
                 <div className="mt-4">
-                    <div className="flex justify-between text-[10px] font-bold text-[#606770] uppercase mb-1">
+                    <div className="flex justify-between text-[10px] font-bold text-[#b0b3b8] uppercase mb-1">
                         <span>Preparando archivos...</span>
                         <span>{queueProgress.current}/{queueProgress.total}</span>
                     </div>
-                    <div className="h-1.5 bg-[#f0f2f5] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[#3a3b3c] rounded-full overflow-hidden">
                         <div 
-                            className="h-full bg-[#1877f2] transition-all duration-300"
+                            className="h-full bg-[#2d88ff] transition-all duration-300"
                             style={{ width: `${(queueProgress.current / queueProgress.total) * 100}%` }}
                         ></div>
                     </div>
@@ -244,10 +244,10 @@ export default function Upload() {
             )}
         </div>
 
-        {/* Bulk Editing - Facebook Lite Style Cards */}
+        {/* Bulk Editing - Dark Style Cards */}
         {files.length > 0 && (
-            <div className="bg-white border-y border-[#dddfe2] p-3 space-y-3">
-                <div className="flex items-center gap-2 text-[#3b5998]">
+            <div className="bg-[#242526] border-y border-[#3e4042] p-3 space-y-3">
+                <div className="flex items-center gap-2 text-[#2d88ff]">
                     <Edit3 size={16} />
                     <span className="text-xs font-bold uppercase">Ajustes para todos</span>
                 </div>
@@ -255,48 +255,48 @@ export default function Upload() {
                     value={bulkDesc}
                     onChange={e => setBulkDesc(e.target.value)}
                     placeholder="Descripción para todos los archivos..."
-                    className="w-full bg-[#f5f6f7] border border-[#dddfe2] rounded-md px-3 py-2 text-sm outline-none focus:border-[#3b5998] resize-none h-20"
+                    className="w-full bg-[#3a3b3c] border border-[#3e4042] rounded-md px-3 py-2 text-sm text-[#e4e6eb] outline-none focus:border-[#2d88ff] resize-none h-20 placeholder-[#b0b3b8]"
                 />
                 <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-[#f5f6f7] border border-[#dddfe2] rounded-md px-2 py-1">
-                        <label className="block text-[9px] font-bold text-[#606770] uppercase">Categoría</label>
+                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-1">
+                        <label className="block text-[9px] font-bold text-[#b0b3b8] uppercase">Categoría</label>
                         <select 
                             value={bulkCategory}
                             onChange={e => setBulkCategory(e.target.value)}
-                            className="w-full bg-transparent text-xs font-bold outline-none"
+                            className="w-full bg-transparent text-xs font-bold outline-none text-[#e4e6eb]"
                         >
-                            {availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+                            {availableCategories.map(c => <option key={c} value={c} className="bg-[#242526]">{c.replace('_', ' ')}</option>)}
                         </select>
                     </div>
-                    <div className="bg-[#f5f6f7] border border-[#dddfe2] rounded-md px-2 py-1">
-                        <label className="block text-[9px] font-bold text-[#606770] uppercase">Precio Sugerido ($)</label>
+                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-1">
+                        <label className="block text-[9px] font-bold text-[#b0b3b8] uppercase">Precio Sugerido ($)</label>
                         <input 
                             type="number" 
                             value={bulkPrice}
                             onChange={e => setBulkPrice(e.target.value)}
                             placeholder="Ej: 5.00"
-                            className="w-full bg-transparent text-xs font-bold outline-none"
+                            className="w-full bg-transparent text-xs font-bold outline-none text-[#e4e6eb]"
                         />
                     </div>
                 </div>
                 <button 
                     onClick={applyBulkChanges}
-                    className="w-full bg-[#f0f2f5] text-[#1c1e21] py-2.5 rounded-md font-bold text-xs hover:bg-[#e4e6e9] transition-colors border border-[#dddfe2]"
+                    className="w-full bg-[#4e4f50] text-[#e4e6eb] py-2.5 rounded-md font-bold text-xs hover:bg-[#5e5f60] transition-colors border border-[#3e4042]"
                 >
                     Aplicar a toda la lista
                 </button>
             </div>
         )}
 
-        {/* List of Files organized in Social style Cards */}
+        {/* List of Files organized in Social style Cards Dark */}
         <form onSubmit={handleSubmit} className="space-y-2 pb-20">
             {files.map((f, idx) => (
-                <div key={`${f.name}-${idx}`} className="bg-white border-y border-[#dddfe2] p-3 animate-in slide-in-from-bottom-2 duration-300">
+                <div key={`${f.name}-${idx}`} className="bg-[#242526] border-y border-[#3e4042] p-3 animate-in slide-in-from-bottom-2 duration-300">
                     <div className="flex gap-3">
-                        <div className="w-24 aspect-video bg-[#000] rounded-md overflow-hidden relative border border-[#dddfe2] shrink-0">
+                        <div className="w-24 aspect-video bg-[#000] rounded-md overflow-hidden relative border border-[#3e4042] shrink-0">
                             {thumbnails[idx] ? <ThumbnailPreview file={thumbnails[idx]!} /> : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                    {f.type.startsWith('audio') ? <Music className="text-[#3b5998]/30" /> : <Loader2 className="animate-spin text-[#3b5998]/30" size={18} />}
+                                    {f.type.startsWith('audio') ? <Music className="text-[#2d88ff]/30" /> : <Loader2 className="animate-spin text-[#2d88ff]/30" size={18} />}
                                 </div>
                             )}
                             {durations[idx] > 0 && (
@@ -312,7 +312,7 @@ export default function Upload() {
                                     type="text"
                                     value={titles[idx]}
                                     onChange={e => updateTitle(idx, e.target.value)}
-                                    className="flex-1 bg-transparent border-b border-transparent focus:border-[#1877f2] outline-none text-[14px] font-bold pb-1 transition-all truncate"
+                                    className="flex-1 bg-transparent border-b border-transparent focus:border-[#2d88ff] outline-none text-[14px] font-bold text-[#e4e6eb] pb-1 transition-all truncate"
                                     placeholder="Añade un título..."
                                     required
                                 />
@@ -320,12 +320,12 @@ export default function Upload() {
                                     type="button" 
                                     onClick={() => removeFile(idx)}
                                     disabled={isProcessingQueue}
-                                    className="text-[#606770] hover:text-red-500 transition-colors"
+                                    className="text-[#b0b3b8] hover:text-[#fa3e3e] transition-colors"
                                 >
                                     <X size={18} />
                                 </button>
                             </div>
-                            <div className="text-[11px] text-[#606770] truncate mt-0.5 uppercase font-bold tracking-tight">
+                            <div className="text-[11px] text-[#b0b3b8] truncate mt-0.5 uppercase font-bold tracking-tight">
                                 {f.name} • {(f.size / (1024 * 1024)).toFixed(2)} MB
                             </div>
                         </div>
@@ -335,29 +335,29 @@ export default function Upload() {
                         <textarea 
                             value={descriptions[idx]}
                             onChange={e => updateDescription(idx, e.target.value)}
-                            className="w-full bg-[#f5f6f7] border border-[#dddfe2] rounded-md px-3 py-2 text-[12px] outline-none focus:border-[#1877f2] resize-none h-16"
+                            className="w-full bg-[#18191a] border border-[#3e4042] rounded-md px-3 py-2 text-[12px] text-[#e4e6eb] outline-none focus:border-[#2d88ff] resize-none h-16 placeholder-[#b0b3b8]"
                             placeholder="Escribe algo sobre este archivo..."
                         />
                         
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="flex flex-col bg-[#f5f6f7] px-3 py-1.5 rounded border border-[#dddfe2]">
-                                <span className="text-[9px] font-bold text-[#606770] uppercase">Carpeta</span>
+                            <div className="flex flex-col bg-[#3a3b3c] px-3 py-1.5 rounded border border-[#3e4042]">
+                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Carpeta</span>
                                 <select 
                                     value={categories[idx]}
                                     onChange={e => updateCategory(idx, e.target.value)}
-                                    className="bg-transparent text-xs font-bold outline-none truncate"
+                                    className="bg-transparent text-xs font-bold text-[#e4e6eb] outline-none truncate"
                                 >
-                                    {availableCategories.map(c => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}
+                                    {availableCategories.map(c => <option key={c} value={c} className="bg-[#242526]">{c.replace('_', ' ')}</option>)}
                                 </select>
                             </div>
-                            <div className="flex flex-col bg-[#f5f6f7] px-3 py-1.5 rounded border border-[#dddfe2]">
-                                <span className="text-[9px] font-bold text-[#606770] uppercase">Precio ($)</span>
+                            <div className="flex flex-col bg-[#3a3b3c] px-3 py-1.5 rounded border border-[#3e4042]">
+                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Precio ($)</span>
                                 <input 
                                     type="number"
                                     step="0.1"
                                     value={prices[idx]}
                                     onChange={e => updatePrice(idx, parseFloat(e.target.value))}
-                                    className="bg-transparent text-xs font-bold outline-none"
+                                    className="bg-transparent text-xs font-bold text-[#e4e6eb] outline-none"
                                 />
                             </div>
                         </div>
@@ -366,11 +366,11 @@ export default function Upload() {
             ))}
 
             {files.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-[#dddfe2] z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+                <div className="fixed bottom-0 left-0 right-0 p-3 bg-[#242526] border-t border-[#3e4042] z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.3)]">
                     <button 
                         type="submit"
                         disabled={isProcessingQueue || files.length === 0}
-                        className="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-3.5 rounded-md transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+                        className="w-full bg-[#2e89ff] hover:bg-[#3e95ff] text-white font-bold py-3.5 rounded-md transition-all active:scale-95 disabled:opacity-50"
                     >
                         {isProcessingQueue ? 'Analizando archivos...' : `Publicar ${files.length} archivos`}
                     </button>
@@ -379,11 +379,11 @@ export default function Upload() {
         </form>
 
         {files.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 text-[#606770]">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-[#dddfe2]">
-                    <UploadIcon size={40} className="opacity-20" />
+            <div className="flex flex-col items-center justify-center py-32 text-[#b0b3b8]">
+                <div className="w-20 h-20 bg-[#242526] rounded-full flex items-center justify-center mb-4 shadow-sm border border-[#3e4042]">
+                    <UploadIcon size={40} className="text-[#2d88ff] opacity-40" />
                 </div>
-                <p className="font-bold">No has seleccionado archivos</p>
+                <p className="font-bold text-[#e4e6eb]">No has seleccionado archivos</p>
                 <p className="text-xs">Sube fotos o videos para tu canal</p>
             </div>
         )}

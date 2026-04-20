@@ -6,10 +6,11 @@ import { getThumbnailUrl } from '../../utils/image';
 import { Video, Notification as AppNotification, User, SystemSettings, Category, Story } from '../../types';
 import { useNotifications } from '../../context/NotificationContext';
 import { 
-    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic, Image, Plus
+    RefreshCw, Search, X, ChevronRight, ChevronDown, Home as HomeIcon, Layers, Folder, Bell, Menu, Crown, User as UserIcon, LogOut, ShieldCheck, MessageSquare, Loader2, Tag, Play, Music, ShoppingBag, History, Edit3, DollarSign, SortAsc, Save, ArrowDownUp, Clock, Zap, Check, CheckCircle, TrendingUp, Mic, Image, Plus, CheckSquare, Square, Download
 } from 'lucide-react';
 import { useNavigate, Link, useLocation } from '../Router';
 import { useToast } from '../../context/ToastContext';
+import { useDownload } from '../../context/DownloadContext';
 
 // Refactored Components
 import Sidebar from '../home/Sidebar';
@@ -55,11 +56,14 @@ export default function Home() {
     const navigate = useNavigate();
     const location = useLocation();
     const toast = useToast();
+    const { addToQueue, queue } = useDownload();
     
     // UI State
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
     const [editingFolder, setEditingFolder] = useState<any | null>(null);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Filtros Persistentes - Leer desde configuración
     const mediaFilter: 'ALL' | 'VIDEO' | 'AUDIO' = (localStorage.getItem('sp_media_filter') as any) || 'ALL';
@@ -746,6 +750,67 @@ export default function Home() {
                 {/* Gutter */}
                 <div className="h-2 bg-[var(--bg-primary)]"></div>
 
+                {/* Sub-Header Toolbar */}
+                <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)] px-4 h-12 flex items-center justify-between">
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => {
+                                if (selectionMode) {
+                                    setSelectionMode(false);
+                                    setSelectedIds(new Set());
+                                } else {
+                                    setSelectionMode(true);
+                                }
+                            }}
+                            className={`flex items-center gap-2 text-xs font-bold transition-colors ${selectionMode ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            {selectionMode ? <CheckSquare size={18} /> : <Square size={18} />}
+                            <span>{selectionMode ? 'Cancelar' : 'Seleccionar'}</span>
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {queue.length > 0 && (
+                            <button 
+                                onClick={() => navigate('/download-queue')}
+                                className="flex items-center gap-2 text-[var(--accent)] text-xs font-bold animate-in bounce-in"
+                            >
+                                <Download size={18} />
+                                <span>Cola ({queue.length})</span>
+                            </button>
+                        )}
+                        <Link to="/folders" className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-bold">
+                            <Folder size={18} />
+                            <span>Carpetas</span>
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Selection Action Bar */}
+                {selectionMode && selectedIds.size > 0 && (
+                    <div className="sticky top-0 z-50 bg-[var(--accent)] text-white px-4 py-2 flex items-center justify-between shadow-lg">
+                        <span className="text-xs font-bold">{selectedIds.size} seleccionados</span>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => {
+                                    const toAdd = videos.filter(v => selectedIds.has(v.id));
+                                    toAdd.forEach(v => addToQueue(v));
+                                    toast.success(`${toAdd.length} archivos añadidos`);
+                                    setSelectionMode(false);
+                                    setSelectedIds(new Set());
+                                }}
+                                className="bg-white/20 px-3 py-1 rounded font-bold text-xs flex items-center gap-1"
+                            >
+                                <Download size={14} /> Añadir a cola
+                            </button>
+                            <button onClick={() => setSelectedIds(new Set())} className="text-xs font-bold px-2 py-1">Deshacer</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Gutter */}
+                <div className="h-2 bg-[var(--bg-primary)]"></div>
+
                 {/* Stories Section */}
                 <div className="bg-[var(--bg-secondary)] py-3 overflow-hidden">
                     <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
@@ -911,12 +976,31 @@ export default function Home() {
                                                 <ShortsGrid shorts={v.shorts} isSingle={v.shorts.length === 1} />
                                             </div>
                                         ) : (
-                                            <div key={v.id} className="bg-[var(--bg-secondary)]">
+                                            <div key={v.id} className="bg-[var(--bg-secondary)] relative group">
+                                                {selectionMode && (
+                                                    <div 
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            const newSelected = new Set(selectedIds);
+                                                            if (newSelected.has(v.id)) newSelected.delete(v.id);
+                                                            else newSelected.add(v.id);
+                                                            setSelectedIds(newSelected);
+                                                        }}
+                                                        className={`absolute inset-0 z-10 flex items-start justify-end p-2 cursor-pointer transition-colors ${selectedIds.has(v.id) ? 'bg-[#1877f2]/20' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}
+                                                    >
+                                                        <div className={`p-1 rounded-full border-2 ${selectedIds.has(v.id) ? 'bg-[#1877f2] border-[#1877f2]' : 'bg-black/20 border-white'}`}>
+                                                            <Check size={16} className="text-white" />
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <VideoCard 
                                                     video={v} 
                                                     isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000) || Number(v.price || 0) <= 0} 
                                                     isWatched={watchedIds.includes(v.id)} 
                                                     onCategoryClick={() => handleCategoryClick(v.category)}
+                                                    showDownload={!selectionMode && !isAdmin}
+                                                    onDownload={() => addToQueue(v)}
                                                     context={{ 
                                                         query: searchQuery, 
                                                         category: selectedCategory, 

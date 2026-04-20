@@ -7,6 +7,7 @@ import { ToastProvider } from '../context/ToastContext';
 import { UploadProvider } from '../context/UploadContext';
 import { CartProvider } from '../context/CartContext';
 import { ServerTaskProvider } from '../context/ServerTaskContext';
+import { DownloadProvider } from '../context/DownloadContext';
 import Layout from '../components/Layout';
 import { APP_VERSION } from './constants';
 
@@ -35,6 +36,7 @@ import WatchLater from '../components/pages/WatchLater';
 import SearchPage from '../components/pages/SearchPage';
 import CategoriesPage from '../components/pages/CategoriesPage';
 import FolderExplorerPage from '../components/pages/FolderExplorerPage';
+import DownloadQueuePage from '../components/pages/DownloadQueuePage';
 import Shorts from '../components/pages/Shorts';
 import HelpPage from '../components/pages/HelpPage';
 import ReportPage from '../components/pages/ReportPage';
@@ -82,45 +84,48 @@ const AppContent: React.FC = () => {
     <NotificationProvider>
       <ToastProvider>
         <UploadProvider>
-          <CartProvider>
-            <ServerTaskProvider>
-              <HashRouter>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route element={<Layout />}>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/watch/:id" element={<Watch />} />
-                    <Route path="/channel/:userId" element={<Channel />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/upload" element={<Upload />} />
-                    <Route path="/edit/:id" element={<EditVideo />} />
-                    <Route path="/marketplace" element={<Marketplace />} />
-                    <Route path="/marketplace/:id" element={<MarketplaceItem />} />
-                    <Route path="/marketplace/create" element={<MarketplaceCreate />} />
-                    <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
-                    <Route path="/seller-dashboard" element={<SellerDashboard />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/menu" element={<MenuPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/vip" element={<VipStore />} />
-                    <Route path="/wallet" element={<WalletPage />} />
-                    <Route path="/recharge" element={<RechargePage />} />
-                    <Route path="/history" element={<HistoryPage />} />
-                    <Route path="/liked" element={<LikedPage />} />
-                    <Route path="/watch-later" element={<WatchLater />} />
-                    <Route path="/search" element={<SearchPage />} />
-                    <Route path="/categories" element={<CategoriesPage />} />
-                    <Route path="/folders" element={<FolderExplorerPage />} />
-                    <Route path="/shorts" element={<Shorts />} />
-                    <Route path="/help" element={<HelpPage />} />
-                    <Route path="/report" element={<ReportPage />} />
-                    <Route path="/admin" element={<Admin />} />
-                  </Route>
-                </Routes>
-              </HashRouter>
-            </ServerTaskProvider>
-          </CartProvider>
+          <DownloadProvider>
+            <CartProvider>
+              <ServerTaskProvider>
+                <HashRouter>
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    <Route element={<Layout />}>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/watch/:id" element={<Watch />} />
+                      <Route path="/channel/:userId" element={<Channel />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/upload" element={<Upload />} />
+                      <Route path="/edit/:id" element={<EditVideo />} />
+                      <Route path="/marketplace" element={<Marketplace />} />
+                      <Route path="/marketplace/:id" element={<MarketplaceItem />} />
+                      <Route path="/marketplace/create" element={<MarketplaceCreate />} />
+                      <Route path="/marketplace/edit/:id" element={<MarketplaceEdit />} />
+                      <Route path="/seller-dashboard" element={<SellerDashboard />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/notifications" element={<Notifications />} />
+                      <Route path="/menu" element={<MenuPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/vip" element={<VipStore />} />
+                      <Route path="/wallet" element={<WalletPage />} />
+                      <Route path="/recharge" element={<RechargePage />} />
+                      <Route path="/history" element={<HistoryPage />} />
+                      <Route path="/liked" element={<LikedPage />} />
+                      <Route path="/watch-later" element={<WatchLater />} />
+                      <Route path="/search" element={<SearchPage />} />
+                      <Route path="/categories" element={<CategoriesPage />} />
+                      <Route path="/folders" element={<FolderExplorerPage />} />
+                      <Route path="/download-queue" element={<DownloadQueuePage />} />
+                      <Route path="/shorts" element={<Shorts />} />
+                      <Route path="/help" element={<HelpPage />} />
+                      <Route path="/report" element={<ReportPage />} />
+                      <Route path="/admin" element={<Admin />} />
+                    </Route>
+                  </Routes>
+                </HashRouter>
+              </ServerTaskProvider>
+            </CartProvider>
+          </DownloadProvider>
         </UploadProvider>
       </ToastProvider>
     </NotificationProvider>
