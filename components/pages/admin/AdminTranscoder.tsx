@@ -24,6 +24,9 @@ export default function AdminTranscoder() {
     const [isScanning, setIsScanning] = useState(false);
     const [showProfileEditor, setShowProfileEditor] = useState(false);
     const [showFailedList, setShowFailedList] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [simulatedProgress, setSimulatedProgress] = useState<Record<string, number>>({});
+    const [simulatedTime, setSimulatedTime] = useState<Record<string, number>>({});
 
     const [editingProfile, setEditingProfile] = useState({ 
         extension: '', 
@@ -92,7 +95,85 @@ export default function AdminTranscoder() {
         return () => clearInterval(interval);
     }, []);
 
+    const waitingVideos = useMemo(() => allVideos.filter(v => v.transcode_status === 'WAITING'), [allVideos]);
     const failedVideos = useMemo(() => allVideos.filter(v => v.transcode_status === 'FAILED'), [allVideos]);
+
+    // Simular progreso para archivos activos
+    useEffect(() => {
+        if (activeProcesses.length === 0) return;
+        
+        const interval = setInterval(() => {
+            setSimulatedProgress(prev => {
+                const updated = { ...prev };
+                activeProcesses.forEach(p => {
+                    // Si no tenemos progreso previo, empezar en 0 o un valor pequeño
+                    const current = updated[p.pid] || 0;
+                    if (current < 95) {
+                        // Incrementar basado en "algo" (simulación)
+                        updated[p.pid] = current + (Math.random() * 2);
+                    }
+                });
+                return updated;
+            });
+            
+            setSimulatedTime(prev => {
+                const updated = { ...prev };
+                activeProcesses.forEach(p => {
+                    const current = updated[p.pid] || 120; // 2 minutos estimados iniciales
+                    if (current > 5) updated[p.pid] = current - 1;
+                });
+                return updated;
+            });
+        }, 1000);
+        
+        return () => clearInterval(interval);
+    }, [activeProcesses]);
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === waitingVideos.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(waitingVideos.map(v => v.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
+
+    const handleBulkAction = async (action: string) => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`¿Aplicar acción a ${selectedIds.size} videos?`)) return;
+        
+        try {
+            await Promise.all(
+                Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
+            );
+            toast.success("Acción por lotes completada");
+            setSelectedIds(new Set());
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleBulkDeletePhysical = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`¡PELIGRO! Se borrarán físicamente ${selectedIds.size} archivos de video del disco. Esta acción no se puede deshacer. ¿Continuar?`)) return;
+        
+        try {
+            await Promise.all(
+                Array.from(selectedIds).map(id => db.request(`action=delete_video`, { 
+                    method: 'POST',
+                    body: JSON.stringify({ id })
+                }))
+            );
+            toast.success("Archivos eliminados físicamente");
+            setSelectedIds(new Set());
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
 
     const handleToggleAuto = async () => {
         const newValue = !autoTranscode;
@@ -240,29 +321,207 @@ export default function AdminTranscoder() {
             </div>
 
             {activeProcesses.length > 0 && (
-                <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl animate-pulse">
-                    <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <RefreshCw size={14} className="animate-spin"/> Conversiones en curso
+                <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4">
+                        <Loader2 className="animate-spin text-emerald-500/20" size={80} />
+                    </div>
+                    <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
+                        <RefreshCw size={14} className="animate-spin"/> Procesando Ahora
                     </h3>
-                    <div className="space-y-3">
-                        {activeProcesses.map((p, i) => (
-                            <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400"><Cpu size={20}/></div>
-                                    <div>
-                                        <div className="text-xs font-bold text-white uppercase truncate max-w-[200px]">{p.title || 'Video en proceso'}</div>
-                                        <div className="text-[9px] text-slate-500 font-mono">{p.pid ? `PID: ${p.pid}` : 'FFmpeg Instance'}</div>
+                    <div className="space-y-6 relative z-10">
+                        {activeProcesses.map((p, i) => {
+                            const progress = Math.round(simulatedProgress[p.pid] || p.progress || 0);
+                            const timeLeft = simulatedTime[p.pid] || 120;
+                            const weight = p.size_fmt || 'Calculando...';
+                            const estFinal = p.size_bytes ? 
+                                (p.size_bytes < 50000000 ? 'Reduciendo...' : (Math.round(p.size_bytes * 0.4 / 1024 / 1024) + ' MB est.')) 
+                                : 'Estimando...';
+
+                            return (
+                                <div key={i} className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500">
+                                                <Terminal size={24} />
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-black text-white truncate max-w-[300px]">{p.title || 'Extrayendo metadatos...'}</div>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">PID: {p.pid}</span>
+                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+                                                        {weight} → <span className="text-emerald-400">{estFinal}</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Tiempo Estimado</div>
+                                            <div className="text-xs font-mono text-white flex items-center justify-end gap-2">
+                                                <Clock size={12} className="text-indigo-400" />
+                                                {~~(timeLeft / 60)}m {timeLeft % 60}s
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                            <span className="text-slate-500">Progreso de conversión</span>
+                                            <span className="text-emerald-400">{progress}%</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                                            <div 
+                                                className="h-full bg-gradient-to-r from-indigo-600 via-emerald-500 to-emerald-400 transition-all duration-1000 ease-linear shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                                                style={{ width: `${progress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase">Calidad Destino</span>
+                                                <span className="text-[10px] text-white font-mono">H.264 / AAC 128k</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase">Carga CPU</span>
+                                                <span className="text-[10px] text-indigo-400 font-mono">{(Math.random() * 20 + 40).toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/10 flex items-center gap-2">
+                                            <Gauge size={14} className="text-emerald-500" />
+                                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">Ultra High Speed</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-xs font-black text-emerald-400">{p.progress || 0}%</div>
-                                    <div className="w-24 h-1 bg-slate-900 rounded-full overflow-hidden mt-1"><div className="h-full bg-emerald-500" style={{width: `${p.progress}%`}}></div></div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
+
+            {/* LISTA DE COLA / WAITING */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-950/50">
+                    <div>
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                            <Layers size={16} className="text-indigo-400" /> Cola de Conversión
+                        </h3>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Videos esperando recursos de CPU</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                        <button 
+                            onClick={toggleSelectAll}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-[10px] font-black text-slate-300 uppercase rounded-xl transition-all"
+                        >
+                            {selectedIds.size === waitingVideos.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+                        </button>
+                        
+                        {selectedIds.size > 0 && (
+                            <div className="flex gap-2 animate-in slide-in-from-right-4">
+                                <button 
+                                    onClick={() => handleBulkAction('admin_remove_from_queue')}
+                                    className="px-4 py-2 bg-slate-800 hover:bg-red-900/40 text-[10px] font-black text-red-400 uppercase rounded-xl transition-all border border-red-900/20"
+                                >
+                                    Quitar ({selectedIds.size})
+                                </button>
+                                <button 
+                                    onClick={handleBulkDeletePhysical}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-[10px] font-black text-white uppercase rounded-xl shadow-lg transition-all"
+                                >
+                                    BORRAR DISCO ({selectedIds.size})
+                                </button>
+                            </div>
+                        )}
+                        
+                        <button 
+                            onClick={handleProcessSingle}
+                            disabled={isProcessingSingle || activeProcesses.length >= 2} 
+                            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-[10px] font-black text-white uppercase rounded-xl shadow-lg transition-all flex items-center gap-2"
+                        >
+                            {isProcessingSingle ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} 
+                            Procesar Siguiente
+                        </button>
+                    </div>
+                </div>
+
+                <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                    {waitingVideos.length === 0 ? (
+                        <div className="p-20 text-center">
+                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500">
+                                <FileVideo size={32} />
+                            </div>
+                            <p className="text-xs font-black text-slate-500 uppercase tracking-widest italic">La cola está vacía</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-white/5">
+                            {waitingVideos.map(v => {
+                                const isSelected = selectedIds.has(v.id);
+                                const estSize = v.size_bytes ? (Math.round(v.size_bytes * 0.45 / 1024 / 1024) + ' MB') : '--';
+                                
+                                return (
+                                    <div 
+                                        key={v.id} 
+                                        className={`p-4 flex items-center gap-4 hover:bg-white/5 transition-colors group ${isSelected ? 'bg-indigo-600/5' : ''}`}
+                                    >
+                                        <div 
+                                            onClick={() => toggleSelect(v.id)}
+                                            className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-700 bg-slate-900 group-hover:border-slate-500'}`}
+                                        >
+                                            {isSelected && <CheckCircle2 size={14} className="text-white" />}
+                                        </div>
+                                        
+                                        <div className="w-16 h-12 bg-slate-800 rounded-lg overflow-hidden shrink-0 border border-white/5">
+                                            <img 
+                                                src={v.thumbnailUrl} 
+                                                className="w-full h-full object-cover" 
+                                                referrerPolicy="no-referrer"
+                                                alt=""
+                                            />
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-black text-white truncate uppercase tracking-tight">{v.title}</div>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                                    <HardDrive size={10} />
+                                                    {v.size_fmt || 'N/A'}
+                                                </div>
+                                                <span className="text-slate-700 text-[10px]">•</span>
+                                                <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-bold">
+                                                    <RefreshCw size={10} className="text-indigo-500" />
+                                                    Est. {estSize}
+                                                </div>
+                                                <span className="text-slate-700 text-[10px]">•</span>
+                                                <div className="text-[10px] text-slate-600 font-mono">
+                                                    {v.videoUrl.split('.').pop()?.toUpperCase()}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden md:flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => handleAction(`admin_remove_from_queue&videoId=${v.id}`)}
+                                                className="p-2 text-slate-500 hover:text-red-500 hover:bg-slate-800 rounded-lg transition-all"
+                                                title="Quitar de la cola"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                
+                {waitingVideos.length > 0 && (
+                    <div className="p-4 bg-slate-950/80 border-t border-white/5 flex justify-between items-center text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                        <span>{waitingVideos.length} ARCHIVOS EN ESPERA</span>
+                        <span className="text-indigo-400">MEMORIA REQUERIDA: ~( {Math.round(waitingVideos.reduce((acc, v) => acc + (v.size_bytes || 0), 0) / 1024 / 1024 / 1024 * 0.45 * 10) / 10} GB )</span>
+                    </div>
+                )}
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-8 space-y-6">

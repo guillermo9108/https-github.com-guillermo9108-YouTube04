@@ -115,6 +115,7 @@ export interface Video {
   transcode_status?: 'NONE' | 'WAITING' | 'PROCESSING' | 'FAILED' | 'DONE';
   reason?: string;
   transcode_progress?: number;
+  size_bytes?: number;
   size_fmt?: string;
   subtitles?: VideoSubtitle[];
 }

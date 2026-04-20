@@ -476,9 +476,51 @@ function admin_get_local_stats($pdo) {
 
     $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
 
+    // Detectar procesos FFmpeg activos
+    $active_processes = [];
+    $ps = shell_exec('ps aux | grep ffmpeg | grep -v grep');
+    if ($ps) {
+        $lines = explode("\n", trim($ps));
+        foreach ($lines as $line) {
+            if (empty(trim($line))) continue;
+            
+            // Extraer PID e info
+            $parts = preg_split('/\s+/', $line);
+            $pid = $parts[1];
+            
+            // Intentar encontrar qué video se está procesando buscando el ID en los argumentos
+            $videoId = '';
+            // Si el worker usa -metadata title="VIDEO_ID", podemos extraerlo
+            if (preg_match('/-metadata title="([^"]+)"/', $line, $metaMatches)) {
+                $videoId = $metaMatches[1];
+            }
+            
+            // Buscar video en DB si tenemos ID
+            $videoInfo = null;
+            if ($videoId) {
+                $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
+                $stmtV->execute([$videoId]);
+                $videoInfo = $stmtV->fetch();
+                if ($videoInfo) {
+                    video_process_rows($videoInfo); // Formatea pesos etc
+                }
+            }
+
+            $active_processes[] = [
+                'pid' => $pid,
+                'command' => $line,
+                'videoId' => $videoId,
+                'title' => $videoInfo['title'] ?? ($videoId ? "Video ID: $videoId" : "Instancia FFmpeg"),
+                'size_fmt' => $videoInfo['size_fmt'] ?? null,
+                'size_bytes' => $videoInfo['size_bytes'] ?? null
+            ];
+        }
+    }
+
     respond(true, [
         'volumes' => $volumes,
-        'category_stats' => $category_stats
+        'category_stats' => $category_stats,
+        'active_processes' => $active_processes
     ]);
 }
 
@@ -1474,8 +1516,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
     // Actualizar estado a PROCESSING
     $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING' WHERE id = ?")->execute([$videoId]);
-
-    $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
+    
+    // Añadimos metadata con el ID del video para poder rastrear el proceso en el dashboard
+    $metaArgs = "-metadata title=" . escapeshellarg($videoId);
+    $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " $metaArgs " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
     write_log("Transcode: Iniciando $videoId: $cmd");
     
     $output = [];

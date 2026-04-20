@@ -481,6 +481,20 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                             <Clock size={16} className={inWatchLater ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
                             <span className="text-sm">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
                         </button>
+                        {isAdmin && (
+                            <button 
+                                onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    e.stopPropagation(); 
+                                    onConvert?.(); 
+                                    setShowMenu(false); 
+                                }} 
+                                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left"
+                            >
+                                <Wand2 size={16} className="text-amber-500" />
+                                <span className="text-sm">Convertir Video</span>
+                            </button>
+                        )}
                         {canEdit && (
                             <>
                                 <div className="h-px bg-[var(--divider)] my-1"></div>

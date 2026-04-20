@@ -83,6 +83,25 @@ function video_process_rows(&$rows) {
             $v['creatorAvatarUrl'] = fix_url($v['creatorAvatarUrl']); 
         }
         if (!isset($v['transcode_status'])) $v['transcode_status'] = 'NONE';
+
+        // Calcular peso del archivo real
+        if ($isLocal || $isUploaded) {
+            $pathForSize = resolve_video_path($v['rawPath']);
+            if ($pathForSize && file_exists($pathForSize)) {
+                $bytes = filesize($pathForSize);
+                $v['size_bytes'] = $bytes;
+                
+                if ($bytes >= 1073741824) {
+                    $v['size_fmt'] = number_format($bytes / 1073741824, 2) . ' GB';
+                } elseif ($bytes >= 1048576) {
+                    $v['size_fmt'] = number_format($bytes / 1048576, 2) . ' MB';
+                } elseif ($bytes >= 1024) {
+                    $v['size_fmt'] = number_format($bytes / 1024, 2) . ' KB';
+                } else {
+                    $v['size_fmt'] = $bytes . ' B';
+                }
+            }
+        }
     }
 }
 
