@@ -64,7 +64,7 @@ export default function AdminTranscoder() {
     const loadData = async () => {
         try {
             const [all, profileData, lStats, settings, realLogs] = await Promise.all([
-                db.getAllVideos(),
+                db.getAllVideos(true),
                 db.request<any[]>('action=admin_get_transcode_profiles'),
                 db.request<any>('action=admin_get_local_stats'),
                 db.getSystemSettings(),

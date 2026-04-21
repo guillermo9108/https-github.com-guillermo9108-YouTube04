@@ -118,8 +118,8 @@ function fix_url($url) {
 function resolve_video_path($url) {
     if (!$url) return null;
     
-    // Si es una URL absoluta de otro servidor, no podemos resolverla localmente
-    if (strpos($url, 'http') === 0) return null;
+    // Si es una URL absoluta de otro servidor o tiene protocolo, no podemos resolverla localmente
+    if (strpos($url, 'http') === 0 || strpos($url, '://') !== false) return null;
     
     // Normalizar separadores de ruta
     $url = str_replace('\\', '/', $url);
@@ -136,7 +136,12 @@ function resolve_video_path($url) {
     if (file_exists($apiPath) && !is_dir($apiPath)) return $apiPath;
 
     // Si es una ruta absoluta del sistema (NAS/Synology)
-    if (file_exists($url) && !is_dir($url)) return $url;
+    // Usamos @ para silenciar errores si PHP intenta usar stream wrappers de red inesperadamente
+    // y verificamos que parezca una ruta local absoluta (empieza con / pero no //, o letra de unidad C:)
+    $looksLocal = (strpos($url, '/') === 0 && strpos($url, '//') !== 0) || preg_match('/^[a-zA-Z]:/', $url);
+    if ($looksLocal && @file_exists($url) && !is_dir($url)) {
+        return $url;
+    }
     
     // Intentar resolver rutas relativas al directorio raíz del proyecto
     $rootPath = dirname(__DIR__) . '/' . ltrim($url, '/');

@@ -201,10 +201,16 @@ function video_get_all($pdo) {
     $onlyUnseen = !empty($_GET['only_unseen']);
 
     $params = []; 
-    // Por defecto ocultar videos pendientes y PRIVADOS
-    $where = ["v.category NOT IN ('PROCESSING', 'FAILED_METADATA')", "v.is_private = 0"];
-    if (!$isShorts) {
-        $where[] = "v.category != 'PENDING'";
+    $isAdmin = !empty($_GET['admin_mode']);
+    
+    // Por defecto ocultar videos pendientes y PRIVADOS a menos que sea el admin
+    $where = ["1=1"]; // Base clause to avoid SQL syntax errors
+    if (!$isAdmin) {
+        $where[] = "v.category NOT IN ('PROCESSING', 'FAILED_METADATA')";
+        $where[] = "v.is_private = 0";
+        if (!$isShorts) {
+            $where[] = "v.category != 'PENDING'";
+        }
     }
 
     if ($onlyUnseen && !empty($userId)) {

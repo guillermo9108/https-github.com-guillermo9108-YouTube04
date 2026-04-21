@@ -105,9 +105,9 @@ class DBService {
         return `/api/index.php?action=stream&id=${videoId}&token=${token}`;
     }
 
-    public async getVideos(page: number = 0, limit: number = 40, folder: string = '', search: string = '', category: string = '', mediaType: string = 'ALL', sortOrder: string = '', userId: string = ''): Promise<VideoPagedResponse> {
+    public async getVideos(page: number = 0, limit: number = 40, folder: string = '', search: string = '', category: string = '', mediaType: string = 'ALL', sortOrder: string = '', userId: string = '', adminMode: boolean = false): Promise<VideoPagedResponse> {
         const offset = page * limit;
-        const query = `action=get_videos&limit=${limit}&offset=${offset}&folder=${encodeURIComponent(folder)}&search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}`;
+        const query = `action=get_videos&limit=${limit}&offset=${offset}&folder=${encodeURIComponent(folder)}&search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}&media_type=${encodeURIComponent(mediaType)}&sort_order=${encodeURIComponent(sortOrder)}&userId=${encodeURIComponent(userId)}${adminMode ? '&admin_mode=1' : ''}`;
         
         const cacheKey = `sp_cache_videos_${folder}_${search}_${category}_${mediaType}_${sortOrder}_${page}`;
         
@@ -139,8 +139,8 @@ class DBService {
         }
     }
 
-    public async getAllVideos(): Promise<Video[]> { 
-        const res = await this.getVideos(0, 10000);
+    public async getAllVideos(adminMode: boolean = false): Promise<Video[]> { 
+        const res = await this.getVideos(0, 10000, '', '', '', 'ALL', '', '', adminMode);
         return res.videos;
     }
 
