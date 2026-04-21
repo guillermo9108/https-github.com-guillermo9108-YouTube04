@@ -472,6 +472,8 @@ function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
         
     return true;
 }
+
+function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $maxHeight = 400, $quality = 80) {
     if (!file_exists($sourcePath)) return false;
     
     if ($targetPath === null) {
