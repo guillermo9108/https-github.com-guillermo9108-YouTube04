@@ -168,7 +168,13 @@ try {
             break;
         case 'port_save_backup': port_save_backup($pdo, $_POST, $_FILES); break;
         case 'port_restore_backup': port_restore_backup($pdo, $input); break;
-        case 'login': auth_login($pdo, $input); break;
+        case 'login': 
+            try {
+                auth_login($pdo, $input); 
+            } catch (Throwable $e) {
+                respond(false, null, "Error en login: " . $e->getMessage());
+            }
+            break;
         case 'register': auth_register($pdo, $input); break;
         case 'heartbeat': auth_heartbeat($pdo, $input); break;
         case 'logout': auth_logout($pdo, $input); break;
@@ -333,7 +339,6 @@ try {
         case 'scan_ftp_recursive': if(function_exists('scanFtpRecursive')) scanFtpRecursive($pdo, $input); else respond(false, null, "Módulo FTP no disponible"); break;
         default: respond(false, null, "Acción desconocida: $action"); break;
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     respond(false, null, $e->getMessage());
 }
-?>

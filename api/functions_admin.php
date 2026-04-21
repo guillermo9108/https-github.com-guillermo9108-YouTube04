@@ -755,11 +755,6 @@ function admin_clear_transcode_queue($pdo) {
     respond(true, "Cola de transcodificación vaciada.");
 }
 
-function admin_remove_from_queue($pdo, $vid) {
-    $pdo->prepare("UPDATE videos SET transcode_status = 'NONE' WHERE id = ?")->execute([$vid]);
-    respond(true);
-}
-
 function admin_skip_transcode($pdo, $vid) {
     $pdo->prepare("UPDATE videos SET transcode_status = 'DONE' WHERE id = ?")->execute([$vid]);
     respond(true);

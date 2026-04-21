@@ -10,12 +10,25 @@ function write_log($msg, $level = 'INFO') {
 }
 
 function get_system_settings($pdo) {
-    static $settings = null;
-    if ($settings === null) {
+    try {
         $stmt = $pdo->query("SELECT * FROM system_settings WHERE id = 1");
-        $settings = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    return $settings;
+        $res = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($res) {
+            $res['categories'] = json_decode($res['categories'] ?: '[]', true);
+            $res['vipPlans'] = json_decode($res['vipPlans'] ?: '[]', true);
+            $res['paymentMethods'] = json_decode($res['paymentMethods'] ?: '[]', true);
+            return $res;
+        }
+    } catch (Exception $e) {}
+    
+    return [
+        'id' => 1,
+        'siteName' => 'StreamPay',
+        'categories' => [],
+        'vipPlans' => [],
+        'paymentMethods' => [],
+        'defaultAvatar' => 'api/uploads/avatars/default.jpg'
+    ];
 }
 
 function get_ffmpeg_binaries($pdo) {

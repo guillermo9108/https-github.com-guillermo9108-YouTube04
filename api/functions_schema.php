@@ -174,7 +174,7 @@ function getAppSchema() {
                 'id' => 'VARCHAR(50) PRIMARY KEY',
                 'userId' => 'VARCHAR(50)',
                 'planSnapshot' => 'JSON',
-                'paymentRef' => 'VARCHAR(100)',
+                'paymentRef' => 'VARCHAR(100) DEFAULT NULL',
                 'proofText' => 'TEXT DEFAULT NULL',
                 'proofImageUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'status' => "ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING'",
@@ -379,7 +379,7 @@ function syncTable($pdo, $tableName, $def) {
                 $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255) DEFAULT 'GENERAL'");
                 $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255) DEFAULT NULL");
                 $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN collection VARCHAR(255) DEFAULT NULL");
-            } catch(Exception $e) {
+            } catch(Throwable $e) {
                 // Si la columna no existe en esta tabla específica, fallará silenciosamente
             }
 
@@ -416,8 +416,7 @@ function syncTable($pdo, $tableName, $def) {
                     ('mp3', '-vn -c:a libmp3lame -q:a 2', 'Solo Audio (MP3)')");
             }
         }
-    } catch (Exception $e) { 
+    } catch (Throwable $e) { 
         write_log("Sync Error en $tableName: " . $e->getMessage(), 'ERROR');
     }
 }
-?>
