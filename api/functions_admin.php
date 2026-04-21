@@ -537,10 +537,12 @@ function admin_get_local_stats($pdo) {
     }
 
     $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
+    $transcode_stats = $pdo->query("SELECT transcode_status, COUNT(*) as count FROM videos GROUP BY transcode_status")->fetchAll();
 
     respond(true, [
         'volumes' => $volumes,
         'category_stats' => $category_stats,
+        'transcode_stats' => $transcode_stats,
         'active_processes' => $active_processes
     ]);
 }
@@ -679,10 +681,15 @@ function admin_transcode_scan_filters($pdo, $input) {
     $onlyNonMp4 = isset($input['onlyNonMp4']) ? (bool)$input['onlyNonMp4'] : false;
     $onlyIncompatible = isset($input['onlyIncompatible']) ? (bool)$input['onlyIncompatible'] : false;
     $onlyAudios = isset($input['onlyAudios']) ? (bool)$input['onlyAudios'] : false;
+    $onlyMetadataError = isset($input['onlyMetadataError']) ? (bool)$input['onlyMetadataError'] : false;
     
     $where = ["transcode_status = 'NONE'", "isLocal = 1"];
     $params = [];
     
+    if ($onlyMetadataError) {
+        $where[] = "category = 'FAILED_METADATA'";
+    }
+
     if ($onlyNonMp4) {
         $where[] = "videoUrl NOT LIKE '%.mp4'";
     }

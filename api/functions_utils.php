@@ -488,7 +488,11 @@ function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
     $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, is_audio = ? WHERE id = ?")
         ->execute([$finalDuration, $thumbUrl, $isAudio ? 1 : 0, $videoId]);
         
-    return true;
+    return [
+        'duration' => $finalDuration,
+        'thumbnailUrl' => $thumbUrl,
+        'is_audio' => $isAudio
+    ];
 }
 
 function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $maxHeight = 400, $quality = 80) {

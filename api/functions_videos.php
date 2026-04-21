@@ -188,7 +188,10 @@ function get_child_categories($pdo, $folderPath) {
 
 function video_get_all($pdo) {
     $limit = intval($_GET['limit'] ?? 40); 
-    if ($limit > 500) $limit = 500; // Protección contra peticiones masivas que causan timeout
+    $isAdmin = !empty($_GET['admin_mode']);
+    if (!$isAdmin && $limit > 500) $limit = 500; // Protección contra peticiones masivas que causan timeout
+    if ($isAdmin && $limit > 5000) $limit = 5000; // Límite mayor para admins
+    
     $offset = intval($_GET['offset'] ?? 0);
     $search = trim($_GET['search'] ?? ''); 
     $folder = trim($_GET['folder'] ?? ''); 
@@ -199,9 +202,9 @@ function video_get_all($pdo) {
     $isShorts = !empty($_GET['shorts']); 
     $seed = trim($_GET['seed'] ?? '');
     $onlyUnseen = !empty($_GET['only_unseen']);
+    $transcodeStatus = trim($_GET['transcode_status'] ?? '');
 
     $params = []; 
-    $isAdmin = !empty($_GET['admin_mode']);
     
     // Por defecto ocultar videos pendientes y PRIVADOS a menos que sea el admin
     $where = ["1=1"]; // Base clause to avoid SQL syntax errors
@@ -211,6 +214,11 @@ function video_get_all($pdo) {
         if (!$isShorts) {
             $where[] = "v.category != 'PENDING'";
         }
+    }
+
+    if (!empty($transcodeStatus)) {
+        $where[] = "v.transcode_status = ?";
+        $params[] = $transcodeStatus;
     }
 
     if ($onlyUnseen && !empty($userId)) {

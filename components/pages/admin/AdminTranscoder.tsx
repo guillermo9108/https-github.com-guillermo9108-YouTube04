@@ -16,7 +16,8 @@ export default function AdminTranscoder() {
     const [autoTranscode, setAutoTranscode] = useState(false);
     const [isProcessingSingle, setIsProcessingSingle] = useState(false);
     const [stats, setStats] = useState({ waiting: 0, processing: 0, failed: 0, done: 0 });
-    const [allVideos, setAllVideos] = useState<Video[]>([]);
+    const [waitingVideos, setWaitingVideos] = useState<Video[]>([]);
+    const [failedVideos, setFailedVideos] = useState<Video[]>([]);
     const [activeProcesses, setActiveProcesses] = useState<any[]>([]);
     const [profiles, setProfiles] = useState<any[]>([]);
     const [log, setLog] = useState<string[]>([]);
@@ -58,31 +59,36 @@ export default function AdminTranscoder() {
     const [filters, setFilters] = useState({ 
         onlyNonMp4: true, 
         onlyIncompatible: false,
-        onlyAudios: false
+        onlyAudios: false,
+        onlyMetadataError: false
     });
 
     const loadData = async () => {
         try {
-            const [all, profileData, lStats, settings, realLogs] = await Promise.all([
-                db.getAllVideos(true),
+            const [profileData, lStats, settings, realLogs, waiting, failed] = await Promise.all([
                 db.request<any[]>('action=admin_get_transcode_profiles'),
                 db.request<any>('action=admin_get_local_stats'),
                 db.getSystemSettings(),
-                db.request<string[]>('action=admin_get_logs')
+                db.request<string[]>('action=admin_get_logs'),
+                db.getAllVideos(true, 'WAITING'),
+                db.getAllVideos(true, 'FAILED')
             ]);
 
-            setAllVideos(all);
+            setWaitingVideos(waiting || []);
+            setFailedVideos(failed || []);
+            
+            // Usar counts del backend para los stats
+            const tStats = lStats.transcode_stats || [];
             setStats({
-                waiting: all.filter((v: any) => v.transcode_status === 'WAITING').length,
-                processing: all.filter((v: any) => v.transcode_status === 'PROCESSING').length,
-                failed: all.filter((v: any) => v.transcode_status === 'FAILED').length,
-                done: all.filter((v: any) => v.transcode_status === 'DONE').length
+                waiting: tStats.find((s: any) => s.transcode_status === 'WAITING')?.count || 0,
+                processing: tStats.find((s: any) => s.transcode_status === 'PROCESSING')?.count || 0,
+                failed: tStats.find((s: any) => s.transcode_status === 'FAILED')?.count || 0,
+                done: tStats.find((s: any) => s.transcode_status === 'DONE')?.count || 0
             });
             
             setProfiles(profileData || []);
             setActiveProcesses(lStats.active_processes || []);
             setIsRunning(!!settings.is_transcoder_active);
-            // CORRECCIÓN: Evitar que "0" sea evaluado como true en JS
             setAutoTranscode(Number(settings.autoTranscode) === 1);
             if (Array.isArray(realLogs)) setLog(realLogs);
             
@@ -94,9 +100,6 @@ export default function AdminTranscoder() {
         const interval = setInterval(loadData, 5000);
         return () => clearInterval(interval);
     }, []);
-
-    const waitingVideos = useMemo(() => allVideos.filter(v => v.transcode_status === 'WAITING'), [allVideos]);
-    const failedVideos = useMemo(() => allVideos.filter(v => v.transcode_status === 'FAILED'), [allVideos]);
 
     // Simular progreso para archivos activos
     useEffect(() => {
@@ -618,6 +621,10 @@ export default function AdminTranscoder() {
                             <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
                                 <input type="checkbox" checked={filters.onlyAudios} onChange={e => setFilters({...filters, onlyAudios: e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
                                 <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">Solo Audios</span>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" checked={filters.onlyMetadataError} onChange={e => setFilters({...filters, onlyMetadataError: e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
+                                <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">Errores de Metadatos</span>
                             </label>
                             <div className="grid grid-cols-2 gap-2 mt-4">
                                 <button onClick={() => handleScanFilter('PREVIEW')} disabled={isScanning} className="bg-slate-800 text-slate-300 py-2.5 rounded-lg text-[10px] font-black uppercase">Escanear</button>
