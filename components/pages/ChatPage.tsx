@@ -79,6 +79,29 @@ export default function ChatPage() {
         } catch (e) {}
     };
 
+    // Polling for online friends as fallback since WebSockets might not be available
+    useEffect(() => {
+        if (!user) return;
+        
+        const fetchOnline = async () => {
+            try {
+                const online = await db.request<User[]>('action=get_online_users');
+                if (online && online.length > 0) {
+                    // Update allKnownUsers with these users to ensure we have their latest lastActive
+                    setAllKnownUsers(prev => {
+                        const map = new Map(prev.map(u => [u.id, u]));
+                        online.forEach(u => map.set(u.id, u));
+                        return Array.from(map.values());
+                    });
+                }
+            } catch (e) {}
+        };
+
+        fetchOnline();
+        const interval = setInterval(fetchOnline, 30000); // Cada 30s
+        return () => clearInterval(interval);
+    }, [user?.id]);
+
     useEffect(() => {
         if (!user) return;
         const now = Date.now() / 1000;

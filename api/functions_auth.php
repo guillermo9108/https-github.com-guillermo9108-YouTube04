@@ -162,6 +162,16 @@ function auth_get_all_users($pdo) {
     respond(true, $users);
 }
 
+function auth_get_online_users($pdo) {
+    $now = time();
+    $threshold = $now - 300; // 5 minutos
+    $stmt = $pdo->prepare("SELECT id, username, avatarUrl, lastActive FROM users WHERE lastActive > ? ORDER BY lastActive DESC LIMIT 100");
+    $stmt->execute([$threshold]);
+    $users = $stmt->fetchAll();
+    foreach ($users as &$u) $u['avatarUrl'] = fix_url($u['avatarUrl']);
+    respond(true, $users);
+}
+
 function auth_search_users($pdo, $input) {
     $q = $input['query'];
     $stmt = $pdo->prepare("SELECT id, username, avatarUrl, role FROM users WHERE username LIKE ? LIMIT 10");

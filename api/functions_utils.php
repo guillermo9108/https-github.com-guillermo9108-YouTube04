@@ -425,7 +425,53 @@ function parse_user_agent($ua) {
     return "$os - $browser";
 }
 
-function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $maxHeight = 400, $quality = 80) {
+function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
+    if (!$videoId) return false;
+    
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE id = ?");
+    $stmt->execute([$videoId]);
+    $video = $stmt->fetch();
+    if (!$video) return false;
+    
+    $realPath = resolve_video_path($video['videoUrl']);
+    if (!$realPath || !file_exists($realPath)) return false;
+    
+    // 1. Duración
+    $duration = get_media_duration($realPath, $ffprobe);
+    if ($duration <= 0) return false;
+    $finalDuration = floor($duration);
+    
+    // 2. Miniatura
+    $ext = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudio = (bool)$video['is_audio'] || in_array($ext, $audioExts);
+    $thumbUrl = '';
+    
+    if ($isAudio) {
+        $thumbUrl = 'api/uploads/thumbnails/defaultaudio.jpg';
+    } else {
+        $thumbName = "{$videoId}.jpg";
+        $thumbFile = 'uploads/thumbnails/' . $thumbName;
+        $fullThumbPath = dirname(__DIR__) . '/' . $thumbFile;
+        if (!is_dir(dirname($fullThumbPath))) @mkdir(dirname($fullThumbPath), 0777, true);
+        
+        $time = ($finalDuration > 5) ? "00:00:02" : "00:00:00.500";
+        $cmd = "$ffmpeg -y -ss $time -i " . escapeshellarg($realPath) . " -frames:v 1 -q:v 4 " . escapeshellarg($fullThumbPath) . " 2>&1";
+        @exec($cmd);
+        
+        if (file_exists($fullThumbPath) && filesize($fullThumbPath) > 0) {
+            create_thumbnail($fullThumbPath, str_replace('.jpg', '_thumb.jpg', $fullThumbPath), 480, 270, 75);
+            $thumbUrl = 'api/' . $thumbFile;
+        } else {
+            $thumbUrl = 'api/uploads/thumbnails/default.jpg';
+        }
+    }
+    
+    $pdo->prepare("UPDATE videos SET duration = ?, thumbnailUrl = ?, is_audio = ? WHERE id = ?")
+        ->execute([$finalDuration, $thumbUrl, $isAudio ? 1 : 0, $videoId]);
+        
+    return true;
+}
     if (!file_exists($sourcePath)) return false;
     
     if ($targetPath === null) {

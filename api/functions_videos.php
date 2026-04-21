@@ -90,6 +90,12 @@ function video_process_rows(&$rows) {
             if ($pathForSize && file_exists($pathForSize)) {
                 $bytes = filesize($pathForSize);
                 $v['size_bytes'] = $bytes;
+
+                // Persistir size_bytes si es la primera vez o cambió
+                if (!isset($v['size_bytes_persisted']) || $v['size_bytes_persisted'] != $bytes) {
+                    $pdo->prepare("UPDATE videos SET size_bytes = ? WHERE id = ?")->execute([$bytes, $v['id']]);
+                    $v['size_bytes_persisted'] = $bytes;
+                }
                 
                 if ($bytes >= 1073741824) {
                     $v['size_fmt'] = number_format($bytes / 1073741824, 2) . ' GB';

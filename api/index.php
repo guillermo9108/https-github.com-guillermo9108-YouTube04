@@ -174,6 +174,7 @@ try {
         case 'logout': auth_logout($pdo, $input); break;
         case 'get_user': auth_get_user($pdo, $_GET['userId'] ?? ''); break;
         case 'get_all_users': auth_get_all_users($pdo); break;
+        case 'get_online_users': auth_get_online_users($pdo); break;
         case 'search_users': auth_search_users($pdo, $input); break;
         case 'update_user_profile': auth_update_user($pdo, $input); break;
         case 'queue_transcode': 
@@ -313,7 +314,8 @@ try {
         case 'admin_get_transcode_log': admin_get_transcode_log(); break;
         case 'admin_retry_failed_transcodes': admin_retry_failed_transcodes($pdo); break;
         case 'admin_clear_transcode_queue': admin_clear_transcode_queue($pdo); break;
-        case 'admin_remove_from_queue': admin_remove_from_queue($pdo, $_GET['videoId'] ?? ''); break;
+        case 'admin_remove_from_queue': admin_remove_from_queue($pdo, $input); break;
+        case 'admin_delete_physical': admin_delete_physical($pdo, $input); break;
         case 'admin_skip_transcode': admin_skip_transcode($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_reconstruct_thumbnails': admin_reconstruct_thumbnails($pdo); break;
         case 'admin_battery_manual_shutdown': admin_battery_manual_shutdown($pdo); break;

@@ -478,24 +478,29 @@ function admin_get_local_stats($pdo) {
 
     // Detectar procesos FFmpeg activos
     $active_processes = [];
-    $ps = @shell_exec('ps auxww | grep ffmpeg | grep -v grep');
+    // Usamos -o pid,command para tener algo limpio y auxww para el comando completo
+    $ps = @shell_exec('ps -Ao pid,command | grep ffmpeg | grep -v grep');
     if ($ps) {
         $lines = explode("\n", trim($ps));
         $seenVideoIds = [];
         foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
+            $line = trim($line);
+            if (empty($line)) continue;
             
-            // Si la línea contiene "sh -c", es probable que sea el shell lanzador
+            // Ignorar el shell lanzador e hilos internos si aparecen
             if (strpos($line, 'sh -c') !== false) continue;
+            // Ignorar el worker de transcodificación si por alguna razón aparece (aunque grep ffmpeg debería filtrarlo)
+            if (strpos($line, 'transcode_worker.php') !== false) continue;
 
             // Extraer PID e info
-            $parts = preg_split('/\s+/', $line);
+            $parts = preg_split('/\s+/', $line, 2);
             if (count($parts) < 2) continue;
-            $pid = $parts[1];
+            $pid = $parts[0];
+            $fullCmd = $parts[1];
             
-            // Intentar encontrar qué video se está procesando buscando el ID en los argumentos
+            // Intentar encontrar qué video se está procesando buscando el ID en los argumentos (-metadata title)
             $videoId = '';
-            if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $line, $metaMatches)) {
+            if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
                 $videoId = $metaMatches[1];
             }
             
@@ -511,20 +516,27 @@ function admin_get_local_stats($pdo) {
                 $videoData = $stmtV->fetch();
                 if ($videoData) {
                     $rows = [$videoData];
-                    video_process_rows($rows); // Espera un array
+                    video_process_rows($rows); 
                     $videoInfo = $rows[0];
                 }
             }
 
+            // Comando corto para el UI
+            $shortCmd = "ffmpeg " . substr($fullCmd, strpos($fullCmd, '-i'));
+            if (strlen($shortCmd) > 100) $shortCmd = substr($shortCmd, 0, 97) . "...";
+
             $active_processes[] = [
                 'pid' => $pid,
+                'command' => $shortCmd,
                 'videoId' => $videoId,
-                'title' => $videoInfo['title'] ?? ($videoId ? "Video ID: $videoId" : "Instancia FFmpeg"),
-                'size_fmt' => $videoInfo['size_fmt'] ?? null,
-                'size_bytes' => $videoInfo['size_bytes'] ?? null
+                'title' => $videoInfo ? $videoInfo['title'] : ($videoId ? "Video $videoId" : "ffmpeg activo"),
+                'size_fmt' => $videoInfo ? $videoInfo['size_fmt'] : '',
+                'size_bytes' => $videoInfo ? ($videoInfo['size_bytes'] ?? 0) : 0,
             ];
         }
     }
+
+    $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
 
     respond(true, [
         'volumes' => $volumes,
@@ -1553,6 +1565,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
             // Actualizar base de datos
             $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', locked_at = 0 WHERE id = ?")
                 ->execute([$newUrl, $videoId]);
+
+            // EXTRA: Intentar regenerar miniatura ahora que el codec es compatible (MP4/H264)
+            $bins = get_ffmpeg_binaries($pdo);
+            worker_video_extract_metadata($pdo, $videoId, $bins['ffmpeg'], $bins['ffprobe']);
             
             write_log("Transcode: Reemplazo exitoso $videoId -> $newUrl");
             return true;
@@ -1567,4 +1583,44 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED', locked_at = 0 WHERE id = ?")->execute([$videoId]);
         return false;
     }
+}
+
+function admin_delete_physical($pdo, $input) {
+    $videoIds = $input['videoIds'] ?? [];
+    if (!is_array($videoIds)) $videoIds = explode(',', $videoIds);
+    
+    $deleted = 0;
+    foreach ($videoIds as $id) {
+        $stmt = $pdo->prepare("SELECT videoUrl FROM videos WHERE id = ?");
+        $stmt->execute([$id]);
+        $video = $stmt->fetch();
+        if ($video) {
+            $path = resolve_video_path($video['videoUrl']);
+            if ($path && file_exists($path)) {
+                @unlink($path);
+                // También borrar miniatura
+                $thumbPath = __DIR__ . '/uploads/thumbnails/' . $id . '.jpg';
+                if (file_exists($thumbPath)) @unlink($thumbPath);
+                $thumbOptimized = __DIR__ . '/uploads/thumbnails/' . $id . '_thumb.jpg';
+                if (file_exists($thumbOptimized)) @unlink($thumbOptimized);
+            }
+            // Borrar de DB
+            $pdo->prepare("DELETE FROM videos WHERE id = ?")->execute([$id]);
+            $deleted++;
+        }
+    }
+    respond(true, ['deleted' => $deleted]);
+}
+
+function admin_remove_from_queue($pdo, $input) {
+    $videoIds = $input['videoIds'] ?? [];
+    if (!is_array($videoIds)) $videoIds = explode(',', $videoIds);
+    
+    $updated = 0;
+    foreach ($videoIds as $id) {
+        // Simplemente cambiar el estado de transcodificación a NONE
+        $pdo->prepare("UPDATE videos SET transcode_status = 'NONE', reason = NULL WHERE id = ?")->execute([$id]);
+        $updated++;
+    }
+    respond(true, ['updated' => $updated]);
 }

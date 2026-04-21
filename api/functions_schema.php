@@ -51,7 +51,8 @@ function getAppSchema() {
                 'reason' => 'TEXT DEFAULT NULL',
                 'locked_at' => 'BIGINT DEFAULT 0',
                 'lock_id' => 'VARCHAR(50) DEFAULT NULL',
-                'is_private' => 'TINYINT(1) DEFAULT 0'
+                'is_private' => 'TINYINT(1) DEFAULT 0',
+                'size_bytes' => 'BIGINT DEFAULT 0'
             ],
             'indices' => [
                 'idx_category' => 'category',
