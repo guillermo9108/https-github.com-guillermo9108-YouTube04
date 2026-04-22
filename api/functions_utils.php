@@ -521,10 +521,17 @@ function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $max
     
     $srcImage = null;
     switch ($type) {
-        case IMAGETYPE_JPEG: $srcImage = imagecreatefromjpeg($sourcePath); break;
-        case IMAGETYPE_PNG:  $srcImage = imagecreatefrompng($sourcePath); break;
-        case IMAGETYPE_GIF:  $srcImage = imagecreatefromgif($sourcePath); break;
-        case IMAGETYPE_WEBP: $srcImage = imagecreatefromwebp($sourcePath); break;
+        case IMAGETYPE_JPEG: $srcImage = @imagecreatefromjpeg($sourcePath); break;
+        case IMAGETYPE_PNG:  $srcImage = @imagecreatefrompng($sourcePath); break;
+        case IMAGETYPE_GIF:  $srcImage = @imagecreatefromgif($sourcePath); break;
+        case IMAGETYPE_WEBP: 
+            if (function_exists('imagecreatefromwebp')) {
+                $srcImage = @imagecreatefromwebp($sourcePath);
+            } else {
+                // Fallback: Si no hay soporte WEBP en GD, no podemos procesarlo
+                return false;
+            }
+            break;
     }
     
     if (!$srcImage) return false;

@@ -882,11 +882,12 @@ function video_update_metadata($pdo, $post, $files) {
 
     if (!$success) {
         $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
-        // Si ha fallado repetidamente o es incompatible, marcar como fallido para que no estanque el procesador
+        // Si ha fallado repetidamente o es incompatible, marcar como WAITING para que el transcodificador lo repare
         if ($clientIncompatible) {
-            $pdo->prepare("UPDATE videos SET category = 'INCOMPATIBLE', transcode_status = 'FAILED' WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', reason = 'Client incompatible/Metadata error' WHERE id = ?")->execute([$id]);
         } else {
-            $pdo->prepare("UPDATE videos SET category = 'FAILED_META' WHERE id = ? AND processing_attempts >= 5")->execute([$id]);
+            // Si falla después de varios intentos, también lo mandamos a transcodificar por si el archivo está corrupto/ilegal para ffprobe
+            $pdo->prepare("UPDATE videos SET category = 'FAILED_META', transcode_status = 'WAITING', reason = 'Metadata extraction failed consistently' WHERE id = ? AND processing_attempts >= 3")->execute([$id]);
         }
         respond(true); 
     }
