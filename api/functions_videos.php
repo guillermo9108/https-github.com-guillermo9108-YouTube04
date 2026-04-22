@@ -631,12 +631,11 @@ function video_get_unprocessed($pdo, $params = []) {
     // Generar un ID de bloqueo único para esta petición
     $lockId = uniqid('lock_', true);
     
-    // Intentar bloquear los videos disponibles
-    // Se ordena por intentos de procesamiento y luego aleatoriamente (o por fecha) 
-    // para evitar quedarse estancado siempre en el mismo video problemático
+    // Solo intentar bloquear videos que no estén ya en la cola de transcodificación
     $stmt = $pdo->prepare("UPDATE videos 
                            SET locked_at = :now, lock_id = :lockId 
                            WHERE category = 'PENDING' 
+                           AND transcode_status = 'NONE'
                            AND processing_attempts < 5 
                            AND (locked_at < :time OR locked_at IS NULL)
                            ORDER BY processing_attempts ASC, RAND()
@@ -880,19 +879,24 @@ function video_update_metadata($pdo, $post, $files) {
     $success = ($post['success'] ?? '1') === '1';
     $clientIncompatible = ($post['clientIncompatible'] ?? '0') === '1';
 
+    $fields = ["processing_attempts = processing_attempts + 1", "locked_at = 0", "lock_id = NULL"]; 
+    $params = [];
+
     if (!$success) {
-        $pdo->prepare("UPDATE videos SET processing_attempts = processing_attempts + 1, locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]); 
-        // Si ha fallado repetidamente o es incompatible, marcar como WAITING para que el transcodificador lo repare
+        // Marcamos como WAITING para que el transcodificador lo repare
         if ($clientIncompatible) {
-            $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', reason = 'Client incompatible/Metadata error' WHERE id = ?")->execute([$id]);
+            $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', reason = 'Client incompatible/Metadata error', locked_at = 0, lock_id = NULL WHERE id = ?")->execute([$id]);
         } else {
-            // Si falla después de varios intentos, también lo mandamos a transcodificar por si el archivo está corrupto/ilegal para ffprobe
-            $pdo->prepare("UPDATE videos SET category = 'FAILED_META', transcode_status = 'WAITING', reason = 'Metadata extraction failed consistently' WHERE id = ? AND processing_attempts >= 3")->execute([$id]);
+            // Si falla después de varios intentos, también lo mandamos a transcodificar
+            $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . ", transcode_status = 'WAITING', reason = 'Metadata extraction failed consistently (Collaborative)' WHERE id = ? AND processing_attempts >= 2")->execute([$id]);
         }
         respond(true); 
     }
+    
     $fields = ["duration = ?", "processing_attempts = 0", "locked_at = 0", "lock_id = NULL"]; 
     $params = [intval($post['duration'])];
+    $hasThumbnail = false;
+
     if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "t_{$id}.jpg"; 
         $target = 'uploads/thumbnails/' . $thumbName;
@@ -903,9 +907,31 @@ function video_update_metadata($pdo, $post, $files) {
         
         $fields[] = "thumbnailUrl = ?"; 
         $params[] = 'api/' . $target;
+        $hasThumbnail = true;
     }
+
+    // Obtener info básica para decidir transcode_status
+    $stmtV = $pdo->prepare("SELECT is_audio FROM videos WHERE id = ?");
+    $stmtV->execute([$id]);
+    $vData = $stmtV->fetch();
+    $isAudio = $vData && (int)$vData['is_audio'] === 1;
+
+    // Si es un vídeo y no se pudo extraer la miniatura, lo enviamos a la cola de conversión
+    // para que FFmpeg en el servidor intente capturar el frame.
+    $finalStatus = ($hasThumbnail || $isAudio) ? 'DONE' : 'WAITING';
+    $reason = '';
+    if ($finalStatus === 'WAITING') {
+        $fields[] = "transcode_status = ?";
+        $params[] = 'WAITING';
+        $fields[] = "reason = ?";
+        $params[] = 'Collaborative extraction: Missing thumbnail';
+    } else {
+        $fields[] = "transcode_status = ?";
+        $params[] = 'DONE';
+    }
+
     $params[] = $id; 
-    $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . ", transcode_status = 'DONE' WHERE id = ?")->execute($params);
+    $pdo->prepare("UPDATE videos SET " . implode(", ", $fields) . " WHERE id = ?")->execute($params);
     $settings = $pdo->query("SELECT * FROM system_settings WHERE id = 1")->fetch();
     video_organize_single($pdo, $id, $settings); 
     respond(true);
