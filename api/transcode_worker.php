@@ -42,7 +42,7 @@ if (!$isAuto) {
 $check = shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
 $count = (int)trim($check);
 if ($count >= 1) {
-    die("[INFO] Ya hay 1 proceso FFmpeg trabajando. Saltando ciclo para evitar saturación.\n");
+    die("[INFO] Ya hay un proceso FFmpeg trabajando. Saltando ciclo para evitar saturación.\n");
 }
 
 // 3. Buscar siguiente video en cola WAITING

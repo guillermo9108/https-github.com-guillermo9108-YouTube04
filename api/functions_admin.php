@@ -1541,8 +1541,8 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING' WHERE id = ?")->execute([$videoId]);
     
     // Añadimos metadata con el ID del video para poder rastrear el proceso en el dashboard
-    $metaArgs = "-metadata title=" . escapeshellarg($videoId);
     // Añadimos -threads 2 después de la entrada (-i) para que FFmpeg use ambos núcleos
+    $metaArgs = "-metadata title=" . escapeshellarg($videoId);
     $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
     write_log("Transcode: Iniciando $videoId: $cmd");
     

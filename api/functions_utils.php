@@ -470,7 +470,7 @@ function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
     } else {
         $thumbName = "{$videoId}.jpg";
         $thumbFile = 'uploads/thumbnails/' . $thumbName;
-        $fullThumbPath = dirname(__DIR__) . '/' . $thumbFile;
+        $fullThumbPath = __DIR__ . '/' . $thumbFile;
         if (!is_dir(dirname($fullThumbPath))) @mkdir(dirname($fullThumbPath), 0777, true);
         
         $time = ($finalDuration > 5) ? "00:00:02" : "00:00:00.500";
