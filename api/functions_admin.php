@@ -1481,9 +1481,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     $ffmpeg = $bins['ffmpeg'];
     $videoId = $video['id'];
     $videoUrl = $video['videoUrl'];
-    $inputPath = resolve_video_path($videoUrl);
+    $inputPath = resolve_video_path($videoUrl, $pdo, $videoId);
 
-    if (!$inputPath || !file_exists($inputPath)) {
+    $isFtp = (strpos($videoId, 'ftp_') === 0);
+    if (!$inputPath || (!$isFtp && !file_exists($inputPath))) {
         write_log("Transcode: Archivo de entrada no encontrado: $videoUrl", 'ERROR');
         $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
         return false;

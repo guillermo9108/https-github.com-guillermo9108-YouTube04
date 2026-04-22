@@ -70,7 +70,68 @@ function scanFtpRecursive($pdo, $input) {
     if (!function_exists('ftp_connect')) {
         respond(false, null, "Módulo FTP no disponible.");
     }
-    // Implementación futura: Escaneo profundo de directorios remotos
-    respond(true, ['scanned' => 0, 'added' => 0], "Escaneo recursivo FTP aún en fase experimental.");
+
+    $startPath = $input['path'] ?? '/';
+    
+    $stmt = $pdo->query("SELECT ftpSettings FROM system_settings WHERE id = 1");
+    $settings = json_decode($stmt->fetchColumn() ?: '{}', true);
+    if (empty($settings['host'])) respond(false, null, "FTP no configurado");
+
+    $conn = @ftp_connect($settings['host'], $settings['port'] ?: 21, 15);
+    if (!$conn) respond(false, null, "No se pudo conectar al host FTP");
+
+    if (!@ftp_login($conn, $settings['user'], $settings['pass'])) {
+        ftp_close($conn);
+        respond(false, null, "Credenciales FTP inválidas");
+    }
+
+    ftp_pasv($conn, true);
+    
+    $scannedCount = 0;
+    $addedCount = 0;
+    $adminId = $pdo->query("SELECT id FROM users WHERE role='ADMIN' LIMIT 1")->fetchColumn();
+    
+    $videoExts = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'm4v', 'flv', 'wmv'];
+    $foldersQueue = [$startPath];
+    
+    while (!empty($foldersQueue) && $scannedCount < 1000) { // Safety limit
+        $current = array_shift($foldersQueue);
+        $rawList = @ftp_rawlist($conn, $current);
+        
+        if (!$rawList) continue;
+        
+        foreach ($rawList as $line) {
+            $parts = preg_split('/\s+/', $line, 9);
+            if (count($parts) < 9) continue;
+            
+            $isDir = $parts[0][0] === 'd';
+            $name = $parts[8];
+            if ($name === '.' || $name === '..') continue;
+            
+            $fullPath = rtrim($current, '/') . '/' . $name;
+            
+            if ($isDir) {
+                $foldersQueue[] = $fullPath;
+            } else {
+                $scannedCount++;
+                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                
+                if (in_array($ext, $videoExts)) {
+                    $vidId = 'ftp_' . md5($fullPath);
+                    $check = $pdo->prepare("SELECT id FROM videos WHERE id = ?");
+                    $check->execute([$vidId]);
+                    
+                    if (!$check->fetch()) {
+                        $stmtI = $pdo->prepare("INSERT INTO videos (id, title, description, price, thumbnailUrl, videoUrl, creatorId, createdAt, category, isLocal) VALUES (?, ?, 'FTP Remote Asset', 0, 'api/uploads/thumbnails/default.jpg', ?, ?, ?, 'PENDING', 1)");
+                        $stmtI->execute([$vidId, $name, $fullPath, $adminId, time()]);
+                        $addedCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    ftp_close($conn);
+    respond(true, ['scanned' => $scannedCount, 'added' => $addedCount]);
 }
 ?>

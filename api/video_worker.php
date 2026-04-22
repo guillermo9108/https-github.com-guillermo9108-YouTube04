@@ -56,9 +56,10 @@ for ($i = 0; $i < $batchSize; $i++) {
     echo "[TASK " . ($i+1) . "] ID: {$video['id']} - '{$video['title']}'\n";
     $pdo->prepare("UPDATE videos SET locked_at = ? WHERE id = ?")->execute([$now, $video['id']]);
     
-    $realPath = resolve_video_path($video['videoUrl']);
+    $realPath = resolve_video_path($video['videoUrl'], $pdo, $video['id']);
     
-    if (!$realPath || !file_exists($realPath)) {
+    $isFtp = (strpos($video['id'], 'ftp_') === 0);
+    if (!$realPath || (!$isFtp && !file_exists($realPath))) {
         $reason = '404: File not found';
         echo "[ERROR] $reason\n";
         $pdo->prepare("UPDATE videos SET category = 'FAILED_METADATA', reason = ?, locked_at = 0 WHERE id = ?")->execute([$reason, $video['id']]);

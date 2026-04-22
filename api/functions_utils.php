@@ -77,8 +77,9 @@ function get_ffmpeg_binaries($pdo) {
 }
 
 function get_media_duration($path, $ffprobe) {
-    // Asegurar que el path sea absoluto si es posible
-    $realPath = realpath($path) ?: $path;
+    // Asegurar que el path sea absoluto si es posible. No usar realpath en protocolos remotos.
+    $isRemote = (strpos($path, '://') !== false);
+    $realPath = ($isRemote) ? $path : (realpath($path) ?: $path);
     
     // 1. Intentar obtener duración del formato (más rápido)
     $cmd = "$ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($realPath) . " 2>&1";
@@ -115,12 +116,34 @@ function fix_url($url) {
     return $url;
 }
 
-function resolve_video_path($url) {
+function get_ftp_url($pdo, $remotePath) {
+    static $settings = null;
+    if ($settings === null) {
+        $stmt = $pdo->query("SELECT ftpSettings FROM system_settings WHERE id = 1");
+        $settings = json_decode($stmt->fetchColumn() ?: '{}', true);
+    }
+    
+    if (empty($settings['host'])) return null;
+    
+    $user = urlencode($settings['user']);
+    $pass = urlencode($settings['pass']);
+    $host = $settings['host'];
+    $port = $settings['port'] ?: 21;
+    
+    return "ftp://{$user}:{$pass}@{$host}:{$port}" . '/' . ltrim($remotePath, '/');
+}
+
+function resolve_video_path($url, $pdo = null, $videoId = null) {
     if (!$url) return null;
     
     // Si es una URL absoluta de otro servidor o tiene protocolo, no podemos resolverla localmente
     if (strpos($url, 'http') === 0 || strpos($url, '://') !== false) return null;
     
+    // CASO ESPECIAL: FTP (si tenemos el ID y empieza con ftp_)
+    if ($videoId && strpos($videoId, 'ftp_') === 0 && $pdo) {
+        return get_ftp_url($pdo, $url);
+    }
+
     // Normalizar separadores de ruta
     $url = str_replace('\\', '/', $url);
     
@@ -268,23 +291,38 @@ function streamVideo($id, $pdo) {
     
     write_log("Stream Access Granted: User $uid for video $id (Path: " . basename($video['videoUrl']) . ")", 'INFO');
     
-    $path = resolve_video_path($video['videoUrl']);
+    $path = resolve_video_path($video['videoUrl'], $pdo, $id);
     
-    if (!$path || !file_exists($path)) {
-        write_log("Stream Error: File not found for video $id. Path: " . ($path ?: 'NULL') . " Original: " . $video['videoUrl'], 'ERROR');
+    if (!$path) {
+        write_log("Stream Error: File not found for video $id. Path: NULL Original: " . $video['videoUrl'], 'ERROR');
         header("HTTP/1.1 404 Not Found");
         echo "Archivo no encontrado en el servidor: " . $video['videoUrl'];
         exit;
     }
 
+    $isFtp = (strpos($id, 'ftp_') === 0);
+    
+    if (!$isFtp && !file_exists($path)) {
+        write_log("Stream Error: File not found for video $id. Path: $path Original: " . $video['videoUrl'], 'ERROR');
+        header("HTTP/1.1 404 Not Found");
+        exit;
+    }
+
     // Check if it's a directory (should not happen but for safety)
-    if (is_dir($path)) {
+    if (!$isFtp && is_dir($path)) {
         write_log("Stream Error: Path is a directory for video $id. Path: $path", 'ERROR');
         header("HTTP/1.1 403 Forbidden");
         exit;
     }
 
-    $size = filesize($path);
+    // Para FTP, filesize() puede fallar dependiendo de wrappers, intentamos obtenerlo de la DB o suponer stream
+    $size = 0;
+    if ($isFtp) {
+        // Intentar obtener tamaño via FTP helper o suponer grande
+        $size = @filesize($path) ?: 2000000000; // Fallback 2GB if unknown
+    } else {
+        $size = filesize($path);
+    }
     $fm = @fopen($path, 'rb');
     if (!$fm) { 
         write_log("Stream Error: Could not open file for video $id. Path: $path", 'ERROR');
@@ -451,8 +489,11 @@ function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
     $video = $stmt->fetch();
     if (!$video) return false;
     
-    $realPath = resolve_video_path($video['videoUrl']);
-    if (!$realPath || !file_exists($realPath)) return false;
+    $realPath = resolve_video_path($video['videoUrl'], $pdo, $videoId);
+    if (!$realPath) return false;
+    
+    $isFtp = (strpos($videoId, 'ftp_') === 0);
+    if (!$isFtp && !file_exists($realPath)) return false;
     
     // 1. Duración
     $duration = get_media_duration($realPath, $ffprobe);
