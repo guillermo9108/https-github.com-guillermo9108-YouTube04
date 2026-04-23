@@ -749,7 +749,7 @@ export default function ChatDetailPage() {
             className={`flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] inset-0 overflow-hidden ${isKeyboardOpen ? 'keyboard-open' : ''}`}
         >
             {/* Header */}
-            <header className="shrink-0 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm h-14 flex items-center px-2 relative z-50">
+            <header className="shrink-0 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm min-h-14 pt-safe flex items-center px-2 relative z-50">
                 <button
                     onClick={() => navigate('/chat')}
                     className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-tertiary)] transition-colors"

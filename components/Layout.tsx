@@ -93,11 +93,11 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[104px]'}`}>
+    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[calc(104px+env(safe-area-inset-top,24px))]'}`}>
       {/* Facebook Lite Style Header */}
       {!isMenuMode && (
         <header 
-          className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--divider)] shadow-md opacity-100"
+          className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--divider)] shadow-md opacity-100 pt-safe"
           style={{ backgroundColor: 'var(--bg-header)' }}
         >
           {/* Top Bar: Logo & Actions */}

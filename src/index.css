@@ -58,6 +58,28 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
 }
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 24px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+  }
+  .mt-safe {
+    margin-top: env(safe-area-inset-top, 24px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 24px);
+  }
+  .top-safe {
+    top: env(safe-area-inset-top, 24px);
+  }
+  .bottom-safe {
+    bottom: env(safe-area-inset-bottom, 24px);
+  }
+}
+
 ::-webkit-scrollbar-track {
   background: var(--bg-primary);
 }

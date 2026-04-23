@@ -576,12 +576,12 @@ export default function Shorts() {
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-scroll snap-y snap-mandatory bg-black scrollbar-hide relative">
-      <div className="fixed top-4 left-4 z-50 flex items-center gap-2">
+      <div className="fixed top-0 mt-safe left-4 pt-4 z-50 flex items-center gap-2">
           <Link to="/" className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center active:scale-90 transition-all"><ArrowLeft size={24} /></Link>
           <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full text-white font-black italic text-sm tracking-tighter">SHORTS</div>
       </div>
 
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+      <div className="fixed top-0 mt-safe right-4 pt-4 z-50 flex items-center gap-2">
           <button 
               onClick={() => {
                   setVideos([]);
