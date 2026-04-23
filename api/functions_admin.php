@@ -1566,9 +1566,9 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
             $newUrl = dirname($videoUrl) . '/' . $newFilename;
             if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
             
-            // Actualizar base de datos
-            $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', locked_at = 0 WHERE id = ?")
-                ->execute([$newUrl, $videoId]);
+            // Actualizar base de datos y refrescar fecha para que aparezca como nuevo
+            $pdo->prepare("UPDATE videos SET videoUrl = ?, transcode_status = 'DONE', createdAt = ?, locked_at = 0 WHERE id = ?")
+                ->execute([$newUrl, time(), $videoId]);
 
             // EXTRA: Intentar regenerar miniatura ahora que el codec es compatible (MP4/H264)
             $bins = get_ffmpeg_binaries($pdo);

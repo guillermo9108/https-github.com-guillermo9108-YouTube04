@@ -209,11 +209,9 @@ function video_get_all($pdo) {
     // Por defecto ocultar videos pendientes y PRIVADOS a menos que sea el admin
     $where = ["1=1"]; // Base clause to avoid SQL syntax errors
     if (!$isAdmin) {
-        $where[] = "v.category NOT IN ('PROCESSING', 'FAILED_METADATA')";
+        $where[] = "v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
+        $where[] = "(v.transcode_status = 'NONE' OR v.transcode_status = 'DONE')";
         $where[] = "v.is_private = 0";
-        if (!$isShorts) {
-            $where[] = "v.category != 'PENDING'";
-        }
     }
 
     if (!empty($transcodeStatus)) {
@@ -476,7 +474,7 @@ function video_get_one($pdo, $id) {
 }
 
 function video_get_by_creator($pdo, $userId) {
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') ORDER BY createdAt DESC");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') ORDER BY createdAt DESC");
     $stmt->execute([$userId]); 
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     video_process_rows($videos); 
@@ -524,7 +522,7 @@ function video_get_related($pdo, $videoId) {
         $orderBy = "createdAt DESC";
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? ORDER BY $orderBy LIMIT 12");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') ORDER BY $orderBy LIMIT 12");
     $stmt->execute([$currentVideo['category'], $videoId]); 
     $videos = $stmt->fetchAll();
     video_process_rows($videos); 
@@ -597,7 +595,7 @@ function video_get_folder_videos($pdo, $videoId, $userSort = '', $contextFolder 
         $params[] = $root . '/' . ($relativePath ? $relativePath . '/' : '') . '%';
     }
 
-    $whereClause = "v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')";
+    $whereClause = "v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (v.transcode_status = 'NONE' OR v.transcode_status = 'DONE')";
     if (!empty($clauses)) {
         $whereClause .= " AND (" . implode(" OR ", $clauses) . ")";
     }
@@ -970,10 +968,17 @@ function video_organize_single($pdo, $id, $settings) {
     $catPrice = getPriceForCategory($newCategory, $settings, $meta['parent_category']);
     $price = (floatval($v['price'] ?? 0) > 0) ? $v['price'] : $catPrice;
 
-    $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")->execute([$newTitle, $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
+    $updateDate = ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING');
+    if ($updateDate) {
+        $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ?, createdAt = ? WHERE id = ?")
+            ->execute([$newTitle, $newCategory, $meta['parent_category'], $meta['collection'], $price, time(), $id]);
+    } else {
+        $pdo->prepare("UPDATE videos SET title = ?, category = ?, parent_category = ?, collection = ?, price = ? WHERE id = ?")
+            ->execute([$newTitle, $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
+    }
 
     // Notificar solo si pasa de PENDING a una categoría real, o si es un upload manual que acaba de procesarse
-    $isNewUpload = (time() - $v['createdAt']) < 60; // Consider it new if created in the last minute
+    $isNewUpload = (time() - $v['createdAt']) < 300; // Consider it new if created in the last 5 minutes (increased for better margin)
     if ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING' || $isNewUpload) {
         if ($v['is_private']) return; // Don't notify private content
         require_once 'functions_interactions.php';
@@ -1218,7 +1223,7 @@ function get_channel_content($pdo, $input) {
     $userId = $input['userId'];
     $filter = $input['filter'] ?? 'ALL';
     
-    $where = ["creatorId = ?", "is_private = 0"];
+    $where = ["creatorId = ?", "is_private = 0", "category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')", "(transcode_status = 'NONE' OR transcode_status = 'DONE')"];
     $params = [$userId];
     
     if ($filter === 'VIDEOS') {
