@@ -788,7 +788,7 @@ export default function Home() {
 
                 {/* Selection Action Bar */}
                 {selectionMode && selectedIds.size > 0 && (
-                    <div className="sticky top-0 z-50 bg-[var(--accent)] text-white px-4 py-2 flex items-center justify-between shadow-lg">
+                    <div className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-[50] bg-[var(--accent)] text-white px-4 py-2 flex items-center justify-between shadow-lg">
                         <span className="text-xs font-bold">{selectedIds.size} seleccionados</span>
                         <div className="flex gap-2">
                             <button 

@@ -130,7 +130,7 @@ export default function Setup() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 py-12 pt-safe">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">

@@ -62,8 +62,8 @@ export default function Admin() {
 
   return (
     <div className="space-y-6 pb-24 px-2 md:px-0">
-      {/* Navegación Admin Sticky Header: top-0 para móvil (Encabezado Nativo), top-[72px] para escritorio */}
-      <div className="flex items-center gap-2 overflow-x-auto bg-slate-900 p-2 md:rounded-xl scrollbar-hide sticky top-0 md:top-[72px] z-[60] shadow-2xl border-b md:border border-white/10 -mx-4 px-4 md:mx-0 md:px-2 transition-all">
+      {/* Navegación Admin Sticky Header: top-[104px] para acompañar al encabezado principal */}
+      <div className="flex items-center gap-2 overflow-x-auto bg-slate-900 p-2 md:rounded-xl scrollbar-hide sticky top-[calc(104px+env(safe-area-inset-top,24px))] md:top-[104px] z-[60] shadow-2xl border-b md:border border-white/10 -mx-4 px-4 md:mx-0 md:px-2 transition-all">
            {/* Botón Salir Admin (Solo visible en móviles para navegación de retorno) */}
            <Link 
               to="/" 

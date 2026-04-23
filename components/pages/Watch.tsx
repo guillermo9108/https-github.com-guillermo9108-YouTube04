@@ -620,7 +620,7 @@ export default function Watch() {
     return (
         <div className="flex flex-col bg-slate-950 min-h-screen animate-in fade-in relative">
             {/* Contenedor de Video Pegajoso - Mejorado para móviles */}
-            <div className="w-full bg-black sticky top-[104px] z-[45] shadow-2xl border-b border-white/5 overflow-hidden transition-all duration-300">
+            <div className="w-full bg-black sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-[45] shadow-2xl border-b border-white/5 overflow-hidden transition-all duration-300">
                 <div 
                     ref={videoContainerRef}
                     className={`relative aspect-video w-full max-w-[1400px] mx-auto bg-black overflow-hidden group ${isFullscreen ? 'h-screen max-w-none aspect-auto' : ''}`}

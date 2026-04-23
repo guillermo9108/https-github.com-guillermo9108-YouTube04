@@ -31,7 +31,7 @@ export default function TrendingPage() {
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
+            <header className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)] shadow-sm">
                 <div className="flex items-center gap-3 px-4 h-14">
                     <button
                         onClick={() => navigate(-1)}

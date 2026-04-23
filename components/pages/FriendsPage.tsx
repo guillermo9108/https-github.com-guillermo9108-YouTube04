@@ -88,7 +88,7 @@ export default function FriendsPage() {
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
+            <header className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-50 bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
                 <div className="flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-4">
                         <button onClick={() => navigate(-1)} className="p-1 hover:bg-[var(--bg-hover)] rounded-full transition-colors">

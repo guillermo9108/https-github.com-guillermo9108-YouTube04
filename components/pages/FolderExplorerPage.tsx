@@ -129,7 +129,7 @@ export default function FolderExplorerPage() {
     return (
         <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-[#242526] border-b border-[#3e4042] shadow-md">
+            <header className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-50 bg-[#242526] border-b border-[#3e4042] shadow-md">
                 <div className="flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-3">
                         <button
