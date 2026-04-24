@@ -582,24 +582,39 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             <Link 
                 to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
                 onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
-                className="absolute inset-0 z-0"
+                className="absolute inset-0 z-0 group/media"
             >
                 {displayThumb ? (
-                    <img 
-                    src={displayThumb} 
-                    alt={video.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
-                    loading="lazy" 
-                    referrerPolicy="no-referrer"
-                    onError={() => {
-                        // Si falló la miniatura optimizada, intentar cargar la original antes de rendirse
-                        if (!retryOriginal && video.thumbnailUrl && getThumbnailUrl(video.thumbnailUrl) !== video.thumbnailUrl) {
-                            setRetryOriginal(true);
-                        } else {
-                            setImgError(true);
-                        }
-                    }}
-                    />
+                    <div className="relative w-full h-full">
+                        <img 
+                        src={displayThumb} 
+                        alt={video.title} 
+                        className="w-full h-full object-cover group-hover/media:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
+                        loading="lazy" 
+                        referrerPolicy="no-referrer"
+                        onError={() => {
+                            // Si falló la miniatura optimizada, intentar cargar la original antes de rendirse
+                            if (!retryOriginal && video.thumbnailUrl && getThumbnailUrl(video.thumbnailUrl) !== video.thumbnailUrl) {
+                                setRetryOriginal(true);
+                            } else {
+                                setImgError(true);
+                            }
+                        }}
+                        />
+                        
+                        {/* Play/Music Icon Overlay - Only for non-images */}
+                        {!isImage && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300">
+                                <div className="w-14 h-14 bg-black/30 backdrop-blur-[2px] border border-white/20 rounded-full flex items-center justify-center group-hover/media:scale-110 transition-transform duration-300">
+                                    {isAudio ? (
+                                        <Music size={28} className="text-white fill-white/20" />
+                                    ) : (
+                                        <Play size={28} className="text-white fill-white/40 ml-1" />
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-slate-700 p-4">
                         <div className="relative">

@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function Marketplace() {
     const navigate = useNavigate();
-    const { cart } = useCart();
+    const { addToCart, cart } = useCart();
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [showFilters, setShowFilters] = useState(false);
@@ -198,7 +198,7 @@ export default function Marketplace() {
                                 )}
                             </div>
 
-                            <div className="p-2 flex flex-col gap-0.5">
+                            <div className="p-2 flex flex-col gap-0.5 relative">
                                 <div className="flex items-baseline gap-1.5">
                                     <span className={`font-bold text-sm ${item.discountPercent ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
                                         {item.price} $
@@ -216,6 +216,24 @@ export default function Marketplace() {
                                     <Star size={10} className="text-amber-500" fill="currentColor"/>
                                     <span className="text-[10px] text-[var(--text-secondary)]">{(item.rating || 0).toFixed(1)}</span>
                                 </div>
+
+                                {/* Quick Add to Cart Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (item.stock === 0 || item.status === 'AGOTADO') return;
+                                        addToCart(item);
+                                    }}
+                                    className={`absolute bottom-2 right-2 p-1.5 rounded-full shadow-md transition-all active:scale-95 ${
+                                        item.stock === 0 || item.status === 'AGOTADO'
+                                        ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                                        : 'bg-[var(--accent)] text-white hover:opacity-90 active:bg-green-600'
+                                    }`}
+                                    disabled={item.stock === 0 || item.status === 'AGOTADO'}
+                                >
+                                    <ShoppingCart size={14} />
+                                </button>
                             </div>
                         </Link>
                     ))}

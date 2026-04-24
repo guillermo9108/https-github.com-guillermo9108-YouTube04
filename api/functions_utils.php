@@ -507,7 +507,21 @@ function worker_video_extract_metadata($pdo, $videoId, $ffmpeg, $ffprobe) {
     $thumbUrl = '';
     
     if ($isAudio) {
-        $thumbUrl = 'api/uploads/thumbnails/defaultaudio.jpg';
+        $thumbName = "{$videoId}.jpg";
+        $thumbFile = 'uploads/thumbnails/' . $thumbName;
+        $fullThumbPath = __DIR__ . '/' . $thumbFile;
+        if (!is_dir(dirname($fullThumbPath))) @mkdir(dirname($fullThumbPath), 0777, true);
+        
+        // Intentar extraer portada de audio (frames:v 1 captura el stream de video adjunto)
+        $cmd = "$ffmpeg -y -i " . escapeshellarg($realPath) . " -frames:v 1 -q:v 5 " . escapeshellarg($fullThumbPath) . " 2>&1";
+        @exec($cmd);
+        
+        if (file_exists($fullThumbPath) && filesize($fullThumbPath) > 0) {
+            create_thumbnail($fullThumbPath, str_replace('.jpg', '_thumb.jpg', $fullThumbPath), 480, 480, 75);
+            $thumbUrl = 'api/' . $thumbFile;
+        } else {
+            $thumbUrl = 'api/uploads/thumbnails/defaultaudio.jpg';
+        }
     } else {
         $thumbName = "{$videoId}.jpg";
         $thumbFile = 'uploads/thumbnails/' . $thumbName;
@@ -600,12 +614,33 @@ function create_thumbnail($sourcePath, $targetPath = null, $maxWidth = 400, $max
 
 function extract_video_thumbnail($videoPath, $targetPath, $ffmpeg) {
     if (!file_exists($videoPath)) return false;
-    // Extraer fotograma en el segundo 1
-    $cmd = "$ffmpeg -ss 00:00:01 -i " . escapeshellarg($videoPath) . " -vframes 1 -q:v 2 " . escapeshellarg($targetPath) . " 2>&1";
-    $output = shell_exec($cmd);
-    if (file_exists($targetPath)) {
+    
+    $ext = strtolower(pathinfo($videoPath, PATHINFO_EXTENSION));
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudio = in_array($ext, $audioExts);
+    
+    if ($isAudio) {
+        // Para audios, capturamos el stream de video (portada) sin buscar tiempo
+        $cmd = "$ffmpeg -y -i " . escapeshellarg($videoPath) . " -frames:v 1 -q:v 4 " . escapeshellarg($targetPath) . " 2>&1";
+    } else {
+        // Extraer fotograma en el segundo 1 para evitar frames negros iniciales
+        $cmd = "$ffmpeg -y -ss 00:00:01 -i " . escapeshellarg($videoPath) . " -vframes 1 -q:v 2 " . escapeshellarg($targetPath) . " 2>&1";
+    }
+    
+    @exec($cmd);
+    
+    if (file_exists($targetPath) && filesize($targetPath) > 0) {
         return true;
     }
-    write_log("FFMPEG fail extracting thumb: " . $output, 'ERROR');
+    
+    // Si falló (ej: video muy corto), intentar sin -ss
+    if (!$isAudio) {
+        $cmd = "$ffmpeg -y -i " . escapeshellarg($videoPath) . " -vframes 1 -q:v 4 " . escapeshellarg($targetPath) . " 2>&1";
+        @exec($cmd);
+        if (file_exists($targetPath) && filesize($targetPath) > 0) {
+            return true;
+        }
+    }
+    
     return false;
 }
