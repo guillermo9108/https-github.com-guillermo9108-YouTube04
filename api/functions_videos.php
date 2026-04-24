@@ -977,12 +977,14 @@ function video_organize_single($pdo, $id, $settings) {
             ->execute([$newTitle, $newCategory, $meta['parent_category'], $meta['collection'], $price, $id]);
     }
 
-    // Notificar solo si pasa de PENDING a una categoría real, o si es un upload manual que acaba de procesarse
-    $isNewUpload = (time() - $v['createdAt']) < 300; // Consider it new if created in the last 5 minutes (increased for better margin)
-    if ($oldCategory === 'PENDING' || $oldCategory === 'PROCESSING' || $isNewUpload) {
+    // Notificar solo si pasa de PENDING/PROCESSING a una categoría real
+    $isNowPublic = !in_array($newCategory, ['PENDING', 'PROCESSING', 'FAILED_METADATA', 'BROKEN']);
+    $wasNotPublic = in_array($oldCategory, ['PENDING', 'PROCESSING', '']);
+    
+    if ($isNowPublic && $wasNotPublic) {
         if ($v['is_private']) return; // Don't notify private content
         require_once 'functions_interactions.php';
-        interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$meta['title']}", "/watch/{$id}", $v['thumbnailUrl']);
+        interact_notify_subscribers($pdo, $v['creatorId'], 'UPLOAD', "¡Nuevo contenido! {$newTitle}", "/watch/{$id}", $v['thumbnailUrl']);
     }
 }
 

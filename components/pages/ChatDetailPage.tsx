@@ -399,7 +399,7 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
-    const isOtherOnline = onlineUserIds.has(String(otherId).trim());
+    const isOtherOnline = onlineUserIds.has(String(otherId).trim()) || (otherUser?.lastActive ? (Date.now() / 1000 - otherUser.lastActive < 300) : false);
 
     const [vh, setVh] = useState(window.innerHeight);
     const [offsetTop, setOffsetTop] = useState(0);
@@ -497,20 +497,25 @@ export default function ChatDetailPage() {
 
         try {
             const currentOffset = initial ? 0 : offset;
-            const [userData, msgData] = await Promise.all([
-                initial ? db.getUser(otherId) : Promise.resolve(otherUser),
-                db.getMessages(user.id, otherId, limit, currentOffset),
-                initial ? db.markDelivered(user.id, otherId) : Promise.resolve(null)
-            ]);
-
-            if (initial && userData) {
-                userData.isOnline = onlineUserIds.has(String(otherId));
-                setOtherUser(userData);
+            
+            // Background tasks for initial load
+            if (initial) {
+                db.getUser(otherId).then(userData => {
+                    if (userData) {
+                        userData.isOnline = onlineUserIds.has(String(otherId).trim()) || (userData.lastActive ? (Date.now() / 1000 - userData.lastActive < 300) : false);
+                        setOtherUser(userData);
+                    }
+                }).catch(() => {});
+                
+                db.markDelivered(user.id, otherId).catch(() => {});
             }
 
+            const msgData = await db.getMessages(user.id, otherId, limit, currentOffset);
+
             if (initial) {
-                setMessages(msgData);
+                setMessages(msgData.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0)));
                 setOffset(msgData.length);
+                setTimeout(() => scrollToBottom('auto'), 100);
             } else {
                 setMessages(prev => {
                     const existingIds = new Set(prev.map(m => String(m.id)));
@@ -783,12 +788,15 @@ export default function ChatDetailPage() {
                 >
                     <div className="relative">
                         <img
-                            src={otherUser?.avatarUrl || 'https://picsum.photos/seed/avatar/100/100'}
-                            className="w-9 h-9 rounded-full object-cover border border-[var(--divider)]"
+                            src={fixMediaUrl(otherUser?.avatarUrl)}
+                            className="w-9 h-9 rounded-full object-cover border border-[var(--divider)] bg-slate-800"
                             alt={otherUser?.username}
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y';
+                            }}
                         />
-                        {otherUser?.lastActive && (Date.now() / 1000 - otherUser.lastActive < 300) && (
+                        {isOtherOnline && (
                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[var(--bg-secondary)] rounded-full" />
                         )}
                     </div>
@@ -829,7 +837,14 @@ export default function ChatDetailPage() {
                 )}
                 
                 <div className="flex flex-col items-center py-4 opacity-70">
-                    <img src={otherUser?.avatarUrl} className="w-20 h-20 rounded-full mb-2 border-2 border-[var(--divider)] shadow-sm" referrerPolicy="no-referrer" />
+                    <img 
+                        src={fixMediaUrl(otherUser?.avatarUrl)} 
+                        className="w-20 h-20 rounded-full mb-2 border-2 border-[var(--divider)] shadow-sm bg-slate-800" 
+                        referrerPolicy="no-referrer" 
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y';
+                        }}
+                    />
                     <h2 className="text-lg font-bold tracking-tight">{otherUser?.username}</h2>
                     <p className="text-[10px] uppercase font-black tracking-widest text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 rounded-full">Amigo en StreamPay</p>
                 </div>

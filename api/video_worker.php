@@ -47,14 +47,14 @@ $failed = 0;
 
 for ($i = 0; $i < $batchSize; $i++) {
     $now = time();
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE (category = 'PENDING' OR thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg') AND transcode_status = 'NONE' AND processing_attempts < 5 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE (category = 'PENDING' OR (thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg')) AND transcode_status = 'NONE' AND processing_attempts < 3 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
     $stmt->execute([$now - 60]);
     $video = $stmt->fetch();
 
     if (!$video) break;
 
     echo "[TASK " . ($i+1) . "] ID: {$video['id']} - '{$video['title']}'\n";
-    $pdo->prepare("UPDATE videos SET locked_at = ? WHERE id = ?")->execute([$now, $video['id']]);
+    $pdo->prepare("UPDATE videos SET locked_at = ?, processing_attempts = processing_attempts + 1 WHERE id = ?")->execute([$now, $video['id']]);
     
     $realPath = resolve_video_path($video['videoUrl'], $pdo, $video['id']);
     

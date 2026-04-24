@@ -14,6 +14,12 @@ const formatTimeAgo = (timestamp: number) => {
     return `hace ${Math.floor(diff / 86400)} d`;
 };
 
+const fixMediaUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('api/') || url.startsWith('/')) return url;
+    return 'api/' + url;
+};
+
 export default function Notifications() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -124,7 +130,7 @@ export default function Notifications() {
                                     <div className="w-14 h-14 rounded-full overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--divider)]">
                                         {n.avatarUrl ? (
                                             <img 
-                                                src={n.avatarUrl} 
+                                                src={fixMediaUrl(n.avatarUrl)} 
                                                 className="w-full h-full object-cover" 
                                                 referrerPolicy="no-referrer" 
                                                 onError={(e) => {
