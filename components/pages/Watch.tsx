@@ -478,7 +478,7 @@ export default function Watch() {
                     autoplay: true,
                     controls: true,
                     responsive: true,
-                    fluid: true,
+                    fill: true,
                     playbackRates: [0.5, 1, 1.25, 1.5, 2],
                     nativeControlsForTouch: false,
                     preload: 'auto',

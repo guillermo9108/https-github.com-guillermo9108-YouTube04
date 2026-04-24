@@ -110,25 +110,87 @@ body {
 
 /* Video.js Custom Styles */
 .video-js {
-  width: 100% !important;
-  height: auto !important;
-  aspect-ratio: 16 / 9;
   background-color: #000 !important;
 }
 
-.vjs-fluid {
-  padding-top: 56.25% !important;
+/* Fallback for aspect ratio when not fluid/fill */
+.video-js:not(.vjs-fluid):not(.vjs-fill):not(.vjs-fullscreen) {
+  width: 100% !important;
+  aspect-ratio: 16 / 9;
 }
 
 .video-js .vjs-control-bar {
   background-color: rgba(0, 0, 0, 0.8) !important;
   height: 50px !important;
   z-index: 100 !important;
+  display: flex !important;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.video-js .vjs-control {
+  width: 48px !important;
+}
+
+.video-js .vjs-volume-panel {
+  width: 80px !important;
+}
+
+.video-js .vjs-current-time, 
+.video-js .vjs-duration, 
+.video-js .vjs-time-divider {
+  display: flex !important;
+  font-weight: bold !important;
+  font-size: 12px !important;
+  padding: 0 4px !important;
+}
+
+.video-js .vjs-remaining-time {
+  display: none !important;
+}
+
+/* Ensure controls are always visible on touch devices when tapped */
+.video-js.vjs-touch-enabled .vjs-control-bar {
+  transition: opacity 0.4s ease-in-out !important;
+}
+
+.video-js.vjs-fullscreen .vjs-control-bar {
+  height: 64px !important;
+  padding-bottom: env(safe-area-inset-bottom, 10px) !important;
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 70%, transparent 100%) !important;
+}
+
+/* Custom Progress Bar for better touch */
+.video-js .vjs-progress-control {
+  height: 10px !important;
+  position: absolute !important;
+  width: 100% !important;
+  top: -10px !important;
+}
+
+.video-js .vjs-progress-holder {
+  height: 4px !important;
+  margin: 0 !important;
+  transition: height 0.2s ease;
+}
+
+.video-js .vjs-progress-control:hover .vjs-progress-holder,
+.video-js .vjs-progress-control:active .vjs-progress-holder {
+  height: 8px !important;
+}
+
+.video-js .vjs-play-progress:before {
+  font-size: 14px !important;
+  top: -4px !important;
 }
 
 .video-js .vjs-button > .vjs-icon-placeholder:before {
   font-size: 24px !important;
   line-height: 50px !important;
+}
+
+.video-js.vjs-fullscreen .vjs-button > .vjs-icon-placeholder:before {
+  line-height: 54px !important;
 }
 
 .video-js .vjs-big-play-button {
@@ -175,4 +237,12 @@ body {
 .vjs-text-track-cue {
   background-color: rgba(0, 0, 0, 0.6) !important;
   font-size: 1.2em !important;
+}
+
+.video-js .vjs-tech {
+  object-fit: contain !important;
+}
+
+.video-js.vjs-fullscreen .vjs-tech {
+  object-fit: contain !important; /* Default to contain to avoid cropping unless requested */
 }
