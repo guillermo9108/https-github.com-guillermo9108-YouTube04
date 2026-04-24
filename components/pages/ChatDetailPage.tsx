@@ -569,7 +569,8 @@ export default function ChatDetailPage() {
                 userId: user.id,
                 receiverId: otherId,
                 text: text || '',
-                mediaType: mediaData?.type
+                mediaType: mediaData?.type,
+                timestamp: Math.floor(Date.now() / 1000)
             };
 
             if (mediaData) {

@@ -555,18 +555,16 @@ function interact_send_message($pdo, $input) {
     $fileUrl = $input['fileUrl'] ?? null;
     $videoId = $input['videoId'] ?? null;
     $mediaType = $input['mediaType'] ?? 'TEXT';
+    $timestamp = isset($input['timestamp']) ? (int)$input['timestamp'] : time();
 
     $id = uniqid('msg_');
-    // Para evitar desfases horarios de 2h (timezone del servidor vs cliente): 
-    // Usamos UTC explícitamente o dejamos que el cliente lo maneje como timestamp Unix puro
-    $now = time(); 
     
     if (empty($text) && empty($imageUrl) && empty($videoUrl) && empty($audioUrl) && empty($fileUrl)) {
         respond(false, null, "Mensaje vacío");
     }
     
     $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, videoId, mediaType, isRead, isDelivered, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)")
-        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $videoId, $mediaType, $now]);
+        ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $videoId, $mediaType, $timestamp]);
         
     respond(true, [
         'id' => $id,
@@ -579,7 +577,7 @@ function interact_send_message($pdo, $input) {
         'fileUrl' => $fileUrl ? fix_url($fileUrl) : null,
         'videoId' => $videoId,
         'mediaType' => $mediaType,
-        'timestamp' => $now,
+        'timestamp' => $timestamp,
         'isRead' => 0,
         'isDelivered' => 0
     ]);
