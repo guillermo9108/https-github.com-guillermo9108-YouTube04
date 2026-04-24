@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus, Lock } from 'lucide-react';
+import { ChevronLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, Info, Loader2, Mic, Paperclip, X, Play, Pause, File as FileIcon, Music, Film, Trash2, Plus, Lock, Check, CheckCheck } from 'lucide-react';
 import { useNavigate, useParams } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
@@ -246,7 +246,13 @@ const MessageItem = React.memo(({ msg, isMe, showAvatar, otherUser, user, onNavi
     msg: ChatMessage, isMe: boolean, showAvatar: boolean, otherUser: User | null, user: User | null, onNavigate: (p: string) => void 
 }) => {
     const formatTime = (timestamp: number) => {
-        return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // El usuario reportó 2h de desfase. 
+        // Si el servidor envía Epoch seconds en UTC (time()), 
+        // new Date(timestamp * 1000) lo convierte a la hora local del dispositivo.
+        // Si hay desfase, podría ser que el servidor NO esté en UTC.
+        // Forzaremos a tratarlo como UTC si es necesario, pero usualmente JS Date(unix) es robusto.
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     const renderContent = () => {
@@ -334,7 +340,20 @@ const MessageItem = React.memo(({ msg, isMe, showAvatar, otherUser, user, onNavi
                 }`}>
                     {renderContent()}
                 </div>
-                <span className="text-[9px] font-bold opacity-50 mt-1 px-1">{formatTime(msg.timestamp)}</span>
+                <div className="flex items-center gap-1 mt-1 px-1">
+                    <span className="text-[9px] font-bold opacity-50">{formatTime(msg.timestamp)}</span>
+                    {isMe && (
+                        <div className="flex items-center">
+                            {msg.isRead ? (
+                                <CheckCheck size={12} className="text-blue-400" />
+                            ) : msg.isDelivered ? (
+                                <CheckCheck size={12} className="text-gray-400" />
+                            ) : (
+                                <Check size={12} className="text-gray-400" />
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </motion.div>
     );
@@ -480,7 +499,8 @@ export default function ChatDetailPage() {
             const currentOffset = initial ? 0 : offset;
             const [userData, msgData] = await Promise.all([
                 initial ? db.getUser(otherId) : Promise.resolve(otherUser),
-                db.getMessages(user.id, otherId, limit, currentOffset)
+                db.getMessages(user.id, otherId, limit, currentOffset),
+                initial ? db.markDelivered(user.id, otherId) : Promise.resolve(null)
             ]);
 
             if (initial && userData) {

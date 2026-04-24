@@ -17,6 +17,11 @@ function interact_get_search_suggestions($pdo, $q, $limit = 5) {
 }
 
 function send_direct_notification($pdo, $userId, $type, $text, $link, $avatarUrl = null, $metadata = null) {
+    // PREVENIR DUPLICADOS: No enviar la misma notificación al mismo usuario si se envió hace menos de 60s
+    $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE userId = ? AND type = ? AND link = ? AND timestamp > ?");
+    $stmtCheck->execute([$userId, $type, $link, time() - 60]);
+    if ($stmtCheck->fetchColumn() > 0) return;
+
     $jsonMeta = is_array($metadata) ? json_encode($metadata) : $metadata;
     $pdo->prepare("INSERT INTO notifications (id, userId, type, text, link, isRead, timestamp, avatarUrl, metadata) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)")
         ->execute([uniqid('n_'), $userId, $type, $text, $link, time(), $avatarUrl, $jsonMeta]);
@@ -224,8 +229,24 @@ function interact_get_notifications($pdo, $uid, $limit = 30) {
     $limit = (int)$limit;
     $stmt = $pdo->prepare("SELECT * FROM notifications WHERE userId = ? ORDER BY timestamp DESC LIMIT $limit"); $stmt->execute([$uid]);
     $notifs = $stmt->fetchAll();
+    
+    // Default avatar fallback
+    $defaultAvatar = null;
+    
     foreach ($notifs as &$n) {
         $n['avatarUrl'] = fix_url($n['avatarUrl']);
+        
+        // Verificar si la miniatura existe (si es local)
+        if ($n['avatarUrl'] && strpos($n['avatarUrl'], '/api/uploads/') === 0) {
+            $localPath = __DIR__ . '/' . substr($n['avatarUrl'], 5);
+            if (!file_exists($localPath)) {
+                if (!$defaultAvatar) {
+                    $defaultAvatar = $pdo->query("SELECT defaultAvatar FROM system_settings WHERE id = 1")->fetchColumn();
+                }
+                $n['avatarUrl'] = fix_url($defaultAvatar);
+            }
+        }
+        
         if ($n['metadata']) {
             $decoded = json_decode($n['metadata'], true);
             $n['metadata'] = $decoded ?: $n['metadata'];
@@ -474,6 +495,14 @@ function interact_get_chats($pdo, $userId) {
     respond(true, $chats);
 }
 
+function interact_mark_delivered($pdo, $input) {
+    $userId = $input['userId'];
+    $otherId = $input['otherId'];
+    $pdo->prepare("UPDATE messages SET isDelivered = 1 WHERE senderId = ? AND receiverId = ? AND isDelivered = 0")
+        ->execute([$otherId, $userId]);
+    respond(true);
+}
+
 function interact_get_messages($pdo, $input) {
     $userId = $input['userId'] ?? '';
     $otherId = $input['otherId'] ?? '';
@@ -482,8 +511,8 @@ function interact_get_messages($pdo, $input) {
     
     if (!$userId || !$otherId) respond(false, null, "Faltan IDs");
 
-    // Marcar como leídos
-    $pdo->prepare("UPDATE messages SET isRead = 1 WHERE senderId = ? AND receiverId = ?")->execute([$otherId, $userId]);
+    // Marcar como leídos Y entregados
+    $pdo->prepare("UPDATE messages SET isRead = 1, isDelivered = 1 WHERE senderId = ? AND receiverId = ?")->execute([$otherId, $userId]);
     
     // Para paginación inversa (traer los últimos), traemos ordenados por timestamp DESC
     // El frontend luego puede invertirlos para mostrar en orden cronológico
@@ -528,13 +557,15 @@ function interact_send_message($pdo, $input) {
     $mediaType = $input['mediaType'] ?? 'TEXT';
 
     $id = uniqid('msg_');
-    $now = time();
+    // Para evitar desfases horarios de 2h (timezone del servidor vs cliente): 
+    // Usamos UTC explícitamente o dejamos que el cliente lo maneje como timestamp Unix puro
+    $now = time(); 
     
     if (empty($text) && empty($imageUrl) && empty($videoUrl) && empty($audioUrl) && empty($fileUrl)) {
         respond(false, null, "Mensaje vacío");
     }
     
-    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, videoId, mediaType, isRead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)")
+    $pdo->prepare("INSERT INTO messages (id, senderId, receiverId, text, imageUrl, videoUrl, audioUrl, fileUrl, videoId, mediaType, isRead, isDelivered, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)")
         ->execute([$id, $senderId, $receiverId, $text, $imageUrl, $videoUrl, $audioUrl, $fileUrl, $videoId, $mediaType, $now]);
         
     respond(true, [
@@ -549,6 +580,7 @@ function interact_send_message($pdo, $input) {
         'videoId' => $videoId,
         'mediaType' => $mediaType,
         'timestamp' => $now,
-        'isRead' => 0
+        'isRead' => 0,
+        'isDelivered' => 0
     ]);
 }

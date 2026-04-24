@@ -646,6 +646,13 @@ class DBService {
             body: JSON.stringify(data)
         });
     }
+
+    public async markDelivered(userId: string, otherId: string): Promise<void> {
+        return this.request<void>('action=mark_delivered', {
+            method: 'POST',
+            body: JSON.stringify({ userId, otherId })
+        });
+    }
 }
 
 export const db = new DBService();

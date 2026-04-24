@@ -356,6 +356,7 @@ export interface ChatMessage {
     videoId?: string;
     mediaType?: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
     isRead: boolean;
+    isDelivered?: boolean;
     timestamp: number;
 }
 

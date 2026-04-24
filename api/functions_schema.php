@@ -302,6 +302,7 @@ function getAppSchema() {
                 'videoId' => 'VARCHAR(50) DEFAULT NULL',
                 'mediaType' => "ENUM('TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'FILE') DEFAULT 'TEXT'",
                 'isRead' => 'TINYINT(1) DEFAULT 0',
+                'isDelivered' => 'TINYINT(1) DEFAULT 0',
                 'timestamp' => 'BIGINT'
             ],
             'indices' => [

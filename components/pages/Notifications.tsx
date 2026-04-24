@@ -39,8 +39,9 @@ export default function Notifications() {
         markAsRead(); // Marcar como leídas al abrir la página
     }, [user]);
 
-    // Combinar notificaciones en tiempo real con las de DB
-    const allNotifications = [...rtNotifications, ...notifs].sort((a, b) => b.timestamp - a.timestamp);
+    // Combinar notificaciones en tiempo real con las de DB y deduplicar por ID
+    const allNotifications = Array.from(new Map([...rtNotifications, ...notifs].map(n => [n.id, n])).values())
+        .sort((a, b) => b.timestamp - a.timestamp);
 
     const handleNotifClick = async (n: AppNotification) => {
         // Marcar como leída individualmente
@@ -122,10 +123,19 @@ export default function Notifications() {
                                 <div className="shrink-0 relative">
                                     <div className="w-14 h-14 rounded-full overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--divider)]">
                                         {n.avatarUrl ? (
-                                            <img src={n.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-bold">
-                                                {n.type?.[0] || 'N'}
+                                            <img 
+                                                src={n.avatarUrl} 
+                                                className="w-full h-full object-cover" 
+                                                referrerPolicy="no-referrer" 
+                                                onError={(e) => {
+                                                    // Si la imagen falla, ocultarla para mostrar el fallback de texto de abajo
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                }}
+                                            />
+                                        ) : null}
+                                        {(!n.avatarUrl) && (
+                                            <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-bold text-lg">
+                                                {n.text?.[0] || 'N'}
                                             </div>
                                         )}
                                     </div>
