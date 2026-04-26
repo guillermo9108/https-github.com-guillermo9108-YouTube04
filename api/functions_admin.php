@@ -506,7 +506,11 @@ function admin_sync_active_transcodes_to_db($pdo) {
 }
 
 function admin_get_local_stats($pdo) {
-    admin_sync_active_transcodes_to_db($pdo);
+    try {
+        admin_sync_active_transcodes_to_db($pdo);
+    } catch (Throwable $e) {
+        write_log("Sync active transcodes failed: " . $e->getMessage(), "WARNING");
+    }
 
     $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
     $s = $stmtS->fetch();
