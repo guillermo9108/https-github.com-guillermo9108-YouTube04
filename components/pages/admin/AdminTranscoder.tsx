@@ -435,7 +435,7 @@ export default function AdminTranscoder() {
                                     <div className="px-6 pb-6 space-y-3">
                                         <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">
                                             <div className="flex items-center gap-2">
-                                                <Zap size={12} className="text-[#1877f2]"/> Monitorizando {p.videoUrl?.split('/').pop() || 'file_t.mp4'}
+                                                <Zap size={12} className="text-[#1877f2]"/> Monitorizando {p.tempPath ? p.tempPath.split(/[/\\]/).pop() : (p.videoUrl ? p.videoUrl.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') + '_t.mp4' : 'file_t.mp4')}
                                             </div>
                                             <span className="text-[#1877f2] text-lg font-black">{progress}%</span>
                                         </div>
