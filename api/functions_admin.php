@@ -489,14 +489,19 @@ function admin_get_local_stats($pdo) {
             if (strpos($line, 'sh -c') !== false) continue;
             if (strpos($line, 'transcode_worker.php') !== false) continue;
 
-            $parts = preg_split('/\s+/', $line, 3);
-            if (count($parts) < 3) continue;
-            $pid = $parts[0];
-            $etime = $parts[1]; // [[dd-]hh:]mm:ss
-            $fullCmd = $parts[2];
+            // MEJORA: SOPORTE PARA ESPACIOS EN RUTAS DE PS
+            // Buscamos PID y ETIME al inicio, el resto es el COMMAND aunque contenga espacios
+            if (preg_match('/^\s*(\d+)\s+([0-9:.-]+)\s+(.+)$/', $line, $matches)) {
+                $pid = $matches[1];
+                $etime = $matches[2];
+                $fullCmd = $matches[3];
+            } else {
+                continue;
+            }
             
             // Convert etime to seconds
             $etimeSec = 0;
+            // ps etime format: [[dd-]hh:]mm:ss
             if (preg_match('/(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)/', $etime, $em)) {
                 $days = $em[1] ? intval($em[1]) : 0;
                 $hours = $em[2] ? intval($em[2]) : 0;
@@ -525,18 +530,22 @@ function admin_get_local_stats($pdo) {
                 }
             }
 
-            // --- MEJORA: PROGRESO REAL ---
+            // MEJORA: PROGRESO REAL
             $realProgress = 0;
             $currentOutputSize = 0;
             $expectedSizeBytes = 0;
             $tempPath = "";
 
+            // Normalizar separadores de ruta en el comando para facilitar matching
+            $normCmd = str_replace('\\', '/', $fullCmd);
+
             // Localizar el archivo temporal de salida (termina en _t.ext)
             // Intentamos capturar la ruta absoluta que suele estar entre comillas cerca del final
             clearstatcache();
-            if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $fullCmd, $matches)) {
-                $tempPath = end($matches[1]);
-                if (file_exists($tempPath)) {
+            if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $normCmd, $matches)) {
+                $tempPathCandidate = end($matches[1]);
+                if (file_exists($tempPathCandidate)) {
+                    $tempPath = $tempPathCandidate;
                     $currentOutputSize = filesize($tempPath);
                 }
             }
@@ -808,26 +817,21 @@ function admin_skip_transcode($pdo, $vid) {
 }
 
 function admin_process_next_transcode($pdo) {
-    // Buscar binarios necesarios
-    $bins = get_ffmpeg_binaries($pdo);
-    $ffmpeg = $bins['ffmpeg']; 
-    
-    // Buscar el siguiente video en cola
-    $stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' LIMIT 1");
-    $video = $stmt->fetch();
-    
-    if (!$video) {
-        respond(true, "Cola vacía");
-    }
-    
     // Disparar el worker en segundo plano para evitar bloqueos en la petición web
     $workerPath = __DIR__ . '/transcode_worker.php';
     if (file_exists($workerPath)) {
         // En Linux usamos nohup y redirección para asegurar que siga corriendo
+        // Agregamos ignore_user_abort para que el script siga aunque se cierre la conexión
         @shell_exec("php " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
-        respond(true, "Procesador de transcodificación iniciado en segundo plano");
+        respond(true, "Procesador iniciado en segundo plano");
     } else {
-        // Fallback síncrono si el worker no existe (no debería pasar)
+        // Fallback síncrono si el worker no existe
+        $bins = get_ffmpeg_binaries($pdo);
+        $ffmpeg = $bins['ffmpeg']; 
+        $stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' LIMIT 1");
+        $video = $stmt->fetch();
+        if (!$video) respond(true, "Cola vacía");
+        
         $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
         respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
     }
@@ -1645,8 +1649,11 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     }
 
     // Actualizar estado a PROCESSING
-    $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING' WHERE id = ?")->execute([$videoId]);
+    $pdo->prepare("UPDATE videos SET transcode_status = 'PROCESSING', locked_at = ? WHERE id = ?")->execute([time(), $videoId]);
     
+    // Normalizar la ruta de salida para que sea absoluta y use "/" para reducir fallos de regex en el dashboard
+    $outputPath = str_replace('\\', '/', $outputPath);
+
     // Añadimos metadata con el ID del video para poder rastrear el proceso en el dashboard
     // Añadimos -threads 2 después de la entrada (-i) para que FFmpeg use ambos núcleos
     $metaArgs = "-metadata title=" . escapeshellarg($videoId);
