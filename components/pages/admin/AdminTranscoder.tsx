@@ -324,6 +324,19 @@ export default function AdminTranscoder() {
                                 (Math.round(p.expected_output_size / (1024 * 1024)) + ' MB') 
                                 : (p.size_bytes ? (Math.round(p.size_bytes * 0.45 / 1024 / 1024) + ' MB') : '...');
 
+                            // Cálculo de tiempo estimado
+                            const etime = p.etime || 0; 
+                            let remainingText = "Estimando...";
+                            if (progress > 1 && etime > 3) {
+                                const totalSec = etime / (progress / 100);
+                                const remSec = Math.max(0, Math.round(totalSec - etime));
+                                if (remSec > 60) {
+                                    remainingText = `${Math.floor(remSec / 60)}m ${remSec % 60}s`;
+                                } else {
+                                    remainingText = `${remSec}s`;
+                                }
+                            }
+
                             return (
                                 <div key={i} className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -332,7 +345,7 @@ export default function AdminTranscoder() {
                                                 <Terminal size={24} />
                                             </div>
                                             <div>
-                                                <div className="text-sm font-black text-white truncate max-w-[300px]">{p.title || 'Extrayendo metadatos...'}</div>
+                                                <div className="text-sm font-black text-white truncate max-w-[200px] md:max-w-[300px]">{p.title || 'Extrayendo metadatos...'}</div>
                                                 <div className="flex items-center gap-3 mt-1">
                                                     <span className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">PID: {p.pid}</span>
                                                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
@@ -340,11 +353,20 @@ export default function AdminTranscoder() {
                                                     </span>
                                                 </div>
                                             </div>
-                                                            <div className="text-right">
-                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Escrito en disco</div>
-                                            <div className="text-xs font-mono text-white flex items-center justify-end gap-2">
-                                                <HardDrive size={12} className="text-emerald-400" />
-                                                {outSize}
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-right">
+                                                <div className="text-[10px] text-slate-500 font-black uppercase mb-1 whitespace-nowrap">Escrito</div>
+                                                <div className="text-xs font-mono text-white flex items-center justify-end gap-2">
+                                                    <HardDrive size={12} className="text-emerald-400" />
+                                                    {outSize}
+                                                </div>
+                                            </div>
+                                            <div className="text-right border-l border-white/10 pl-6">
+                                                <div className="text-[10px] text-slate-500 font-black uppercase mb-1 whitespace-nowrap">Restante</div>
+                                                <div className="text-xs font-mono text-indigo-400 flex items-center justify-end gap-2">
+                                                    <Clock size={12} className="text-indigo-400" />
+                                                    {remainingText}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

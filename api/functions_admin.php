@@ -478,7 +478,7 @@ function admin_get_local_stats($pdo) {
 
     // Detectar procesos FFmpeg activos
     $active_processes = [];
-    $ps = @shell_exec('ps -Ao pid,command | grep ffmpeg | grep -v grep');
+    $ps = @shell_exec('ps -Ao pid,etime,command | grep ffmpeg | grep -v grep');
     if ($ps) {
         $lines = explode("\n", trim($ps));
         $seenVideoIds = [];
@@ -489,11 +489,22 @@ function admin_get_local_stats($pdo) {
             if (strpos($line, 'sh -c') !== false) continue;
             if (strpos($line, 'transcode_worker.php') !== false) continue;
 
-            $parts = preg_split('/\s+/', $line, 2);
-            if (count($parts) < 2) continue;
+            $parts = preg_split('/\s+/', $line, 3);
+            if (count($parts) < 3) continue;
             $pid = $parts[0];
-            $fullCmd = $parts[1];
+            $etime = $parts[1]; // [[dd-]hh:]mm:ss
+            $fullCmd = $parts[2];
             
+            // Convert etime to seconds
+            $etimeSec = 0;
+            if (preg_match('/(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)/', $etime, $em)) {
+                $days = $em[1] ? intval($em[1]) : 0;
+                $hours = $em[2] ? intval($em[2]) : 0;
+                $mins = intval($em[3]);
+                $secs = intval($em[4]);
+                $etimeSec = ($days * 86400) + ($hours * 3600) + ($mins * 60) + $secs;
+            }
+
             $videoId = '';
             if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
                 $videoId = $metaMatches[1];
@@ -515,9 +526,10 @@ function admin_get_local_stats($pdo) {
             }
 
             // --- MEJORA: PROGRESO REAL ---
-            // Intentar encontrar el archivo temporal de salida para reportar progreso real
             $realProgress = 0;
             $currentOutputSize = 0;
+            $expectedSizeBytes = 0;
+
             if (preg_match('/\s+([^\s]+\_t\.[a-z0-9]+)$/', $fullCmd, $outputMatches)) {
                 $tempPath = $outputMatches[1];
                 if (file_exists($tempPath)) {
@@ -525,19 +537,15 @@ function admin_get_local_stats($pdo) {
                 }
             }
             
-            // Estimar tamaño final basado en el comando
             $bitrate = _admin_extract_bitrate($fullCmd); // kbps
-            if ($bitrate > 0 && $videoInfo && $videoInfo['duration'] > 0) {
+            if ($bitrate > 0 && $videoInfo && ($videoInfo['duration'] ?? 0) > 0) {
                 $expectedSizeBytes = ($bitrate * 1000 * $videoInfo['duration']) / 8;
-                if ($expectedSizeBytes > 0 && $currentOutputSize > 0) {
-                    $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
-                }
-            } else if ($videoInfo && $videoInfo['size_bytes'] > 0) {
-                // Fallback: usar una tasa de compresión estimada del 40%
-                $expectedSizeBytes = $videoInfo['size_bytes'] * 0.4;
-                if ($currentOutputSize > 0) {
-                    $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
-                }
+            } else if ($videoInfo && ($videoInfo['size_bytes'] ?? 0) > 0) {
+                $expectedSizeBytes = $videoInfo['size_bytes'] * 0.45;
+            }
+
+            if ($expectedSizeBytes > 0 && $currentOutputSize > 0) {
+                $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
             }
 
             $shortCmd = "ffmpeg " . substr($fullCmd, strpos($fullCmd, '-i'));
@@ -545,6 +553,7 @@ function admin_get_local_stats($pdo) {
 
             $active_processes[] = [
                 'pid' => $pid,
+                'etime' => $etimeSec,
                 'command' => $shortCmd,
                 'videoId' => $videoId,
                 'title' => $videoInfo ? $videoInfo['title'] : ($videoId ? "Video $videoId" : "ffmpeg activo"),
@@ -552,8 +561,8 @@ function admin_get_local_stats($pdo) {
                 'size_bytes' => $videoInfo ? ($videoInfo['size_bytes'] ?? 0) : 0,
                 'current_output_size' => $currentOutputSize,
                 'expected_output_size' => $expectedSizeBytes,
-                'progress' => $realProgress > 0 ? $realProgress : null,
-                'isDualCore' => true // Simulando que usa 2 núcleos
+                'progress' => $realProgress > 0 ? $realProgress : 0,
+                'isDualCore' => true
             ];
         }
     }
@@ -810,21 +819,31 @@ function admin_process_next_transcode($pdo) {
 
 function _admin_extract_bitrate($cmd) {
     $total = 0;
-    // Buscar Bitrate de Video
-    if (preg_match('/-b:v\s+([0-9]+)([km]?)/', $cmd, $m)) {
-        $val = intval($m[1]);
-        if ($m[2] === 'k') $total += $val;
-        else if ($m[2] === 'm') $total += $val * 1024;
-        else $total += $val / 1000;
-    }
-    // Buscar Bitrate de Audio
-    if (preg_match('/-(ab|b:a)\s+([0-9]+)([km]?)/', $cmd, $m)) {
+    // Buscar Bitrate de Video (-b:v o -vb o -maxrate)
+    if (preg_match('/-(b:v|vb|maxrate)\s+([0-9]+)([km]?)/i', $cmd, $m)) {
         $val = intval($m[2]);
-        if ($m[3] === 'k') $total += $val;
-        else if ($m[3] === 'm') $total += $val * 1024;
-        else $total += $val / 1000;
+        if (strtolower($m[3] ?? '') === 'k') $total += $val;
+        else if (strtolower($m[3] ?? '') === 'm') $total += $val * 1024;
+        else $total += $val; // Assumed kbps if no unit for these flags in some contexts, but ffmpeg usually expects bits/s if no unit. 
+        // Standardize: if value < 10000, probably kbps. else bits/s.
+        if ($total > 20000) $total = $total / 1000; 
+    } else {
+        $total += 1500; // Default video
     }
-    return $total > 0 ? $total : 1500; // 1500kbps default if not found
+    
+    // Buscar Bitrate de Audio (-b:a o -ab)
+    if (preg_match('/-(b:a|ab)\s+([0-9]+)([km]?)/i', $cmd, $m)) {
+        $val = intval($m[2]);
+        if (strtolower($m[3] ?? '') === 'k') $total += $val;
+        else if (strtolower($m[3] ?? '') === 'm') $total += $val * 1024;
+        else {
+            if ($val > 1000) $total += $val / 1000;
+            else $total += $val;
+        }
+    } else {
+        $total += 128; // Default audio
+    }
+    return $total; // returns in kbps
 }
 
 function admin_reorder_transcode_queue($pdo, $input) {
