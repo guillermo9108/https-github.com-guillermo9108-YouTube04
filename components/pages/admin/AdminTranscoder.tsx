@@ -549,34 +549,34 @@ export default function AdminTranscoder() {
                                             />
                                         </div>
 
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-[14px] font-black text-white truncate flex items-center gap-2 uppercase tracking-tight">
+                                        <div className="flex-1 min-w-0 pr-2">
+                                            <div className="text-[12px] md:text-[14px] font-black text-white truncate flex items-center gap-2 uppercase tracking-tight">
                                                 {v.title}
                                                 {(v as any).queue_priority > 0 && <Zap size={12} className="text-amber-500 fill-amber-500 shrink-0"/>}
                                             </div>
-                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-tighter">
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[9px] md:text-[11px] text-slate-500 font-bold uppercase tracking-tighter">
                                                 <span className="flex items-center gap-1 shrink-0"><HardDrive size={11}/> {v.size_fmt || 'N/A'}</span>
-                                                <span className="text-slate-800 hidden md:inline">•</span>
+                                                <span className="text-slate-800 hidden sm:inline opacity-30">•</span>
                                                 <span className="flex items-center gap-1 text-[#1877f2] shrink-0"><Zap size={11} className="fill-[#1877f2]"/> {estSize} Est.</span>
-                                                <span className="text-slate-800 hidden md:inline">•</span>
+                                                <span className="text-slate-800 hidden sm:inline opacity-30">•</span>
                                                 <span className="font-mono text-slate-600 uppercase shrink-0">{v.videoUrl.split('.').pop() || '??'}</span>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-1 md:gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                            <div className="hidden sm:flex flex-col gap-0.5 mr-1 px-1">
+                                        <div className="flex items-center gap-2 shrink-0 self-center md:self-auto">
+                                            <div className="hidden lg:flex flex-col gap-0.5 mr-1 px-1">
                                                 <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Subir"><ChevronRight size={12} className="-rotate-90"/></button>
                                                 <button onClick={() => handleReorder(v.id, 'DOWN')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Bajar"><ChevronRight size={12} className="rotate-90"/></button>
                                             </div>
                                             <button 
                                                 onClick={() => handleStartNow(v.id)}
-                                                className="px-3 py-2 bg-[#1877f2]/10 hover:bg-[#1877f2] text-[#1877f2] hover:text-white rounded-xl text-[9px] md:text-[10px] font-black uppercase transition-all border border-[#1877f2]/20 whitespace-nowrap"
+                                                className="px-2 md:px-3 py-1.5 md:py-2 bg-[#1877f2]/10 hover:bg-[#1877f2] text-[#1877f2] hover:text-white rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase transition-all border border-[#1877f2]/20 whitespace-nowrap"
                                             >
-                                                Prioritizar
+                                                Priorizar
                                             </button>
                                             <button 
                                                 onClick={() => handleAction(`admin_remove_from_queue&videoId=${v.id}`)}
-                                                className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                                className="p-1.5 md:p-2 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg md:rounded-xl transition-all"
                                                 title="Quitar"
                                             >
                                                 <X size={18} />

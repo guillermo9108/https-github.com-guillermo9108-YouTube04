@@ -532,8 +532,10 @@ function admin_get_local_stats($pdo) {
             $tempPath = "";
 
             // Localizar el archivo temporal de salida (termina en _t.ext)
-            if (preg_match('/(?:\s|^)[\'"]?([^\'"]+\_t\.[a-z0-9]+)[\'"]?(?:\s|$)/i', $fullCmd, $matchPath)) {
-                $tempPath = trim($matchPath[1], " '\"");
+            // Intentamos capturar la ruta absoluta que suele estar entre comillas cerca del final
+            clearstatcache();
+            if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $fullCmd, $matches)) {
+                $tempPath = end($matches[1]);
                 if (file_exists($tempPath)) {
                     $currentOutputSize = filesize($tempPath);
                 }
@@ -818,10 +820,17 @@ function admin_process_next_transcode($pdo) {
         respond(true, "Cola vacía");
     }
     
-    // Ejecutar transcodificación (usa la función interna _admin_perform_transcode_single)
-    $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
-    
-    respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
+    // Disparar el worker en segundo plano para evitar bloqueos en la petición web
+    $workerPath = __DIR__ . '/transcode_worker.php';
+    if (file_exists($workerPath)) {
+        // En Linux usamos nohup y redirección para asegurar que siga corriendo
+        @shell_exec("php " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
+        respond(true, "Procesador de transcodificación iniciado en segundo plano");
+    } else {
+        // Fallback síncrono si el worker no existe (no debería pasar)
+        $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
+        respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
+    }
 }
 
 function _admin_extract_bitrate($cmd) {
