@@ -358,6 +358,16 @@ function getAppSchema() {
                 'idx_story_user' => 'userId',
                 'idx_story_expiry' => 'expiresAt'
             ]
+        ],
+        'active_transcodes' => [
+            'cols' => [
+                'videoId' => 'VARCHAR(50) PRIMARY KEY',
+                'pid' => 'INT',
+                'tempPath' => 'TEXT',
+                'lastSize' => 'BIGINT DEFAULT 0',
+                'lastUpdated' => 'BIGINT',
+                'status' => "ENUM('PROCESSING', 'STALLED', 'COMPLETED') DEFAULT 'PROCESSING'"
+            ]
         ]
     ];
 }

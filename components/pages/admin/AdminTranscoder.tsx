@@ -549,16 +549,16 @@ export default function AdminTranscoder() {
                                             />
                                         </div>
 
-                                        <div className="flex-1 min-w-0 pr-2">
+                                        <div className="flex-1 min-w-0 pr-2 overflow-hidden">
                                             <div className="text-[12px] md:text-[14px] font-black text-white truncate flex items-center gap-2 uppercase tracking-tight">
                                                 {v.title}
                                                 {(v as any).queue_priority > 0 && <Zap size={12} className="text-amber-500 fill-amber-500 shrink-0"/>}
                                             </div>
                                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[9px] md:text-[11px] text-slate-500 font-bold uppercase tracking-tighter">
                                                 <span className="flex items-center gap-1 shrink-0"><HardDrive size={11}/> {v.size_fmt || 'N/A'}</span>
-                                                <span className="text-slate-800 hidden sm:inline opacity-30">•</span>
+                                                <span className="text-slate-800 opacity-30">•</span>
                                                 <span className="flex items-center gap-1 text-[#1877f2] shrink-0"><Zap size={11} className="fill-[#1877f2]"/> {estSize} Est.</span>
-                                                <span className="text-slate-800 hidden sm:inline opacity-30">•</span>
+                                                <span className="text-slate-800 opacity-30">•</span>
                                                 <span className="font-mono text-slate-600 uppercase shrink-0">{v.videoUrl.split('.').pop() || '??'}</span>
                                             </div>
                                         </div>

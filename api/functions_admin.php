@@ -443,7 +443,71 @@ function admin_upload_default_thumb($pdo, $post, $files) {
     respond(false, null, "Error al mover el archivo");
 }
 
+function admin_sync_active_transcodes_to_db($pdo) {
+    // 1. Obtener procesos ffmpeg reales desde el sistema
+    $ps = @shell_exec('ps -Ao pid,etime,command | grep ffmpeg | grep -v grep');
+    $currentPids = [];
+    $foundMatches = [];
+    
+    if ($ps) {
+        $lines = explode("\n", trim($ps));
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line) || strpos($line, 'sh -c') !== false) continue;
+            
+            if (preg_match('/^\s*(\d+)\s+([0-9:.-]+)\s+(.+)$/', $line, $matches)) {
+                $pid = $matches[1];
+                $fullCmd = $matches[3];
+                
+                $videoId = '';
+                if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
+                    $videoId = $metaMatches[1];
+                }
+                
+                if ($videoId) {
+                    $currentPids[] = $pid;
+                    $tempPath = "";
+                    $normCmd = str_replace('\\', '/', $fullCmd);
+                    if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $normCmd, $m)) {
+                        $tempPath = end($m[1]);
+                    }
+                    
+                    clearstatcache();
+                    $lastSize = (file_exists($tempPath)) ? filesize($tempPath) : 0;
+                    
+                    $foundMatches[$videoId] = [
+                        'pid' => $pid,
+                        'tempPath' => $tempPath,
+                        'lastSize' => $lastSize
+                    ];
+                }
+            }
+        }
+    }
+    
+    // 2. Sincronizar con la tabla active_transcodes
+    if (!empty($foundMatches)) {
+        foreach ($foundMatches as $vid => $data) {
+            $stmt = $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
+                                 VALUES (?, ?, ?, ?, ?, 'PROCESSING')
+                                 ON DUPLICATE KEY UPDATE pid = VALUES(pid), tempPath = VALUES(tempPath), lastSize = VALUES(lastSize), lastUpdated = VALUES(lastUpdated)");
+            $stmt->execute([$vid, $data['pid'], $data['tempPath'], $data['lastSize'], time()]);
+        }
+    }
+    
+    // 3. Eliminar registros de procesos que ya no existen (ignorando los que están inicializando con pid 0)
+    $sql = "DELETE FROM active_transcodes WHERE pid > 0";
+    $params = [];
+    if (!empty($currentPids)) {
+        $sql .= " AND pid NOT IN (" . implode(',', array_fill(0, count($currentPids), '?')) . ")";
+        $params = $currentPids;
+    }
+    $pdo->prepare($sql)->execute($params);
+}
+
 function admin_get_local_stats($pdo) {
+    admin_sync_active_transcodes_to_db($pdo);
+
     $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
     $s = $stmtS->fetch();
     $paths = json_decode($s['libraryPaths'] ?: '[]', true);
@@ -475,118 +539,50 @@ function admin_get_local_stats($pdo) {
     }
 
     $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
-
-    // Detectar procesos FFmpeg activos
-    $active_processes = [];
-    $ps = @shell_exec('ps -Ao pid,etime,command | grep ffmpeg | grep -v grep');
-    if ($ps) {
-        $lines = explode("\n", trim($ps));
-        $seenVideoIds = [];
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) continue;
-            
-            if (strpos($line, 'sh -c') !== false) continue;
-            if (strpos($line, 'transcode_worker.php') !== false) continue;
-
-            // MEJORA: SOPORTE PARA ESPACIOS EN RUTAS DE PS
-            // Buscamos PID y ETIME al inicio, el resto es el COMMAND aunque contenga espacios
-            if (preg_match('/^\s*(\d+)\s+([0-9:.-]+)\s+(.+)$/', $line, $matches)) {
-                $pid = $matches[1];
-                $etime = $matches[2];
-                $fullCmd = $matches[3];
-            } else {
-                continue;
-            }
-            
-            // Convert etime to seconds
-            $etimeSec = 0;
-            // ps etime format: [[dd-]hh:]mm:ss
-            if (preg_match('/(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)/', $etime, $em)) {
-                $days = $em[1] ? intval($em[1]) : 0;
-                $hours = $em[2] ? intval($em[2]) : 0;
-                $mins = intval($em[3]);
-                $secs = intval($em[4]);
-                $etimeSec = ($days * 86400) + ($hours * 3600) + ($mins * 60) + $secs;
-            }
-
-            $videoId = '';
-            if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
-                $videoId = $metaMatches[1];
-            }
-            
-            if ($videoId && isset($seenVideoIds[$videoId])) continue;
-            if ($videoId) $seenVideoIds[$videoId] = true;
-
-            $videoInfo = null;
-            if ($videoId) {
-                $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
-                $stmtV->execute([$videoId]);
-                $videoData = $stmtV->fetch();
-                if ($videoData) {
-                    $rows = [$videoData];
-                    video_process_rows($rows); 
-                    $videoInfo = $rows[0];
-                }
-            }
-
-            // MEJORA: PROGRESO REAL
-            $realProgress = 0;
-            $currentOutputSize = 0;
-            $expectedSizeBytes = 0;
-            $tempPath = "";
-
-            // Normalizar separadores de ruta en el comando para facilitar matching
-            $normCmd = str_replace('\\', '/', $fullCmd);
-
-            // Localizar el archivo temporal de salida (termina en _t.ext)
-            // Intentamos capturar la ruta absoluta que suele estar entre comillas cerca del final
-            clearstatcache();
-            if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $normCmd, $matches)) {
-                $tempPathCandidate = end($matches[1]);
-                if (file_exists($tempPathCandidate)) {
-                    $tempPath = $tempPathCandidate;
-                    $currentOutputSize = filesize($tempPath);
-                }
-            }
-            
-            $bitrate = _admin_extract_bitrate($fullCmd); // kbps
-            $duration = $videoInfo ? (float)($videoInfo['duration'] ?? 0) : 0;
-
-            if ($bitrate > 0 && $duration > 0) {
-                // (kbps * 1000 / 8) * duration = bytes/seg * seg
-                $expectedSizeBytes = ($bitrate * 125) * $duration;
-            } else if ($videoInfo && ($videoInfo['size_bytes'] ?? 0) > 0) {
-                $expectedSizeBytes = $videoInfo['size_bytes'] * 0.45;
-            }
-
-            if ($expectedSizeBytes > 1024 && $currentOutputSize > 0) {
-                $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
-            }
-
-            $shortCmd = "ffmpeg " . substr($fullCmd, strpos($fullCmd, '-i'));
-            if (strlen($shortCmd) > 100) $shortCmd = substr($shortCmd, 0, 97) . "...";
-
-            $active_processes[] = [
-                'pid' => $pid,
-                'etime' => $etimeSec,
-                'command' => $shortCmd,
-                'videoId' => $videoId,
-                'videoUrl' => $videoInfo ? $videoInfo['videoUrl'] : '',
-                'tempPath' => $tempPath,
-                'title' => $videoInfo ? $videoInfo['title'] : ($videoId ? "Video $videoId" : "ffmpeg activo"),
-                'size_fmt' => $videoInfo ? $videoInfo['size_fmt'] : '',
-                'size_bytes' => $videoInfo ? ($videoInfo['size_bytes'] ?? 0) : 0,
-                'current_output_size' => $currentOutputSize,
-                'expected_output_size' => $expectedSizeBytes,
-                'progress' => $realProgress,
-                'isDualCore' => true
-            ];
-        }
-    }
-
-    $category_stats = $pdo->query("SELECT category, COUNT(*) as count FROM videos GROUP BY category")->fetchAll();
     $transcode_stats = $pdo->query("SELECT transcode_status, COUNT(*) as count FROM videos GROUP BY transcode_status")->fetchAll();
+
+    // Detectar procesos FFmpeg activos usando la nueva tabla persistente
+    $active_processes = [];
+    $stmtProc = $pdo->query("SELECT t.*, v.title, v.videoUrl, v.size_bytes, v.size_fmt, v.duration 
+                            FROM active_transcodes t 
+                            JOIN videos v ON t.videoId = v.id");
+    
+    while ($p = $stmtProc->fetch()) {
+        $realProgress = 0;
+        $expectedSizeBytes = 0;
+        
+        // Calcular bitrate estimado si no lo tenemos (por ahora lo extraemos del comando si es posible)
+        // O mejor: usar el 45% del tamaño original como aproximación si no hay bitrate
+        $duration = (float)($p['duration'] ?? 0);
+        
+        // Intentar obtener el bitrate del comando guardado en el sistema (opcional)
+        // Por ahora mantenemos la lógica de estimación
+        if ($duration > 0) {
+            $expectedSizeBytes = (1500 * 125) * $duration; // 1500 kbps promedio
+        } else if (($p['size_bytes'] ?? 0) > 0) {
+            $expectedSizeBytes = $p['size_bytes'] * 0.45;
+        }
+
+        if ($expectedSizeBytes > 1024 && $p['lastSize'] > 0) {
+            $realProgress = min(99, round(($p['lastSize'] / $expectedSizeBytes) * 100));
+        }
+
+        $active_processes[] = [
+            'pid' => $p['pid'],
+            'etime' => time() - $p['lastUpdated'], // Estimado simple
+            'command' => "ffmpeg ... " . basename($p['tempPath']),
+            'videoId' => $p['videoId'],
+            'videoUrl' => $p['videoUrl'],
+            'tempPath' => $p['tempPath'],
+            'title' => $p['title'],
+            'size_fmt' => $p['size_fmt'],
+            'size_bytes' => (int)$p['size_bytes'],
+            'current_output_size' => (int)$p['lastSize'],
+            'expected_output_size' => $expectedSizeBytes,
+            'progress' => $realProgress,
+            'isDualCore' => true
+        ];
+    }
 
     respond(true, [
         'volumes' => $volumes,
@@ -1660,9 +1656,64 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
     write_log("Transcode: Iniciando $videoId: $cmd");
     
-    $output = [];
-    $returnVar = 0;
-    exec($cmd, $output, $returnVar);
+    // Insertar registro inicial en la tabla de seguimiento persistente
+    $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
+                  VALUES (?, 0, ?, 0, ?, 'PROCESSING') 
+                  ON DUPLICATE KEY UPDATE status='PROCESSING', tempPath=VALUES(tempPath), lastUpdated=VALUES(lastUpdated)")
+        ->execute([$videoId, $outputPath, time()]);
+
+    $descriptorspec = array(
+       0 => array("pipe", "r"),
+       1 => array("pipe", "w"),
+       2 => array("pipe", "w")
+    );
+
+    $process = proc_open($cmd, $descriptorspec, $pipes);
+    $returnVar = 1;
+
+    if (is_resource($process)) {
+        $status = proc_get_status($process);
+        $pid = $status['pid'];
+        
+        // Intentar obtener el PID real de ffmpeg (proc_open a veces devuelve el PID del shell)
+        $realPid = $pid;
+        $childPs = @shell_exec("pgrep -P $pid");
+        if ($childPs) $realPid = (int)trim($childPs);
+        
+        $pdo->prepare("UPDATE active_transcodes SET pid = ? WHERE videoId = ?")->execute([$realPid, $videoId]);
+
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        
+        $stderr = $pipes[2];
+        stream_set_blocking($stderr, 0);
+
+        while (true) {
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                $returnVar = $status['exitcode'];
+                break;
+            }
+
+            // Actualizar tamaño de salida periódicamente
+            clearstatcache();
+            if (file_exists($outputPath)) {
+                $currentSize = filesize($outputPath);
+                $pdo->prepare("UPDATE active_transcodes SET lastSize = ?, lastUpdated = ? WHERE videoId = ?")
+                    ->execute([$currentSize, time(), $videoId]);
+            }
+            
+            // Vaciar stderr para evitar bloqueos
+            while (fgets($stderr)) { }
+            
+            sleep(5);
+        }
+        fclose($pipes[2]);
+        proc_close($process);
+    }
+    
+    // Limpieza de la tabla de seguimiento
+    $pdo->prepare("DELETE FROM active_transcodes WHERE videoId = ?")->execute([$videoId]);
 
     if ($returnVar === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
         // Éxito - Reemplazar el original por el convertido para mantener rutas y ahorrar espacio
