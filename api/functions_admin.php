@@ -531,8 +531,9 @@ function admin_get_local_stats($pdo) {
             $expectedSizeBytes = 0;
 
             // Intentar encontrar el archivo de salida buscando la extensión temporal definida en video_worker.php (_t.xxx)
-            if (preg_match('/([^\s]+\_t\.[a-z0-9]+)(\s|$)/', $fullCmd, $matchPath)) {
-                $tempPath = trim($matchPath[1], " '\"");
+            // Soportamos rutas con espacios buscando una subcadena que termine en _t.ext y que no sea la entrada
+            if (preg_match('/[\'"]?([^\'"]+\_t\.[a-z0-9]+)[\'"]?/i', $fullCmd, $matchPath)) {
+                $tempPath = trim($matchPath[1]);
                 if (file_exists($tempPath)) {
                     $currentOutputSize = filesize($tempPath);
                 }
