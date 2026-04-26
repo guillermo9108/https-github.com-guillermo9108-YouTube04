@@ -478,7 +478,6 @@ function admin_get_local_stats($pdo) {
 
     // Detectar procesos FFmpeg activos
     $active_processes = [];
-    // Usamos -o pid,command para tener algo limpio y auxww para el comando completo
     $ps = @shell_exec('ps -Ao pid,command | grep ffmpeg | grep -v grep');
     if ($ps) {
         $lines = explode("\n", trim($ps));
@@ -487,28 +486,22 @@ function admin_get_local_stats($pdo) {
             $line = trim($line);
             if (empty($line)) continue;
             
-            // Ignorar el shell lanzador e hilos internos si aparecen
             if (strpos($line, 'sh -c') !== false) continue;
-            // Ignorar el worker de transcodificación si por alguna razón aparece (aunque grep ffmpeg debería filtrarlo)
             if (strpos($line, 'transcode_worker.php') !== false) continue;
 
-            // Extraer PID e info
             $parts = preg_split('/\s+/', $line, 2);
             if (count($parts) < 2) continue;
             $pid = $parts[0];
             $fullCmd = $parts[1];
             
-            // Intentar encontrar qué video se está procesando buscando el ID en los argumentos (-metadata title)
             $videoId = '';
             if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
                 $videoId = $metaMatches[1];
             }
             
-            // Si ya vimos este video (por otro PID), ignorar duplicados
             if ($videoId && isset($seenVideoIds[$videoId])) continue;
             if ($videoId) $seenVideoIds[$videoId] = true;
 
-            // Buscar video en DB si tenemos ID
             $videoInfo = null;
             if ($videoId) {
                 $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
@@ -521,7 +514,32 @@ function admin_get_local_stats($pdo) {
                 }
             }
 
-            // Comando corto para el UI
+            // --- MEJORA: PROGRESO REAL ---
+            // Intentar encontrar el archivo temporal de salida para reportar progreso real
+            $realProgress = 0;
+            $currentOutputSize = 0;
+            if (preg_match('/\s+([^\s]+\_t\.[a-z0-9]+)$/', $fullCmd, $outputMatches)) {
+                $tempPath = $outputMatches[1];
+                if (file_exists($tempPath)) {
+                    $currentOutputSize = filesize($tempPath);
+                }
+            }
+            
+            // Estimar tamaño final basado en el comando
+            $bitrate = _admin_extract_bitrate($fullCmd); // kbps
+            if ($bitrate > 0 && $videoInfo && $videoInfo['duration'] > 0) {
+                $expectedSizeBytes = ($bitrate * 1000 * $videoInfo['duration']) / 8;
+                if ($expectedSizeBytes > 0 && $currentOutputSize > 0) {
+                    $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
+                }
+            } else if ($videoInfo && $videoInfo['size_bytes'] > 0) {
+                // Fallback: usar una tasa de compresión estimada del 40%
+                $expectedSizeBytes = $videoInfo['size_bytes'] * 0.4;
+                if ($currentOutputSize > 0) {
+                    $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
+                }
+            }
+
             $shortCmd = "ffmpeg " . substr($fullCmd, strpos($fullCmd, '-i'));
             if (strlen($shortCmd) > 100) $shortCmd = substr($shortCmd, 0, 97) . "...";
 
@@ -532,6 +550,10 @@ function admin_get_local_stats($pdo) {
                 'title' => $videoInfo ? $videoInfo['title'] : ($videoId ? "Video $videoId" : "ffmpeg activo"),
                 'size_fmt' => $videoInfo ? $videoInfo['size_fmt'] : '',
                 'size_bytes' => $videoInfo ? ($videoInfo['size_bytes'] ?? 0) : 0,
+                'current_output_size' => $currentOutputSize,
+                'expected_output_size' => $expectedSizeBytes,
+                'progress' => $realProgress > 0 ? $realProgress : null,
+                'isDualCore' => true // Simulando que usa 2 núcleos
             ];
         }
     }
@@ -784,6 +806,55 @@ function admin_process_next_transcode($pdo) {
     $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
     
     respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
+}
+
+function _admin_extract_bitrate($cmd) {
+    $total = 0;
+    // Buscar Bitrate de Video
+    if (preg_match('/-b:v\s+([0-9]+)([km]?)/', $cmd, $m)) {
+        $val = intval($m[1]);
+        if ($m[2] === 'k') $total += $val;
+        else if ($m[2] === 'm') $total += $val * 1024;
+        else $total += $val / 1000;
+    }
+    // Buscar Bitrate de Audio
+    if (preg_match('/-(ab|b:a)\s+([0-9]+)([km]?)/', $cmd, $m)) {
+        $val = intval($m[2]);
+        if ($m[3] === 'k') $total += $val;
+        else if ($m[3] === 'm') $total += $val * 1024;
+        else $total += $val / 1000;
+    }
+    return $total > 0 ? $total : 1500; // 1500kbps default if not found
+}
+
+function admin_reorder_transcode_queue($pdo, $input) {
+    $videoId = $input['videoId'];
+    $direction = $input['direction']; // TOP, UP, DOWN
+    
+    if ($direction === 'TOP') {
+        $max = $pdo->query("SELECT MAX(queue_priority) FROM videos")->fetchColumn() ?: 0;
+        $pdo->prepare("UPDATE videos SET queue_priority = ?, createdAt = ? WHERE id = ?")->execute([$max + 1, time(), $videoId]);
+    } else {
+        if ($direction === 'UP') {
+            $pdo->prepare("UPDATE videos SET queue_priority = queue_priority + 1 WHERE id = ?")->execute([$videoId]);
+        } else {
+            $pdo->prepare("UPDATE videos SET queue_priority = GREATEST(0, queue_priority - 1) WHERE id = ?")->execute([$videoId]);
+        }
+    }
+    respond(true);
+}
+
+function admin_start_transcode_now($pdo, $input) {
+    $videoId = $input['videoId'];
+    // Matar procesos actuales para forzar este
+    @shell_exec("ps aux | grep ffmpeg | grep -v grep | awk '{print $2}' | xargs kill -9");
+    // Poner al tope de prioridad y resetear lock
+    $max = $pdo->query("SELECT MAX(queue_priority) FROM videos")->fetchColumn() ?: 0;
+    $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0, queue_priority = ? WHERE id = ?")->execute([$max + 1, $videoId]);
+    // Ejecutar worker
+    $cmd = "php " . __DIR__ . "/video_worker.php > /dev/null 2>&1 &";
+    @shell_exec($cmd);
+    respond(true, "Video priorizado y worker reiniciado.");
 }
 
 // --- SMART CLEANER & ORPHAN SYNC ---

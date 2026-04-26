@@ -47,7 +47,7 @@ if ($count >= 1) {
 
 // 3. Buscar siguiente video en cola WAITING
 $now = time();
-$stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND locked_at < ? ORDER BY createdAt ASC LIMIT 1");
+$stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND locked_at < ? ORDER BY queue_priority DESC, createdAt ASC LIMIT 1");
 $stmt->execute([$now - 300]); // No bloqueado en los últimos 5 minutos
 $video = $stmt->fetch();
 

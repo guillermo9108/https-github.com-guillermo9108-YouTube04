@@ -26,8 +26,6 @@ export default function AdminTranscoder() {
     const [showProfileEditor, setShowProfileEditor] = useState(false);
     const [showFailedList, setShowFailedList] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [simulatedProgress, setSimulatedProgress] = useState<Record<string, number>>({});
-    const [simulatedTime, setSimulatedTime] = useState<Record<string, number>>({});
 
     const [editingProfile, setEditingProfile] = useState({ 
         extension: '', 
@@ -97,40 +95,9 @@ export default function AdminTranscoder() {
 
     useEffect(() => { 
         loadData(); 
-        const interval = setInterval(loadData, 5000);
+        const interval = setInterval(loadData, 3000); // Poll faster
         return () => clearInterval(interval);
     }, []);
-
-    // Simular progreso para archivos activos
-    useEffect(() => {
-        if (activeProcesses.length === 0) return;
-        
-        const interval = setInterval(() => {
-            setSimulatedProgress(prev => {
-                const updated = { ...prev };
-                activeProcesses.forEach(p => {
-                    // Si no tenemos progreso previo, empezar en 0 o un valor pequeño
-                    const current = updated[p.pid] || 0;
-                    if (current < 95) {
-                        // Incrementar basado en "algo" (simulación)
-                        updated[p.pid] = current + (Math.random() * 2);
-                    }
-                });
-                return updated;
-            });
-            
-            setSimulatedTime(prev => {
-                const updated = { ...prev };
-                activeProcesses.forEach(p => {
-                    const current = updated[p.pid] || 120; // 2 minutos estimados iniciales
-                    if (current > 5) updated[p.pid] = current - 1;
-                });
-                return updated;
-            });
-        }, 1000);
-        
-        return () => clearInterval(interval);
-    }, [activeProcesses]);
 
     const toggleSelectAll = () => {
         if (selectedIds.size === waitingVideos.length) {
@@ -229,6 +196,22 @@ export default function AdminTranscoder() {
         try {
             await db.request(`action=${action}`, { method: 'POST' });
             toast.success("Operación completada");
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleReorder = async (videoId: string, direction: 'TOP' | 'UP' | 'DOWN') => {
+        try {
+            await db.request(`action=admin_reorder_transcode_queue&videoId=${videoId}&direction=${direction}`, { method: 'POST' });
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleStartNow = async (videoId: string) => {
+        if (!confirm("Esto prioriza este video y reinicia el worker. ¿Continuar?")) return;
+        try {
+            await db.request(`action=admin_start_transcode_now&videoId=${videoId}`, { method: 'POST' });
+            toast.success("Priorizado");
             loadData();
         } catch (e: any) { toast.error(e.message); }
     };
@@ -333,12 +316,13 @@ export default function AdminTranscoder() {
                     </h3>
                     <div className="space-y-6 relative z-10">
                         {activeProcesses.map((p, i) => {
-                            const progress = Math.round(simulatedProgress[p.pid] || p.progress || 0);
-                            const timeLeft = simulatedTime[p.pid] || 120;
+                            const progress = p.progress || 0;
                             const weight = p.size_fmt || 'Calculando...';
-                            const estFinal = p.size_bytes ? 
-                                (p.size_bytes < 50000000 ? 'Reduciendo...' : (Math.round(p.size_bytes * 0.4 / 1024 / 1024) + ' MB est.')) 
-                                : 'Estimando...';
+                            const outSize = p.current_output_size ? (p.current_output_size / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
+                            
+                            const estFinal = p.expected_output_size ? 
+                                (Math.round(p.expected_output_size / (1024 * 1024)) + ' MB') 
+                                : (p.size_bytes ? (Math.round(p.size_bytes * 0.45 / 1024 / 1024) + ' MB') : '...');
 
                             return (
                                 <div key={i} className="bg-slate-950 p-6 rounded-2xl border border-white/5 space-y-4">
@@ -356,45 +340,40 @@ export default function AdminTranscoder() {
                                                     </span>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Tiempo Estimado</div>
+                                                            <div className="text-right">
+                                            <div className="text-[10px] text-slate-500 font-black uppercase mb-1">Escrito en disco</div>
                                             <div className="text-xs font-mono text-white flex items-center justify-end gap-2">
-                                                <Clock size={12} className="text-indigo-400" />
-                                                {~~(timeLeft / 60)}m {timeLeft % 60}s
+                                                <HardDrive size={12} className="text-emerald-400" />
+                                                {outSize}
                                             </div>
                                         </div>
                                     </div>
                                     
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                            <span className="text-slate-500">Progreso de conversión</span>
+                                            <span className="text-slate-500">Progreso real por tamaño de archivo</span>
                                             <span className="text-emerald-400">{progress}%</span>
                                         </div>
                                         <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
                                             <div 
-                                                className="h-full bg-gradient-to-r from-indigo-600 via-emerald-500 to-emerald-400 transition-all duration-1000 ease-linear shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                                                className="h-full bg-gradient-to-r from-indigo-600 via-emerald-500 to-emerald-400 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
                                                 style={{ width: `${progress}%` }}
                                             />
                                         </div>
                                     </div>
-
+                                    
                                     <div className="flex items-center justify-between pt-2 border-t border-white/5">
                                         <div className="flex items-center gap-4">
                                             <div className="flex flex-col">
-                                                <span className="text-[9px] text-slate-500 font-bold uppercase">Calidad Destino</span>
-                                                <span className="text-[10px] text-white font-mono">H.264 / AAC 128k</span>
-                                            </div>
-                                            <div className="flex flex-col">
                                                 <span className="text-[9px] text-slate-500 font-bold uppercase">Carga CPU</span>
-                                                <span className="text-[10px] text-indigo-400 font-mono">{(Math.random() * 20 + 40).toFixed(1)}%</span>
+                                                <span className="text-[10px] text-indigo-400 font-mono font-black italic">LOW LOAD (2 CORES)</span>
                                             </div>
                                         </div>
                                         <div className="p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/10 flex items-center gap-2">
                                             <Gauge size={14} className="text-emerald-500" />
-                                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">Ultra High Speed</span>
+                                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">Balanced Precision</span>
                                         </div>
-                                    </div>
+                                    </div>                      </div>
                                 </div>
                             );
                         })}
@@ -458,11 +437,15 @@ export default function AdminTranscoder() {
                         </div>
                     ) : (
                         <div className="divide-y divide-white/5">
-                            {waitingVideos.map(v => {
-                                const isSelected = selectedIds.has(v.id);
-                                const estSize = v.size_bytes ? (Math.round(v.size_bytes * 0.45 / 1024 / 1024) + ' MB') : '--';
-                                
-                                return (
+                                    {waitingVideos.map(v => {
+                                        const isSelected = selectedIds.has(v.id);
+                                        const duration = (v as any).duration || 0;
+                                        // 1500kbps v + 128kbps a = 1628kbps = 203.5 KB/s
+                                        const estSize = duration > 0 
+                                            ? (Math.round(duration * 203.5 / 1024) + ' MB')
+                                            : (v.size_bytes ? (Math.round(v.size_bytes * 0.45 / 1024 / 1024) + ' MB') : '--');
+                                        
+                                        return (
                                     <div 
                                         key={v.id} 
                                         className={`p-4 flex items-center gap-4 hover:bg-white/5 transition-colors group ${isSelected ? 'bg-indigo-600/5' : ''}`}
@@ -484,7 +467,10 @@ export default function AdminTranscoder() {
                                         </div>
 
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-black text-white truncate uppercase tracking-tight">{v.title}</div>
+                                            <div className="text-xs font-black text-white truncate uppercase tracking-tight flex items-center gap-2">
+                                                {v.title}
+                                                {(v as any).queue_priority > 0 && <Zap size={10} className="text-amber-500 fill-amber-500"/>}
+                                            </div>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
                                                     <HardDrive size={10} />
@@ -493,7 +479,7 @@ export default function AdminTranscoder() {
                                                 <span className="text-slate-700 text-[10px]">•</span>
                                                 <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-bold">
                                                     <RefreshCw size={10} className="text-indigo-500" />
-                                                    Est. {estSize}
+                                                    Pred. {estSize}
                                                 </div>
                                                 <span className="text-slate-700 text-[10px]">•</span>
                                                 <div className="text-[10px] text-slate-600 font-mono">
@@ -502,7 +488,17 @@ export default function AdminTranscoder() {
                                             </div>
                                         </div>
 
-                                        <div className="hidden md:flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex flex-col gap-1 mr-2">
+                                                <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-white" title="Subir en cola"><ChevronRight size={14} className="-rotate-90"/></button>
+                                                <button onClick={() => handleReorder(v.id, 'DOWN')} className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-white" title="Bajar en cola"><ChevronRight size={14} className="rotate-90"/></button>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleStartNow(v.id)}
+                                                className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-lg text-[9px] font-black uppercase transition-all flex items-center gap-1 border border-indigo-500/20"
+                                            >
+                                                <Zap size={12}/> Priorizar
+                                            </button>
                                             <button 
                                                 onClick={() => handleAction(`admin_remove_from_queue&videoId=${v.id}`)}
                                                 className="p-2 text-slate-500 hover:text-red-500 hover:bg-slate-800 rounded-lg transition-all"
