@@ -109,14 +109,14 @@ export default function ChatPage() {
         // 1. Get online users from known users
         const onlineFromKnown = allKnownUsers.filter(u => 
             u.id !== user.id && 
-            (onlineUserIds.has(String(u.id)) || (u.lastActive && (now - Number(u.lastActive) < 300)))
+            (onlineUserIds.has(String(u.id)) || (u.lastActive && (now - Number(u.lastActive) < 60)))
         );
 
         // 2. Get online users from active chats
         const onlineFromChats = chats
             .filter(c => 
                 c.user.id !== user.id && 
-                (onlineUserIds.has(String(c.user.id)) || (c.user.lastActive && (now - Number(c.user.lastActive) < 300)))
+                (onlineUserIds.has(String(c.user.id)) || (c.user.lastActive && (now - Number(c.user.lastActive) < 60)))
             )
             .map(c => c.user);
 
@@ -265,7 +265,7 @@ export default function ChatPage() {
                 ) : (
                     <div className="flex flex-col">
                         {filteredChats.map((chat, index) => {
-                            const isOnline = chat.user.isOnline || (chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 300));
+                            const isOnline = chat.user.isOnline || (chat.user.lastActive && (Date.now() / 1000 - chat.user.lastActive < 60));
                             return (
                                 <button
                                     key={chat.user.id}
@@ -369,13 +369,13 @@ export default function ChatPage() {
                                 >
                                     <div className="relative">
                                         <img src={u.avatarUrl || `https://picsum.photos/seed/${u.id}/200/200`} className="w-14 h-14 rounded-full object-cover" referrerPolicy="no-referrer" />
-                                        {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) && (
+                                        {u.lastActive && (Date.now() / 1000 - u.lastActive < 60) && (
                                             <div className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-500 border-[3px] border-[#000] rounded-full" />
                                         )}
                                     </div>
                                     <div className="text-left">
                                         <div className="font-bold text-[16px]">{u.username}</div>
-                                        <div className="text-xs text-white/40">{u.lastActive && (Date.now() / 1000 - u.lastActive < 300) ? 'En línea' : 'Seguidor'}</div>
+                                        <div className="text-xs text-white/40">{u.lastActive && (Date.now() / 1000 - u.lastActive < 60) ? 'En línea' : 'Seguidor'}</div>
                                     </div>
                                 </button>
                             ))

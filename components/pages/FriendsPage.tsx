@@ -156,7 +156,7 @@ export default function FriendsPage() {
                                             </div>
                                         )}
                                     </div>
-                                    {u.lastActive && (Date.now() / 1000 - u.lastActive < 300) && (
+                                    {u.lastActive && (Date.now() / 1000 - u.lastActive < 60) && (
                                         <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-[#242526] rounded-full" />
                                     )}
                                 </div>

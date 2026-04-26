@@ -399,7 +399,7 @@ export default function ChatDetailPage() {
         return () => { if (interval) clearInterval(interval); };
     }, [user?.id, otherId]);
 
-    const isOtherOnline = onlineUserIds.has(String(otherId).trim()) || (otherUser?.lastActive ? (Date.now() / 1000 - otherUser.lastActive < 300) : false);
+    const isOtherOnline = onlineUserIds.has(String(otherId).trim()) || (otherUser?.lastActive ? (Date.now() / 1000 - otherUser.lastActive < 60) : false);
 
     const [vh, setVh] = useState(window.innerHeight);
     const [offsetTop, setOffsetTop] = useState(0);
@@ -502,7 +502,7 @@ export default function ChatDetailPage() {
             if (initial) {
                 db.getUser(otherId).then(userData => {
                     if (userData) {
-                        userData.isOnline = onlineUserIds.has(String(otherId).trim()) || (userData.lastActive ? (Date.now() / 1000 - userData.lastActive < 300) : false);
+                        userData.isOnline = onlineUserIds.has(String(otherId).trim()) || (userData.lastActive ? (Date.now() / 1000 - userData.lastActive < 60) : false);
                         setOtherUser(userData);
                     }
                 }).catch(() => {});

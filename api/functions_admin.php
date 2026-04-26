@@ -1119,8 +1119,8 @@ function update_battery_simulation($pdo) {
         ];
     }
 
-    // Si el salto es mayor a 5 minutos, probablemente el sistema estuvo apagado.
-    $isOutage = $elapsedSeconds > 300;
+    // Si el salto es mayor a 1 minuto, probablemente el sistema estuvo apagado.
+    $isOutage = $elapsedSeconds > 60;
     $elapsedHours = $elapsedSeconds / 3600;
 
     if ($isOutage) {
@@ -1377,9 +1377,9 @@ function admin_get_server_stats($pdo) {
     $netUp = rand(50, 2000);
 
     // 5. Active Users
-    $fiveMinsAgo = time() - 300;
+    $oneMinAgo = time() - 60;
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE lastActive > ?");
-    $stmt->execute([$fiveMinsAgo]);
+    $stmt->execute([$oneMinAgo]);
     $userCount = (int)$stmt->fetchColumn();
 
     respond(true, [

@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import videojs from 'video.js';
-import 'video.js/dist/video-js.css';
 import { Video, Comment, UserInteraction, Category } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
@@ -106,7 +104,6 @@ export default function Watch() {
     const shareTimeout = useRef<any>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
-    const playerRef = useRef<any>(null);
     const viewMarkedRef = useRef(false);
 
     useEffect(() => { 
@@ -126,10 +123,11 @@ export default function Watch() {
         setInteraction(null);
         setLoading(true);
 
-        if (playerRef.current) {
+        if (videoRef.current) {
             try {
-                playerRef.current.dispose();
-                playerRef.current = null;
+                videoRef.current.pause();
+                videoRef.current.src = "";
+                videoRef.current.load();
             } catch (e) {}
         }
 
@@ -455,129 +453,45 @@ export default function Watch() {
         return `${base}&download=1&filename=${filename}.${ext}`;
     }, [video?.id, user?.sessionToken, video?.title, video?.is_audio]);
 
-    // Initialize Video.js
+    // Handle video load and play
     useEffect(() => {
-        // Solo inicializar si tenemos video, url y está desbloqueado
         if (!isUnlocked || !video || !streamUrl || !videoRef.current) return;
+        
+        const el = videoRef.current;
+        el.src = streamUrl;
+        el.poster = posterUrl;
+        el.load();
 
-        let player: any = null;
-
-        const initPlayer = () => {
-            if (!videoRef.current) return;
-            
-            try {
-                // Destruir instancia previa si existe por seguridad
-                if (playerRef.current) {
-                    try {
-                        playerRef.current.dispose();
-                    } catch (e) {}
-                    playerRef.current = null;
-                }
-
-                player = videojs(videoRef.current, {
-                    autoplay: true,
-                    controls: true,
-                    responsive: true,
-                    fill: true,
-                    playbackRates: [0.5, 1, 1.25, 1.5, 2],
-                    nativeControlsForTouch: false,
-                    preload: 'auto',
-                    html5: {
-                        vhs: { overrideNative: true },
-                        nativeAudioTracks: false,
-                        nativeVideoTracks: false,
-                        nativeTextTracks: false
-                    },
-                    controlBar: {
-                        children: [
-                            'playToggle',
-                            'volumePanel',
-                            'currentTimeDisplay',
-                            'timeDivider',
-                            'durationDisplay',
-                            'progressControl',
-                            'liveDisplay',
-                            'remainingTimeDisplay',
-                            'customControlSpacer',
-                            'playbackRateMenuButton',
-                            'chaptersButton',
-                            'descriptionsButton',
-                            'subsCapsButton',
-                            'audioTrackButton',
-                            'fullscreenToggle',
-                        ],
-                    },
-                }, () => {
-                    if (player) {
-                        player.src({
-                            src: streamUrl,
-                            type: video.videoUrl.endsWith('.m3u8') ? 'application/x-mpegURL' : (isAudio ? 'audio/mpeg' : 'video/mp4')
-                        });
-                        player.poster(posterUrl);
-                        
-                        // Add tracks
-                        video.subtitles?.forEach((sub, idx) => {
-                            player.addRemoteTextTrack({
-                                src: sub.url,
-                                kind: sub.kind,
-                                srclang: sub.lang.toLowerCase(),
-                                label: sub.label,
-                                default: idx === 0
-                            }, false);
-                        });
-                    }
-                });
-
-                playerRef.current = player;
-
-                player.on('play', () => {
-                    setThrottled(true);
-                    if (!viewMarkedRef.current && video) {
-                        db.incrementView(video.id);
-                        viewMarkedRef.current = true;
-                    }
-                });
-                player.on('pause', () => setThrottled(false));
-                player.on('ended', handleVideoEnded);
-                player.on('timeupdate', handleTimeUpdate);
-                
-                player.on('error', () => {
-                    const error = player.error();
-                    console.error("Video.js Error:", error);
-                    // Si hay error de red, intentar re-conectar una vez
-                    if (error?.code === 4) {
-                        setTimeout(() => {
-                            if (player && !player.isDisposed()) {
-                                player.src(streamUrl);
-                                player.load();
-                            }
-                        }, 2000);
-                    }
-                });
-            } catch (err) {
-                console.error("Failed to init videojs", err);
+        const onPlay = () => {
+            setThrottled(true);
+            if (!viewMarkedRef.current && video) {
+                db.incrementView(video.id).catch(() => {});
+                viewMarkedRef.current = true;
             }
         };
 
-        // Pequeño delay para asegurar que el DOM está listo tras el cambio de ID
-        const timer = setTimeout(initPlayer, 100);
+        const onPause = () => setThrottled(false);
+
+        el.addEventListener('play', onPlay);
+        el.addEventListener('pause', onPause);
+        el.addEventListener('ended', handleVideoEnded);
+        el.addEventListener('timeupdate', handleTimeUpdate);
 
         return () => {
-            clearTimeout(timer);
-            if (player) {
-                try {
-                    player.dispose();
-                } catch (e) {}
-                playerRef.current = null;
-            }
+            el.removeEventListener('play', onPlay);
+            el.removeEventListener('pause', onPause);
+            el.removeEventListener('ended', handleVideoEnded);
+            el.removeEventListener('timeupdate', handleTimeUpdate);
         };
-    }, [id, isUnlocked, !!video, streamUrl]);
+    }, [id, isUnlocked, !!video, streamUrl, posterUrl]);
 
     useEffect(() => {
         return () => {
-            if (playerRef.current) {
-                playerRef.current.dispose();
-                playerRef.current = null;
+            if (videoRef.current) {
+                try {
+                    videoRef.current.pause();
+                    videoRef.current.src = "";
+                } catch (e) {}
             }
         };
     }, []);
@@ -630,14 +544,28 @@ export default function Watch() {
                             {(video?.is_audio || !video?.thumbnailUrl) && (
                                 <img src={posterUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-30 scale-110" referrerPolicy="no-referrer" />
                             )}
-                            <div key={video?.id} data-vjs-player className="w-full h-full">
+                            <div className="w-full h-full">
                                 <video 
                                     ref={videoRef} 
-                                    className="video-js vjs-big-play-centered vjs-fill w-full h-full"
+                                    className="w-full h-full outline-none"
                                     crossOrigin="anonymous" 
                                     playsInline
-                                    style={{ backgroundColor: 'black' }}
-                                />
+                                    autoPlay
+                                    controls
+                                    poster={posterUrl}
+                                    style={{ backgroundColor: 'black', objectFit: videoFit }}
+                                >
+                                    {video?.subtitles?.map((sub, idx) => (
+                                        <track 
+                                            key={idx}
+                                            src={sub.url}
+                                            kind={sub.kind}
+                                            srcLang={sub.lang.toLowerCase()}
+                                            label={sub.label}
+                                            default={idx === 0}
+                                        />
+                                    ))}
+                                </video>
                             </div>
                         </div>
                     ) : (

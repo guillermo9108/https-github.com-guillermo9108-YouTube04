@@ -164,7 +164,7 @@ function auth_get_all_users($pdo) {
 
 function auth_get_online_users($pdo) {
     $now = time();
-    $threshold = $now - 300; // 5 minutos
+    $threshold = $now - 60; // 1 minuto
     $stmt = $pdo->prepare("SELECT id, username, avatarUrl, lastActive FROM users WHERE lastActive > ? ORDER BY lastActive DESC LIMIT 100");
     $stmt->execute([$threshold]);
     $users = $stmt->fetchAll();
