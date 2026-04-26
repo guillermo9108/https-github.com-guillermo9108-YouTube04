@@ -530,21 +530,25 @@ function admin_get_local_stats($pdo) {
             $currentOutputSize = 0;
             $expectedSizeBytes = 0;
 
-            if (preg_match('/\s+([^\s]+\_t\.[a-z0-9]+)$/', $fullCmd, $outputMatches)) {
-                $tempPath = $outputMatches[1];
+            // Intentar encontrar el archivo de salida buscando la extensión temporal definida en video_worker.php (_t.xxx)
+            if (preg_match('/([^\s]+\_t\.[a-z0-9]+)(\s|$)/', $fullCmd, $matchPath)) {
+                $tempPath = trim($matchPath[1], " '\"");
                 if (file_exists($tempPath)) {
                     $currentOutputSize = filesize($tempPath);
                 }
             }
             
             $bitrate = _admin_extract_bitrate($fullCmd); // kbps
-            if ($bitrate > 0 && $videoInfo && ($videoInfo['duration'] ?? 0) > 0) {
-                $expectedSizeBytes = ($bitrate * 1000 * $videoInfo['duration']) / 8;
+            $duration = $videoInfo ? (float)($videoInfo['duration'] ?? 0) : 0;
+
+            if ($bitrate > 0 && $duration > 0) {
+                // (kbps * 1000 / 8) * duration = bytes/seg * seg
+                $expectedSizeBytes = ($bitrate * 125) * $duration;
             } else if ($videoInfo && ($videoInfo['size_bytes'] ?? 0) > 0) {
                 $expectedSizeBytes = $videoInfo['size_bytes'] * 0.45;
             }
 
-            if ($expectedSizeBytes > 0 && $currentOutputSize > 0) {
+            if ($expectedSizeBytes > 1024 && $currentOutputSize > 0) {
                 $realProgress = min(99, round(($currentOutputSize / $expectedSizeBytes) * 100));
             }
 
@@ -561,7 +565,7 @@ function admin_get_local_stats($pdo) {
                 'size_bytes' => $videoInfo ? ($videoInfo['size_bytes'] ?? 0) : 0,
                 'current_output_size' => $currentOutputSize,
                 'expected_output_size' => $expectedSizeBytes,
-                'progress' => $realProgress > 0 ? $realProgress : 0,
+                'progress' => $realProgress,
                 'isDualCore' => true
             ];
         }
