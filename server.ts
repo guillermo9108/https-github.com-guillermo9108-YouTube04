@@ -17,8 +17,8 @@ async function startServer() {
   const PORT = 3000;
 
   // Start PHP server for API
-  console.log("Starting PHP server on port 8000...");
-  const php = spawn("php", ["-S", "0.0.0.0:8000", "-t", "."], {
+  console.log("Starting PHP server on port 8005...");
+  const php = spawn("php", ["-S", "0.0.0.0:8005", "-t", "."], {
     stdio: "inherit"
   });
 
@@ -194,7 +194,7 @@ async function startServer() {
 
   // 3. Catch-all PHP Backend Proxy
   app.use("/api", createProxyMiddleware({
-    target: "http://localhost:8000/api",
+    target: "http://localhost:8005",
     changeOrigin: true,
     on: {
       proxyReq: (proxyReq, req, res) => {

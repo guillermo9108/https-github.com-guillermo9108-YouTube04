@@ -547,45 +547,44 @@ function admin_get_local_stats($pdo) {
 
     // Detectar procesos FFmpeg activos usando la nueva tabla persistente
     $active_processes = [];
-    $stmtProc = $pdo->query("SELECT t.*, v.title, v.videoUrl, v.size_bytes, v.size_fmt, v.duration 
-                            FROM active_transcodes t 
-                            JOIN videos v ON t.videoId = v.id");
-    
-    while ($p = $stmtProc->fetch()) {
-        $realProgress = 0;
-        $expectedSizeBytes = 0;
+    try {
+        $stmtProc = $pdo->query("SELECT t.*, v.title, v.videoUrl, v.size_bytes, v.size_fmt, v.duration 
+                                FROM active_transcodes t 
+                                JOIN videos v ON t.videoId = v.id");
         
-        // Calcular bitrate estimado si no lo tenemos (por ahora lo extraemos del comando si es posible)
-        // O mejor: usar el 45% del tamaño original como aproximación si no hay bitrate
-        $duration = (float)($p['duration'] ?? 0);
-        
-        // Intentar obtener el bitrate del comando guardado en el sistema (opcional)
-        // Por ahora mantenemos la lógica de estimación
-        if ($duration > 0) {
-            $expectedSizeBytes = (1500 * 125) * $duration; // 1500 kbps promedio
-        } else if (($p['size_bytes'] ?? 0) > 0) {
-            $expectedSizeBytes = $p['size_bytes'] * 0.45;
-        }
+        while ($p = $stmtProc->fetch()) {
+            $realProgress = 0;
+            $expectedSizeBytes = 0;
+            
+            $duration = (float)($p['duration'] ?? 0);
+            if ($duration > 0) {
+                $expectedSizeBytes = (1500 * 125) * $duration; // 1500 kbps promedio
+            } else if (($p['size_bytes'] ?? 0) > 0) {
+                $expectedSizeBytes = $p['size_bytes'] * 0.45;
+            }
 
-        if ($expectedSizeBytes > 1024 && $p['lastSize'] > 0) {
-            $realProgress = min(99, round(($p['lastSize'] / $expectedSizeBytes) * 100));
-        }
+            if ($expectedSizeBytes > 1024 && $p['lastSize'] > 0) {
+                $realProgress = min(99, round(($p['lastSize'] / $expectedSizeBytes) * 100));
+            }
 
-        $active_processes[] = [
-            'pid' => $p['pid'],
-            'etime' => time() - $p['lastUpdated'], // Estimado simple
-            'command' => "ffmpeg ... " . basename($p['tempPath']),
-            'videoId' => $p['videoId'],
-            'videoUrl' => $p['videoUrl'],
-            'tempPath' => $p['tempPath'],
-            'title' => $p['title'],
-            'size_fmt' => $p['size_fmt'],
-            'size_bytes' => (int)$p['size_bytes'],
-            'current_output_size' => (int)$p['lastSize'],
-            'expected_output_size' => $expectedSizeBytes,
-            'progress' => $realProgress,
-            'isDualCore' => true
-        ];
+            $active_processes[] = [
+                'pid' => $p['pid'],
+                'etime' => time() - $p['lastUpdated'],
+                'command' => "ffmpeg ... " . basename($p['tempPath']),
+                'videoId' => $p['videoId'],
+                'videoUrl' => $p['videoUrl'],
+                'tempPath' => $p['tempPath'],
+                'title' => $p['title'],
+                'size_fmt' => $p['size_fmt'],
+                'size_bytes' => (int)$p['size_bytes'],
+                'current_output_size' => (int)$p['lastSize'],
+                'expected_output_size' => $expectedSizeBytes,
+                'progress' => $realProgress,
+                'isDualCore' => true
+            ];
+        }
+    } catch (Throwable $e) {
+        write_log("Load active processes failed: " . $e->getMessage(), "WARNING");
     }
 
     respond(true, [
