@@ -446,19 +446,37 @@ function admin_upload_default_thumb($pdo, $post, $files) {
 function admin_sync_active_transcodes_to_db($pdo) {
     // 1. Obtener procesos ffmpeg reales desde el sistema
     $ps = @shell_exec('ps -Ao pid,etime,command | grep ffmpeg | grep -v grep');
+    if (!$ps) {
+        $ps = @shell_exec('ps aux | grep ffmpeg | grep -v grep');
+    }
+    
     $currentPids = [];
     $foundMatches = [];
     
     if ($ps) {
+        if (function_exists('mb_convert_encoding')) {
+            $ps = @mb_convert_encoding($ps, 'UTF-8', 'auto');
+        }
         $lines = explode("\n", trim($ps));
         foreach ($lines as $line) {
             $line = trim($line);
-            if (empty($line) || strpos($line, 'sh -c') !== false) continue;
+            if (empty($line) || strpos($line, 'sh -c') !== false || strpos($line, 'grep') !== false) continue;
             
+            $pid = '';
+            $fullCmd = '';
+            
+            // Intento 1: Formato ps -Ao (PID ETIME COMMAND)
             if (preg_match('/^\s*(\d+)\s+([0-9:.-]+)\s+(.+)$/', $line, $matches)) {
                 $pid = $matches[1];
                 $fullCmd = $matches[3];
-                
+            } 
+            // Intento 2: Formato ps aux
+            else if (preg_match('/^\S+\s+(\d+)\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+(.*)$/', $line, $matches)) {
+                $pid = $matches[1];
+                $fullCmd = $matches[2];
+            }
+            
+            if ($pid && $fullCmd) {
                 $videoId = '';
                 if (preg_match('/-metadata\s+title=[\'"]?([a-zA-Z0-9_\-]+)[\'"]?/', $fullCmd, $metaMatches)) {
                     $videoId = $metaMatches[1];
@@ -466,14 +484,32 @@ function admin_sync_active_transcodes_to_db($pdo) {
                 
                 if ($videoId) {
                     $currentPids[] = $pid;
+                    
+                    // Buscar datos previos en DB para obtener el tempPath real y persistencia
+                    $stmtCheck = $pdo->prepare("SELECT tempPath, lastSize FROM active_transcodes WHERE videoId = ?");
+                    $stmtCheck->execute([$videoId]);
+                    $dbRecord = $stmtCheck->fetch();
+                    
                     $tempPath = "";
-                    $normCmd = str_replace('\\', '/', $fullCmd);
-                    if (preg_match_all('/[\'"]?([^\'"]+?\_t\.[a-z0-9]+)[\'"]?/i', $normCmd, $m)) {
-                        $tempPath = end($m[1]);
+                    if ($dbRecord) {
+                        $tempPath = $dbRecord['tempPath'];
+                    }
+                    
+                    // Intentar extraer tempPath de ps solo si no estaba en DB (como fallback)
+                    if (empty($tempPath)) {
+                        if (preg_match('/(?:\s|[\'"])([^\'"]+?\_t\.[a-z0-9]+)(?:[\'"]|\s|$)/i', $fullCmd, $m)) {
+                            $tempPath = $m[1];
+                        }
                     }
                     
                     clearstatcache();
-                    $lastSize = (file_exists($tempPath)) ? filesize($tempPath) : 0;
+                    $realTempPath = resolve_video_path($tempPath);
+                    $lastSize = ($realTempPath && file_exists($realTempPath)) ? @filesize($realTempPath) : 0;
+                    
+                    // Persistencia de progreso: evitar que baje a 0 si el proceso sigue vivo pero el path falló momentáneamente
+                    if ($lastSize <= 0 && $dbRecord) {
+                        $lastSize = (int)$dbRecord['lastSize'];
+                    }
                     
                     $foundMatches[$videoId] = [
                         'pid' => $pid,
@@ -496,13 +532,13 @@ function admin_sync_active_transcodes_to_db($pdo) {
     }
     
     // 3. Eliminar registros de procesos que ya no existen (ignorando los que están inicializando con pid 0)
-    $sql = "DELETE FROM active_transcodes WHERE pid > 0";
-    $params = [];
     if (!empty($currentPids)) {
-        $sql .= " AND pid NOT IN (" . implode(',', array_fill(0, count($currentPids), '?')) . ")";
-        $params = $currentPids;
+        $placeholders = implode(',', array_fill(0, count($currentPids), '?'));
+        $pdo->prepare("DELETE FROM active_transcodes WHERE pid > 0 AND pid NOT IN ($placeholders)")->execute($currentPids);
+    } else if ($ps !== null) {
+        // Solo borramos si el comando ps se ejecutó (aunque devolviera vacío)
+        $pdo->exec("DELETE FROM active_transcodes WHERE pid > 0");
     }
-    $pdo->prepare($sql)->execute($params);
 }
 
 function admin_get_local_stats($pdo) {
@@ -516,6 +552,12 @@ function admin_get_local_stats($pdo) {
     $s = $stmtS->fetch();
     $paths = json_decode($s['libraryPaths'] ?: '[]', true);
     if ($s['localLibraryPath']) $paths[] = $s['localLibraryPath'];
+    
+    // Fallback: Si no hay rutas configuradas, intentar usar el directorio de uploads
+    if (empty($paths)) {
+        $paths[] = __DIR__ . '/uploads';
+    }
+    
     $paths = array_unique(array_filter($paths));
 
     $volumes = [];
@@ -1587,6 +1629,9 @@ function admin_deep_cleanup($pdo) {
  * Realiza la transcodificación de un solo video (Uso interno por worker)
  */
 function _admin_perform_transcode_single($pdo, $video, $bins) {
+    @set_time_limit(0);
+    @ignore_user_abort(true);
+    
     $ffmpeg = $bins['ffmpeg'];
     $videoId = $video['id'];
     $videoUrl = $video['videoUrl'];
