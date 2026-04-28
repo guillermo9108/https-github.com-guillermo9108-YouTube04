@@ -92,7 +92,12 @@ function auth_heartbeat($pdo, $input) {
     if ($user && $user['currentSessionId'] === $sid) {
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $deviceInfo = parse_user_agent($userAgent);
-        $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([time(), $deviceInfo, $uid]);
+        $now = time();
+        $pdo->prepare("UPDATE users SET lastActive = ?, lastDeviceId = ? WHERE id = ?")->execute([$now, $deviceInfo, $uid]);
+        
+        // AUTO-MARK AS DELIVERED: Any pending message sent to this user is now "Delivered" because they are active
+        $pdo->prepare("UPDATE messages SET isDelivered = 1 WHERE receiverId = ? AND isDelivered = 0")->execute([$uid]);
+        
         respond(true, $user);
     }
     respond(false, null, "Sesión expirada");

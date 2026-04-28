@@ -217,7 +217,7 @@ export default function MarketplaceItemView() {
                                 <div className="text-[9px] md:text-[10px] text-slate-500 mt-4 flex flex-wrap gap-2">
                                     <span className="bg-slate-950 border border-white/5 px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest">{item.category}</span>
                                     <span className="bg-slate-950 border border-white/5 px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest">{item.condition}</span>
-                                    {item.isFlashSale && <span className="bg-amber-500 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest flex items-center gap-1">⚡ VENTA FLASH</span>}
+                                    {Number(item.isFlashSale) === 1 && <span className="bg-amber-500 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest flex items-center gap-1">⚡ VENTA FLASH</span>}
                                     {item.stock !== undefined && item.stock < 5 && item.stock > 0 && <span className="bg-red-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest animate-pulse">¡STOCK CRÍTICO: {item.stock}!</span>}
                                     {item.stock === 0 && <span className="bg-slate-800 text-slate-400 px-2 py-0.5 md:px-3 md:py-1 rounded-full font-black uppercase tracking-widest">AGOTADO</span>}
                                 </div>

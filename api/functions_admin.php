@@ -468,12 +468,33 @@ function admin_sync_active_transcodes_to_db($pdo) {
             // Intento 1: Formato ps -Ao (PID ETIME COMMAND)
             if (preg_match('/^\s*(\d+)\s+([0-9:.-]+)\s+(.+)$/', $line, $matches)) {
                 $pid = $matches[1];
+                $etimeStr = $matches[2];
                 $fullCmd = $matches[3];
+                
+                // Convertir etimeStr (format: [[dd-]hh:]mm:ss) a segundos
+                $etimeSec = 0;
+                $parts = explode(':', $etimeStr);
+                if (count($parts) == 2) { // mm:ss
+                    $etimeSec = $parts[0] * 60 + $parts[1];
+                } else if (count($parts) == 3) {
+                    $s = array_pop($parts);
+                    $m = array_pop($parts);
+                    $h_d = array_pop($parts);
+                    
+                    if (strpos($h_d, '-') !== false) {
+                        list($d, $h) = explode('-', $h_d);
+                        $etimeSec = $d * 86400 + $h * 3600 + $m * 60 + $s;
+                    } else {
+                        $etimeSec = $h_d * 3600 + $m * 60 + $s;
+                    }
+                }
+                $data_etime = $etimeSec;
             } 
             // Intento 2: Formato ps aux
             else if (preg_match('/^\S+\s+(\d+)\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+.*?\s+(.*)$/', $line, $matches)) {
                 $pid = $matches[1];
                 $fullCmd = $matches[2];
+                $data_etime = 0;
             }
             
             if ($pid && $fullCmd) {
@@ -486,13 +507,22 @@ function admin_sync_active_transcodes_to_db($pdo) {
                     $currentPids[] = $pid;
                     
                     // Buscar datos previos en DB para obtener el tempPath real y persistencia
-                    $stmtCheck = $pdo->prepare("SELECT tempPath, lastSize FROM active_transcodes WHERE videoId = ?");
+                    $stmtCheck = $pdo->prepare("SELECT tempPath, lastSize, startTime FROM active_transcodes WHERE videoId = ?");
                     $stmtCheck->execute([$videoId]);
                     $dbRecord = $stmtCheck->fetch();
                     
                     $tempPath = "";
+                    $startTime = 0;
                     if ($dbRecord) {
                         $tempPath = $dbRecord['tempPath'];
+                        $startTime = $dbRecord['startTime'];
+                    }
+                    
+                    // Si tenemos etime del sistema, calculamos el startTime real retrocediendo desde ahora
+                    if ($data_etime > 0) {
+                        $startTime = time() - $data_etime;
+                    } else if (!$startTime) {
+                        $startTime = time();
                     }
                     
                     // Intentar extraer tempPath de ps solo si no estaba en DB (como fallback)
@@ -514,7 +544,8 @@ function admin_sync_active_transcodes_to_db($pdo) {
                     $foundMatches[$videoId] = [
                         'pid' => $pid,
                         'tempPath' => $tempPath,
-                        'lastSize' => $lastSize
+                        'lastSize' => $lastSize,
+                        'startTime' => $startTime
                     ];
                 }
             }
@@ -524,10 +555,10 @@ function admin_sync_active_transcodes_to_db($pdo) {
     // 2. Sincronizar con la tabla active_transcodes
     if (!empty($foundMatches)) {
         foreach ($foundMatches as $vid => $data) {
-            $stmt = $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
-                                 VALUES (?, ?, ?, ?, ?, 'PROCESSING')
-                                 ON DUPLICATE KEY UPDATE pid = VALUES(pid), tempPath = VALUES(tempPath), lastSize = VALUES(lastSize), lastUpdated = VALUES(lastUpdated)");
-            $stmt->execute([$vid, $data['pid'], $data['tempPath'], $data['lastSize'], time()]);
+            $stmt = $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, startTime, status) 
+                                 VALUES (?, ?, ?, ?, ?, ?, 'PROCESSING')
+                                 ON DUPLICATE KEY UPDATE pid = VALUES(pid), tempPath = VALUES(tempPath), lastSize = VALUES(lastSize), lastUpdated = VALUES(lastUpdated), startTime = VALUES(startTime)");
+            $stmt->execute([$vid, $data['pid'], $data['tempPath'], $data['lastSize'], time(), $data['startTime']]);
         }
     }
     
@@ -543,6 +574,11 @@ function admin_sync_active_transcodes_to_db($pdo) {
 
 function admin_get_local_stats($pdo) {
     try {
+        // Auto-patch schema if needed
+        try {
+            $pdo->exec("ALTER TABLE active_transcodes ADD COLUMN startTime BIGINT AFTER lastUpdated");
+        } catch (Throwable $e) {}
+        
         admin_sync_active_transcodes_to_db($pdo);
     } catch (Throwable $e) {
         write_log("Sync active transcodes failed: " . $e->getMessage(), "WARNING");
@@ -611,7 +647,7 @@ function admin_get_local_stats($pdo) {
 
             $active_processes[] = [
                 'pid' => $p['pid'],
-                'etime' => time() - $p['lastUpdated'],
+                'etime' => time() - ($p['startTime'] ?: $p['lastUpdated']),
                 'command' => "ffmpeg ... " . basename($p['tempPath']),
                 'videoId' => $p['videoId'],
                 'videoUrl' => $p['videoUrl'],

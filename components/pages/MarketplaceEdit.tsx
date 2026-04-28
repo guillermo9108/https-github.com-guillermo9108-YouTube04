@@ -56,7 +56,7 @@ export default function MarketplaceEdit() {
                     setDiscount(data.discountPercent ?? 0);
                     setTitle(data.title);
                     setDesc(data.description);
-                    setIsFlashSale(!!data.isFlashSale);
+                    setIsFlashSale(Number(data.isFlashSale) === 1);
                     setTags(data.tags || []);
                 }
                 setLoading(false);

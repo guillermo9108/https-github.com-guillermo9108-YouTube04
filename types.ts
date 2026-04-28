@@ -256,7 +256,7 @@ export interface MarketplaceItem {
     is_featured?: boolean | number;
     salesCount?: number;
     popularity?: number;
-    isFlashSale?: boolean;
+    isFlashSale?: boolean | number | string;
     tags?: string[];
     customAttributes?: Record<string, string>;
 }

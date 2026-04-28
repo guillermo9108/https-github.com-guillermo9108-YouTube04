@@ -367,6 +367,7 @@ function getAppSchema() {
                 'tempPath' => 'TEXT',
                 'lastSize' => 'BIGINT DEFAULT 0',
                 'lastUpdated' => 'BIGINT',
+                'startTime' => 'BIGINT',
                 'status' => "ENUM('PROCESSING', 'STALLED', 'COMPLETED') DEFAULT 'PROCESSING'"
             ]
         ]

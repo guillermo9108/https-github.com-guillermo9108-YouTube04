@@ -511,8 +511,9 @@ function interact_get_messages($pdo, $input) {
     
     if (!$userId || !$otherId) respond(false, null, "Faltan IDs");
 
-    // Marcar como leídos Y entregados
-    $pdo->prepare("UPDATE messages SET isRead = 1, isDelivered = 1 WHERE senderId = ? AND receiverId = ?")->execute([$otherId, $userId]);
+    // Marcar como LEÍDOS (lo que implica entregados) los mensajes ENVIADOS POR EL OTRO al USUARIO ACTUAL
+    // Esto se hace solo cuando se abre el chat (al llamar a get_messages)
+    $pdo->prepare("UPDATE messages SET isRead = 1, isDelivered = 1 WHERE senderId = ? AND receiverId = ? AND isRead = 0")->execute([$otherId, $userId]);
     
     // Para paginación inversa (traer los últimos), traemos ordenados por timestamp DESC
     // El frontend luego puede invertirlos para mostrar en orden cronológico

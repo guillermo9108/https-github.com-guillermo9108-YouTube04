@@ -169,7 +169,13 @@ export default function FriendsPage() {
                                             {u.username}
                                         </span>
                                         <span className="text-[var(--text-secondary)] text-xs">
-                                            {u.lastActive ? 'Activo recientemente' : ''}
+                                            {u.lastActive ? (() => {
+                                                const seconds = Math.floor(Date.now() / 1000 - u.lastActive);
+                                                if (seconds < 60) return 'Activo ahora';
+                                                if (seconds < 3600) return `Activo hace ${Math.floor(seconds / 60)} min`;
+                                                if (seconds < 86400) return `Activo hace ${Math.floor(seconds / 3600)} h`;
+                                                return `Activo hace ${Math.floor(seconds / 86400)} d`;
+                                            })() : ''}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1 mb-2">

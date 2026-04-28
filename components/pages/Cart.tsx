@@ -69,10 +69,10 @@ export default function Cart() {
     // Advanced Calculations
     const totals = useMemo(() => {
         return cart.reduce((acc: { subtotal: number, total: number, itemCount: number }, item: CartItem) => {
-            const qty = item.quantity;
+            const qty = Number(item.quantity);
             const price = Number(item.price);
             // Fallback to price if originalPrice is missing or 0
-            const originalPrice = (item.originalPrice && item.originalPrice > 0) ? Number(item.originalPrice) : price;
+            const originalPrice = (Number(item.originalPrice) > 0) ? Number(item.originalPrice) : price;
             
             acc.subtotal += originalPrice * qty;
             acc.total += price * qty;
@@ -163,17 +163,20 @@ export default function Cart() {
                     <div className="lg:col-span-2 space-y-4">
                         <div className="bg-slate-900/50 rounded-2xl border border-slate-800 overflow-hidden">
                             {cart.map((item: CartItem, index: number) => {
-                                const original = (item.originalPrice && item.originalPrice > 0) ? item.originalPrice : item.price;
-                                const hasDiscount = original > item.price;
+                                const priceNum = Number(item.price);
+                                const originalPriceNum = Number(item.originalPrice);
+                                const original = originalPriceNum > 0 ? originalPriceNum : priceNum;
+                                const hasDiscount = original > priceNum;
+                                const discountPerc = Number(item.discountPercent);
 
                                 return (
                                     <div key={item.id} className={`flex gap-2 md:gap-4 p-2 md:p-4 ${index !== cart.length - 1 ? 'border-b border-slate-800' : ''}`}>
                                         {/* Image (Smaller on mobile) */}
                                         <div className="w-20 h-20 md:w-24 md:h-28 bg-black rounded-lg md:rounded-xl overflow-hidden shrink-0 border border-slate-800 relative group">
                                             {item.images && item.images[0] && <img src={item.images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />}
-                                            {hasDiscount && (
+                                            {hasDiscount && discountPerc > 0 && (
                                                 <div className="absolute top-0 left-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br shadow-sm">
-                                                    -{item.discountPercent}%
+                                                    -{discountPerc}%
                                                 </div>
                                             )}
                                         </div>
@@ -188,7 +191,7 @@ export default function Cart() {
                                                     </p>
                                                     {hasDiscount && (
                                                         <p className="text-[9px] text-emerald-400 font-bold mt-1 flex items-center gap-1">
-                                                            <Tag size={10}/> Ahorras {(original - item.price).toFixed(2)} $
+                                                            <Tag size={10}/> Ahorras {(original - priceNum).toFixed(2)} $
                                                         </p>
                                                     )}
                                                 </div>
@@ -200,14 +203,14 @@ export default function Cart() {
                                             <div className="flex justify-between items-end mt-1 md:mt-4">
                                                 <div>
                                                     {hasDiscount && (
-                                                        <div className="text-[9px] md:text-xs text-slate-500 line-through mb-0.5">{original} $</div>
+                                                        <div className="text-[9px] md:text-xs text-slate-500 line-through mb-0.5">{original.toFixed(2)} $</div>
                                                     )}
                                                     <div className={`font-mono font-bold text-base md:text-xl ${hasDiscount ? 'text-red-400' : 'text-amber-400'}`}>
-                                                        {item.price} $
+                                                        {priceNum.toFixed(2)} $
                                                     </div>
-                                                    {hasDiscount && item.quantity > 1 && (
+                                                    {hasDiscount && Number(item.quantity) > 1 && (
                                                         <div className="text-[8px] font-bold text-emerald-500/80 bg-emerald-500/5 px-1.5 py-0.5 rounded mt-1 border border-emerald-500/10 inline-block">
-                                                            Ahorro: {((original - item.price) * item.quantity).toFixed(2)} $
+                                                            Ahorro: {((original - priceNum) * Number(item.quantity)).toFixed(2)} $
                                                         </div>
                                                     )}
                                                 </div>

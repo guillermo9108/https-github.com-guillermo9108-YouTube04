@@ -55,7 +55,7 @@ export default function Marketplace() {
         
         // Section Filters
         let matchesSection = true;
-        if (selectedSection === 'FLASH') matchesSection = !!item.isFlashSale;
+        if (selectedSection === 'FLASH') matchesSection = Number(item.isFlashSale) === 1;
         if (selectedSection === 'BEST') matchesSection = (item.salesCount || 0) > 0;
         if (selectedSection === 'POPULAR') matchesSection = (item.popularity || 0) > 0;
         if (selectedSection === 'CHEAP') matchesSection = Number(item.price) < 50;
@@ -176,12 +176,12 @@ export default function Marketplace() {
                                 
                                 {/* Tags Overlay */}
                                 <div className="absolute top-1 left-1 flex flex-col gap-1 items-start">
-                                    {item.discountPercent && item.discountPercent > 0 ? (
+                                    {(Number(item.discountPercent) > 0) ? (
                                         <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm">
                                             -{item.discountPercent}%
                                         </span>
                                     ) : null}
-                                    {item.isFlashSale && (
+                                    {Number(item.isFlashSale) === 1 && (
                                         <span className="bg-amber-500 text-black text-[8px] font-bold px-1 py-0.5 rounded-sm">
                                             ⚡ FLASH
                                         </span>
@@ -189,7 +189,7 @@ export default function Marketplace() {
                                 </div>
 
                                 {/* Stock Status */}
-                                {(item.stock === 0 || item.status === 'AGOTADO') && (
+                                {(Number(item.stock) === 0 || item.status === 'AGOTADO') && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                                         <span className="bg-white/90 text-red-600 font-bold text-[10px] px-2 py-1 rounded-sm uppercase tracking-tighter">
                                             Agotado
@@ -200,10 +200,10 @@ export default function Marketplace() {
 
                             <div className="p-2 flex flex-col gap-0.5 relative">
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className={`font-bold text-sm ${item.discountPercent ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
+                                    <span className={`font-bold text-sm ${Number(item.discountPercent) > 0 ? 'text-red-500' : 'text-[var(--text-primary)]'}`}>
                                         {item.price} $
                                     </span>
-                                    {item.discountPercent && item.discountPercent > 0 && (
+                                    {Number(item.discountPercent) > 0 && (
                                         <span className="text-[10px] text-[var(--text-secondary)] line-through">
                                             {item.originalPrice}
                                         </span>

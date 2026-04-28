@@ -201,10 +201,21 @@ function market_create_listing($pdo, $post, $files) {
         $val = strtolower((string)$post['isFlashSale']);
         if ($val === 'true' || $val === '1' || $val === 'on') {
             $isFlashSale = 1;
+        } else {
+            $isFlashSale = 0; // Defensive
         }
     }
-    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, stock, images, sellerId, category, itemCondition, isFlashSale, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), floatval($post['price']), intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], $isFlashSale, $post['tags'] ?? '[]', time()]);
+    
+    $origPrice = isset($post['originalPrice']) ? floatval($post['originalPrice']) : floatval($post['price']);
+    $discount = isset($post['discountPercent']) ? intval($post['discountPercent']) : 0;
+    
+    // Si se activó flash sale pero no hay descuento, intentamos inferir uno o forzarlo si existe originalPrice
+    if ($isFlashSale && $discount === 0 && $origPrice > floatval($post['price'])) {
+        $discount = round((($origPrice - floatval($post['price'])) / $origPrice) * 100);
+    }
+
+    $pdo->prepare("INSERT INTO marketplace_items (id, title, description, price, originalPrice, discountPercent, stock, images, sellerId, category, itemCondition, isFlashSale, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$id, $post['title'], $post['description'], floatval($post['price']), $origPrice, $discount, intval($post['stock']), json_encode($imgs), $post['sellerId'], $post['category'], $post['condition'], $isFlashSale, $post['tags'] ?? '[]', time()]);
     
     // NOTIFICACIÓN: Avisar a seguidores del vendedor
     require_once 'functions_interactions.php';
@@ -236,6 +247,12 @@ function market_edit_listing($pdo, $input) {
     
     $data['discountPercent'] = $discount;
     $data['originalPrice'] = $origPrice;
+    
+    // Asegurar que isFlashSale sea un entero 0 o 1
+    if (isset($data['isFlashSale'])) {
+        $data['isFlashSale'] = (intval($data['isFlashSale']) > 0 || $data['isFlashSale'] === true || $data['isFlashSale'] === 'true' || $data['isFlashSale'] === 'on') ? 1 : 0;
+    }
+
     if (isset($data['tags']) && is_array($data['tags'])) {
         $data['tags'] = json_encode($data['tags']);
     }
