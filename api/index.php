@@ -36,6 +36,7 @@ register_shutdown_function(function() {
         if (ob_get_level()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => false, 'error' => 'Critical PHP Error: ' . $error['message']]);
+        exit;
     }
 });
 
@@ -70,6 +71,7 @@ if (!file_exists($configFile)) {
 $config = json_decode(file_get_contents($configFile), true);
 
 function respond($success, $data = null, $error = null) {
+    if ($error) write_log("Response Error: $error", 'ERROR');
     // Limpiamos cualquier salida previa (espacios, warnings) para que el JSON sea puro
     while (ob_get_level()) ob_end_clean(); 
     header('Content-Type: application/json; charset=utf-8');

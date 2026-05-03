@@ -75,8 +75,9 @@ class DBService {
             try { 
                 json = JSON.parse(rawText); 
             } catch (e) {
-                this.logRemote(`Malformed JSON from ${endpoint}: ${rawText.substring(0, 250)}`, 'ERROR');
-                throw new Error(`Respuesta inválida del servidor.`);
+                const preview = rawText.trim().substring(0, 100);
+                this.logRemote(`Malformed JSON from ${endpoint}: ${preview}`, 'ERROR');
+                throw new Error(`Respuesta inválida del servidor (Inicia con: ${preview.substring(0, 20)}...)`);
             }
             if (json.success === false) throw new Error(json.error || 'Error desconocido');
             return json.data as T;

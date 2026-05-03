@@ -377,7 +377,9 @@ function getAppSchema() {
 
 function syncTable($pdo, $tableName, $def) {
     try {
-        $result = $pdo->query("SHOW TABLES LIKE '$tableName'");
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $result = $pdo->query($driver === 'sqlite' ? "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'" : "SHOW TABLES LIKE '$tableName'");
+        
         if ($result->rowCount() == 0) {
             $sql = "CREATE TABLE $tableName (";
             $cols = [];
@@ -386,21 +388,28 @@ function syncTable($pdo, $tableName, $def) {
             }
             $sql .= implode(", ", $cols);
             if (isset($def['pk'])) $sql .= ", " . $def['pk'];
-            $sql .= ") CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+            $sql .= ")";
+            if ($driver === 'mysql') $sql .= " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
             $pdo->exec($sql);
         } else {
-            // Patch para aumentar el tamaño de categoría si existe
-            try {
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255) DEFAULT 'GENERAL'");
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255) DEFAULT NULL");
-                $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN collection VARCHAR(255) DEFAULT NULL");
-            } catch(Throwable $e) {
-                // Si la columna no existe en esta tabla específica, fallará silenciosamente
+            // Patch para aumentar el tamaño de categoría si existe (solo MySQL)
+            if ($driver === 'mysql') {
+                try {
+                    $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255) DEFAULT 'GENERAL'");
+                    $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255) DEFAULT NULL");
+                } catch(Throwable $e) {}
             }
 
-            $stmt = $pdo->query("SHOW COLUMNS FROM $tableName");
-            $existingColumnsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $existingCols = array_map('strtolower', array_column($existingColumnsData, 'Field'));
+            if ($driver === 'mysql') {
+                $stmt = $pdo->query("SHOW COLUMNS FROM $tableName");
+                $existingColumnsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $existingCols = array_map('strtolower', array_column($existingColumnsData, 'Field'));
+            } else {
+                $stmt = $pdo->query("PRAGMA table_info($tableName)");
+                $existingColumnsData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $existingCols = array_map('strtolower', array_column($existingColumnsData, 'name'));
+            }
+
             foreach ($def['cols'] as $colName => $colDef) {
                 if (!in_array(strtolower($colName), $existingCols)) {
                     try {
@@ -416,9 +425,13 @@ function syncTable($pdo, $tableName, $def) {
         
         // Sincronización de Índices
         if (isset($def['indices'])) {
-            $existingIndices = $pdo->query("SHOW INDEX FROM $tableName")->fetchAll(PDO::FETCH_COLUMN, 2);
+            $existingIndices = [];
+            if ($driver === 'mysql') {
+                $existingIndices = $pdo->query("SHOW INDEX FROM $tableName")->fetchAll(PDO::FETCH_COLUMN, 2);
+            }
+            // Para SQLite saltamos índices por ahora para evitar complejidad
             foreach ($def['indices'] as $idxName => $col) {
-                if (!in_array($idxName, $existingIndices)) {
+                if ($driver === 'mysql' && !in_array($idxName, $existingIndices)) {
                     try {
                         $pdo->exec("CREATE INDEX $idxName ON $tableName ($col)");
                     } catch (Exception $e) {}
