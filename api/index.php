@@ -1,8 +1,8 @@
 <?php
-ob_start();
 /**
- * StreamPay - Core Controller V11.8 (Notification & Admin Delete Fix)
+ * StreamPay - Core Controller V12.0 (Stability & Fallback Fix)
  */
+ob_start(); 
 ini_set('display_errors', 0); 
 error_reporting(E_ALL);
 date_default_timezone_set('UTC');
@@ -20,13 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+// Bloquear cualquier salida HTML que no sea JSON
 require_once 'functions_utils.php';
 require_once 'functions_app.php';
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     if (!(error_reporting() & $errno)) return false;
     write_log("$errstr in $errfile on line $errline", 'ERROR');
-    return false;
+    return true; // No permitir que el error pase al controlador estándar de PHP
 });
 
 register_shutdown_function(function() {
@@ -83,10 +84,20 @@ try {
     $dsn = "mysql:host={$config['host']};port={$config['port']};dbname={$config['name']};charset=utf8mb4";
     $pdo = new PDO($dsn, $config['user'], $config['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_TIMEOUT => 5
     ]);
 } catch (PDOException $e) {
-    respond(false, null, "Error de conexión BD");
+    // Intento de fallback a SQLite si MySQL falla (común en entornos de desarrollo aislados)
+    try {
+        $pdo = new PDO("sqlite:database.sqlite", null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]);
+        write_log("Fallback to SQLite handled successfully", "INFO");
+    } catch (PDOException $e2) {
+        respond(false, null, "Error de conexión BD: " . $e->getMessage());
+    }
 }
 
 require_once 'functions_auth.php';

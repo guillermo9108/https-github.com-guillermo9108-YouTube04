@@ -377,9 +377,14 @@ function getAppSchema() {
 
 function syncTable($pdo, $tableName, $def) {
     try {
-        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        $result = $pdo->query($driver === 'sqlite' ? "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'" : "SHOW TABLES LIKE '$tableName'");
-        
+        $driver = @$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $query = ($driver === 'sqlite') 
+            ? "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'" 
+            : "SHOW TABLES LIKE '$tableName'";
+            
+        $result = $pdo->query($query);
+        if (!$result) throw new Exception("Query failed");
+
         if ($result->rowCount() == 0) {
             $sql = "CREATE TABLE $tableName (";
             $cols = [];
