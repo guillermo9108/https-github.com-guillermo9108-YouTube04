@@ -4,9 +4,11 @@
  */
 
 function write_log($msg, $level = 'INFO') {
-    $date = date('Y-m-d H:i:s');
-    $line = "[$date] [$level] $msg" . PHP_EOL;
-    file_put_contents('transcode_log.txt', $line, FILE_APPEND);
+    try {
+        $date = date('Y-m-d H:i:s');
+        $line = "[$date] [$level] $msg" . PHP_EOL;
+        @file_put_contents('transcode_log.txt', $line, FILE_APPEND);
+    } catch (Throwable $e) {}
 }
 
 function get_system_settings($pdo) {

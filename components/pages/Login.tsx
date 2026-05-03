@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from '../Router';
-import { Layout as LayoutIcon, Camera, User } from 'lucide-react';
+import { Layout as LayoutIcon, Camera, User, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [avatar, setAvatar] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -113,15 +114,23 @@ export default function Login() {
                )}
              </div>
 
-             <div>
+             <div className="relative">
                <label className="block text-xs font-medium text-slate-400 mb-1 uppercase tracking-wider">Password</label>
                <input
-                 type="password"
+                 type={showPassword ? "text" : "password"}
                  value={password}
                  onChange={(e) => setPassword(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-12"
                  placeholder="Enter your password"
                />
+               <button
+                 type="button"
+                 onClick={() => setShowPassword(!showPassword)}
+                 className="absolute right-3 top-[32px] p-2 text-slate-500 hover:text-slate-300 transition-colors"
+                 tabIndex={-1}
+               >
+                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+               </button>
              </div>
 
              <div className="flex items-center gap-2 py-1">

@@ -95,14 +95,14 @@ require_once 'functions_admin.php';
 require_once 'functions_portability.php';
 require_once 'functions_analytics.php';
 // Verificar sincronización de esquema (periódico)
-$syncCache = 'schema_synced.txt';
+$syncCache = sys_get_temp_dir() . '/sp_schema_synced_' . md5($configFile) . '.txt';
 if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
     require_once 'functions_schema.php';
     $schema = getAppSchema();
     foreach ($schema as $tableName => $def) {
         syncTable($pdo, $tableName, $def);
     }
-    @touch($syncCache);
+    @file_put_contents($syncCache, time());
 }
 
 if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';
