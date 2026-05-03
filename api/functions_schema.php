@@ -403,8 +403,13 @@ function syncTable($pdo, $tableName, $def) {
             $existingCols = array_map('strtolower', array_column($existingColumnsData, 'Field'));
             foreach ($def['cols'] as $colName => $colDef) {
                 if (!in_array(strtolower($colName), $existingCols)) {
-                    $alterDef = str_ireplace("PRIMARY KEY", "", $colDef);
-                    $pdo->exec("ALTER TABLE $tableName ADD COLUMN $colName $alterDef");
+                    try {
+                        $alterDef = str_ireplace("PRIMARY KEY", "", $colDef);
+                        $pdo->exec("ALTER TABLE $tableName ADD COLUMN $colName $alterDef");
+                        write_log("Sync: Added column $colName to $tableName");
+                    } catch(Throwable $e) {
+                        write_log("Sync Error adding $colName to $tableName: " . $e->getMessage());
+                    }
                 }
             }
         }

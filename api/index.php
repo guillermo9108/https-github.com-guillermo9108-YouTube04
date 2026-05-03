@@ -94,7 +94,7 @@ require_once 'functions_market.php';
 require_once 'functions_admin.php';
 require_once 'functions_portability.php';
 require_once 'functions_analytics.php';
-// Sincronizar esquema periódicamente para asegurar que existan las nuevas columnas sin penalizar cada petición
+// Verificar sincronización de esquema (periódico)
 $syncCache = 'schema_synced.txt';
 if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
     require_once 'functions_schema.php';

@@ -22,8 +22,8 @@ function video_lock_for_processing($pdo, $input) {
     }
 }
 
-function video_process_rows(&$rows) {
-    if (!$rows) return;
+function video_process_rows(&$rows, $depth = 0) {
+    if (!$rows || $depth > 3) return;
     global $pdo;
     $settings = get_system_settings($pdo);
 
@@ -117,14 +117,10 @@ function video_process_rows(&$rows) {
             $stmt->execute([$v['originalId']]);
             $orig = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($orig) {
-                // Avoid infinite recursion by not processing originalVideo recursively if it also has originalId?
-                // Actually, let's process it but depth limited or just once.
-                // To keep it simple and avoid infinite loops (even if data is corrupted):
+                // Avoid infinite recursion by limit depth
                 $v['originalVideo'] = $orig;
                 $temp = [$v['originalVideo']];
-                // We call process_rows but we need a way to stop extra deep recursion if needed.
-                // But typically there are no loops in reshares.
-                video_process_rows($temp); 
+                video_process_rows($temp, $depth + 1); 
                 $v['originalVideo'] = $temp[0];
             }
         }
@@ -1633,4 +1629,3 @@ function video_get_trending($pdo) {
     video_process_rows($rows);
     respond(true, $rows);
 }
-?>
