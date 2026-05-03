@@ -12,6 +12,8 @@ interface VideoPagedResponse {
     appliedSortOrder?: string;
     total: number;
     hasMore: boolean;
+    users?: User[];
+    navigationInfo?: { suggestedPath: string[], parentFolder: string };
 }
 
 class DBService {
@@ -193,6 +195,10 @@ class DBService {
         return this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
     }
 
+    public async getHashtagSuggestions(q: string, limit: number = 10): Promise<any[]> {
+        return this.request<any[]>(`action=get_hashtag_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
+    }
+
     public async checkInstallation(): Promise<{status: string}> {
         return fetch('api/install.php?action=check').then(r => r.json()).then(res => ({ status: res.data?.installed ? 'installed' : 'not_installed' })).catch(() => ({ status: 'installed' })); 
     }
@@ -324,6 +330,15 @@ class DBService {
 
     public async incrementShare(videoId: string): Promise<void> {
         return this.request<void>(`action=increment_share&id=${videoId}`);
+    }
+
+    public async reshareVideo(originalId: string, userId: string, description: string): Promise<any> {
+        const res = await this.request<any>(`action=reshare_video`, { 
+            method: 'POST', 
+            body: JSON.stringify({ originalId, userId, description }) 
+        });
+        this.setHomeDirty();
+        return res;
     }
 
     public async getVideoLikers(videoId: string, userId?: string): Promise<{username: string, avatarUrl: string}[]> {

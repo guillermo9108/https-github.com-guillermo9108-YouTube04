@@ -16,13 +16,40 @@ const EditVideo: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [loadedId, setLoadedId] = useState<string | null>(null);
-    
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         price: '1.00',
         category: ''
     });
+    const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
+    const [showTags, setShowTags] = useState(false);
+    const [cursorPos, setCursorPos] = useState(0);
+
+    const handleTextChange = async (val: string, pos: number) => {
+        setFormData(prev => ({ ...prev, description: val }));
+        setCursorPos(pos);
+
+        const textBeforeCursor = val.slice(0, pos);
+        const match = textBeforeCursor.match(/#(\w*)$/);
+        
+        if (match) {
+            const query = match[1];
+            const suggestions = await db.getHashtagSuggestions(query);
+            setTagSuggestions(suggestions);
+            setShowTags(true);
+        } else {
+            setShowTags(false);
+        }
+    };
+
+    const selectHashtag = (tag: string) => {
+        const textBefore = formData.description.slice(0, cursorPos);
+        const textAfter = formData.description.slice(cursorPos);
+        const newTextBefore = textBefore.replace(/#(\w*)$/, tag + ' ');
+        setFormData(prev => ({ ...prev, description: newTextBefore + textAfter }));
+        setShowTags(false);
+    };
 
     useEffect(() => {
         const loadVideo = async () => {
@@ -135,13 +162,29 @@ const EditVideo: React.FC = () => {
                         />
                     </div>
 
-                    <div>
+                    <div className="relative">
                         <label className="block text-sm font-medium text-slate-400 mb-2">Descripción</label>
                         <textarea 
                             value={formData.description}
-                            onChange={e => setFormData({...formData, description: e.target.value})}
+                            onChange={e => handleTextChange(e.target.value, e.target.selectionStart)}
+                            onKeyUp={e => handleTextChange((e.target as any).value, (e.target as any).selectionStart)}
                             className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 transition-colors min-h-[120px]"
                         />
+                        {showTags && tagSuggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[100] max-h-[180px] overflow-y-auto mt-2">
+                                {tagSuggestions.map((s, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => selectHashtag(s.label)}
+                                        className="w-full text-left px-4 py-3 hover:bg-white/5 flex items-center justify-between transition-colors"
+                                    >
+                                        <span className="text-sm font-bold text-indigo-400">{s.label}</span>
+                                        {s.count > 0 && <span className="text-[10px] text-slate-500">{s.count}</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">

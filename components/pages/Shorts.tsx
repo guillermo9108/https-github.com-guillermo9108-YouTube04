@@ -647,10 +647,9 @@ export default function Shorts() {
       {videoToShare && (
           <ShareModal 
             video={videoToShare} 
-            user={user} 
             onClose={() => setVideoToShare(null)} 
-            onShareSuccess={(target) => {
-                toast.success(`Short compartido con @${target}`);
+            onShared={() => {
+                toast.success(`Short compartido correctamente`);
                 setVideoToShare(null);
             }} 
           />

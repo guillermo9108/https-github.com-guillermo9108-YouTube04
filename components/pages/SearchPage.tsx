@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Search, X, ChevronRight, Mic, Tag, Folder, History, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Search, X, ChevronRight, Mic, Tag, Folder, History, TrendingUp, Music } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
@@ -62,15 +62,19 @@ export default function SearchPage() {
 
     const handleSuggestionClick = (suggestion: any) => {
         if (suggestion.type === 'CATEGORY') {
-            navigate(`/?cat=${encodeURIComponent(suggestion.value)}`);
+            navigate(`/?cat=${encodeURIComponent(suggestion.label || suggestion.value)}`);
         } else if (suggestion.type === 'FOLDER') {
-            navigate(`/?folder=${encodeURIComponent(suggestion.value)}`);
+            navigate(`/?folder=${encodeURIComponent(suggestion.label || suggestion.value)}`);
         } else if (suggestion.type === 'HISTORY') {
-            setSearchQuery(suggestion.value);
-            navigate(`/?q=${encodeURIComponent(suggestion.value)}`);
+            setSearchQuery(suggestion.label || suggestion.value);
+            navigate(`/?q=${encodeURIComponent(suggestion.label || suggestion.value)}`);
+        } else if (suggestion.type === 'USER') {
+            navigate(`/channel/${suggestion.id}`);
+        } else if (suggestion.type === 'VIDEO' || suggestion.type === 'AUDIO') {
+            navigate(`/watch/${suggestion.id}?q=${encodeURIComponent(searchQuery)}`);
         } else {
-            setSearchQuery(suggestion.value);
-            navigate(`/?q=${encodeURIComponent(suggestion.value)}`);
+            setSearchQuery(suggestion.label || suggestion.value);
+            navigate(`/?q=${encodeURIComponent(suggestion.label || suggestion.value)}`);
         }
     };
 
@@ -104,11 +108,20 @@ export default function SearchPage() {
         recognition.start();
     };
 
-    const getSuggestionIcon = (type: string) => {
-        switch (type) {
+    const getSuggestionIcon = (s: any) => {
+        switch (s.type) {
             case 'CATEGORY': return <Tag size={16} />;
             case 'FOLDER': return <Folder size={16} />;
             case 'HISTORY': return <History size={16} />;
+            case 'USER': 
+                return s.avatarUrl ? (
+                    <img src={s.avatarUrl} className="w-full h-full object-cover rounded-md" />
+                ) : (
+                    <div className="w-full h-full bg-[var(--accent)] text-white flex items-center justify-center font-bold text-xs rounded-md">
+                        {s.label?.[0]?.toUpperCase()}
+                    </div>
+                );
+            case 'AUDIO': return <Music size={16} />;
             default: return <Search size={16} />;
         }
     };
@@ -230,7 +243,7 @@ export default function SearchPage() {
                                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                                         }`}
                                     >
-                                        {getSuggestionIcon(s.type)}
+                                        {getSuggestionIcon(s)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors truncate">

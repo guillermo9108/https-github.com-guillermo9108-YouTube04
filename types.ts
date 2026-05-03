@@ -118,6 +118,8 @@ export interface Video {
   size_bytes?: number;
   size_fmt?: string;
   subtitles?: VideoSubtitle[];
+  originalId?: string;
+  originalVideo?: Video;
 }
 
 export interface Comment {

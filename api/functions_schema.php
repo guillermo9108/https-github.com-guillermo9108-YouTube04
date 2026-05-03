@@ -54,7 +54,8 @@ function getAppSchema() {
                 'is_private' => 'TINYINT(1) DEFAULT 0',
                 'size_bytes' => 'BIGINT DEFAULT 0',
                 'size_fmt' => 'VARCHAR(20) DEFAULT NULL',
-                'queue_priority' => 'INT DEFAULT 0'
+                'queue_priority' => 'INT DEFAULT 0',
+                'originalId' => 'VARCHAR(50) DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',

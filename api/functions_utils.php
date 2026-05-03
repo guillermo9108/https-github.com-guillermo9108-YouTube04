@@ -226,7 +226,7 @@ function streamVideo($id, $pdo) {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT v.videoUrl, v.title, v.price, v.creatorId, u.role as creatorRole FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
+    $stmt = $pdo->prepare("SELECT v.videoUrl, v.title, v.price, v.creatorId, v.originalId, u.role as creatorRole FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
     $stmt->execute([$id]);
     $video = $stmt->fetch();
     
@@ -234,6 +234,16 @@ function streamVideo($id, $pdo) {
         write_log("Stream Error: Video ID $id not found", 'ERROR');
         header("HTTP/1.1 404 Not Found"); 
         exit; 
+    }
+
+    // If it's a reshare, use the original video's URL
+    if (!empty($video['originalId'])) {
+        $stmtO = $pdo->prepare("SELECT videoUrl FROM videos WHERE id = ?");
+        $stmtO->execute([$video['originalId']]);
+        $origUrl = $stmtO->fetchColumn();
+        if ($origUrl) {
+            $video['videoUrl'] = $origUrl;
+        }
     }
 
     // Basic Auth Check for streaming/downloading

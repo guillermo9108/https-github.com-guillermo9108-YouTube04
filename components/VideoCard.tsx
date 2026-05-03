@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
 import { Link } from './Router';
 import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon, Wand2 } from 'lucide-react';
+import InteractiveDescription from './InteractiveDescription';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -530,9 +531,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                 <span className="font-bold mr-1">{video.title}</span>
               )}
               {video.description && (
-                  <span className="text-[var(--text-primary)]">
-                      {video.description}
-                  </span>
+                  <div className="text-[var(--text-primary)]">
+                      <InteractiveDescription text={video.description} />
+                  </div>
               )}
             </div>
             {((video.title?.length || 0) + (video.description?.length || 0)) > 150 && !showFullTitle && (
@@ -547,176 +548,271 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       </div>
 
       {/* Media Content */}
-      <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden`}>
-        {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
-            <div className="grid grid-cols-4 h-full gap-0.5" onClick={handleImageClick}>
-                {/* Main Image (Left) */}
-                <div className="col-span-3 h-full relative">
-                    <img 
-                        src={db.getStreamerUrl(video.albumItems[0].id)} 
-                        alt={video.albumItems[0].title}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                    />
-                </div>
-                {/* Side Column (Right) */}
-                <div className="col-span-1 flex flex-col gap-0.5 h-full">
-                    {video.albumItems.slice(1, 4).map((item, idx) => (
-                        <div key={item.id} className="flex-1 relative">
+      {video.originalVideo ? (
+          <div className="mx-3 mb-3 border border-[var(--divider)] rounded-xl overflow-hidden bg-[var(--bg-primary)]">
+              <div className="p-3 flex items-center gap-2">
+                  <Link to={`/channel/${video.originalVideo.creatorId}`} className="shrink-0">
+                      <div className="w-8 h-8 rounded-full border border-[var(--divider)] overflow-hidden">
+                          <img src={getThumbnailUrl(video.originalVideo.creatorAvatarUrl) || settings?.defaultAvatar} className="w-full h-full object-cover" alt={video.originalVideo.creatorName} referrerPolicy="no-referrer" />
+                      </div>
+                  </Link>
+                  <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                          <Link to={`/channel/${video.originalVideo.creatorId}`} className="text-xs font-bold text-[var(--text-primary)] hover:underline">
+                              {video.originalVideo.creatorName}
+                          </Link>
+                          <CheckCircle2 size={10} className="text-[#1877f2] fill-[#1877f2]/10" />
+                      </div>
+                      <div className="text-[10px] text-[var(--text-secondary)] leading-tight">
+                          <span>{formatTimeAgo(video.originalVideo.createdAt)}</span>
+                      </div>
+                  </div>
+              </div>
+
+              {video.originalVideo.description && (
+                  <div className="px-3 pb-2 text-sm text-[var(--text-primary)]">
+                      <InteractiveDescription text={video.originalVideo.description} />
+                  </div>
+              )}
+
+              <div className="relative aspect-video bg-black overflow-hidden">
+                  <Link to={`/watch/${video.originalVideo.id}`} className="absolute inset-0">
+                      <img 
+                          src={getThumbnailUrl(video.originalVideo.thumbnailUrl) || (Number(video.originalVideo.is_audio) === 1 ? settings?.defaultAudioThumb : settings?.defaultVideoThumb)} 
+                          alt={video.originalVideo.title}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                      />
+                      {!video.originalVideo.category?.includes('IMAGES') && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-10 h-10 bg-black/30 backdrop-blur-[2px] border border-white/20 rounded-full flex items-center justify-center">
+                                  {Number(video.originalVideo.is_audio) === 1 ? <Music size={20} className="text-white" /> : <Play size={20} className="text-white ml-1" />}
+                              </div>
+                          </div>
+                      )}
+                  </Link>
+              </div>
+          </div>
+      ) : (
+          <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden`}>
+            {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
+                <div 
+                    className={`grid gap-0.5 h-full ${
+                        video.albumItems.length === 2 ? 'grid-cols-2' : 
+                        video.albumItems.length === 3 ? 'grid-cols-3' : 
+                        'grid-cols-4'
+                    }`} 
+                    onClick={handleImageClick}
+                >
+                    {/* Variant 1: 2 Images (50/50) */}
+                    {video.albumItems.length === 2 && video.albumItems.map(item => (
+                        <div key={item.id} className="relative h-full">
                             <img 
                                 src={db.getStreamerUrl(item.id)} 
                                 alt={item.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
                             />
-                            {idx === 2 && video.albumItems!.length > 4 && (
-                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                    <span className="text-white font-black text-lg">+{video.albumItems!.length - 4}</span>
-                                </div>
-                            )}
                         </div>
                     ))}
-                </div>
-            </div>
-        ) : (
-            <Link 
-                to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
-                onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
-                className="absolute inset-0 z-0 group/media"
-            >
-                {displayThumb ? (
-                    <div className="relative w-full h-full">
-                        <img 
-                        src={displayThumb} 
-                        alt={video.title} 
-                        className="w-full h-full object-cover group-hover/media:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
-                        loading="lazy" 
-                        referrerPolicy="no-referrer"
-                        onError={() => {
-                            // Si falló la miniatura optimizada, intentar cargar la original antes de rendirse
-                            if (!retryOriginal && video.thumbnailUrl && getThumbnailUrl(video.thumbnailUrl) !== video.thumbnailUrl) {
-                                setRetryOriginal(true);
-                            } else {
-                                setImgError(true);
-                            }
-                        }}
-                        />
-                        
-                        {/* Play/Music Icon Overlay - Only for non-images */}
-                        {!isImage && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300">
-                                <div className="w-14 h-14 bg-black/30 backdrop-blur-[2px] border border-white/20 rounded-full flex items-center justify-center group-hover/media:scale-110 transition-transform duration-300">
-                                    {isAudio ? (
-                                        <Music size={28} className="text-white fill-white/20" />
-                                    ) : (
-                                        <Play size={28} className="text-white fill-white/40 ml-1" />
-                                    )}
-                                </div>
+
+                    {/* Variant 2: 3 Images (Big left, two small right) */}
+                    {video.albumItems.length === 3 && (
+                        <>
+                            <div className="col-span-2 h-full relative">
+                                <img 
+                                    src={db.getStreamerUrl(video.albumItems[0].id)} 
+                                    alt={video.albumItems[0].title}
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                />
                             </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-slate-700 p-4">
-                        <div className="relative">
-                            {isAudio ? <Music size={48} className="opacity-10 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-10 mb-2" /> : <Play size={48} className="opacity-10 mb-2"/>}
-                            {isProcessing && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                            <div className="col-span-1 flex flex-col gap-0.5 h-full">
+                                {video.albumItems.slice(1, 3).map(item => (
+                                    <div key={item.id} className="flex-1 relative">
+                                        <img 
+                                            src={db.getStreamerUrl(item.id)} 
+                                            alt={item.title}
+                                            className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Variant 3: 4+ Images (Current Logic improved) */}
+                    {video.albumItems.length >= 4 && (
+                        <>
+                            <div className="col-span-3 h-full relative">
+                                <img 
+                                    src={db.getStreamerUrl(video.albumItems[0].id)} 
+                                    alt={video.albumItems[0].title}
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                />
+                            </div>
+                            <div className="col-span-1 flex flex-col gap-0.5 h-full">
+                                {video.albumItems.slice(1, 4).map((item, idx) => (
+                                    <div key={item.id} className="flex-1 relative">
+                                        <img 
+                                            src={db.getStreamerUrl(item.id)} 
+                                            alt={item.title}
+                                            className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                        {idx === 2 && video.albumItems!.length > 4 && (
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                <span className="text-white font-black text-lg">+{video.albumItems!.length - 4}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+            ) : (
+                <Link 
+                    to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
+                    onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
+                    className="absolute inset-0 z-0 group/media"
+                >
+                    {displayThumb ? (
+                        <div className="relative w-full h-full">
+                            <img 
+                            src={displayThumb} 
+                            alt={video.title} 
+                            className="w-full h-full object-cover group-hover/media:scale-105 transition-transform duration-700 ease-out animate-in fade-in"
+                            loading="lazy" 
+                            referrerPolicy="no-referrer"
+                            onError={() => {
+                                // Si falló la miniatura optimizada, intentar cargar la original antes de rendirse
+                                if (!retryOriginal && video.thumbnailUrl && getThumbnailUrl(video.thumbnailUrl) !== video.thumbnailUrl) {
+                                    setRetryOriginal(true);
+                                } else {
+                                    setImgError(true);
+                                }
+                            }}
+                            />
+                            
+                            {/* Play/Music Icon Overlay - Only for non-images */}
+                            {!isImage && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300">
+                                    <div className="w-14 h-14 bg-black/30 backdrop-blur-[2px] border border-white/20 rounded-full flex items-center justify-center group-hover/media:scale-110 transition-transform duration-300">
+                                        {isAudio ? (
+                                            <Music size={28} className="text-white fill-white/20" />
+                                        ) : (
+                                            <Play size={28} className="text-white fill-white/40 ml-1" />
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
-                        {!shouldLoadImg && <div className="text-[10px] font-bold opacity-20 uppercase tracking-widest mt-2">Cargando...</div>}
-                    </div>
-                )}
-            </Link>
-        )}
-        
-        {locationLabel && (
-            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-slate-300 px-2 py-0.5 rounded-lg border border-white/10 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                <Folder size={8} className="text-indigo-400" /> {locationLabel}
-            </div>
-        )}
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-slate-700 p-4">
+                            <div className="relative">
+                                {isAudio ? <Music size={48} className="opacity-10 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-10 mb-2" /> : <Play size={48} className="opacity-10 mb-2"/>}
+                                {isProcessing && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                                    </div>
+                                )}
+                            </div>
+                            {!shouldLoadImg && <div className="text-[10px] font-bold opacity-20 uppercase tracking-widest mt-2">Cargando...</div>}
+                        </div>
+                    )}
+                </Link>
+            )}
+            
+            {locationLabel && (
+                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-slate-300 px-2 py-0.5 rounded-lg border border-white/10 uppercase tracking-widest flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                    <Folder size={8} className="text-indigo-400" /> {locationLabel}
+                </div>
+            )}
 
-        {!isImage && (
-            <div className="absolute bottom-2 right-2 flex items-center gap-2">
-               {onView && (
-                   <button 
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onView(); }}
-                        className="bg-[#2d88ff] text-white p-1 rounded-md shadow-lg hover:bg-[#2d88ff]/80 transition-colors"
-                        title="Ver contenido"
-                   >
-                       <Eye size={14} />
-                   </button>
-               )}
-               {onConvert && (
-                   <button 
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConvert(); }}
-                        className="bg-amber-600 text-white p-1 rounded-md shadow-lg hover:bg-amber-500 transition-colors"
-                        title="Convertir Video (Transcodificar)"
-                   >
-                       <Wand2 size={14} />
-                   </button>
-               )}
-               <div className="bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
-                {showDownload && (
+            {!isImage && (
+                <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                {onView && (
                     <button 
-                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
-                         className="text-[#2d88ff] hover:text-white transition-colors"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onView(); }}
+                            className="bg-[#2d88ff] text-white p-1 rounded-md shadow-lg hover:bg-[#2d88ff]/80 transition-colors"
+                            title="Ver contenido"
                     >
-                        <Download size={12} />
+                        <Eye size={14} />
                     </button>
                 )}
-                <div className="h-3 w-[1px] bg-white/20"></div>
-                {isProcessing ? (
-                    <div className="flex items-center gap-1">
-                        <RefreshCw size={10} className="animate-spin text-indigo-400" />
-                        <span>PROCESANDO</span>
+                {onConvert && (
+                    <button 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConvert(); }}
+                            className="bg-amber-600 text-white p-1 rounded-md shadow-lg hover:bg-amber-500 transition-colors"
+                            title="Convertir Video (Transcodificar)"
+                    >
+                        <Wand2 size={14} />
+                    </button>
+                )}
+                <div className="bg-black/80 text-white text-[10px] font-black flex items-center gap-2 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/5">
+                    {showDownload && (
+                        <button 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
+                            className="text-[#2d88ff] hover:text-white transition-colors"
+                        >
+                            <Download size={12} />
+                        </button>
+                    )}
+                    <div className="h-3 w-[1px] bg-white/20"></div>
+                    {isProcessing ? (
+                        <div className="flex items-center gap-1">
+                            <RefreshCw size={10} className="animate-spin text-indigo-400" />
+                            <span>PROCESANDO</span>
+                        </div>
+                    ) : formatDuration(video.duration)}
+                </div>
+                </div>
+            )}
+
+            {isImage && (
+                <div className="absolute top-3 right-3 z-10 flex gap-2">
+                    {showDownload && (
+                        <button 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
+                            className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg hover:bg-[#2d88ff]"
+                        >
+                            <Download size={14} />
+                        </button>
+                    )}
+                    {video.isAlbum && (
+                        <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-lg flex items-center gap-1">
+                            <Layers size={14} />
+                            <span className="text-[10px] font-black">{video.albumItems?.length}</span>
+                        </div>
+                    )}
+                    <div className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg">
+                        <ImageIcon size={14} />
                     </div>
-                ) : formatDuration(video.duration)}
-               </div>
-            </div>
-        )}
+                </div>
+            )}
 
-        {isImage && (
-            <div className="absolute top-3 right-3 z-10 flex gap-2">
-                 {showDownload && (
-                     <button 
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDownload?.(); }}
-                        className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg hover:bg-[#2d88ff]"
-                     >
-                         <Download size={14} />
-                     </button>
-                 )}
-                 {video.isAlbum && (
-                     <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-lg flex items-center gap-1">
-                         <Layers size={14} />
-                         <span className="text-[10px] font-black">{video.albumItems?.length}</span>
-                     </div>
-                 )}
-                 <div className="bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg">
-                     <ImageIcon size={14} />
-                 </div>
-            </div>
-        )}
+            {isNew && !isWatched && !isAudio && (
+                <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
+            )}
 
-        {isNew && !isWatched && !isAudio && (
-            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg shadow-red-900/40 animate-pulse uppercase tracking-widest pointer-events-none">NUEVO</div>
-        )}
-
-        {isWatched && (
-             <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">
-                 <div className="flex items-center gap-2 text-slate-200 bg-indigo-600/80 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
-                    <CheckCircle2 size={14} /> <span className="text-[10px] font-black tracking-widest uppercase">VISTO</span>
-                 </div>
-             </div>
-        )}
-        
-        {!isUnlocked && !isWatched && (
-            <div className="absolute bottom-2 left-2 bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-500/20 pointer-events-none">
-                {video.price} $
-            </div>
-        )}
-      </div>
+            {isWatched && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px] pointer-events-none">
+                    <div className="flex items-center gap-2 text-slate-200 bg-indigo-600/80 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
+                        <CheckCircle2 size={14} /> <span className="text-[10px] font-black tracking-widest uppercase">VISTO</span>
+                    </div>
+                </div>
+            )}
+            
+            {!isUnlocked && !isWatched && (
+                <div className="absolute bottom-2 left-2 bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-500/20 pointer-events-none">
+                    {video.price} $
+                </div>
+            )}
+          </div>
+      )}
 
       {/* Footer: Interactions */}
       <div className="p-1">
@@ -870,11 +966,9 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       {showShareModal && (
           <ShareModal 
             video={video} 
-            user={user} 
             onClose={() => setShowShareModal(false)}
-            onShareSuccess={(target) => {
+            onShared={() => {
                 setSharesCount(prev => prev + 1);
-                setShowShareModal(false);
             }}
           />
       )}

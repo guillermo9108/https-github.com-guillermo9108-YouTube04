@@ -108,6 +108,26 @@ function video_process_rows(&$rows) {
                 }
             }
         }
+
+        // Fetch original video if this is a reshare
+        if (!empty($v['originalId']) && !isset($v['originalVideo'])) {
+            $stmt = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole 
+                                   FROM videos v LEFT JOIN users u ON v.creatorId = u.id 
+                                   WHERE v.id = ?");
+            $stmt->execute([$v['originalId']]);
+            $orig = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($orig) {
+                // Avoid infinite recursion by not processing originalVideo recursively if it also has originalId?
+                // Actually, let's process it but depth limited or just once.
+                // To keep it simple and avoid infinite loops (even if data is corrupted):
+                $v['originalVideo'] = $orig;
+                $temp = [$v['originalVideo']];
+                // We call process_rows but we need a way to stop extra deep recursion if needed.
+                // But typically there are no loops in reshares.
+                video_process_rows($temp); 
+                $v['originalVideo'] = $temp[0];
+            }
+        }
     }
 }
 
@@ -241,7 +261,11 @@ function video_get_all($pdo) {
         // Shorts are included to be grouped by the frontend into the Reels section
     }
     
-    if (!empty($search)) { $where[] = "v.title LIKE ?"; $params[] = "%$search%"; }
+    if (!empty($search)) { 
+        $where[] = "(v.title LIKE ? OR v.description LIKE ?)"; 
+        $params[] = "%$search%"; 
+        $params[] = "%$search%"; 
+    }
     if (!empty($category) && $category !== 'TODOS') { $where[] = "v.category = ?"; $params[] = $category; }
     
     $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
@@ -431,6 +455,16 @@ function video_get_all($pdo) {
         }
     }
 
+    $users = [];
+    if (!empty($search) && $offset === 0) {
+        $userStmt = $pdo->prepare("SELECT id, username, avatarUrl, role FROM users WHERE username LIKE ? LIMIT 5");
+        $userStmt->execute(["%$search%"]);
+        $users = $userStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach($users as &$u) {
+            $u['avatarUrl'] = fix_url($u['avatarUrl']);
+        }
+    }
+
     respond(true, [
         'videos' => $videos, 
         'folders' => $subfolders, 
@@ -438,7 +472,8 @@ function video_get_all($pdo) {
         'total' => (int)$totalCount, 
         'hasMore' => ($offset + $limit) < $totalCount,
         'appliedSortOrder' => $effectiveSort,
-        'navigationInfo' => $navigationInfo
+        'navigationInfo' => $navigationInfo,
+        'users' => $users
     ]);
 }
 
@@ -992,6 +1027,42 @@ function video_increment_share($pdo, $videoId) {
     $stmt = $pdo->prepare("UPDATE videos SET shares = shares + 1 WHERE id = ?");
     $stmt->execute([$videoId]);
     respond(true);
+}
+
+function video_reshare($pdo, $input) {
+    $originalId = $input['originalId'] ?? '';
+    $userId = $input['userId'] ?? '';
+    $description = $input['description'] ?? '';
+    
+    if (!$originalId || !$userId) respond(false, null, "Faltan parámetros");
+    
+    // Obtener datos del video original
+    $stmtO = $pdo->prepare("SELECT * FROM videos WHERE id = ?");
+    $stmtO->execute([$originalId]);
+    $orig = $stmtO->fetch();
+    
+    if (!$orig) respond(false, null, "Publicación original no encontrada");
+    
+    $newId = uniqid('reshare_');
+    $now = time();
+    
+    // Crear el nuevo post (repost)
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, creatorId, createdAt, originalId, category, is_audio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $newId,
+        $orig['title'],
+        $description,
+        $userId,
+        $now,
+        $originalId,
+        $orig['category'],
+        $orig['is_audio']
+    ]);
+    
+    // Incrementar shares del original
+    $pdo->prepare("UPDATE videos SET shares = shares + 1 WHERE id = ?")->execute([$originalId]);
+    
+    respond(true, ['id' => $newId]);
 }
 
 function smartParseFilename($path, $currentCategory, $categories) {

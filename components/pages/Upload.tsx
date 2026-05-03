@@ -32,6 +32,43 @@ export default function Upload() {
   const [prices, setPrices] = useState<number[]>([]); 
   
   const [bulkDesc, setBulkDesc] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
+  const [showTags, setShowTags] = useState(false);
+  const [activeInput, setActiveInput] = useState<{idx: number | 'bulk', pos: number} | null>(null);
+
+  const handleTextChange = async (val: string, pos: number, idx: number | 'bulk') => {
+    if (idx === 'bulk') setBulkDesc(val);
+    else updateDescription(idx, val);
+    
+    setActiveInput({ idx, pos });
+
+    const textBeforeCursor = val.slice(0, pos);
+    const match = textBeforeCursor.match(/#(\w*)$/);
+    
+    if (match) {
+        const query = match[1];
+        const suggestions = await db.getHashtagSuggestions(query);
+        setTagSuggestions(suggestions);
+        setShowTags(true);
+    } else {
+        setShowTags(false);
+    }
+  };
+
+  const selectHashtag = (tag: string) => {
+    if (!activeInput) return;
+    const { idx, pos } = activeInput;
+    const currentVal = idx === 'bulk' ? bulkDesc : descriptions[idx as number];
+    
+    const textBefore = currentVal.slice(0, pos);
+    const textAfter = currentVal.slice(pos);
+    const newTextBefore = textBefore.replace(/#(\w*)$/, tag + ' ');
+    
+    if (idx === 'bulk') setBulkDesc(newTextBefore + textAfter);
+    else updateDescription(idx as number, newTextBefore + textAfter);
+    
+    setShowTags(false);
+  };
   const [bulkCategory, setBulkCategory] = useState<string>(VideoCategory.PERSONAL);
   const [bulkPrice, setBulkPrice] = useState<string>('');
 
@@ -251,12 +288,30 @@ export default function Upload() {
                     <Edit3 size={16} />
                     <span className="text-xs font-bold uppercase">Ajustes para todos</span>
                 </div>
-                <textarea 
-                    value={bulkDesc}
-                    onChange={e => setBulkDesc(e.target.value)}
-                    placeholder="Descripción para todos los archivos..."
-                    className="w-full bg-[#3a3b3c] border border-[#3e4042] rounded-md px-3 py-2 text-sm text-[#e4e6eb] outline-none focus:border-[#2d88ff] resize-none h-20 placeholder-[#b0b3b8]"
-                />
+                <div className="relative">
+                    <textarea 
+                        value={bulkDesc}
+                        onChange={e => handleTextChange(e.target.value, e.target.selectionStart, 'bulk')}
+                        onKeyUp={e => handleTextChange((e.target as any).value, (e.target as any).selectionStart, 'bulk')}
+                        placeholder="Descripción para todos los archivos..."
+                        className="w-full bg-[#3a3b3c] border border-[#3e4042] rounded-md px-3 py-2 text-sm text-[#e4e6eb] outline-none focus:border-[#2d88ff] resize-none h-20 placeholder-[#b0b3b8]"
+                    />
+                    {showTags && activeInput?.idx === 'bulk' && tagSuggestions.length > 0 && (
+                        <div className="absolute bottom-full left-0 right-0 bg-[#242526] border border-[#3e4042] rounded-lg shadow-xl z-[100] max-h-[150px] overflow-y-auto mb-1">
+                            {tagSuggestions.map((s, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => selectHashtag(s.label)}
+                                    className="w-full text-left px-3 py-2 hover:bg-[#3a3b3c] flex items-center justify-between transition-colors"
+                                >
+                                    <span className="text-xs font-bold text-[#1877f2]">{s.label}</span>
+                                    {s.count > 0 && <span className="text-[10px] text-[#b0b3b8]">{s.count}</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                     <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-1">
                         <label className="block text-[9px] font-bold text-[#b0b3b8] uppercase">Categoría</label>
@@ -331,13 +386,29 @@ export default function Upload() {
                         </div>
                     </div>
 
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-2 relative">
                         <textarea 
                             value={descriptions[idx]}
-                            onChange={e => updateDescription(idx, e.target.value)}
+                            onChange={e => handleTextChange(e.target.value, e.target.selectionStart, idx)}
+                            onKeyUp={e => handleTextChange((e.target as any).value, (e.target as any).selectionStart, idx)}
                             className="w-full bg-[#18191a] border border-[#3e4042] rounded-md px-3 py-2 text-[12px] text-[#e4e6eb] outline-none focus:border-[#2d88ff] resize-none h-16 placeholder-[#b0b3b8]"
                             placeholder="Escribe algo sobre este archivo..."
                         />
+                        {showTags && activeInput?.idx === idx && tagSuggestions.length > 0 && (
+                            <div className="absolute bottom-full left-0 right-0 bg-[#242526] border border-[#3e4042] rounded-lg shadow-xl z-[100] max-h-[150px] overflow-y-auto mb-1">
+                                {tagSuggestions.map((s, sidx) => (
+                                    <button
+                                        key={sidx}
+                                        type="button"
+                                        onClick={() => selectHashtag(s.label)}
+                                        className="w-full text-left px-3 py-2 hover:bg-[#3a3b3c] flex items-center justify-between transition-colors"
+                                    >
+                                        <span className="text-xs font-bold text-[#1877f2]">{s.label}</span>
+                                        {s.count > 0 && <span className="text-[10px] text-[#b0b3b8]">{s.count}</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         
                         <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col bg-[#3a3b3c] px-3 py-1.5 rounded border border-[#3e4042]">

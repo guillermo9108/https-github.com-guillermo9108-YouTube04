@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Video, Comment, UserInteraction, Category } from '../../types';
+import InteractiveDescription from '../InteractiveDescription';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -18,6 +19,21 @@ import CommentSection from '../watch/CommentSection';
 import ShareModal from '../ShareModal';
 
 const naturalCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+const formatTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor(Date.now() / 1000 - timestamp);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " a";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " m";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " d";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " h";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " min";
+    return "Ahora";
+};
 
 export default function Watch() {
     const { id } = useParams();
@@ -649,10 +665,28 @@ export default function Watch() {
                         </div>
                     </div>
 
+                    {video.originalVideo && (
+                         <div className="bg-slate-900/40 p-4 mb-4 rounded-2xl border border-white/5 flex items-center gap-3">
+                             <Link to={`/channel/${video.originalVideo.creatorId}`} className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                                 <img src={video.originalVideo.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                             </Link>
+                             <div className="flex-1 min-w-0">
+                                 <div className="flex items-center gap-1.5 min-w-0">
+                                     <Link to={`/channel/${video.originalVideo.creatorId}`} className="font-bold text-sm text-white hover:text-indigo-400 truncate">@{video.originalVideo.creatorName}</Link>
+                                     <CheckCircle2 size={12} className="text-blue-500 shrink-0" />
+                                 </div>
+                                 <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider line-clamp-1">Publicación Original • {formatTimeAgo(video.originalVideo.createdAt)}</div>
+                             </div>
+                             <Link to={`/watch/${video.originalVideo.id}`} className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
+                                 <ArrowRightCircle size={20} />
+                             </Link>
+                         </div>
+                    )}
+
                     {video?.description && (
                         <div className="bg-slate-900/50 p-6 rounded-[32px] border border-white/5 text-sm text-slate-300 leading-relaxed whitespace-pre-wrap mb-8">
                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Descripción del Contenido</h3>
-                            {video.description}
+                            <InteractiveDescription text={video.description} />
                         </div>
                     )}
 
@@ -791,10 +825,9 @@ export default function Watch() {
             {showShareModal && video && (
                 <ShareModal 
                     video={video} 
-                    user={user} 
                     onClose={() => setShowShareModal(false)}
-                    onShareSuccess={(targetUsername) => {
-                        toast.success(`Video enviado a @${targetUsername}`);
+                    onShared={() => {
+                        toast.success(`Video compartido correctamente`);
                         setShowShareModal(false);
                     }}
                 />

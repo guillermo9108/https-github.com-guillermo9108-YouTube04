@@ -345,11 +345,11 @@ const MessageItem = React.memo(({ msg, isMe, showAvatar, otherUser, user, onNavi
                     {isMe && (
                         <div className="flex items-center">
                             {msg.isRead ? (
-                                <CheckCheck size={12} className="text-blue-400" />
+                                <CheckCheck size={12} className="text-sky-400 animate-in zoom-in duration-300" />
                             ) : msg.isDelivered ? (
-                                <CheckCheck size={12} className="text-gray-400" />
+                                <CheckCheck size={12} className="text-gray-400 opacity-70" />
                             ) : (
-                                <Check size={12} className="text-gray-400" />
+                                <Check size={12} className="text-gray-400 opacity-50" />
                             )}
                         </div>
                     )}
@@ -851,8 +851,8 @@ export default function ChatDetailPage() {
 
                 <AnimatePresence initial={false}>
                     {messages.map((msg, index) => {
-                        const isMe = msg.senderId === user?.id;
-                        const showAvatar = !isMe && (index === messages.length - 1 || messages[index + 1].senderId !== msg.senderId);
+                        const isMe = String(msg.senderId) === String(user?.id);
+                        const showAvatar = !isMe && (index === messages.length - 1 || String(messages[index + 1].senderId) !== String(msg.senderId));
                         
                         return (
                             <MessageItem 

@@ -213,6 +213,7 @@ try {
         case 'update_video': video_update($pdo, $input); break;
         case 'delete_video': video_delete($pdo, $input); break;
         case 'increment_share': video_increment_share($pdo, $_GET['id'] ?? ''); break;
+        case 'reshare_video': video_reshare($pdo, $input); break;
         case 'get_folders': respond(true, video_discover_subfolders($pdo, $_GET['path'] ?? '')); break;
         case 'get_scan_folders': video_get_scan_folders($pdo); break;
         case 'get_admin_library_stats': video_get_admin_stats($pdo); break;
@@ -225,6 +226,7 @@ try {
         case 'stream_sub': streamSubtitle($_GET['id'] ?? '', $_GET['ext'] ?? 'vtt', $pdo); break;
         case 'save_search': interact_save_search($pdo, $input); break;
         case 'get_search_suggestions': interact_get_search_suggestions($pdo, $_GET['q'] ?? '', $_GET['limit'] ?? 5); break;
+        case 'get_hashtag_suggestions': interact_get_hashtag_suggestions($pdo, $_GET['q'] ?? '', $_GET['limit'] ?? 10); break;
         case 'get_video_likers': interact_get_video_likers($pdo, $_GET['videoId'] ?? '', $_GET['userId'] ?? null); break;
         case 'get_user_followers': interact_get_user_followers($pdo, $_GET['userId'] ?? ''); break;
         case 'has_purchased': interact_has_purchased($pdo, $_GET['userId'] ?? '', $_GET['videoId'] ?? ''); break;

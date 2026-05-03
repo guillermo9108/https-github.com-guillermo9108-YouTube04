@@ -13,6 +13,38 @@ export default function CreatePost() {
     const [files, setFiles] = useState<File[]>([]);
     const [previews, setPreviews] = useState<string[]>([]);
     const [description, setDescription] = useState('');
+    const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
+    const [showTags, setShowTags] = useState(false);
+    const [cursorPos, setCursorPos] = useState(0);
+
+    const handleTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        const pos = e.target.selectionStart;
+        setDescription(val);
+        setCursorPos(pos);
+
+        // Buscar si el usuario acaba de escribir un # o está dentro de uno
+        const textBeforeCursor = val.slice(0, pos);
+        const match = textBeforeCursor.match(/#(\w*)$/);
+        
+        if (match) {
+            const query = match[1];
+            const suggestions = await db.getHashtagSuggestions(query);
+            setTagSuggestions(suggestions);
+            setShowTags(true);
+        } else {
+            setShowTags(false);
+        }
+    };
+
+    const selectHashtag = (tag: string) => {
+        const textBefore = description.slice(0, cursorPos);
+        const textAfter = description.slice(cursorPos);
+        
+        const newTextBefore = textBefore.replace(/#(\w*)$/, tag + ' ');
+        setDescription(newTextBefore + textAfter);
+        setShowTags(false);
+    };
     const [isUploading, setIsUploading] = useState(false);
     const [durations, setDurations] = useState<number[]>([]);
 
@@ -141,13 +173,30 @@ export default function CreatePost() {
                     </div>
                 </div>
 
-                {/* Text Input */}
-                <textarea 
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="¿Qué estás pensando?"
-                    className="w-full bg-transparent border-none text-lg text-[#e4e6eb] placeholder-[#b0b3b8] focus:ring-0 resize-none min-h-[120px]"
-                />
+                <div className="relative">
+                    <textarea 
+                        value={description}
+                        onChange={handleTextChange}
+                        onKeyUp={e => setCursorPos((e.target as any).selectionStart)}
+                        placeholder="¿Qué estás pensando?"
+                        className="w-full bg-transparent border-none text-lg text-[#e4e6eb] placeholder-[#b0b3b8] focus:ring-0 resize-none min-h-[120px]"
+                    />
+                    
+                    {showTags && tagSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 bg-[#242526] border border-[#3e4042] rounded-lg shadow-xl z-[100] max-h-[180px] overflow-y-auto mt-1">
+                            {tagSuggestions.map((s, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => selectHashtag(s.label)}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-[#3a3b3c] flex items-center justify-between group transition-colors"
+                                >
+                                    <span className="text-sm font-bold text-[#1877f2]">{s.label}</span>
+                                    {s.count > 0 && <span className="text-[10px] text-[#b0b3b8]">{s.count} usos</span>}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 {/* Image Previews */}
                 {previews.length > 0 && (

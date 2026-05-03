@@ -153,6 +153,7 @@ export default function Home() {
     const [watchedIds, setWatchedIds] = useState<string[]>([]);
     const [followingIds, setFollowingIds] = useState<string[]>([]);
     const [notifs, setNotifs] = useState<AppNotification[]>([]);
+    const [foundUsers, setFoundUsers] = useState<User[]>([]);
 
     // Pull to refresh state
     const [refreshing, setRefreshing] = useState(false);
@@ -235,6 +236,7 @@ export default function Home() {
             const res = await db.getVideos(p, 40, currentFolder, searchQuery, selectedCategory, mediaFilter, effectiveSort, user?.id);
             
             if (reset) {
+                setFoundUsers(res.users || []);
                 let finalVideos = res.videos;
                 
                 // Refuerzo de búsqueda multi-término local
@@ -932,6 +934,34 @@ export default function Home() {
                                     </h2>
                                 </div> 
                             )}
+                            {searchQuery && foundUsers.length > 0 && (
+                                <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)]">
+                                    <div className="flex items-center justify-between p-3">
+                                        <h2 className="text-sm font-bold text-[var(--text-primary)]">Usuarios encontrados</h2>
+                                    </div>
+                                    <div className="flex gap-4 px-3 pb-4 overflow-x-auto scrollbar-hide">
+                                        {foundUsers.map(u => (
+                                            <div 
+                                                key={u.id} 
+                                                onClick={() => navigate(`/channel/${u.id}`)}
+                                                className="flex flex-col items-center gap-1 shrink-0 cursor-pointer active:scale-95 transition-transform"
+                                            >
+                                                <div className="w-14 h-14 rounded-full border-2 border-[var(--accent)] p-0.5">
+                                                    {u.avatarUrl ? (
+                                                        <img src={getThumbnailUrl(u.avatarUrl) || ''} className="w-full h-full object-cover rounded-full" />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-[var(--bg-tertiary)] rounded-full flex items-center justify-center text-lg font-bold">
+                                                            {u.username[0].toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] font-bold text-[var(--text-primary)] max-w-[70px] truncate">{u.username}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {searchQuery && ( 
                                 <div className="flex items-center justify-between p-3 border-b border-[var(--divider)]">
                                     <h2 className="text-sm font-bold text-[var(--text-primary)]">Resultados: {searchQuery}</h2>

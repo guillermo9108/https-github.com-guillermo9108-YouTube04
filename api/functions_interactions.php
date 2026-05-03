@@ -9,11 +9,51 @@ function interact_save_search($pdo, $input) {
     respond(true);
 }
 
-function interact_get_search_suggestions($pdo, $q, $limit = 5) {
+function interact_get_hashtag_suggestions($pdo, $q, $limit = 10) {
+    $q = trim($q, '# ');
     $limit = (int)$limit;
-    $q = trim($q); if (empty($q)) respond(true, $pdo->query("SELECT term as label, 'HISTORY' as type FROM search_history ORDER BY count DESC LIMIT 6")->fetchAll());
-    $stmt = $pdo->prepare("SELECT title as label, id, 'VIDEO' as type FROM videos WHERE title LIKE ? LIMIT $limit");
-    $stmt->execute(["%$q%"]); respond(true, $stmt->fetchAll());
+    
+    // Búsqueda simple en descripciones para encontrar hashtags que comiencen con $q
+    // LIMIT 100 para no procesar demasiadas filas, luego extraemos con regex
+    $stmt = $pdo->prepare("SELECT description FROM videos WHERE description LIKE ? LIMIT 100");
+    $stmt->execute(["%#$q%"]);
+    $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    $tags = [];
+    foreach ($rows as $desc) {
+        if (preg_match_all('/#(\w+)/', $desc, $matches)) {
+            foreach ($matches[1] as $tag) {
+                if (stripos($tag, $q) === 0) {
+                    $tags[$tag] = ($tags[$tag] ?? 0) + 1;
+                }
+            }
+        }
+    }
+    
+    arsort($tags);
+    $results = [];
+    foreach (array_slice(array_keys($tags), 0, $limit) as $t) {
+        $results[] = ['label' => "#$t", 'value' => $t];
+    }
+    
+    respond(true, $results);
+}
+    $limit = (int)$limit;
+    $q = trim($q); 
+    if (empty($q)) respond(true, $pdo->query("SELECT term as label, 'HISTORY' as type FROM search_history ORDER BY count DESC LIMIT 6")->fetchAll());
+    
+    // Sugerencias de Usuarios
+    $stmtU = $pdo->prepare("SELECT id, username as label, avatarUrl, 'USER' as type FROM users WHERE username LIKE ? LIMIT 5");
+    $stmtU->execute(["%$q%"]);
+    $uResults = $stmtU->fetchAll(PDO::FETCH_ASSOC);
+    foreach($uResults as &$u) $u['avatarUrl'] = fix_url($u['avatarUrl']);
+
+    // Sugerencias de Contenido (Videos/Audios)
+    $stmtV = $pdo->prepare("SELECT id, title as label, (CASE WHEN is_audio = 1 THEN 'AUDIO' ELSE 'VIDEO' END) as type FROM videos WHERE title LIKE ? LIMIT $limit");
+    $stmtV->execute(["%$q%"]); 
+    $vResults = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+    
+    respond(true, array_merge($uResults, $vResults));
 }
 
 function send_direct_notification($pdo, $userId, $type, $text, $link, $avatarUrl = null, $metadata = null) {
@@ -537,10 +577,13 @@ function interact_get_messages($pdo, $input) {
     $messages = array_reverse($messages);
     
     foreach ($messages as &$m) {
-        if ($m['imageUrl']) $m['imageUrl'] = fix_url($m['imageUrl']);
-        if ($m['videoUrl']) $m['videoUrl'] = fix_url($m['videoUrl']);
-        if ($m['audioUrl']) $m['audioUrl'] = fix_url($m['audioUrl']);
-        if ($m['fileUrl']) $m['fileUrl'] = fix_url($m['fileUrl']);
+        if (isset($m['imageUrl']) && $m['imageUrl']) $m['imageUrl'] = fix_url($m['imageUrl']);
+        if (isset($m['videoUrl']) && $m['videoUrl']) $m['videoUrl'] = fix_url($m['videoUrl']);
+        if (isset($m['audioUrl']) && $m['audioUrl']) $m['audioUrl'] = fix_url($m['audioUrl']);
+        if (isset($m['fileUrl']) && $m['fileUrl']) $m['fileUrl'] = fix_url($m['fileUrl']);
+        
+        $m['isRead'] = (int)$m['isRead'] === 1;
+        $m['isDelivered'] = (int)$m['isDelivered'] === 1;
     }
     
     respond(true, $messages);
