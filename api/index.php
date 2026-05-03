@@ -3,6 +3,8 @@
  * StreamPay - Core Controller V12.0 (Stability & Fallback Fix)
  */
 ob_start(); 
+require_once __DIR__ . '/functions_utils.php';
+write_log("API Request: " . ($_GET['action'] ?? 'none') . " from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
 ini_set('display_errors', 0); 
 error_reporting(E_ALL);
 date_default_timezone_set('UTC');
@@ -21,8 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Bloquear cualquier salida HTML que no sea JSON
-require_once 'functions_utils.php';
-require_once 'functions_app.php';
+require_once __DIR__ . '/functions_app.php';
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     if (!(error_reporting() & $errno)) return false;
@@ -41,7 +42,7 @@ register_shutdown_function(function() {
     }
 });
 
-$configFile = 'db_config.json';
+$configFile = __DIR__ . '/db_config.json';
 
 // Permitir verificar instalación sin tener el config
 if (isset($_GET['action']) && $_GET['action'] === 'check_installation') {
@@ -100,17 +101,17 @@ try {
     }
 }
 
-require_once 'functions_auth.php';
-require_once 'functions_videos.php';
-require_once 'functions_interactions.php';
-require_once 'functions_market.php';
-require_once 'functions_admin.php';
-require_once 'functions_portability.php';
-require_once 'functions_analytics.php';
+require_once __DIR__ . '/functions_auth.php';
+require_once __DIR__ . '/functions_videos.php';
+require_once __DIR__ . '/functions_interactions.php';
+require_once __DIR__ . '/functions_market.php';
+require_once __DIR__ . '/functions_admin.php';
+require_once __DIR__ . '/functions_portability.php';
+require_once __DIR__ . '/functions_analytics.php';
 // Verificar sincronización de esquema (periódico)
 $syncCache = sys_get_temp_dir() . '/sp_schema_synced_' . md5($configFile) . '.txt';
 if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
-    require_once 'functions_schema.php';
+    require_once __DIR__ . '/functions_schema.php';
     $schema = getAppSchema();
     foreach ($schema as $tableName => $def) {
         syncTable($pdo, $tableName, $def);
@@ -118,8 +119,8 @@ if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
     @file_put_contents($syncCache, time());
 }
 
-if (file_exists('functions_ftp.php')) require_once 'functions_ftp.php';
-if (file_exists('functions_payment.php')) require_once 'functions_payment.php';
+if (file_exists(__DIR__ . '/functions_ftp.php')) require_once __DIR__ . '/functions_ftp.php';
+if (file_exists(__DIR__ . '/functions_payment.php')) require_once __DIR__ . '/functions_payment.php';
 
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 if (!is_array($input)) $input = [];

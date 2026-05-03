@@ -18,8 +18,22 @@ async function startServer() {
 
   // Start PHP server for API
   console.log("Starting PHP server on port 8005...");
-  const php = spawn("php", ["-S", "0.0.0.0:8005", "-t", "."], {
-    stdio: "inherit"
+  const fs = await import("fs");
+  const phpLog = fs.createWriteStream("php_server.log");
+  const php = spawn("php", ["-S", "127.0.0.1:8005", "-t", "api"], {
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  php.stdout?.pipe(phpLog);
+  php.stderr?.pipe(phpLog);
+  
+  php.on("error", (err) => {
+    console.error("Failed to start PHP process:", err);
+    fs.appendFileSync("php_server.log", `Failed to start PHP process: ${err.message}\n`);
+  });
+
+  php.on("exit", (code, signal) => {
+    console.log(`PHP process exited with code ${code} and signal ${signal}`);
+    fs.appendFileSync("php_server.log", `PHP process exited with code ${code} and signal ${signal}\n`);
   });
 
   // Start Streamer server on port 3001
@@ -192,19 +206,134 @@ async function startServer() {
     pathRewrite: { "^/api/video": "/video" },
   }));
 
-  // 3. Catch-all PHP Backend Proxy
+  // 3. Node.js API Fallback (since PHP is missing in this environment)
+  const Database = (await import("better-sqlite3")).default;
+  const bcrypt = (await import("bcryptjs")).default;
+  const db = new Database("api/database.sqlite");
+
+  // Initialize DB Schema if missing
+  db.exec(`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'USER',
+    balance DECIMAL(10,2) DEFAULT 0,
+    avatarUrl TEXT,
+    currentSessionId TEXT,
+    lastActive INTEGER,
+    lastDeviceId TEXT,
+    shippingDetails TEXT,
+    watchLater TEXT,
+    defaultPrices TEXT
+  )`);
+  
+  db.exec(`CREATE TABLE IF NOT EXISTS videos (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) DEFAULT 0,
+    thumbnailUrl TEXT,
+    videoUrl TEXT,
+    creatorId TEXT,
+    views INTEGER DEFAULT 0,
+    createdAt INTEGER,
+    category TEXT DEFAULT 'GENERAL',
+    duration INTEGER DEFAULT 0,
+    isLocal INTEGER DEFAULT 0,
+    transcode_status TEXT DEFAULT 'NONE'
+  )`);
+
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  app.all(["/api/index.php", "/api/install.php"], async (req, res) => {
+    const action = req.query.action || req.body.action;
+    console.log(`Node API Fallback: ${action}`);
+
+    try {
+      if (action === 'check_installation' || action === 'check') {
+        return res.json({ success: true, data: { installed: true } });
+      }
+
+      if (action === 'login') {
+        const { username, password } = req.body;
+        const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        if (user && bcrypt.compareSync(password, user.password_hash)) {
+          const sid = Math.random().toString(36).substring(2);
+          db.prepare("UPDATE users SET currentSessionId = ?, lastActive = ? WHERE id = ?")
+            .run(sid, Math.floor(Date.now() / 1000), user.id);
+          delete user.password_hash;
+          user.sessionToken = sid;
+          return res.json({ success: true, data: user });
+        }
+        return res.json({ success: false, error: "Credenciales inválidas" });
+      }
+
+      if (action === 'register') {
+        const { username, password } = req.body;
+        const id = 'u_' + Date.now();
+        const hash = bcrypt.hashSync(password, 10);
+        try {
+          db.prepare("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)")
+            .run(id, username, hash);
+          const sid = Math.random().toString(36).substring(2);
+          db.prepare("UPDATE users SET currentSessionId = ?, lastActive = ? WHERE id = ?")
+            .run(sid, Math.floor(Date.now() / 1000), id);
+          const user = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
+          delete user.password_hash;
+          user.sessionToken = sid;
+          return res.json({ success: true, data: user });
+        } catch (e) {
+          return res.json({ success: false, error: "El usuario ya existe" });
+        }
+      }
+
+      if (action === 'video_get_all') {
+        const videos = db.prepare("SELECT * FROM videos ORDER BY createdAt DESC").all();
+        return res.json({ success: true, data: videos, appliedSortOrder: 'LATEST' });
+      }
+
+      if (action === 'get_system_settings') {
+        return res.json({ success: true, data: {
+          currencyConversion: 300,
+          videoCommission: 20,
+          marketCommission: 25,
+          transferFee: 5,
+          latestApkVersion: '1.0.0',
+          defaultAvatar: 'api/uploads/avatars/default.png'
+        }});
+      }
+
+      // Fallback for actions not yet implemented in Node.js
+      return res.status(501).json({ success: false, error: `Action '${action}' not implemented in Node.js fallback. PHP is missing in this environment.` });
+
+    } catch (err: any) {
+      console.error("Node API Error:", err);
+      return res.status(500).json({ success: true, error: err.message });
+    }
+  });
+
+  // 4. Catch-all PHP Backend Proxy (will mostly fail here, but kept for non-index.php requests if any)
   app.use("/api", createProxyMiddleware({
-    target: "http://localhost:8005",
+    target: "http://127.0.0.1:8005",
     changeOrigin: true,
+    pathRewrite: { "^/api": "" },
     on: {
       proxyReq: (proxyReq, req, res) => {
-        // Direct streaming for FormData/POST requests
+        console.log(`Proxying ${req.method} ${req.url} to PHP server`);
+        // Fix for POST requests with body
+        if ((req as any).body) {
+          const bodyData = JSON.stringify((req as any).body);
+          proxyReq.setHeader('Content-Type', 'application/json');
+          proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+          proxyReq.write(bodyData);
+        }
       },
       error: (err, req, res) => {
         console.error("Proxy Error (PHP):", err);
         const response = res as any;
-        if (response && response.status && !response.headersSent) {
-          response.status(502).json({ success: false, error: "PHP Gateway Error" });
+        if (response.headersSent === false) {
+          response.status(502).json({ success: false, error: "PHP Gateway Error: " + err.message });
         }
       }
     }

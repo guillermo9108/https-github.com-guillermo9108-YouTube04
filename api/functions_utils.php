@@ -7,7 +7,7 @@ function write_log($msg, $level = 'INFO') {
     try {
         $date = date('Y-m-d H:i:s');
         $line = "[$date] [$level] $msg" . PHP_EOL;
-        @file_put_contents('transcode_log.txt', $line, FILE_APPEND);
+        @file_put_contents(__DIR__ . '/transcode_log.txt', $line, FILE_APPEND);
     } catch (Throwable $e) {}
 }
 
