@@ -26,6 +26,8 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
         }).catch(() => {});
     }, []);
 
+    const shareUrl = `${window.location.origin}/watch/${video.id}`;
+
     const handleShareNow = async () => {
         if (!user) {
             toast.error("Debes iniciar sesión para compartir");
@@ -42,6 +44,68 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
             toast.error(err.message || "Error al compartir");
         } finally {
             setIsSharing(false);
+        }
+    };
+
+    const handleWhatsAppShare = () => {
+        const text = encodeURIComponent(`${video.title}\n${shareUrl}`);
+        window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+        onClose();
+    };
+
+    const handleNativeShare = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: video.title,
+                    text: video.description,
+                    url: shareUrl,
+                });
+            } catch (err) {}
+        } else {
+            navigator.clipboard.writeText(shareUrl);
+            toast.success("Enlace copiado al portapapeles");
+        }
+        onClose();
+    };
+
+    const handleStoryShare = async () => {
+        if (!user) return;
+        setIsSharing(true);
+        try {
+            const formData = new FormData();
+            formData.append('userId', user.id);
+            formData.append('title', video.title);
+            formData.append('mediaUrl', video.videoUrl || '');
+            formData.append('thumbnailUrl', video.thumbnailUrl || '');
+            formData.append('videoId', video.id); // Reference to original video
+            
+            await db.uploadStory(formData);
+            toast.success("Añadido a tu historia");
+            onClose();
+        } catch (err: any) {
+            toast.error(err.message || "Error al subir historia");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const handleShareToUser = async (targetUser: User) => {
+        if (!user) return;
+        try {
+            const isImage = video.category?.toUpperCase() === 'IMAGES';
+            await db.sendMessage({
+                userId: user.id,
+                receiverId: targetUser.id,
+                text: `Te recomendé este contenido: ${video.title}`,
+                videoUrl: !isImage ? video.videoUrl : undefined,
+                imageUrl: isImage ? video.videoUrl : undefined,
+                mediaType: isImage ? 'IMAGE' : 'VIDEO'
+            });
+            toast.success(`Enviado a ${targetUser.username}`);
+            onClose();
+        } catch (err: any) {
+            toast.error("Error al enviar mensaje");
         }
     };
 
@@ -139,7 +203,11 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
                     <div className="p-4 border-t border-white/10 bg-[#242526]">
                         <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
                             {recentUsers.map((u) => (
-                                <div key={u.id} className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer">
+                                <div 
+                                    key={u.id} 
+                                    onClick={() => handleShareToUser(u)}
+                                    className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer"
+                                >
                                     <div className="relative">
                                         <img 
                                             src={u.avatarUrl || 'https://via.placeholder.com/60'} 
@@ -155,19 +223,29 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
 
                         {/* Secondary Actions */}
                         <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-white/5">
-                            <button className="flex flex-col items-center gap-2 group">
+                            <button 
+                                onClick={handleStoryShare}
+                                disabled={isSharing}
+                                className="flex flex-col items-center gap-2 group"
+                            >
                                 <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
                                     <Users size={24} />
                                 </div>
                                 <span className="text-[10px] text-[#b0b3b8] font-bold">Tu historia</span>
                             </button>
-                            <button className="flex flex-col items-center gap-2 group">
+                            <button 
+                                onClick={handleNativeShare}
+                                className="flex flex-col items-center gap-2 group"
+                            >
                                 <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
                                     <MessageCircle size={24} />
                                 </div>
                                 <span className="text-[10px] text-[#b0b3b8] font-bold">Messenger</span>
                             </button>
-                            <button className="flex flex-col items-center gap-2 group">
+                            <button 
+                                onClick={handleWhatsAppShare}
+                                className="flex flex-col items-center gap-2 group"
+                            >
                                 <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
                                     <Share2 size={24} />
                                 </div>

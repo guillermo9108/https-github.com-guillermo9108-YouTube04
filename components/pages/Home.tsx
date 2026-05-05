@@ -557,17 +557,48 @@ export default function Home() {
 
         const isOnRoot = !searchQuery && currentFolder.length === 0 && selectedCategory === 'TODOS';
 
+        // --- GROUPING LOGIC (Same as Channel.tsx) ---
+        const categoryCounts: Record<string, number> = {};
+        validVideos.forEach(v => {
+            const cat = (v.category || '').toUpperCase();
+            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        });
+
+        const grouped: any[] = [];
+        const collectionsSeen = new Set();
+        
+        validVideos.forEach(item => {
+            const itemCat = (item.category || '').toUpperCase();
+            if (item.collection && itemCat === 'IMAGES') {
+                if (!collectionsSeen.has(item.collection)) {
+                    collectionsSeen.add(item.collection);
+                    const albumItems = validVideos.filter(v => v.collection === item.collection);
+                    grouped.push({
+                        ...item,
+                        isAlbum: true,
+                        albumItems: albumItems,
+                        categoryCount: categoryCounts[itemCat]
+                    });
+                }
+            } else {
+                grouped.push({
+                    ...item,
+                    categoryCount: categoryCounts[itemCat]
+                });
+            }
+        });
+
         if (!isOnRoot) {
             // Standard Greedy Logic for Search/Folders/Categories
             const result: any[] = [];
             let i = 0;
-            while (i < validVideos.length) {
-                const item = validVideos[i];
+            while (i < grouped.length) {
+                const item = grouped[i];
                 if (!item) { i++; continue; }
                 if (isShort(item)) {
                     const group: any[] = [];
-                    while (i < validVideos.length && validVideos[i] && isShort(validVideos[i])) {
-                        group.push(validVideos[i]);
+                    while (i < grouped.length && grouped[i] && isShort(grouped[i])) {
+                        group.push(grouped[i]);
                         i++;
                     }
                     if (group.length > 0) {
@@ -588,7 +619,7 @@ export default function Home() {
 
         // --- ROOT HIERARCHICAL LOGIC (4 PHASES) ---
         // Filter out watched content for root
-        const unwatched = validVideos.filter(v => !watchedIds.includes(v.id));
+        const unwatched = grouped.filter(v => !watchedIds.includes(v.id));
         
         // Phase 1: 5 Recent
         const recent = [...unwatched].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)).slice(0, 5);

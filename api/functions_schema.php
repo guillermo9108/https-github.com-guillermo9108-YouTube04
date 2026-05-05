@@ -121,7 +121,7 @@ function getAppSchema() {
                 'sellerId' => 'VARCHAR(50)',
                 'totalAmount' => 'DECIMAL(10, 2)',
                 'paymentMethod' => "ENUM('PLATFORM', 'DIRECT') DEFAULT 'PLATFORM'",
-                'status' => "ENUM('PENDING', 'PAID', 'CANCELLED') DEFAULT 'PENDING'",
+                'status' => "ENUM('PENDING', 'PAID', 'CANCELLED', 'REJECTED') DEFAULT 'PENDING'",
                 'shippingDetails' => 'LONGTEXT',
                 'createdAt' => 'BIGINT',
                 'updatedAt' => 'BIGINT'
@@ -134,7 +134,7 @@ function getAppSchema() {
                 'itemId' => 'VARCHAR(50)',
                 'quantity' => 'INT',
                 'price' => 'DECIMAL(10, 2)',
-                'status' => "ENUM('PENDING', 'PAID') DEFAULT 'PENDING'"
+                'status' => "ENUM('PENDING', 'PAID', 'REJECTED', 'CANCELLED') DEFAULT 'PENDING'"
             ]
         ],
         'subscriptions' => [
