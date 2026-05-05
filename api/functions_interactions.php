@@ -38,6 +38,8 @@ function interact_get_hashtag_suggestions($pdo, $q, $limit = 10) {
     
     respond(true, $results);
 }
+
+function interact_get_search_suggestions($pdo, $q, $limit = 10) {
     $limit = (int)$limit;
     $q = trim($q); 
     if (empty($q)) respond(true, $pdo->query("SELECT term as label, 'HISTORY' as type FROM search_history ORDER BY count DESC LIMIT 6")->fetchAll());
