@@ -216,7 +216,7 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
                                         />
                                         {u.isOnline && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#242526] rounded-full"></div>}
                                     </div>
-                                    <span className="text-[10px] text-[#b0b3b8] max-w-[60px] truncate">{u.username.split(' ')[0]}</span>
+                                    <span className="text-[10px] text-[#b0b3b8] max-w-[60px] truncate">{(u.username || 'Usuario').split(' ')[0]}</span>
                                 </div>
                             ))}
                         </div>

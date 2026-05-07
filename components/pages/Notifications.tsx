@@ -67,12 +67,12 @@ export default function Notifications() {
             // Si el link es una ruta relativa, navegar directamente
             if (n.link.startsWith('/')) {
                 navigate(n.link);
-            } else if (n.link.includes('watch/')) {
+            } else if (n.link && n.link.includes('watch/')) {
                 // Extraer ID si el link tiene formato /watch/v_123
                 const parts = n.link.split('/');
                 const id = parts[parts.length - 1];
                 if (id) navigate(`/watch/${id}`);
-            } else {
+            } else if (n.link) {
                 navigate(n.link);
             }
         } else if (n.type === 'SALE') {

@@ -425,7 +425,7 @@ export default function AdminFinance() {
                                             <div className="flex justify-between items-start">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black uppercase text-xs">
-                                                        {req.username[0]}
+                                                        {(req.username || 'U')[0]}
                                                     </div>
                                                     <div>
                                                         <h4 className="font-black text-white text-sm">@{req.username}</h4>
@@ -499,7 +499,7 @@ export default function AdminFinance() {
                         <div className="p-8 space-y-6">
                             <div className="flex flex-col items-center gap-4 mb-4">
                                 <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white text-3xl font-black shadow-2xl">
-                                    {selectedIdentity.username[0].toUpperCase()}
+                                    {(selectedIdentity.username || 'U')[0].toUpperCase()}
                                 </div>
                                 <h3 className="font-black text-white text-xl uppercase">@{selectedIdentity.username}</h3>
                             </div>

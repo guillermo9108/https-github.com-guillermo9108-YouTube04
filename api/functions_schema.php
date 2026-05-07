@@ -403,6 +403,18 @@ function syncTable($pdo, $tableName, $def) {
                     $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN category VARCHAR(255) DEFAULT 'GENERAL'");
                     $pdo->exec("ALTER TABLE $tableName MODIFY COLUMN parent_category VARCHAR(255) DEFAULT NULL");
                 } catch(Throwable $e) {}
+
+                // PATCH ESPECÍFICO: Actualizar ENUMs de status
+                if ($tableName === 'marketplace_orders') {
+                    try {
+                        $pdo->exec("ALTER TABLE marketplace_orders MODIFY COLUMN status ENUM('PENDING', 'PAID', 'CANCELLED', 'REJECTED') DEFAULT 'PENDING'");
+                    } catch(Throwable $e) {}
+                }
+                if ($tableName === 'marketplace_order_items') {
+                    try {
+                        $pdo->exec("ALTER TABLE marketplace_order_items MODIFY COLUMN status ENUM('PENDING', 'PAID', 'REJECTED', 'CANCELLED') DEFAULT 'PENDING'");
+                    } catch(Throwable $e) {}
+                }
             }
 
             if ($driver === 'mysql') {

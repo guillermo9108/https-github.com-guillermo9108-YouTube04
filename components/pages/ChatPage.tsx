@@ -244,7 +244,7 @@ export default function ChatPage() {
                             <div className="absolute bottom-0 right-1 w-[16px] h-[16px] bg-[#45bd62] border-[3px] border-[#18191a] rounded-full shadow-lg" />
                         </div>
                         <span className="text-[11px] text-[#e4e6eb] font-medium truncate w-[64px] text-center">
-                            {f.username.split(' ')[0]}
+                            {(f.username || 'Usuario').split(' ')[0]}
                         </span>
                     </button>
                 ))}
