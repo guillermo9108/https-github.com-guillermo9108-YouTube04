@@ -1511,7 +1511,27 @@ function upload_story($pdo, $post, $files) {
     }
 
     if (!isset($files['file']) || $files['file']['error'] !== UPLOAD_ERR_OK) {
-        // If no file, but we have text, we can create a text-only story
+        // Option 1: Create story from existing video
+        if (!empty($post['videoId'])) {
+            $stmtV = $pdo->prepare("SELECT videoUrl, category, is_audio, thumbnailUrl FROM videos WHERE id = ?");
+            $stmtV->execute([$post['videoId']]);
+            $video = $stmtV->fetch();
+            
+            if ($video) {
+                $id = uniqid('story_');
+                $now = time();
+                $expiry = $now + (24 * 3600);
+                
+                $storyType = ($video['category'] === 'IMAGES') ? 'IMAGE' : 'VIDEO';
+                
+                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$id, $userId, $video['videoUrl'], $storyType, $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
+                respond(true, ['id' => $id]);
+                return;
+            }
+        }
+
+        // Option 2: Text-only story
         if ($type === 'IMAGE' && $overlayText) {
             // Create a placeholder or just use the text
             $id = uniqid('story_');

@@ -590,7 +590,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                               </div>
                           </div>
                       )}
+                      {video.originalVideo.duration > 0 && (
+                          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[9px] font-black px-1.5 py-0.5 rounded backdrop-blur-md">
+                              {formatDuration(video.originalVideo.duration)}
+                          </div>
+                      )}
                   </Link>
+              </div>
+              <div className="p-3 bg-[var(--bg-tertiary)] border-t border-[var(--divider)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mb-0.5">STREAMPAY.APP</div>
+                  <h5 className="text-[var(--text-primary)] font-bold text-sm line-clamp-1">{video.originalVideo.title}</h5>
               </div>
           </div>
       ) : (

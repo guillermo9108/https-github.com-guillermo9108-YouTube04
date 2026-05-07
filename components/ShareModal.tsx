@@ -75,9 +75,6 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
         try {
             const formData = new FormData();
             formData.append('userId', user.id);
-            formData.append('title', video.title);
-            formData.append('mediaUrl', video.videoUrl || '');
-            formData.append('thumbnailUrl', video.thumbnailUrl || '');
             formData.append('videoId', video.id); // Reference to original video
             
             await db.uploadStory(formData);
@@ -238,24 +235,15 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
                                 className="flex flex-col items-center gap-2 group"
                             >
                                 <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
-                                    <MessageCircle size={24} />
+                                    <Send size={24} />
                                 </div>
-                                <span className="text-[10px] text-[#b0b3b8] font-bold">Messenger</span>
-                            </button>
-                            <button 
-                                onClick={handleWhatsAppShare}
-                                className="flex flex-col items-center gap-2 group"
-                            >
-                                <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
-                                    <Share2 size={24} />
-                                </div>
-                                <span className="text-[10px] text-[#b0b3b8] font-bold">WhatsApp</span>
+                                <span className="text-[10px] text-[#b0b3b8] font-bold">Enviar</span>
                             </button>
                             <button className="flex flex-col items-center gap-2 group">
                                 <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
                                     <MoreHorizontal size={24} />
                                 </div>
-                                <span className="text-[10px] text-[#b0b3b8] font-bold">Grupo</span>
+                                <span className="text-[10px] text-[#b0b3b8] font-bold">Más</span>
                             </button>
                         </div>
                     </div>
