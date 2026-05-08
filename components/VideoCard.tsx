@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
 import { Link } from './Router';
-import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon, Wand2 } from 'lucide-react';
+import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon, Wand2, Scissors } from 'lucide-react';
 import InteractiveDescription from './InteractiveDescription';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
@@ -245,6 +245,21 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       }
   };
 
+  const handleSplitShorts = async (e: React.MouseEvent) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!isAdmin) return;
+    try {
+        await db.request('action=admin_add_video_to_transcode_queue', {
+            method: 'POST',
+            body: JSON.stringify({ videoId: video.id, split: 1 })
+        });
+        toast.success("Video añadido a cola con fragmentación activa");
+        setShowMenu(false);
+    } catch (err: any) {
+        toast.error(err.message || "Error al añadir a la cola");
+    }
+  };
+
   useEffect(() => {
       const handleClickOutside = (e: MouseEvent) => {
           if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -483,18 +498,31 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                             <span className="text-sm">{inWatchLater ? 'Quitar de ver más tarde' : 'Ver más tarde'}</span>
                         </button>
                         {isAdmin && (
-                            <button 
-                                onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    e.stopPropagation(); 
-                                    onConvert?.(); 
-                                    setShowMenu(false); 
-                                }} 
-                                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left"
-                            >
-                                <Wand2 size={16} className="text-amber-500" />
-                                <span className="text-sm">Convertir Video</span>
-                            </button>
+                            <>
+                                <button 
+                                    onClick={(e) => { 
+                                        e.preventDefault(); 
+                                        e.stopPropagation(); 
+                                        onConvert?.(); 
+                                        setShowMenu(false); 
+                                    }} 
+                                    className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left"
+                                >
+                                    <Wand2 size={16} className="text-amber-500" />
+                                    <span className="text-sm">Convertir Video</span>
+                                </button>
+                                <button 
+                                    onClick={(e) => { 
+                                        e.preventDefault(); 
+                                        e.stopPropagation(); 
+                                        handleSplitShorts(e);
+                                    }} 
+                                    className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left"
+                                >
+                                    <Scissors size={16} className="text-amber-500" />
+                                    <span className="text-sm">Fragmentar para Shorts</span>
+                                </button>
+                            </>
                         )}
                         {canEdit && (
                             <>

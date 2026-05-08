@@ -219,10 +219,11 @@ export default function AdminTranscoder() {
         if (isProcessingSingle) return;
         setIsProcessingSingle(true);
         try {
-            toast.info("Iniciando conversión FFmpeg...");
+            toast.info("Solicitando proceso al servidor...");
             await db.request('action=admin_process_next_transcode', { method: 'POST' });
-            toast.success("Tarea completada");
-            loadData();
+            toast.success("Trabajador FFmpeg iniciado");
+            // Esperar un momento para que el worker bloquee el video y aparezca como 'PROCESSING'
+            setTimeout(loadData, 1500);
         } catch (e: any) {
             toast.error(e.message || "Fallo FFmpeg");
         } finally {

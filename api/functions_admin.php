@@ -894,23 +894,21 @@ function admin_skip_transcode($pdo, $vid) {
 }
 
 function admin_process_next_transcode($pdo) {
-    // Disparar el worker en segundo plano para evitar bloqueos en la petición web
+    // 1. Asegurarnos que el siguiente video no esté bloqueado (lock reset)
+    $stmt = $pdo->query("SELECT id FROM videos WHERE transcode_status = 'WAITING' ORDER BY queue_priority DESC, createdAt ASC LIMIT 1");
+    $next = $stmt->fetch();
+    if ($next) {
+        $pdo->prepare("UPDATE videos SET locked_at = 0 WHERE id = ?")->execute([$next['id']]);
+    }
+
+    // 2. Disparar el worker en segundo plano
     $workerPath = __DIR__ . '/transcode_worker.php';
     if (file_exists($workerPath)) {
         // En Linux usamos nohup y redirección para asegurar que siga corriendo
-        // Agregamos ignore_user_abort para que el script siga aunque se cierre la conexión
         @shell_exec("php " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
-        respond(true, "Procesador iniciado en segundo plano");
+        respond(true, "Procesador disparado para el siguiente video en cola");
     } else {
-        // Fallback síncrono si el worker no existe
-        $bins = get_ffmpeg_binaries($pdo);
-        $ffmpeg = $bins['ffmpeg']; 
-        $stmt = $pdo->query("SELECT * FROM videos WHERE transcode_status = 'WAITING' LIMIT 1");
-        $video = $stmt->fetch();
-        if (!$video) respond(true, "Cola vacía");
-        
-        $success = _admin_perform_transcode_single($pdo, $video, ['ffmpeg' => $ffmpeg]);
-        respond($success, $success ? "Procesado correctamente" : "Fallo al procesar");
+        respond(false, null, "Script del worker no encontrado");
     }
 }
 
@@ -968,9 +966,25 @@ function admin_start_transcode_now($pdo, $input) {
     $max = $pdo->query("SELECT MAX(queue_priority) FROM videos")->fetchColumn() ?: 0;
     $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0, queue_priority = ? WHERE id = ?")->execute([$max + 1, $videoId]);
     // Ejecutar worker
-    $cmd = "php " . __DIR__ . "/video_worker.php > /dev/null 2>&1 &";
+    $cmd = "php " . __DIR__ . "/transcode_worker.php > /dev/null 2>&1 &";
     @shell_exec($cmd);
     respond(true, "Video priorizado y worker reiniciado.");
+}
+
+function admin_add_video_to_transcode_queue($pdo, $input) {
+    if (empty($input['videoId'])) respond(false, null, "ID de video faltante");
+    $videoId = $input['videoId'];
+    $split = !empty($input['split']) ? 1 : 0;
+    
+    // Si ya está en la cola, solo actualizamos el estado y split
+    $stmt = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', split_shorts = ?, encrypted = 0, locked_at = 0 WHERE id = ?");
+    $stmt->execute([$split, $videoId]);
+    
+    if ($stmt->rowCount() > 0) {
+        respond(true, "Video añadido a la cola de transcodificación");
+    } else {
+        respond(false, null, "No se encontró el video o ya estaba en cola");
+    }
 }
 
 // --- SMART CLEANER & ORPHAN SYNC ---
@@ -1936,16 +1950,17 @@ function admin_delete_physical($pdo, $input) {
 function admin_toggle_split_shorts($pdo, $input) {
     $videoId = $input['videoId'] ?? '';
     if (!$videoId) respond(false, null, "ID faltante");
-    $pdo->prepare("UPDATE videos SET split_shorts = NOT split_shorts WHERE id = ?")->execute([$videoId]);
+    $pdo->prepare("UPDATE videos SET split_shorts = CASE WHEN split_shorts = 1 THEN 0 ELSE 1 END WHERE id = ?")->execute([$videoId]);
     respond(true);
 }
 
 function admin_remove_from_queue($pdo, $input) {
-    $videoIds = $input['videoIds'] ?? [];
+    $videoIds = $input['videoIds'] ?? $input['videoId'] ?? [];
     if (!is_array($videoIds)) $videoIds = explode(',', $videoIds);
     
     $updated = 0;
     foreach ($videoIds as $id) {
+        if (empty($id)) continue;
         // Simplemente cambiar el estado de transcodificación a NONE
         $pdo->prepare("UPDATE videos SET transcode_status = 'NONE', reason = NULL WHERE id = ?")->execute([$id]);
         $updated++;

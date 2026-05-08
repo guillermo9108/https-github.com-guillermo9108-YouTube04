@@ -340,6 +340,7 @@ try {
         case 'admin_remove_from_queue': admin_remove_from_queue($pdo, $input); break;
         case 'admin_reorder_transcode_queue': admin_reorder_transcode_queue($pdo, $input); break;
         case 'admin_start_transcode_now': admin_start_transcode_now($pdo, $input); break;
+        case 'admin_add_video_to_transcode_queue': admin_add_video_to_transcode_queue($pdo, $input); break;
         case 'admin_delete_physical': admin_delete_physical($pdo, $input); break;
         case 'admin_skip_transcode': admin_skip_transcode($pdo, $_GET['videoId'] ?? ''); break;
         case 'admin_reconstruct_thumbnails': admin_reconstruct_thumbnails($pdo); break;
