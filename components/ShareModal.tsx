@@ -4,7 +4,8 @@ import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { 
-    X, Globe, ChevronDown, Users, Share2, Send, MoreHorizontal 
+    X, Globe, ChevronDown, Users, Share2, Send, MoreHorizontal,
+    Facebook, Link as LinkIcon, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -59,9 +60,8 @@ export default function ShareModal({ video, item, onClose, onShared }: ShareModa
         }
     };
 
-    const handleWhatsAppShare = () => {
-        const text = encodeURIComponent(`${title}\n${shareUrl}`);
-        window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    const handleFacebookShare = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
         onClose();
     };
 
@@ -201,14 +201,35 @@ export default function ShareModal({ video, item, onClose, onShared }: ShareModa
                             </div>
                         </div>
 
-                        {/* Share Options Footer */}
-                        <div className="flex items-center justify-end pt-2">
+                        {/* Share Options Footer - Simplified layout */}
+                        <div className="flex flex-col gap-4 pt-2">
+                             <div className="flex flex-wrap gap-3 justify-center">
+                                <button 
+                                    onClick={handleFacebookShare}
+                                    className="p-3 bg-[#1877f2]/10 text-[#1877f2] rounded-xl hover:bg-[#1877f2] hover:text-white transition-all transform active:scale-95 flex items-center gap-2"
+                                >
+                                    <Facebook size={18} />
+                                    <span className="text-xs font-bold uppercase tracking-tight">Facebook</span>
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(shareUrl);
+                                        toast.success("Enlace copiado");
+                                    }}
+                                    className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-zinc-700 transition-all transform active:scale-95 flex items-center gap-2"
+                                >
+                                    <LinkIcon size={18} />
+                                    <span className="text-xs font-bold uppercase tracking-tight">Enlace</span>
+                                </button>
+                             </div>
+
                              <button 
                                 onClick={handleShareNow}
                                 disabled={isSharing}
-                                className="bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-2 px-8 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center min-w-[150px]"
+                                className="w-full bg-[#1877f2] hover:bg-[#166fe5] text-white font-bold py-3 px-8 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center shadow-lg shadow-blue-500/20"
                              >
-                                {isSharing ? "Compartiendo..." : "Compartir ahora"}
+                                {isSharing ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
+                                {isSharing ? "Compartiendo..." : "Publicar en Feed"}
                              </button>
                         </div>
                     </div>
@@ -242,8 +263,8 @@ export default function ShareModal({ video, item, onClose, onShared }: ShareModa
                                 disabled={isSharing}
                                 className="flex flex-col items-center gap-2 group"
                             >
-                                <div className="w-12 h-12 bg-[#3a3b3c] hover:bg-[#4e4f50] rounded-full flex items-center justify-center text-white transition-colors">
-                                    <Users size={24} />
+                                <div className="w-12 h-12 bg-pink-600 hover:bg-pink-500 rounded-full flex items-center justify-center text-white transition-colors shadow-lg shadow-pink-500/20">
+                                    <ImageIcon size={24} />
                                 </div>
                                 <span className="text-[10px] text-[#b0b3b8] font-bold">Tu historia</span>
                             </button>

@@ -56,7 +56,8 @@ function getAppSchema() {
                 'size_fmt' => 'VARCHAR(20) DEFAULT NULL',
                 'queue_priority' => 'INT DEFAULT 0',
                 'originalId' => 'VARCHAR(50) DEFAULT NULL',
-                'originalMarketplaceId' => 'VARCHAR(50) DEFAULT NULL'
+                'originalMarketplaceId' => 'VARCHAR(50) DEFAULT NULL',
+                'split_shorts' => 'TINYINT(1) DEFAULT 0'
             ],
             'indices' => [
                 'idx_category' => 'category',

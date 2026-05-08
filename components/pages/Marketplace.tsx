@@ -243,7 +243,7 @@ export default function Marketplace() {
                                         e.stopPropagation();
                                         setSelectedItemForShare(item);
                                     }}
-                                    className="absolute bottom-2 left-2 p-1.5 rounded-full shadow-md bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition-all active:scale-95"
+                                    className="absolute top-2 right-2 p-1.5 rounded-full shadow-md bg-black/40 text-white backdrop-blur-md hover:bg-black/60 transition-all active:scale-95 z-20"
                                 >
                                     <Share2 size={14} />
                                 </button>

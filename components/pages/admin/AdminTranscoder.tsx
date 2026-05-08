@@ -4,7 +4,7 @@ import { useNavigate } from '../../../components/Router';
 import { 
     Cpu, RefreshCw, Play, CheckCircle2, Terminal, Layers, Clock, Zap, Pause, 
     Filter, History, AlertCircle, Activity, Box, Radio, Trash2, Settings2, 
-    Plus, X, ChevronRight, FileVideo, AlertTriangle, RotateCcw, ShieldAlert, 
+    Plus, X, ChevronRight, FileVideo, AlertTriangle, RotateCcw, ShieldAlert, Scissors,
     FileText, ScrollText, Copy, FastForward, Save, PlusCircle, Loader2, Gauge, HardDrive, Edit3, ToggleLeft, ToggleRight, Wand2,
     Image as ImageIcon
 } from 'lucide-react';
@@ -231,11 +231,43 @@ export default function AdminTranscoder() {
     };
 
     const handleAction = async (action: string) => {
+        if (action.includes('admin_remove_from_queue') && !confirm("¿Quitar de la cola de conversión?")) return;
         try {
             await db.request(`action=${action}`, { method: 'POST' });
             toast.success("Operación completada");
             loadData();
         } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleDeletePhysical = async (videoId: string) => {
+        if (!confirm("¡ATENCIÓN! Se borrará el archivo físico del disco permanentemente. ¿Continuar?")) return;
+        try {
+            await db.request(`action=delete_video`, { 
+                method: 'POST',
+                body: JSON.stringify({ id: videoId })
+            });
+            toast.success("Archivo eliminado físicamente");
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleClearQueue = async () => {
+        if (!confirm("¿Vaciar TODA la cola de transcodificación?")) return;
+        try {
+            await db.request('action=admin_clear_transcode_queue', { method: 'POST' });
+            toast.success("Cola vaciada");
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
+    const handleToggleSplit = async (videoId: string) => {
+        try {
+            await db.request(`action=admin_toggle_split_shorts&videoId=${videoId}`, { method: 'POST' });
+            setWaitingVideos(prev => prev.map(v => v.id === videoId ? { ...v, split_shorts: !(v as any).split_shorts ? 1 : 0 } : v));
+            toast.success("Ajuste de fragmentación actualizado");
+        } catch (e) {
+            toast.error("Error al actualizar fragmentación");
+        }
     };
 
     const handleReorder = async (videoId: string, direction: 'TOP' | 'UP' | 'DOWN') => {
@@ -484,22 +516,29 @@ export default function AdminTranscoder() {
                                 {selectedIds.size === waitingVideos.length ? 'Deseleccionar' : 'Todos'}
                             </button>
                             
-                            {selectedIds.size > 0 && (
-                                <div className="flex gap-2 animate-in slide-in-from-right-4">
+                                {selectedIds.size > 0 ? (
+                                    <div className="flex gap-2 animate-in slide-in-from-right-4">
+                                        <button 
+                                            onClick={() => handleBulkAction('admin_remove_from_queue')}
+                                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-500 uppercase rounded-xl transition-all border border-red-500/20"
+                                        >
+                                            Quitar de Cola ({selectedIds.size})
+                                        </button>
+                                        <button 
+                                            onClick={handleBulkDeletePhysical}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-[10px] font-black text-white uppercase rounded-xl shadow-lg shadow-red-900/40 transition-all"
+                                        >
+                                            Borrar Disco
+                                        </button>
+                                    </div>
+                                ) : (
                                     <button 
-                                        onClick={() => handleBulkAction('admin_remove_from_queue')}
-                                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-500 uppercase rounded-xl transition-all border border-red-500/20"
+                                        onClick={handleClearQueue}
+                                        className="px-4 py-2 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black text-red-400 hover:text-red-500 uppercase rounded-xl transition-all border border-red-500/10"
                                     >
-                                        Quitar ({selectedIds.size})
+                                        Limpiar Todo
                                     </button>
-                                    <button 
-                                        onClick={handleBulkDeletePhysical}
-                                        className="px-4 py-2 bg-red-600 hover:bg-red-500 text-[10px] font-black text-white uppercase rounded-xl shadow-lg shadow-red-900/40 transition-all"
-                                    >
-                                        Borrar Disco
-                                    </button>
-                                </div>
-                            )}
+                                )}
                             
                             <button 
                                 onClick={handleProcessSingle}
@@ -564,6 +603,13 @@ export default function AdminTranscoder() {
                                         </div>
 
                                         <div className="flex items-center gap-2 shrink-0 self-center md:self-auto">
+                                            <button 
+                                                onClick={() => handleToggleSplit(v.id)}
+                                                className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${v.split_shorts ? 'text-amber-500 bg-amber-500/10' : 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10'}`}
+                                                title={v.split_shorts ? "Fragmentación Activada (5m)" : "Fragmentar para Shorts (5m)"}
+                                            >
+                                                <Scissors size={18} />
+                                            </button>
                                             <div className="hidden lg:flex flex-col gap-0.5 mr-1 px-1">
                                                 <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Subir"><ChevronRight size={12} className="-rotate-90"/></button>
                                                 <button onClick={() => handleReorder(v.id, 'DOWN')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Bajar"><ChevronRight size={12} className="rotate-90"/></button>
@@ -576,10 +622,17 @@ export default function AdminTranscoder() {
                                             </button>
                                             <button 
                                                 onClick={() => handleAction(`admin_remove_from_queue&videoId=${v.id}`)}
-                                                className="p-1.5 md:p-2 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg md:rounded-xl transition-all"
-                                                title="Quitar"
+                                                className="p-1.5 md:p-2 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg md:rounded-xl transition-all"
+                                                title="Quitar de Cola"
                                             >
                                                 <X size={18} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeletePhysical(v.id)}
+                                                className="p-1.5 md:p-2 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg md:rounded-xl transition-all"
+                                                title="Eliminar de Disco"
+                                            >
+                                                <Trash2 size={18} />
                                             </button>
                                         </div>
                                     </div>

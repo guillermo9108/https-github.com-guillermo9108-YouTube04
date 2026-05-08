@@ -1721,10 +1721,16 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         }
     }
     
-    $outputPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t.' . $outputExt;
+    $isSplit = (bool)($video['split_shorts'] ?? false);
+    $outputBase = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t';
+    $outputPath = $outputBase . '.' . $outputExt;
+    
+    if ($isSplit) {
+        $outputPath = $outputBase . '_%03d.' . $outputExt;
+    }
     
     // Evitar colisión si ya existe el archivo de salida
-    if (file_exists($outputPath)) {
+    if (!$isSplit && file_exists($outputPath)) {
         @unlink($outputPath);
     }
 
@@ -1737,14 +1743,18 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     // Añadimos metadata con el ID del video para poder rastrear el proceso en el dashboard
     // Añadimos -threads 2 después de la entrada (-i) para que FFmpeg use ambos núcleos
     $metaArgs = "-metadata title=" . escapeshellarg($videoId);
-    $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " " . escapeshellarg($outputPath) . " 2>&1";
-    write_log("Transcode: Iniciando $videoId: $cmd");
+    $splitArgs = $isSplit ? "-f segment -segment_time 300 -reset_timestamps 1" : "";
     
-    // Insertar registro inicial en la tabla de seguimiento persistente
-    $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
-                  VALUES (?, 0, ?, 0, ?, 'PROCESSING') 
-                  ON DUPLICATE KEY UPDATE status='PROCESSING', tempPath=VALUES(tempPath), lastUpdated=VALUES(lastUpdated)")
-        ->execute([$videoId, $outputPath, time()]);
+    $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " $splitArgs " . escapeshellarg($outputPath) . " 2>&1";
+    write_log("Transcode: Iniciando $videoId (Split:" . ($isSplit?'SI':'NO') . "): $cmd");
+    
+    // Insertar registro inicial en la tabla de seguimiento persistente (si no es split, rastreamos el archivo único)
+    if (!$isSplit) {
+        $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
+                      VALUES (?, 0, ?, 0, ?, 'PROCESSING') 
+                      ON DUPLICATE KEY UPDATE status='PROCESSING', tempPath=VALUES(tempPath), lastUpdated=VALUES(lastUpdated)")
+            ->execute([$videoId, $outputPath, time()]);
+    }
 
     $descriptorspec = array(
        0 => array("pipe", "r"),
@@ -1799,7 +1809,66 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     // Limpieza de la tabla de seguimiento
     $pdo->prepare("DELETE FROM active_transcodes WHERE videoId = ?")->execute([$videoId]);
 
-    if ($returnVar === 0 && file_exists($outputPath) && filesize($outputPath) > 0) {
+    if ($returnVar === 0) {
+        if ($isSplit) {
+            // Manejar múltiples segmentos
+            $dir = dirname($inputPath);
+            $pattern = preg_quote(basename($outputBase)) . '_\d+\.' . preg_quote($outputExt);
+            $segments = [];
+            foreach (scandir($dir) as $file) {
+                if (preg_match("/^$pattern$/", $file)) {
+                    $segments[] = "$dir/$file";
+                }
+            }
+            sort($segments);
+
+            if (empty($segments)) {
+                write_log("Split Transcode: Sin segmentos generados", 'ERROR');
+                $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
+                return false;
+            }
+
+            foreach ($segments as $idx => $segPath) {
+                $newId = $videoId . '_s' . ($idx + 1);
+                $newTitle = $video['title'] . " (Parte " . ($idx + 1) . ")";
+                
+                // Si es la primera parte, podemos reutilizar el registro original o crear uno nuevo
+                // Para simplificar, crearemos nuevos registros para cada parte y marcaremos el original como DONE
+                // con un flag o simplemente esconderlo de la vista principal.
+                
+                $newUrl = dirname($videoUrl) . '/' . basename($segPath);
+                if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
+                
+                // Extraer miniatura para cada segmento
+                $thumbName = basename($segPath) . '_thumb.jpg';
+                $thumbDest = 'uploads/thumbnails/' . $thumbName;
+                $thumbnail = 'api/uploads/thumbnails/default.jpg';
+                if (extract_video_thumbnail($segPath, $thumbDest, $ffmpeg)) {
+                    $thumbnail = 'api/' . $thumbDest;
+                }
+
+                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, duration, transcode_status, locked_at, originalId) 
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DONE', 0, ?)");
+                $stmt->execute([
+                    $newId,
+                    $newTitle,
+                    $video['description'],
+                    $newUrl,
+                    $thumbnail,
+                    $video['creatorId'],
+                    time() + $idx, // Slighly offset for sorting
+                    $video['category'],
+                    0, // Duración desconocida por ahora (se puede extraer con ffprobe si es necesario)
+                    $videoId
+                ]);
+            }
+            
+            // Eliminar original físico si se desea (o mantenerlo como backup)
+            // Por ahora marcamos el original como DONE y lo quitamos de la cola
+            $pdo->prepare("UPDATE videos SET transcode_status = 'DONE', locked_at = 0 WHERE id = ?")->execute([$videoId]);
+            return true;
+        }
+
         // Éxito - Reemplazar el original por el convertido para mantener rutas y ahorrar espacio
         $finalPath = $inputPath;
         if ($outputExt !== $ext) {
@@ -1862,6 +1931,13 @@ function admin_delete_physical($pdo, $input) {
         }
     }
     respond(true, ['deleted' => $deleted]);
+}
+
+function admin_toggle_split_shorts($pdo, $input) {
+    $videoId = $input['videoId'] ?? '';
+    if (!$videoId) respond(false, null, "ID faltante");
+    $pdo->prepare("UPDATE videos SET split_shorts = NOT split_shorts WHERE id = ?")->execute([$videoId]);
+    respond(true);
 }
 
 function admin_remove_from_queue($pdo, $input) {

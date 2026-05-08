@@ -131,6 +131,12 @@ function video_process_rows(&$rows, $depth = 0) {
             $stmtM->execute([$v['originalMarketplaceId']]);
             $item = $stmtM->fetch(PDO::FETCH_ASSOC);
             if ($item) {
+                // Fix URLs and types
+                $item['images'] = json_decode($item['images'] ?? '[]', true);
+                if (is_array($item['images'])) {
+                    foreach ($item['images'] as &$img) $img = fix_url($img);
+                }
+                $item['sellerAvatarUrl'] = fix_url($item['sellerAvatarUrl']);
                 $v['originalMarketplaceItem'] = $item;
             }
         }
@@ -1064,7 +1070,7 @@ function video_reshare($pdo, $input) {
         $stmtM->execute([$originalMarketplaceId]);
         $item = $stmtM->fetch();
         if (!$item) respond(false, null, "Producto no encontrado");
-        $title = $item['name'];
+        $title = $item['title'];
         $category = 'MARKETPLACE';
         $imgs = json_decode($item['images'] ?? '[]', true);
         $thumbnail = count($imgs) > 0 ? $imgs[0] : null;
@@ -1523,25 +1529,28 @@ function video_update($pdo, $input) {
 }
 
 function upload_story($pdo, $post, $files) {
-    $userId = $post['userId'];
+    $userId = $post['userId'] ?? '';
+    if (!$userId) respond(false, null, "ID de usuario faltante");
+
     $type = $post['type'] ?? 'IMAGE';
     $overlayText = $post['overlayText'] ?? null;
-    $overlayColor = $post['overlayColor'] ?? null;
-    $overlayBg = $post['overlayBg'] ?? null;
+    $overlayColor = $post['overlayColor'] ?? '#ffffff';
+    $overlayBg = $post['overlayBg'] ?? 'rgba(0,0,0,0.5)';
     
-    $audioUrl = null;
+    $audioUrl = $post['audioUrl'] ?? null;
     if (isset($files['audio']) && $files['audio']['error'] === UPLOAD_ERR_OK) {
         $audioId = uniqid('audio_');
         $audioExt = pathinfo($files['audio']['name'], PATHINFO_EXTENSION);
         $audioFilename = $audioId . '.' . $audioExt;
-        $audioTarget = 'uploads/videos/' . $audioFilename;
+        $audioTarget = 'uploads/stories/' . $audioFilename;
         if (move_uploaded_file($files['audio']['tmp_name'], $audioTarget)) {
-            $audioUrl = $audioTarget;
+            $audioUrl = 'api/' . $audioTarget;
         }
     }
 
-    if (!isset($files['file']) || $files['file']['error'] !== UPLOAD_ERR_OK) {
-        // Option 1: Create story from existing video
+    // Si no hay archivo, es una compartición de contenido existente o texto
+    if (!isset($files['file']) || $files['file']['error'] === UPLOAD_ERR_NO_FILE || $files['file']['error'] !== UPLOAD_ERR_OK) {
+        // Opción 1: Crear historia desde video existente
         if (!empty($post['videoId'])) {
             $stmtV = $pdo->prepare("SELECT videoUrl, category, is_audio, thumbnailUrl FROM videos WHERE id = ?");
             $stmtV->execute([$post['videoId']]);
@@ -1561,7 +1570,7 @@ function upload_story($pdo, $post, $files) {
             }
         }
 
-        // Option 1.5: Create story from marketplace product
+        // Opción 1.5: Crear historia desde producto
         if (!empty($post['productId'])) {
             $stmtP = $pdo->prepare("SELECT images, title FROM marketplace_items WHERE id = ?");
             $stmtP->execute([$post['productId']]);
@@ -1582,18 +1591,28 @@ function upload_story($pdo, $post, $files) {
             }
         }
 
-        // Option 2: Text-only story
-        if ($type === 'IMAGE' && $overlayText) {
-            // Create a placeholder or just use the text
+        // Opción 2: Historia de solo texto (con fondo gradiente o imagen por defecto)
+        if ($overlayText) {
             $id = uniqid('story_');
             $now = time();
             $expiry = $now + (24 * 3600);
+            
+            // Usar una imagen de fondo por defecto
+            $contentUrl = 'api/uploads/stories/text_bg.jpg'; 
+            
             $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$id, $userId, '', $type, $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
+            $stmt->execute([$id, $userId, $contentUrl, 'IMAGE', $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
             respond(true, ['id' => $id]);
             return;
         }
-        respond(false, null, "Archivo no recibido");
+
+        // Error si llegamos aquí buscando compartición pero no hay datos
+        if (isset($files['file']) && $files['file']['error'] !== UPLOAD_ERR_NO_FILE) {
+             respond(false, null, "Error en archivo: " . $files['file']['error']);
+        } else {
+             respond(false, null, "No se recibió contenido para la historia (videoId, productId o file)");
+        }
+        return;
     }
 
     $id = uniqid('story_');
@@ -1640,17 +1659,18 @@ function get_stories($pdo) {
         $s['audioUrl'] = fix_url($s['audioUrl']);
 
         if (!empty($s['videoId'])) {
-            $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v JOIN users u ON v.userId = u.id WHERE v.id = ?");
+            $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
             $stmtV->execute([$s['videoId']]);
-            $s['originalVideo'] = $stmtV->fetch();
-            if ($s['originalVideo']) {
-                $s['originalVideo']['thumbnailUrl'] = fix_url($s['originalVideo']['thumbnailUrl']);
-                $s['originalVideo']['videoUrl'] = fix_url($s['originalVideo']['videoUrl']);
+            $orig = $stmtV->fetch();
+            if ($orig) {
+                $temp = [$orig];
+                video_process_rows($temp);
+                $s['originalVideo'] = $temp[0];
             }
         }
 
         if (!empty($s['productId'])) {
-            $stmtP = $pdo->prepare("SELECT p.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items p JOIN users u ON p.sellerId = u.id WHERE p.id = ?");
+            $stmtP = $pdo->prepare("SELECT p.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items p LEFT JOIN users u ON p.sellerId = u.id WHERE p.id = ?");
             $stmtP->execute([$s['productId']]);
             $item = $stmtP->fetch();
             if ($item) {

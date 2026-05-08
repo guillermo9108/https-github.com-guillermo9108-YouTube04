@@ -126,6 +126,7 @@ export interface Video {
   originalVideo?: Video;
   originalMarketplaceId?: string;
   originalMarketplaceItem?: MarketplaceItem;
+  split_shorts?: boolean | number;
 }
 
 export interface Comment {
