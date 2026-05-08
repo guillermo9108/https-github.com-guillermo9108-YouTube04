@@ -75,6 +75,10 @@ export interface Story {
   overlayColor?: string;
   overlayBg?: string;
   audioUrl?: string;
+  videoId?: string;
+  productId?: string;
+  originalVideo?: Video;
+  originalMarketplaceItem?: MarketplaceItem;
   createdAt: number;
   expiresAt: number;
 }
@@ -120,6 +124,8 @@ export interface Video {
   subtitles?: VideoSubtitle[];
   originalId?: string;
   originalVideo?: Video;
+  originalMarketplaceId?: string;
+  originalMarketplaceItem?: MarketplaceItem;
 }
 
 export interface Comment {

@@ -237,20 +237,32 @@ export default function Home() {
             
             if (reset) {
                 setFoundUsers(res.users || []);
-                let finalVideos = res.videos;
+                let rawVideos = res.videos;
                 
-                // Refuerzo de búsqueda multi-término local
                 if (searchQuery.trim().includes(' ')) {
                     const terms = searchQuery.toLowerCase().trim().split(/\s+/);
-                    finalVideos = res.videos.filter(v => {
+                    rawVideos = res.videos.filter(v => {
                         const title = v.title.toLowerCase();
                         return terms.every(term => title.includes(term));
                     });
-                    
-                    if (finalVideos.length === 0 && res.videos.length > 0) {
-                        finalVideos = res.videos;
-                    }
+                    if (rawVideos.length === 0) rawVideos = res.videos;
                 }
+
+                // Group by collection if it's an image album
+                const finalVideos: Video[] = [];
+                const collectionsSeen = new Set();
+                rawVideos.forEach(item => {
+                    const itemCat = (item.category || '').toUpperCase();
+                    if (item.collection && itemCat === 'IMAGES') {
+                        if (!collectionsSeen.has(item.collection)) {
+                            collectionsSeen.add(item.collection);
+                            const albumItems = rawVideos.filter(v => v.collection === item.collection);
+                            finalVideos.push({ ...item, isAlbum: true, albumItems } as any);
+                        }
+                    } else {
+                        finalVideos.push(item);
+                    }
+                });
 
                 setVideos(finalVideos);
                 
@@ -285,7 +297,21 @@ export default function Home() {
                 setAppliedSortOrder(res.appliedSortOrder || '');
                 setActiveCategories(['TODOS', ...res.activeCategories]);
             } else { 
-                setVideos(prev => [...prev, ...res.videos]); 
+                const groupedNew: Video[] = [];
+                const localSeen = new Set();
+                res.videos.forEach(item => {
+                    const itemCat = (item.category || '').toUpperCase();
+                    if (item.collection && itemCat === 'IMAGES') {
+                        if (!localSeen.has(item.collection)) {
+                            localSeen.add(item.collection);
+                            const albumItems = res.videos.filter(v => v.collection === item.collection);
+                            groupedNew.push({ ...item, isAlbum: true, albumItems } as any);
+                        }
+                    } else {
+                        groupedNew.push(item);
+                    }
+                });
+                setVideos(prev => [...prev, ...groupedNew]); 
             }
             setHasMore(res.hasMore); 
             setPage(p);

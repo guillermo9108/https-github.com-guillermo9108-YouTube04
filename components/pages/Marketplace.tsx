@@ -4,9 +4,10 @@ import { db } from '../../services/db';
 import { MarketplaceItem } from '../../types';
 import { Link, useNavigate } from '../Router';
 import { useCart } from '../../context/CartContext';
-import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell, Plus } from 'lucide-react';
+import { ShoppingBag, Tag, Loader2, Search, Star, Filter, ShoppingCart, X, ArrowDownUp, SlidersHorizontal, Bell, Plus, Share2 } from 'lucide-react';
 import { getThumbnailUrl } from '../../utils/image';
 import { useAuth } from '../../context/AuthContext';
+import ShareModal from '../ShareModal';
 
 export default function Marketplace() {
     const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function Marketplace() {
     const [selectedSection, setSelectedSection] = useState<'TODOS' | 'FLASH' | 'BEST' | 'RECENT' | 'POPULAR' | 'CHEAP'>('TODOS');
     const [visibleCount, setVisibleCount] = useState(20);
     const [pendingCount, setPendingCount] = useState(0);
+    const [selectedItemForShare, setSelectedItemForShare] = useState<MarketplaceItem | null>(null);
     const { user } = useAuth();
 
     // Filters
@@ -234,6 +236,17 @@ export default function Marketplace() {
                                 >
                                     <ShoppingCart size={14} />
                                 </button>
+
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setSelectedItemForShare(item);
+                                    }}
+                                    className="absolute bottom-2 left-2 p-1.5 rounded-full shadow-md bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition-all active:scale-95"
+                                >
+                                    <Share2 size={14} />
+                                </button>
                             </div>
                         </Link>
                     ))}
@@ -342,6 +355,13 @@ export default function Marketplace() {
                     </div>
                     <div className="flex-1" onClick={() => setShowFilters(false)}></div>
                 </div>
+            )}
+
+            {selectedItemForShare && (
+                <ShareModal 
+                    item={selectedItemForShare} 
+                    onClose={() => setSelectedItemForShare(null)} 
+                />
             )}
         </div>
     );

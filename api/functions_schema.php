@@ -55,7 +55,8 @@ function getAppSchema() {
                 'size_bytes' => 'BIGINT DEFAULT 0',
                 'size_fmt' => 'VARCHAR(20) DEFAULT NULL',
                 'queue_priority' => 'INT DEFAULT 0',
-                'originalId' => 'VARCHAR(50) DEFAULT NULL'
+                'originalId' => 'VARCHAR(50) DEFAULT NULL',
+                'originalMarketplaceId' => 'VARCHAR(50) DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',
@@ -353,6 +354,8 @@ function getAppSchema() {
                 'overlayColor' => 'VARCHAR(20) DEFAULT NULL',
                 'overlayBg' => 'VARCHAR(20) DEFAULT NULL',
                 'audioUrl' => 'TEXT DEFAULT NULL',
+                'videoId' => 'VARCHAR(50) DEFAULT NULL',
+                'productId' => 'VARCHAR(50) DEFAULT NULL',
                 'createdAt' => 'BIGINT',
                 'expiresAt' => 'BIGINT'
             ],

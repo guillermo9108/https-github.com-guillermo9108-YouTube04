@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Video, User } from '../types';
+import { Video, User, MarketplaceItem } from '../types';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { X, Globe, ChevronDown, UserSquare2, Users, MessageCircle, Heart, Share2, Send, Bookmark, MoreHorizontal } from 'lucide-react';
+import { 
+    X, Globe, ChevronDown, Users, Share2, Send, MoreHorizontal 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ShareModalProps {
-    video: Video;
+    video?: Video;
+    item?: MarketplaceItem;
     onClose: () => void;
     onShared?: () => void;
 }
 
-export default function ShareModal({ video, onClose, onShared }: ShareModalProps) {
+export default function ShareModal({ video, item, onClose, onShared }: ShareModalProps) {
     const { user } = useAuth();
     const toast = useToast();
     const [description, setDescription] = useState('');
@@ -20,13 +23,17 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
     const [recentUsers, setRecentUsers] = useState<User[]>([]);
 
     useEffect(() => {
-        // Load some users to show in the sharing list
         db.getAllUsers().then(users => {
             setRecentUsers(users.slice(0, 10));
         }).catch(() => {});
     }, []);
 
-    const shareUrl = `${window.location.origin}/watch/${video.id}`;
+    const shareUrl = video 
+        ? `${window.location.origin}/watch/${video.id}` 
+        : (item ? `${window.location.origin}/marketplace/item/${item.id}` : window.location.origin);
+
+    const title = video?.title || item?.title || 'Contenido';
+    const thumb = video ? video.thumbnailUrl : (item?.images?.[0] || '');
 
     const handleShareNow = async () => {
         if (!user) {
@@ -36,7 +43,12 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
 
         setIsSharing(true);
         try {
-            await db.reshareVideo(video.id, user.id, description);
+            await db.reshareVideo(
+                video?.id || null, 
+                user.id, 
+                description, 
+                item?.id || null
+            );
             toast.success("Publicado en tu perfil");
             if (onShared) onShared();
             onClose();
@@ -48,7 +60,7 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
     };
 
     const handleWhatsAppShare = () => {
-        const text = encodeURIComponent(`${video.title}\n${shareUrl}`);
+        const text = encodeURIComponent(`${title}\n${shareUrl}`);
         window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
         onClose();
     };
@@ -57,8 +69,8 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: video.title,
-                    text: video.description,
+                    title,
+                    text: video?.description || item?.description || '',
                     url: shareUrl,
                 });
             } catch (err) {}
@@ -75,7 +87,9 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
         try {
             const formData = new FormData();
             formData.append('userId', user.id);
-            formData.append('videoId', video.id); // Reference to original video
+            if (video) formData.append('videoId', video.id);
+            if (item) formData.append('productId', item.id);
+            if (description) formData.append('overlayText', description);
             
             await db.uploadStory(formData);
             toast.success("Añadido a tu historia");
@@ -90,14 +104,14 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
     const handleShareToUser = async (targetUser: User) => {
         if (!user) return;
         try {
-            const isImage = video.category?.toUpperCase() === 'IMAGES';
+            const isImage = video?.category?.toUpperCase() === 'IMAGES';
             await db.sendMessage({
                 userId: user.id,
                 receiverId: targetUser.id,
-                text: `Te recomendé este contenido: ${video.title}`,
-                videoUrl: !isImage ? video.videoUrl : undefined,
-                imageUrl: isImage ? video.videoUrl : undefined,
-                mediaType: isImage ? 'IMAGE' : 'VIDEO'
+                text: `Te recomendé este contenido: ${title}${description ? ` - ${description}` : ''}`,
+                videoUrl: video && !isImage ? video.videoUrl : undefined,
+                imageUrl: (video && isImage) ? video.videoUrl : (item ? item.images?.[0] : undefined),
+                mediaType: isImage || item ? 'IMAGE' : 'VIDEO'
             });
             toast.success(`Enviado a ${targetUser.username}`);
             onClose();
@@ -170,17 +184,20 @@ export default function ShareModal({ video, onClose, onShared }: ShareModalProps
 
                         {/* Content Preview (Facebook style) */}
                         <div className="border border-white/10 rounded-xl overflow-hidden bg-[#18191a]">
-                            {(video.thumbnailUrl || video.videoUrl) && (
+                            {(thumb) && (
                                 <img 
-                                    src={video.thumbnailUrl} 
-                                    alt={video.title}
+                                    src={thumb} 
+                                    alt={title}
                                     className="w-full aspect-video object-cover"
+                                    referrerPolicy="no-referrer"
                                 />
                             )}
                             <div className="p-3 border-t border-white/5">
-                                <div className="text-[#b0b3b8] text-[12px] uppercase font-bold mb-1">STREAMPAY.APP</div>
-                                <h5 className="text-white font-bold text-sm line-clamp-2">{video.title}</h5>
-                                <p className="text-[#b0b3b8] text-xs mt-1 line-clamp-1">{video.description}</p>
+                                <div className="text-[#b0b3b8] text-[12px] uppercase font-bold mb-1">
+                                    {video ? 'STREAMPAY.APP' : (item ? 'MARKETPLACE' : 'STREAMPAY.APP')}
+                                </div>
+                                <h5 className="text-white font-bold text-sm line-clamp-2">{title}</h5>
+                                <p className="text-[#b0b3b8] text-xs mt-1 line-clamp-1">{video?.description || item?.description}</p>
                             </div>
                         </div>
 

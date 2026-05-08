@@ -124,6 +124,16 @@ function video_process_rows(&$rows, $depth = 0) {
                 $v['originalVideo'] = $temp[0];
             }
         }
+
+        // Fetch original marketplace item if this is a marketplace reshare
+        if (!empty($v['originalMarketplaceId']) && !isset($v['originalMarketplaceItem'])) {
+            $stmtM = $pdo->prepare("SELECT m.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items m LEFT JOIN users u ON m.sellerId = u.id WHERE m.id = ?");
+            $stmtM->execute([$v['originalMarketplaceId']]);
+            $item = $stmtM->fetch(PDO::FETCH_ASSOC);
+            if ($item) {
+                $v['originalMarketplaceItem'] = $item;
+            }
+        }
     }
 }
 
@@ -1027,36 +1037,56 @@ function video_increment_share($pdo, $videoId) {
 
 function video_reshare($pdo, $input) {
     $originalId = $input['originalId'] ?? '';
+    $originalMarketplaceId = $input['originalMarketplaceId'] ?? '';
     $userId = $input['userId'] ?? '';
     $description = $input['description'] ?? '';
     
-    if (!$originalId || !$userId) respond(false, null, "Faltan parámetros");
-    
-    // Obtener datos del video original
-    $stmtO = $pdo->prepare("SELECT * FROM videos WHERE id = ?");
-    $stmtO->execute([$originalId]);
-    $orig = $stmtO->fetch();
-    
-    if (!$orig) respond(false, null, "Publicación original no encontrada");
+    if ((!$originalId && !$originalMarketplaceId) || !$userId) respond(false, null, "Faltan parámetros");
     
     $newId = uniqid('reshare_');
     $now = time();
+    $title = '';
+    $category = 'GENERAL';
+    $thumbnail = null;
+
+    if ($originalId) {
+        // Obtener datos del video original
+        $stmtO = $pdo->prepare("SELECT * FROM videos WHERE id = ?");
+        $stmtO->execute([$originalId]);
+        $orig = $stmtO->fetch();
+        if (!$orig) respond(false, null, "Publicación original no encontrada");
+        $title = $orig['title'];
+        $category = $orig['category'];
+        $thumbnail = $orig['thumbnailUrl'];
+    } else {
+        // Obtener datos del producto original
+        $stmtM = $pdo->prepare("SELECT * FROM marketplace_items WHERE id = ?");
+        $stmtM->execute([$originalMarketplaceId]);
+        $item = $stmtM->fetch();
+        if (!$item) respond(false, null, "Producto no encontrado");
+        $title = $item['name'];
+        $category = 'MARKETPLACE';
+        $imgs = json_decode($item['images'] ?? '[]', true);
+        $thumbnail = count($imgs) > 0 ? $imgs[0] : null;
+    }
     
     // Crear el nuevo post (repost)
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, creatorId, createdAt, originalId, category, is_audio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, creatorId, createdAt, originalId, originalMarketplaceId, category, thumbnailUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $newId,
-        $orig['title'],
+        $title,
         $description,
         $userId,
         $now,
-        $originalId,
-        $orig['category'],
-        $orig['is_audio']
+        $originalId ?: null,
+        $originalMarketplaceId ?: null,
+        $category,
+        $thumbnail
     ]);
     
-    // Incrementar shares del original
-    $pdo->prepare("UPDATE videos SET shares = shares + 1 WHERE id = ?")->execute([$originalId]);
+    if ($originalId) {
+        $pdo->prepare("UPDATE videos SET shares = shares + 1 WHERE id = ?")->execute([$originalId]);
+    }
     
     respond(true, ['id' => $newId]);
 }
@@ -1524,8 +1554,29 @@ function upload_story($pdo, $post, $files) {
                 
                 $storyType = ($video['category'] === 'IMAGES') ? 'IMAGE' : 'VIDEO';
                 
-                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$id, $userId, $video['videoUrl'], $storyType, $overlayText, $overlayColor, $overlayBg, $audioUrl, $now, $expiry]);
+                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, videoId, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$id, $userId, $video['videoUrl'], $storyType, $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['videoId'], $now, $expiry]);
+                respond(true, ['id' => $id]);
+                return;
+            }
+        }
+
+        // Option 1.5: Create story from marketplace product
+        if (!empty($post['productId'])) {
+            $stmtP = $pdo->prepare("SELECT images, title FROM marketplace_items WHERE id = ?");
+            $stmtP->execute([$post['productId']]);
+            $product = $stmtP->fetch();
+
+            if ($product) {
+                $imgs = json_decode($product['images'] ?? '[]', true);
+                $contentUrl = count($imgs) > 0 ? $imgs[0] : '';
+                
+                $id = uniqid('story_');
+                $now = time();
+                $expiry = $now + (24 * 3600);
+                
+                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, productId, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$id, $userId, $contentUrl, 'IMAGE', $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['productId'], $now, $expiry]);
                 respond(true, ['id' => $id]);
                 return;
             }
@@ -1587,6 +1638,30 @@ function get_stories($pdo) {
         $s['contentUrl'] = fix_url($s['contentUrl']);
         $s['avatarUrl'] = fix_url($s['avatarUrl']);
         $s['audioUrl'] = fix_url($s['audioUrl']);
+
+        if (!empty($s['videoId'])) {
+            $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName FROM videos v JOIN users u ON v.userId = u.id WHERE v.id = ?");
+            $stmtV->execute([$s['videoId']]);
+            $s['originalVideo'] = $stmtV->fetch();
+            if ($s['originalVideo']) {
+                $s['originalVideo']['thumbnailUrl'] = fix_url($s['originalVideo']['thumbnailUrl']);
+                $s['originalVideo']['videoUrl'] = fix_url($s['originalVideo']['videoUrl']);
+            }
+        }
+
+        if (!empty($s['productId'])) {
+            $stmtP = $pdo->prepare("SELECT p.*, u.username as sellerName, u.avatarUrl as sellerAvatarUrl FROM marketplace_items p JOIN users u ON p.sellerId = u.id WHERE p.id = ?");
+            $stmtP->execute([$s['productId']]);
+            $item = $stmtP->fetch();
+            if ($item) {
+                $item['images'] = json_decode($item['images'] ?? '[]', true);
+                if (is_array($item['images'])) {
+                    foreach ($item['images'] as &$img) $img = fix_url($img);
+                }
+                $item['sellerAvatarUrl'] = fix_url($item['sellerAvatarUrl']);
+                $s['originalMarketplaceItem'] = $item;
+            }
+        }
     }
     
     respond(true, $stories);

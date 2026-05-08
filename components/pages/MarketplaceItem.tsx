@@ -5,9 +5,10 @@ import { db } from '../../services/db';
 import { MarketplaceItem, MarketplaceReview, CartItem } from '../../types';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-// Added Loader2 and MessageSquare to imports to fix missing name errors
-import { ShoppingBag, ChevronLeft, User, Tag, ShieldCheck, ShoppingCart, Star, Edit3, Send, AlertTriangle, Check, ShieldAlert, Fingerprint, Loader2, MessageSquare, Bell, BellOff, UserPlus, UserMinus } from 'lucide-react';
+// Added Share2 and ShareModal imports
+import { ShoppingBag, ChevronLeft, User, Tag, ShieldCheck, ShoppingCart, Star, Edit3, Send, AlertTriangle, Check, ShieldAlert, Fingerprint, Loader2, MessageSquare, Bell, BellOff, UserPlus, UserMinus, Share2 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import ShareModal from '../ShareModal';
 
 export default function MarketplaceItemView() {
     const { id } = useParams();
@@ -24,6 +25,7 @@ export default function MarketplaceItemView() {
     const [hasPriceAlert, setHasPriceAlert] = useState(false);
     const [submittingSub, setSubmittingSub] = useState(false);
     const [submittingAlert, setSubmittingAlert] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
     // Review Form
     const [rating, setRating] = useState(5);
@@ -300,6 +302,14 @@ export default function MarketplaceItemView() {
                                         {submittingSub ? <Loader2 className="animate-spin" size={14}/> : (isSubscribed ? <UserMinus size={14}/> : <UserPlus size={14}/>)}
                                         {isSubscribed ? 'Siguiendo' : 'Seguir Vendedor'}
                                     </button>
+
+                                    <button 
+                                        onClick={() => setShowShareModal(true)}
+                                        className="flex items-center justify-center gap-2 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all border bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700 col-span-2 md:col-span-1"
+                                    >
+                                        <Share2 size={14}/>
+                                        Compartir
+                                    </button>
                                 </div>
                                 
                                 {!isInCart && item.status === 'ACTIVO' && (
@@ -428,6 +438,13 @@ export default function MarketplaceItemView() {
                     ))}
                 </div>
             </div>
+
+            {showShareModal && (
+                <ShareModal 
+                    item={item} 
+                    onClose={() => setShowShareModal(false)} 
+                />
+            )}
         </div>
     );
 }

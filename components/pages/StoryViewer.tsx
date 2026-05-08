@@ -259,6 +259,43 @@ export default function StoryViewer() {
                     <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600" />
                 )}
 
+                {/* Shared Content Overlay (Facebook style) */}
+                {(currentStory.originalVideo || currentStory.originalMarketplaceItem) && (
+                    <div className="absolute inset-x-0 bottom-24 flex justify-center p-4 z-50 pointer-events-none">
+                        <div 
+                            className="bg-black/60 backdrop-blur-md border border-white/20 rounded-2xl w-full max-w-[300px] overflow-hidden pointer-events-auto shadow-2xl active:scale-95 transition-transform"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (currentStory.originalVideo) navigate(`/watch/${currentStory.videoId}`);
+                                if (currentStory.originalMarketplaceItem) navigate(`/marketplace/${currentStory.productId}`);
+                            }}
+                        >
+                            <div className="flex p-2 gap-3 items-center">
+                                <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-800">
+                                    <img 
+                                        src={currentStory.originalVideo ? currentStory.originalVideo.thumbnailUrl : (currentStory.originalMarketplaceItem?.images?.[0] || '')} 
+                                        className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                </div>
+                                <div className="min-w-0 pr-2">
+                                    <h4 className="text-white text-xs font-bold truncate">
+                                        {currentStory.originalVideo ? currentStory.originalVideo.title : currentStory.originalMarketplaceItem?.title}
+                                    </h4>
+                                    <p className="text-white/60 text-[10px] truncate">
+                                        {currentStory.originalVideo ? `@${currentStory.originalVideo.creatorName}` : (currentStory.originalMarketplaceItem ? `Marketplace • ${currentStory.originalMarketplaceItem.price} $` : '')}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="bg-white/10 p-1.5 text-center border-t border-white/5">
+                                <span className="text-white text-[10px] font-bold uppercase tracking-widest">
+                                    {currentStory.originalVideo ? 'Ver Video' : 'Ver Producto'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Overlay Text */}
                 {currentStory.overlayText && (
                     <div className="absolute inset-0 flex items-center justify-center p-8 pointer-events-none">

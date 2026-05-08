@@ -333,10 +333,10 @@ class DBService {
         return this.request<void>(`action=increment_share&id=${videoId}`);
     }
 
-    public async reshareVideo(originalId: string, userId: string, description: string): Promise<any> {
+    public async reshareVideo(originalId: string | null, userId: string, description: string, originalMarketplaceId: string | null = null): Promise<any> {
         const res = await this.request<any>(`action=reshare_video`, { 
             method: 'POST', 
-            body: JSON.stringify({ originalId, userId, description }) 
+            body: JSON.stringify({ originalId, userId, description, originalMarketplaceId }) 
         });
         this.setHomeDirty();
         return res;

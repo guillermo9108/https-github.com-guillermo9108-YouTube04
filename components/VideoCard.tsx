@@ -548,8 +548,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       </div>
 
       {/* Media Content */}
-      {video.originalVideo ? (
-          <div className="mx-3 mb-3 border border-[var(--divider)] rounded-xl overflow-hidden bg-[var(--bg-primary)]">
+      {video.originalVideo && (
+          <div className="mx-3 mb-3 border border-[var(--divider)] rounded-xl overflow-hidden bg-[var(--bg-primary)] hover:border-[#1877f2]/50 transition-colors">
               <div className="p-3 flex items-center gap-2">
                   <Link to={`/channel/${video.originalVideo.creatorId}`} className="shrink-0">
                       <div className="w-8 h-8 rounded-full border border-[var(--divider)] overflow-hidden">
@@ -561,7 +561,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                           <Link to={`/channel/${video.originalVideo.creatorId}`} className="text-xs font-bold text-[var(--text-primary)] hover:underline">
                               {video.originalVideo.creatorName}
                           </Link>
-                          <CheckCircle2 size={10} className="text-[#1877f2] fill-[#1877f2]/10" />
+                          {video.originalVideo.creatorRole === 'ADMIN' && <CheckCircle2 size={10} className="text-[#1877f2] fill-[#1877f2]/10" />}
                       </div>
                       <div className="text-[10px] text-[var(--text-secondary)] leading-tight">
                           <span>{formatTimeAgo(video.originalVideo.createdAt)}</span>
@@ -602,7 +602,54 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   <h5 className="text-[var(--text-primary)] font-bold text-sm line-clamp-1">{video.originalVideo.title}</h5>
               </div>
           </div>
-      ) : (
+      )}
+
+      {video.originalMarketplaceItem && (
+          <div className="mx-3 mb-3 border border-[var(--divider)] rounded-xl overflow-hidden bg-[var(--bg-primary)] hover:border-[#1877f2]/50 transition-colors">
+              <div className="p-3 flex items-center gap-2">
+                  <div className="shrink-0 w-8 h-8 rounded-full border border-[var(--divider)] overflow-hidden">
+                      <img src={video.originalMarketplaceItem.sellerAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" alt={video.originalMarketplaceItem.sellerName} referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-[var(--text-primary)]">
+                              {video.originalMarketplaceItem.sellerName}
+                          </span>
+                          <CheckCircle2 size={10} className="text-[#1877f2] fill-[#1877f2]/10" />
+                      </div>
+                      <div className="text-[10px] text-[var(--text-secondary)] leading-tight">
+                          <span>Tienda</span>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="px-3 pb-2 text-sm text-[var(--text-primary)] font-medium">
+                  Recomendó este producto de nuestra tienda oficial.
+              </div>
+
+              <div className="relative aspect-square bg-[#f0f2f5] overflow-hidden">
+                  <Link to={`/marketplace/item/${video.originalMarketplaceItem.id}`} className="absolute inset-0">
+                      <img 
+                          src={video.originalMarketplaceItem.images?.[0] || 'https://via.placeholder.com/400'} 
+                          alt={video.originalMarketplaceItem.title}
+                          className="w-full h-full object-contain"
+                          referrerPolicy="no-referrer"
+                      />
+                  </Link>
+              </div>
+              <div className="p-3 bg-[var(--bg-tertiary)] border-t border-[var(--divider)] flex justify-between items-center">
+                  <div>
+                      <div className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mb-0.5">MARKETPLACE</div>
+                      <h5 className="text-[var(--text-primary)] font-bold text-sm line-clamp-1">{video.originalMarketplaceItem.title}</h5>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-xs font-black text-[#45bd62]">${video.originalMarketplaceItem.price}</div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {!video.originalVideo && !video.originalMarketplaceItem && (
           <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden`}>
             {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
                 <div 
