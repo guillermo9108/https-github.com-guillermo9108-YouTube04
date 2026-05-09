@@ -440,6 +440,18 @@ export default function AdminConfig() {
                                 * Los videos en esta ruta se tratarán como Shorts (sin importar duración) y se ocultarán de la página principal.
                             </p>
                         </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-amber-400 uppercase flex items-center gap-1 ml-1"><Clock size={10}/> Tiempo de Fragmentación (Segundos)</label>
+                            <input 
+                                type="number" 
+                                value={settings?.fragmentation_time || 60} 
+                                onChange={e => updateValue('fragmentation_time', parseInt(e.target.value))} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-amber-500 outline-none" 
+                            />
+                            <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">
+                                * Tiempo para cortar los videos cuando se activa la fragmentación para shorts.
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}

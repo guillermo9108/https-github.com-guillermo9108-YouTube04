@@ -238,8 +238,8 @@ function streamVideo($id, $pdo) {
         exit; 
     }
 
-    // If it's a reshare, use the original video's URL
-    if (!empty($video['originalId'])) {
+    // If it's a reshare (no internal videoUrl) use the original video's URL
+    if (!empty($video['originalId']) && empty($video['videoUrl'])) {
         $stmtO = $pdo->prepare("SELECT videoUrl FROM videos WHERE id = ?");
         $stmtO->execute([$video['originalId']]);
         $origUrl = $stmtO->fetchColumn();

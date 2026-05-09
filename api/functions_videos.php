@@ -246,6 +246,13 @@ function video_get_all($pdo) {
         $where[] = "v.is_private = 0";
     }
 
+    // Filtros de visibilidad
+    $where[] = "v.is_series_fragment = 0";
+    // Ocultar el video original si fue fragmentado para shorts (ya que se publican individuales)
+    $where[] = "(v.split_shorts = 0 OR v.transcode_status != 'DONE')";
+    // Ocultar reshares si no tienen videoUrl (opcional, dependiendo de si se quieren mostrar como el original)
+    // $where[] = "(v.originalId IS NULL OR v.videoUrl IS NOT NULL)"; 
+
     if (!empty($transcodeStatus)) {
         $where[] = "v.transcode_status = ?";
         $params[] = $transcodeStatus;
@@ -515,13 +522,18 @@ function video_get_one($pdo, $id) {
 
     $v['folderSortOrder'] = get_folder_sort_order($pdo, $relativePath, $v['category']);
 
+    // Obtener segmentos si existen (ordenados por createdAt)
+    $stmtSeg = $pdo->prepare("SELECT id, videoUrl, title, duration FROM videos WHERE originalId = ? ORDER BY createdAt ASC");
+    $stmtSeg->execute([$id]);
+    $v['segments'] = $stmtSeg->fetchAll(PDO::FETCH_ASSOC);
+
     $rows = [$v]; 
     video_process_rows($rows); 
     respond(true, $rows[0]);
 }
 
 function video_get_by_creator($pdo, $userId) {
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') ORDER BY createdAt DESC");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND is_series_fragment = 0 AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY createdAt DESC");
     $stmt->execute([$userId]); 
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     video_process_rows($videos); 
@@ -569,7 +581,7 @@ function video_get_related($pdo, $videoId) {
         $orderBy = "createdAt DESC";
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') ORDER BY $orderBy LIMIT 12");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND is_series_fragment = 0 AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY $orderBy LIMIT 12");
     $stmt->execute([$currentVideo['category'], $videoId]); 
     $videos = $stmt->fetchAll();
     video_process_rows($videos); 

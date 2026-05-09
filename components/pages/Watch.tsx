@@ -66,10 +66,16 @@ export default function Watch() {
                di.includes('StreamPay');
     }, [user?.deviceInfo, user?.lastDeviceId]);
 
+    const [currentSegmentIndex, setCurrentSegmentIndex] = useState<number>(-1);
     const streamUrl = useMemo(() => {
         if (!id) return '';
-        return db.getStreamerUrl(id, user?.sessionToken);
-    }, [id, user?.sessionToken]);
+        // Si hay una lista de segmentos y estamos en modo fragmentado
+        const activeSegments = (video as any)?.segments || [];
+        const targetId = (currentSegmentIndex >= 0 && activeSegments[currentSegmentIndex])
+            ? activeSegments[currentSegmentIndex].id 
+            : id;
+        return db.getStreamerUrl(targetId, user?.sessionToken);
+    }, [id, user?.sessionToken, currentSegmentIndex, (video as any)?.segments]);
 
     const isAudio = useMemo(() => {
         const path = (video as any)?.rawPath || video?.videoUrl || '';
@@ -237,6 +243,11 @@ export default function Watch() {
                 }
 
             setVideo(v); 
+                if ((v as any).segments && (v as any).segments.length > 0) {
+                    setCurrentSegmentIndex(0);
+                } else {
+                    setCurrentSegmentIndex(-1);
+                }
                 setLikes(Number(v.likes || 0));
                 setDislikes(Number(v.dislikes || 0));
 
@@ -417,6 +428,17 @@ export default function Watch() {
 
     const handleVideoEnded = async () => {
         if (!video || !user) return;
+
+        // --- Lógica de Fragmentación (Gapless Playback Simulation) ---
+        const activeSegments = (video as any)?.segments || [];
+        if (activeSegments.length > 0) {
+            const nextSegIdx = currentSegmentIndex + 1;
+            if (nextSegIdx < activeSegments.length) {
+                setCurrentSegmentIndex(nextSegIdx);
+                toast.info(`Parte ${nextSegIdx + 1} de ${activeSegments.length}`);
+                return;
+            }
+        }
         
         // Intentar encontrar el video actual en la cola
         let currentIndex = seriesQueue.findIndex(v => v.id === video.id);

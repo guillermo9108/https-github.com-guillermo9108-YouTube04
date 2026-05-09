@@ -157,9 +157,18 @@ export default function AdminTranscoder() {
         if (!confirm(`¿Aplicar acción a ${selectedIds.size} videos?`)) return;
         
         try {
-            await Promise.all(
-                Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
-            );
+            if (action === 'admin_remove_from_queue') {
+                const ids = Array.from(selectedIds).join(',');
+                await db.request(`action=admin_remove_from_queue&videoIds=${ids}`, { method: 'POST' });
+            } else if (action === 'admin_toggle_split_shorts' || action === 'admin_toggle_split_series') {
+                await Promise.all(
+                    Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
+                );
+            } else {
+                await Promise.all(
+                    Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
+                );
+            }
             toast.success("Acción por lotes completada");
             setSelectedIds(new Set());
             loadData();
@@ -231,6 +240,19 @@ export default function AdminTranscoder() {
         }
     };
 
+    const handleRemoveSelected = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`¿Eliminar ${selectedIds.size} videos de la cola?`)) return;
+        
+        try {
+            const ids = Array.from(selectedIds).join(',');
+            await db.request(`action=admin_remove_from_queue&videoIds=${ids}`, { method: 'POST' });
+            toast.success("Videos eliminados de la cola");
+            setSelectedIds(new Set());
+            loadData();
+        } catch (e: any) { toast.error(e.message); }
+    };
+
     const handleAction = async (action: string) => {
         if (action.includes('admin_remove_from_queue') && !confirm("¿Quitar de la cola de conversión?")) return;
         try {
@@ -268,6 +290,16 @@ export default function AdminTranscoder() {
             toast.success("Ajuste de fragmentación actualizado");
         } catch (e) {
             toast.error("Error al actualizar fragmentación");
+        }
+    };
+
+    const handleToggleSeries = async (videoId: string) => {
+        try {
+            await db.request(`action=admin_toggle_split_series&videoId=${videoId}`, { method: 'POST' });
+            setWaitingVideos(prev => prev.map(v => v.id === videoId ? { ...v, split_series: !(v as any).split_series ? 1 : 0 } : v));
+            toast.success("Ajuste de serie actualizado");
+        } catch (e) {
+            toast.error("Error al actualizar serie");
         }
     };
 
@@ -520,6 +552,20 @@ export default function AdminTranscoder() {
                                 {selectedIds.size > 0 ? (
                                     <div className="flex gap-2 animate-in slide-in-from-right-4">
                                         <button 
+                                            onClick={() => handleBulkAction('admin_toggle_split_shorts')}
+                                            className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500 text-[10px] font-black text-amber-500 hover:text-white uppercase rounded-xl transition-all border border-amber-500/20 flex items-center gap-2"
+                                            title="Alternar fragmentación para shorts"
+                                        >
+                                            <Scissors size={14} /> Tgl
+                                        </button>
+                                        <button 
+                                            onClick={() => handleBulkAction('admin_toggle_split_series')}
+                                            className="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500 text-[10px] font-black text-indigo-500 hover:text-white uppercase rounded-xl transition-all border border-indigo-500/20 flex items-center gap-2"
+                                            title="Alternar fragmentación para series"
+                                        >
+                                            <Layers size={14} /> Tgl
+                                        </button>
+                                        <button 
                                             onClick={() => handleBulkAction('admin_remove_from_queue')}
                                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-500 uppercase rounded-xl transition-all border border-red-500/20"
                                         >
@@ -607,9 +653,16 @@ export default function AdminTranscoder() {
                                             <button 
                                                 onClick={() => handleToggleSplit(v.id)}
                                                 className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${v.split_shorts ? 'text-amber-500 bg-amber-500/10' : 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10'}`}
-                                                title={v.split_shorts ? "Fragmentación Activada (5m)" : "Fragmentar para Shorts (5m)"}
+                                                title={v.split_shorts ? "Fragmentación Shorts Activada" : "Fragmentar para Shorts (60s)"}
                                             >
                                                 <Scissors size={18} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleToggleSeries(v.id)}
+                                                className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${(v as any).split_series ? 'text-indigo-500 bg-indigo-500/10' : 'text-slate-600 hover:text-indigo-500 hover:bg-indigo-500/10'}`}
+                                                title={(v as any).split_series ? "Fragmentación Serie Activada" : "Fragmentar para Serie (Capítulos)"}
+                                            >
+                                                <Layers size={18} />
                                             </button>
                                             <div className="hidden lg:flex flex-col gap-0.5 mr-1 px-1">
                                                 <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Subir"><ChevronRight size={12} className="-rotate-90"/></button>

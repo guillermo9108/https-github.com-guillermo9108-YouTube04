@@ -203,6 +203,7 @@ export interface SystemSettings {
   collaboration_enabled?: boolean;
   batteryConfig?: any;
   shortsPath?: string;
+  fragmentation_time?: number;
 }
 
 export interface Transaction {

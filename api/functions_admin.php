@@ -50,7 +50,7 @@ function admin_update_settings($pdo, $input) {
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
         'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory',
-        'shortsPath', 'collaboration_enabled'
+        'shortsPath', 'collaboration_enabled', 'fragmentation_time'
     ];
     
     $fields = []; $params = [];
@@ -977,7 +977,7 @@ function admin_add_video_to_transcode_queue($pdo, $input) {
     $split = !empty($input['split']) ? 1 : 0;
     
     // Si ya está en la cola, solo actualizamos el estado y split
-    $stmt = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', split_shorts = ?, encrypted = 0, locked_at = 0 WHERE id = ?");
+    $stmt = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', split_shorts = ?, locked_at = 0 WHERE id = ?");
     $stmt->execute([$split, $videoId]);
     
     if ($stmt->rowCount() > 0) {
@@ -1735,7 +1735,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         }
     }
     
-    $isSplit = (bool)($video['split_shorts'] ?? false);
+    $isSplitShorts = (bool)($video['split_shorts'] ?? false);
+    $isSplitSeries = (bool)($video['split_series'] ?? false);
+    $isSplit = $isSplitShorts || $isSplitSeries;
+
     $outputBase = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t';
     $outputPath = $outputBase . '.' . $outputExt;
     
@@ -1757,7 +1760,11 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     // Añadimos metadata con el ID del video para poder rastrear el proceso en el dashboard
     // Añadimos -threads 2 después de la entrada (-i) para que FFmpeg use ambos núcleos
     $metaArgs = "-metadata title=" . escapeshellarg($videoId);
-    $splitArgs = $isSplit ? "-f segment -segment_time 300 -reset_timestamps 1" : "";
+    
+    $settings = $pdo->query("SELECT fragmentation_time FROM system_settings WHERE id = 1")->fetch();
+    $fragTime = $settings['fragmentation_time'] ?? 60;
+    
+    $splitArgs = $isSplit ? "-f segment -segment_time $fragTime -reset_timestamps 1" : "";
     
     $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " $splitArgs " . escapeshellarg($outputPath) . " 2>&1";
     write_log("Transcode: Iniciando $videoId (Split:" . ($isSplit?'SI':'NO') . "): $cmd");
@@ -1861,8 +1868,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
                     $thumbnail = 'api/' . $thumbDest;
                 }
 
-                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, duration, transcode_status, locked_at, originalId) 
-                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DONE', 0, ?)");
+                $isSeriesFragment = $isSplitSeries ? 1 : 0;
+
+                $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, videoUrl, thumbnailUrl, creatorId, createdAt, category, duration, transcode_status, locked_at, originalId, is_series_fragment) 
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DONE', 0, ?, ?)");
                 $stmt->execute([
                     $newId,
                     $newTitle,
@@ -1873,11 +1882,14 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
                     time() + $idx, // Slighly offset for sorting
                     $video['category'],
                     0, // Duración desconocida por ahora (se puede extraer con ffprobe si es necesario)
-                    $videoId
+                    $videoId,
+                    $isSeriesFragment
                 ]);
             }
             
             // Eliminar original físico si se desea (o mantenerlo como backup)
+            @unlink($inputPath);
+            
             // Por ahora marcamos el original como DONE y lo quitamos de la cola
             $pdo->prepare("UPDATE videos SET transcode_status = 'DONE', locked_at = 0 WHERE id = ?")->execute([$videoId]);
             return true;
@@ -1889,9 +1901,10 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
             // Si la extensión cambió, actualizar el nombre del archivo original
             $finalPath = preg_replace('/\.[^.]+$/', '', $inputPath) . '.' . $outputExt;
             @unlink($inputPath);
+        } else {
+            // Si la extensión es la misma, borrar el original antes de mover el nuevo
+            @unlink($inputPath);
         }
-        
-        // Mover el archivo transcodificado a la posición final (reemplazando si es necesario)
         if (rename($outputPath, $finalPath)) {
             $newFilename = basename($finalPath);
             $newUrl = dirname($videoUrl) . '/' . $newFilename;
@@ -1951,6 +1964,13 @@ function admin_toggle_split_shorts($pdo, $input) {
     $videoId = $input['videoId'] ?? '';
     if (!$videoId) respond(false, null, "ID faltante");
     $pdo->prepare("UPDATE videos SET split_shorts = CASE WHEN split_shorts = 1 THEN 0 ELSE 1 END WHERE id = ?")->execute([$videoId]);
+    respond(true);
+}
+
+function admin_toggle_split_series($pdo, $input) {
+    $videoId = $input['videoId'] ?? '';
+    if (!$videoId) respond(false, null, "ID faltante");
+    $pdo->prepare("UPDATE videos SET split_series = CASE WHEN split_series = 1 THEN 0 ELSE 1 END WHERE id = ?")->execute([$videoId]);
     respond(true);
 }
 

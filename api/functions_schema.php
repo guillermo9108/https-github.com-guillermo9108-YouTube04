@@ -57,7 +57,9 @@ function getAppSchema() {
                 'queue_priority' => 'INT DEFAULT 0',
                 'originalId' => 'VARCHAR(50) DEFAULT NULL',
                 'originalMarketplaceId' => 'VARCHAR(50) DEFAULT NULL',
-                'split_shorts' => 'TINYINT(1) DEFAULT 0'
+                'split_shorts' => 'TINYINT(1) DEFAULT 0',
+                'split_series' => 'TINYINT(1) DEFAULT 0',
+                'is_series_fragment' => 'TINYINT(1) DEFAULT 0'
             ],
             'indices' => [
                 'idx_category' => 'category',
@@ -252,7 +254,8 @@ function getAppSchema() {
                 'latestApkVersion' => "VARCHAR(20) DEFAULT '0.0.1'",
                 'batteryConfig' => 'LONGTEXT',
                 'batteryHistory' => 'LONGTEXT',
-                'shortsPath' => "VARCHAR(255) DEFAULT ''"
+                'shortsPath' => "VARCHAR(255) DEFAULT ''",
+                'fragmentation_time' => 'INT DEFAULT 60'
             ]
         ],
         'transactions' => [
