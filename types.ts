@@ -127,6 +127,9 @@ export interface Video {
   originalMarketplaceId?: string;
   originalMarketplaceItem?: MarketplaceItem;
   split_shorts?: boolean | number;
+  split_series?: boolean | number;
+  is_series_fragment?: boolean | number;
+  custom_fragmentation_time?: number;
 }
 
 export interface Comment {

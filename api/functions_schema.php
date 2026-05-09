@@ -59,7 +59,8 @@ function getAppSchema() {
                 'originalMarketplaceId' => 'VARCHAR(50) DEFAULT NULL',
                 'split_shorts' => 'TINYINT(1) DEFAULT 0',
                 'split_series' => 'TINYINT(1) DEFAULT 0',
-                'is_series_fragment' => 'TINYINT(1) DEFAULT 0'
+                'is_series_fragment' => 'TINYINT(1) DEFAULT 0',
+                'custom_fragmentation_time' => 'INT DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',

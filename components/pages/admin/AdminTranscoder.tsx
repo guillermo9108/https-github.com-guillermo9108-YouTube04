@@ -164,6 +164,13 @@ export default function AdminTranscoder() {
                 await Promise.all(
                     Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
                 );
+            } else if (action === 'admin_set_fragmentation_time') {
+                const time = prompt("Segundos para fragmentar:", "60");
+                if (time === null) return;
+                await Promise.all(
+                    Array.from(selectedIds).map(id => db.request(`action=admin_set_fragmentation_time&videoId=${id}&time=${time}`, { method: 'POST' }))
+                );
+                toast.success("Tiempos actualizados en selección");
             } else {
                 await Promise.all(
                     Array.from(selectedIds).map(id => db.request(`action=${action}&videoId=${id}`, { method: 'POST' }))
@@ -300,6 +307,15 @@ export default function AdminTranscoder() {
             toast.success("Ajuste de serie actualizado");
         } catch (e) {
             toast.error("Error al actualizar serie");
+        }
+    };
+
+    const handleSetFragTime = async (videoId: string, time: string) => {
+        try {
+            await db.request(`action=admin_set_fragmentation_time&videoId=${videoId}&time=${time}`, { method: 'POST' });
+            setWaitingVideos(prev => prev.map(v => v.id === videoId ? { ...v, custom_fragmentation_time: parseInt(time) } : v));
+        } catch (e) {
+            toast.error("Error al guardar tiempo");
         }
     };
 
@@ -566,6 +582,13 @@ export default function AdminTranscoder() {
                                             <Layers size={14} /> Tgl
                                         </button>
                                         <button 
+                                            onClick={() => handleBulkAction('admin_set_fragmentation_time')}
+                                            className="px-4 py-2 bg-slate-500/10 hover:bg-slate-500 text-[10px] font-black text-slate-500 hover:text-white uppercase rounded-xl transition-all border border-slate-500/20 flex items-center gap-2"
+                                            title="Establecer tiempo de fragmentación"
+                                        >
+                                            <Clock size={14} /> Time
+                                        </button>
+                                        <button 
                                             onClick={() => handleBulkAction('admin_remove_from_queue')}
                                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-[10px] font-black text-red-500 uppercase rounded-xl transition-all border border-red-500/20"
                                         >
@@ -664,6 +687,21 @@ export default function AdminTranscoder() {
                                             >
                                                 <Layers size={18} />
                                             </button>
+                                            {((v as any).split_shorts || (v as any).split_series) && (
+                                                <div className="flex flex-col gap-1 shrink-0">
+                                                    <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1 border border-white/5">
+                                                        <Clock size={10} className="text-slate-500"/>
+                                                        <input 
+                                                            type="number"
+                                                            defaultValue={(v as any).custom_fragmentation_time || 60}
+                                                            onBlur={(e) => handleSetFragTime(v.id, e.target.value)}
+                                                            className="w-10 bg-transparent text-[10px] font-bold text-white outline-none text-center"
+                                                            title="Segundos por fragmento"
+                                                        />
+                                                        <span className="text-[8px] text-slate-600 font-black">S</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="hidden lg:flex flex-col gap-0.5 mr-1 px-1">
                                                 <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Subir"><ChevronRight size={12} className="-rotate-90"/></button>
                                                 <button onClick={() => handleReorder(v.id, 'DOWN')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Bajar"><ChevronRight size={12} className="rotate-90"/></button>

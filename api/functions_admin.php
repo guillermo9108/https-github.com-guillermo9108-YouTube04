@@ -1742,13 +1742,15 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     $outputBase = preg_replace('/\.[^.]+$/', '', $inputPath) . '_t';
     $outputPath = $outputBase . '.' . $outputExt;
     
+    $checkPath = str_replace('\\', '/', $outputPath); // RUTA PARA MONITORIZAR TAMAÑO
     if ($isSplit) {
         $outputPath = $outputBase . '_%03d.' . $outputExt;
+        $checkPath = str_replace('\\', '/', $outputBase . '_000.' . $outputExt); // Monitorizamos el primer fragmento
     }
     
     // Evitar colisión si ya existe el archivo de salida
-    if (!$isSplit && file_exists($outputPath)) {
-        @unlink($outputPath);
+    if (!$isSplit && file_exists($checkPath)) {
+        @unlink($checkPath);
     }
 
     // Actualizar estado a PROCESSING
@@ -1762,20 +1764,18 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
     $metaArgs = "-metadata title=" . escapeshellarg($videoId);
     
     $settings = $pdo->query("SELECT fragmentation_time FROM system_settings WHERE id = 1")->fetch();
-    $fragTime = $settings['fragmentation_time'] ?? 60;
+    $fragTime = $video['custom_fragmentation_time'] ?? $settings['fragmentation_time'] ?? 60;
     
     $splitArgs = $isSplit ? "-f segment -segment_time $fragTime -reset_timestamps 1" : "";
     
     $cmd = "$ffmpeg -y -i " . escapeshellarg($inputPath) . " -threads 2 $metaArgs " . $profile['command_args'] . " $splitArgs " . escapeshellarg($outputPath) . " 2>&1";
-    write_log("Transcode: Iniciando $videoId (Split:" . ($isSplit?'SI':'NO') . "): $cmd");
+    write_log("Transcode: Iniciando $videoId (Split:" . ($isSplit?'SI':'NO') . " Time: $fragTime): $cmd");
     
     // Insertar registro inicial en la tabla de seguimiento persistente (si no es split, rastreamos el archivo único)
-    if (!$isSplit) {
-        $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
-                      VALUES (?, 0, ?, 0, ?, 'PROCESSING') 
-                      ON DUPLICATE KEY UPDATE status='PROCESSING', tempPath=VALUES(tempPath), lastUpdated=VALUES(lastUpdated)")
-            ->execute([$videoId, $outputPath, time()]);
-    }
+    $pdo->prepare("INSERT INTO active_transcodes (videoId, pid, tempPath, lastSize, lastUpdated, status) 
+                  VALUES (?, 0, ?, 0, ?, 'PROCESSING') 
+                  ON DUPLICATE KEY UPDATE status='PROCESSING', tempPath=VALUES(tempPath), lastUpdated=VALUES(lastUpdated)")
+        ->execute([$videoId, $checkPath, time()]);
 
     $descriptorspec = array(
        0 => array("pipe", "r"),
@@ -1812,8 +1812,17 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
             // Actualizar tamaño de salida periódicamente
             clearstatcache();
-            if (file_exists($outputPath)) {
-                $currentSize = filesize($outputPath);
+            if (file_exists($checkPath)) {
+                $currentSize = filesize($checkPath);
+                // Si es split, intentamos sumar todos los fragmentos existentes para una mejor visualización de progreso
+                if ($isSplit) {
+                    $pattern = str_replace(['\\', '%03d'], ['/', '*'], $outputPath);
+                    $totalSize = 0;
+                    foreach (glob($pattern) as $f) {
+                        $totalSize += filesize($f);
+                    }
+                    $currentSize = $totalSize;
+                }
                 $pdo->prepare("UPDATE active_transcodes SET lastSize = ?, lastUpdated = ? WHERE videoId = ?")
                     ->execute([$currentSize, time(), $videoId]);
             }
@@ -1958,6 +1967,15 @@ function admin_delete_physical($pdo, $input) {
         }
     }
     respond(true, ['deleted' => $deleted]);
+}
+
+function admin_set_fragmentation_time($pdo, $input) {
+    $videoId = $input['videoId'] ?? '';
+    $time = intval($input['time'] ?? 60);
+    if (!$videoId) respond(false, null, "ID faltante");
+    if ($time <= 0) $time = 60;
+    $pdo->prepare("UPDATE videos SET custom_fragmentation_time = ? WHERE id = ?")->execute([$time, $videoId]);
+    respond(true);
 }
 
 function admin_toggle_split_shorts($pdo, $input) {
