@@ -163,6 +163,7 @@ try {
         case 'admin_feature_listing': admin_feature_listing($pdo, $input); break;
         case 'admin_toggle_split_shorts': admin_toggle_split_shorts($pdo, $input); break;
         case 'admin_toggle_split_series': admin_toggle_split_series($pdo, $input); break;
+        case 'admin_save_video_transcode_config': admin_save_video_transcode_config($pdo, $input); break;
         case 'admin_set_fragmentation_time': admin_set_fragmentation_time($pdo, $input); break;
         case 'admin_deep_cleanup': admin_deep_cleanup($pdo); break;
         case 'submit_manual_vip_request': 

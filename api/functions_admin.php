@@ -1858,13 +1858,16 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
                 return false;
             }
 
+            $totalDuration = 0;
+            $bins = get_ffmpeg_binaries($pdo);
+            $ffprobe = $bins['ffprobe'];
+
             foreach ($segments as $idx => $segPath) {
                 $newId = $videoId . '_s' . ($idx + 1);
                 $newTitle = $video['title'] . " (Parte " . ($idx + 1) . ")";
                 
-                // Si es la primera parte, podemos reutilizar el registro original o crear uno nuevo
-                // Para simplificar, crearemos nuevos registros para cada parte y marcaremos el original como DONE
-                // con un flag o simplemente esconderlo de la vista principal.
+                $segDuration = get_media_duration($segPath, $ffprobe);
+                $totalDuration += $segDuration;
                 
                 $newUrl = dirname($videoUrl) . '/' . basename($segPath);
                 if ($videoUrl[0] === '/') $newUrl = '/' . ltrim($newUrl, '/');
@@ -1873,7 +1876,7 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
                 $thumbName = basename($segPath) . '_thumb.jpg';
                 $thumbDest = 'uploads/thumbnails/' . $thumbName;
                 $thumbnail = 'api/uploads/thumbnails/default.jpg';
-                if (extract_video_thumbnail($segPath, $thumbDest, $ffmpeg)) {
+                if (extract_video_thumbnail($segPath, $thumbDest, $bins['ffmpeg'])) {
                     $thumbnail = 'api/' . $thumbDest;
                 }
 
@@ -1890,17 +1893,19 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
                     $video['creatorId'],
                     time() + $idx, // Slighly offset for sorting
                     $video['category'],
-                    0, // Duración desconocida por ahora (se puede extraer con ffprobe si es necesario)
+                    floor($segDuration),
                     $videoId,
                     $isSeriesFragment
                 ]);
             }
             
-            // Eliminar original físico si se desea (o mantenerlo como backup)
+            // Eliminar original físico
             @unlink($inputPath);
             
-            // Por ahora marcamos el original como DONE y lo quitamos de la cola
-            $pdo->prepare("UPDATE videos SET transcode_status = 'DONE', locked_at = 0 WHERE id = ?")->execute([$videoId]);
+            // Actualizar original con la duración total y marcar como DONE
+            // Si es serie, el 'principal' ahora tiene la suma de sus partes.
+            $pdo->prepare("UPDATE videos SET transcode_status = 'DONE', duration = ?, locked_at = 0 WHERE id = ?")
+                ->execute([floor($totalDuration), $videoId]);
             return true;
         }
 
@@ -1967,6 +1972,28 @@ function admin_delete_physical($pdo, $input) {
         }
     }
     respond(true, ['deleted' => $deleted]);
+}
+
+function admin_save_video_transcode_config($pdo, $input) {
+    $videoId = $input['videoId'] ?? '';
+    if (!$videoId) respond(false, null, "ID faltante");
+    
+    $mode = $input['mode'] ?? 'NORMAL';
+    $fragTime = intval($input['fragTime'] ?? 60);
+    $profileExt = $input['profileExt'] ?? 'mp4';
+    
+    $splitShorts = ($mode === 'SHORTS') ? 1 : 0;
+    $splitSeries = ($mode === 'SERIES') ? 1 : 0;
+    
+    $stmt = $pdo->prepare("UPDATE videos SET 
+        split_shorts = ?, 
+        split_series = ?, 
+        custom_fragmentation_time = ?, 
+        target_extension = ? 
+        WHERE id = ?");
+    $stmt->execute([$splitShorts, $splitSeries, $fragTime, $profileExt, $videoId]);
+    
+    respond(true);
 }
 
 function admin_set_fragmentation_time($pdo, $input) {

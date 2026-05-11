@@ -37,6 +37,14 @@ export default function AdminTranscoder() {
         description: '' 
     });
 
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [configVideo, setConfigVideo] = useState<Video | null>(null);
+    const [configData, setConfigData] = useState({
+        mode: 'NORMAL', // NORMAL, SHORTS, SERIES
+        fragTime: 60,
+        profileExt: ''
+    });
+
     const SUGGESTED_PROFILES = [
         {
             name: 'Webview Compatible (HD)',
@@ -333,6 +341,48 @@ export default function AdminTranscoder() {
             toast.success("Priorizado");
             loadData();
         } catch (e: any) { toast.error(e.message); }
+    };
+
+    const openConfigModal = (video: Video) => {
+        const v: any = video;
+        let mode = 'NORMAL';
+        if (v.split_shorts) mode = 'SHORTS';
+        else if (v.split_series) mode = 'SERIES';
+        
+        setConfigVideo(video);
+        setConfigData({
+            mode,
+            fragTime: v.custom_fragmentation_time || 60,
+            profileExt: v.target_extension || (profiles[0]?.extension || 'mp4')
+        });
+        setShowConfigModal(true);
+    };
+
+    const saveConfig = async () => {
+        if (!configVideo) return;
+        try {
+            const videoId = configVideo.id;
+            // Actualizar configuraciones en el servidor
+            await Promise.all([
+                db.request(`action=admin_toggle_split_shorts&videoId=${videoId}`, { 
+                    method: 'POST', 
+                    body: JSON.stringify({ force: configData.mode === 'SHORTS' ? 1 : 0 }) 
+                }),
+                db.request(`action=admin_toggle_split_series&videoId=${videoId}`, { 
+                    method: 'POST',
+                    body: JSON.stringify({ force: configData.mode === 'SERIES' ? 1 : 0 })
+                }),
+                db.request(`action=admin_set_fragmentation_time&videoId=${videoId}&time=${configData.fragTime}`, { method: 'POST' }),
+                // Podríamos necesitar una acción para guardar el perfil seleccionado si no se ha hecho
+                db.request(`action=admin_set_video_target_extension&videoId=${videoId}&ext=${configData.profileExt}`, { method: 'POST' })
+            ]);
+
+            toast.success("Configuración guardada");
+            setShowConfigModal(false);
+            loadData();
+        } catch (e: any) {
+            toast.error(e.message);
+        }
     };
 
     const handleDeleteProfile = async (ext: string) => {
@@ -674,34 +724,21 @@ export default function AdminTranscoder() {
 
                                         <div className="flex items-center gap-2 shrink-0 self-center md:self-auto">
                                             <button 
-                                                onClick={() => handleToggleSplit(v.id)}
-                                                className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${v.split_shorts ? 'text-amber-500 bg-amber-500/10' : 'text-slate-600 hover:text-amber-500 hover:bg-amber-500/10'}`}
-                                                title={v.split_shorts ? "Fragmentación Shorts Activada" : "Fragmentar para Shorts (60s)"}
+                                                onClick={() => openConfigModal(v)}
+                                                className="p-1.5 md:p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg md:rounded-xl transition-all border border-white/5 flex items-center gap-2"
+                                                title="Configurar conversión"
                                             >
-                                                <Scissors size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleToggleSeries(v.id)}
-                                                className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${(v as any).split_series ? 'text-indigo-500 bg-indigo-500/10' : 'text-slate-600 hover:text-indigo-500 hover:bg-indigo-500/10'}`}
-                                                title={(v as any).split_series ? "Fragmentación Serie Activada" : "Fragmentar para Serie (Capítulos)"}
-                                            >
-                                                <Layers size={18} />
-                                            </button>
-                                            {((v as any).split_shorts || (v as any).split_series) && (
-                                                <div className="flex flex-col gap-1 shrink-0">
-                                                    <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1 border border-white/5">
-                                                        <Clock size={10} className="text-slate-500"/>
-                                                        <input 
-                                                            type="number"
-                                                            defaultValue={(v as any).custom_fragmentation_time || 60}
-                                                            onBlur={(e) => handleSetFragTime(v.id, e.target.value)}
-                                                            className="w-10 bg-transparent text-[10px] font-bold text-white outline-none text-center"
-                                                            title="Segundos por fragmento"
-                                                        />
-                                                        <span className="text-[8px] text-slate-600 font-black">S</span>
+                                                <Settings2 size={18} />
+                                                <div className="hidden lg:flex flex-col items-start gap-1">
+                                                    <span className="text-[10px] font-black uppercase tracking-tighter leading-none">Configurar</span>
+                                                    <div className="flex gap-1">
+                                                        {v.split_shorts ? <span className="text-[8px] bg-amber-500/20 text-amber-500 px-1 rounded uppercase">Shorts</span> : null}
+                                                        {(v as any).split_series ? <span className="text-[8px] bg-indigo-500/20 text-indigo-500 px-1 rounded uppercase">Serie</span> : null}
+                                                        {!v.split_shorts && !(v as any).split_series && <span className="text-[8px] bg-emerald-500/20 text-emerald-500 px-1 rounded uppercase">Normal</span>}
                                                     </div>
                                                 </div>
-                                            )}
+                                            </button>
+                                            
                                             <div className="hidden lg:flex flex-col gap-0.5 mr-1 px-1">
                                                 <button onClick={() => handleReorder(v.id, 'UP')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Subir"><ChevronRight size={12} className="-rotate-90"/></button>
                                                 <button onClick={() => handleReorder(v.id, 'DOWN')} className="p-1 hover:bg-white/10 rounded-lg text-slate-600 hover:text-white" title="Bajar"><ChevronRight size={12} className="rotate-90"/></button>
@@ -836,6 +873,122 @@ export default function AdminTranscoder() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Configuración de Transcodificación */}
+            {showConfigModal && configVideo && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-[#1e293b] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-white/5 bg-black/20 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#1877f2] rounded-xl text-white">
+                                    <Settings2 size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-white uppercase tracking-tight">Configurar Conversión</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase truncate max-w-[200px]">{configVideo.title}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowConfigModal(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-400">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            {/* Tipo de Proceso */}
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Modo de Publicación</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { id: 'NORMAL', icon: Play, label: 'Normal', color: 'slate' },
+                                        { id: 'SHORTS', icon: Scissors, label: 'Shorts', color: 'amber' },
+                                        { id: 'SERIES', icon: Layers, label: 'Serie', color: 'indigo' }
+                                    ].map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => setConfigData(prev => ({ ...prev, mode: m.id }))}
+                                            className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${
+                                                configData.mode === m.id 
+                                                    ? `bg-${m.color}-500/20 border-${m.color}-500/50 text-${m.color}-500 shadow-lg shadow-${m.color}-500/10` 
+                                                    : 'bg-white/5 border-white/5 text-slate-600 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <m.icon size={20} />
+                                            <span className="text-[10px] font-black uppercase tracking-tighter">{m.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Formato de Salida */}
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Perfil de Salida</label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {profiles.map(p => (
+                                        <button
+                                            key={p.extension}
+                                            onClick={() => setConfigData(prev => ({ ...prev, profileExt: p.extension }))}
+                                            className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                                                configData.profileExt === p.extension 
+                                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' 
+                                                    : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${configData.profileExt === p.extension ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                                    .{p.extension}
+                                                </span>
+                                                <span className="text-[11px] font-black uppercase">{p.description}</span>
+                                            </div>
+                                            {configData.profileExt === p.extension && <CheckCircle2 size={16} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Tiempo de Fragmentación */}
+                            {(configData.mode === 'SHORTS' || configData.mode === 'SERIES') && (
+                                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                            <Clock size={12}/> Tiempo de {configData.mode === 'SHORTS' ? 'Short' : 'Capítulo'}
+                                        </label>
+                                        <span className="text-[12px] font-black text-white">{configData.fragTime} segundos</span>
+                                    </div>
+                                    <input 
+                                        type="range"
+                                        min="15"
+                                        max="300"
+                                        step="1"
+                                        value={configData.fragTime}
+                                        onChange={(e) => setConfigData(prev => ({ ...prev, fragTime: parseInt(e.target.value) }))}
+                                        className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-[#1877f2]"
+                                    />
+                                    <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase italic">
+                                        <span>Mínima (15s)</span>
+                                        <span>Máxima (5m)</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 bg-black/20 border-t border-white/5 flex gap-3">
+                            <button 
+                                onClick={() => setShowConfigModal(false)}
+                                className="flex-1 py-4 rounded-2xl bg-white/5 text-slate-400 text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={saveConfig}
+                                className="flex-[2] py-4 rounded-2xl bg-[#1877f2] text-white text-[11px] font-black uppercase tracking-widest hover:bg-[#166fe5] transition-all shadow-lg shadow-[#1877f2]/30 flex items-center justify-center gap-2"
+                            >
+                                <Save size={18} />
+                                Confirmar y Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
 
             {/* Modal: Fallidos */}

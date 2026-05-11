@@ -60,7 +60,8 @@ function getAppSchema() {
                 'split_shorts' => 'TINYINT(1) DEFAULT 0',
                 'split_series' => 'TINYINT(1) DEFAULT 0',
                 'is_series_fragment' => 'TINYINT(1) DEFAULT 0',
-                'custom_fragmentation_time' => 'INT DEFAULT NULL'
+                'custom_fragmentation_time' => 'INT DEFAULT NULL',
+                'target_extension' => 'VARCHAR(10) DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',

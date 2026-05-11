@@ -618,12 +618,14 @@ export default function Home() {
             // Standard Greedy Logic for Search/Folders/Categories
             const result: any[] = [];
             let i = 0;
+            const MAX_SHORTS_PER_GROUP = 12; // Limit to 12 shorts per block
+
             while (i < grouped.length) {
                 const item = grouped[i];
                 if (!item) { i++; continue; }
                 if (isShort(item)) {
                     const group: any[] = [];
-                    while (i < grouped.length && grouped[i] && isShort(grouped[i])) {
+                    while (i < grouped.length && grouped[i] && isShort(grouped[i]) && group.length < MAX_SHORTS_PER_GROUP) {
                         group.push(grouped[i]);
                         i++;
                     }
@@ -670,28 +672,42 @@ export default function Home() {
 
         const combined = [...recent, ...mostLiked, ...followed, ...randomRest];
 
-        // Apply greedy grouping to combined
+        // Apply greedy grouping to combined with SPACING
         const finalResult: any[] = [];
         let k = 0;
+        const MAX_ROOT_SHORTS = 12;
+        let blocksSinceShorts = 5; // Start high to allow first group early
+
         while (k < combined.length) {
             const item = combined[k];
             if (isShort(item)) {
-                const group: any[] = [];
-                while (k < combined.length && isShort(combined[k])) {
-                    group.push(combined[k]);
+                // Only create a shorts group if we haven't had one recently, or if we have no choice (to avoid gaps)
+                if (blocksSinceShorts >= 3 || k === 0) {
+                    const group: any[] = [];
+                    while (k < combined.length && isShort(combined[k]) && group.length < MAX_ROOT_SHORTS) {
+                        group.push(combined[k]);
+                        k++;
+                    }
+                    if (group.length > 0) {
+                        finalResult.push({ 
+                            isShortsGroup: true, 
+                            shorts: group, 
+                            items: group, 
+                            id: `root-shorts-${k}` 
+                        });
+                        blocksSinceShorts = 0;
+                    }
+                } else {
+                    // Temporarily skip or just treat as normal video if we want to force spacing?
+                    // Better to just push it as a regular video card if it's too soon for a "Shorts Shelf"
+                    finalResult.push(item);
                     k++;
-                }
-                if (group.length > 0) {
-                    finalResult.push({ 
-                        isShortsGroup: true, 
-                        shorts: group, 
-                        items: group, 
-                        id: `root-shorts-${k}` 
-                    });
+                    blocksSinceShorts++;
                 }
             } else if (item) {
                 finalResult.push(item);
                 k++;
+                blocksSinceShorts++;
             } else {
                 k++;
             }

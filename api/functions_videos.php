@@ -246,12 +246,17 @@ function video_get_all($pdo) {
         $where[] = "v.is_private = 0";
     }
 
-    // Filtros de visibilidad
-    $where[] = "v.is_series_fragment = 0";
-    // Ocultar el video original si fue fragmentado para shorts (ya que se publican individuales)
+    // Filtros de visibilidad mejorados
+    // - Los fragmentos de serie (is_series_fragment=1) se muestran individualmente si el admin lo desea, 
+    //   pero generalmente los filtramos para que aparezcan dentro del reproductor.
+    //   SIN EMBARGO, el usuario pide que se publiquen como NUEVOS.
+    //   Si es fragmento de serie, lo mostramos.
+    // - Si el video original se marcó para shorts, lo ocultamos porque los fragmentos son los que importan.
     $where[] = "(v.split_shorts = 0 OR v.transcode_status != 'DONE')";
-    // Ocultar reshares si no tienen videoUrl (opcional, dependiendo de si se quieren mostrar como el original)
-    // $where[] = "(v.originalId IS NULL OR v.videoUrl IS NOT NULL)"; 
+    
+    // Si queremos que los fragmentos de serie aparezcan como nuevos, quitamos la restricción de is_series_fragment=0
+    // Opcional: Podríamos querer ocultar el 'Padre' de una serie si ya están los fragmentos, 
+    // pero el usuario dice que el principal aparezca como nuevo con la suma.
 
     if (!empty($transcodeStatus)) {
         $where[] = "v.transcode_status = ?";
