@@ -66,7 +66,7 @@ export const VideoTranscodeModal: React.FC<Props> = ({ video, show, onClose, onS
 
             // Si el modo no es NORMAL, o si el usuario quiere convertir después de configurar...
             // El requerimiento dice: "este modal envíe el video a la cola con la configuración que ajuste el administrador"
-            await db.request(`action=admin_add_to_transcode_queue&videoId=${videoId}`, { method: 'POST' });
+            await db.request(`action=admin_add_video_to_transcode_queue&videoId=${videoId}`, { method: 'POST' });
 
             toast.success("Enviado a cola de transcodificación");
             onSaved?.();
