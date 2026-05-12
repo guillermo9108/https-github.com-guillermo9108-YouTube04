@@ -292,6 +292,7 @@ function getAppSchema() {
                 'disliked' => 'TINYINT(1) DEFAULT 0',
                 'isWatched' => 'TINYINT(1) DEFAULT 0',
                 'isSkipped' => 'TINYINT(1) DEFAULT 0',
+                'skip_count' => 'INT DEFAULT 0',
                 'watchedAt' => 'BIGINT DEFAULT 0'
             ],
             'pk' => 'PRIMARY KEY (userId, videoId)',

@@ -672,20 +672,31 @@ export default function Home() {
 
         const combined = [...recent, ...mostLiked, ...followed, ...randomRest];
 
+        // Evitar inundar el inicio con muchos fragmentos del mismo video original
+        const filteredCombined: Video[] = [];
+        const originalCountMap = new Map<string, number>();
+        for (const v of combined) {
+            const oid = v.originalId || v.id;
+            const count = originalCountMap.get(oid) || 0;
+            if (count < 2) { // Máximo 2 fragmentos del mismo video original para dar variedad
+                filteredCombined.push(v);
+                originalCountMap.set(oid, count + 1);
+            }
+        }
+
         // Apply greedy grouping to combined with SPACING
         const finalResult: any[] = [];
         let k = 0;
-        const MAX_ROOT_SHORTS = 12;
-        let blocksSinceShorts = 5; // Start high to allow first group early
+        const MAX_ROOT_SHORTS = 10;
+        let blocksSinceShorts = 5;
 
-        while (k < combined.length) {
-            const item = combined[k];
+        while (k < filteredCombined.length) {
+            const item = filteredCombined[k];
             if (isShort(item)) {
-                // Only create a shorts group if we haven't had one recently, or if we have no choice (to avoid gaps)
-                if (blocksSinceShorts >= 3 || k === 0) {
+                if (blocksSinceShorts >= 4 || k === 0) {
                     const group: any[] = [];
-                    while (k < combined.length && isShort(combined[k]) && group.length < MAX_ROOT_SHORTS) {
-                        group.push(combined[k]);
+                    while (k < filteredCombined.length && isShort(filteredCombined[k]) && group.length < MAX_ROOT_SHORTS) {
+                        group.push(filteredCombined[k]);
                         k++;
                     }
                     if (group.length > 0) {

@@ -131,6 +131,13 @@ function interact_purchase_vip_instant($pdo, $input) {
 function interact_rate($pdo, $input) {
     $uid = $input['userId']; $vid = $input['videoId']; $type = $input['type'];
     
+    // Si es fragmento, obtenemos el originalId para marcar la interacción globalmente si se desea,
+    // o simplemente para que la lógica de filtrado sepa que el "origen" fue rechazado.
+    $v = $pdo->prepare("SELECT originalId FROM videos WHERE id = ?");
+    $v->execute([$vid]);
+    $vMeta = $v->fetch();
+    $origId = $vMeta['originalId'] ?? $vid;
+
     $stmt = $pdo->prepare("SELECT liked, disliked FROM interactions WHERE userId = ? AND videoId = ?");
     $stmt->execute([$uid, $vid]);
     $current = $stmt->fetch();
@@ -152,6 +159,12 @@ function interact_rate($pdo, $input) {
         $pdo->prepare("INSERT INTO interactions (userId, videoId, liked, disliked) VALUES (?, ?, ?, ?)")->execute([$uid, $vid, $newLiked, $newDisliked]);
         $resLiked = ($newLiked === 1);
         $resDisliked = ($newDisliked === 1);
+    }
+
+    // SI ES DISLIKE Y ES FRAGMENTO: Marcar dislike también en el ORGINAL para que el filtro lo detecte
+    if ($type === 'dislike' && $resDisliked && $origId !== $vid) {
+        $pdo->prepare("INSERT INTO interactions (userId, videoId, disliked) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE disliked = 1")
+            ->execute([$uid, $origId]);
     }
     
     $likes = $pdo->query("SELECT COUNT(*) FROM interactions WHERE videoId = '$vid' AND liked = 1")->fetchColumn();
@@ -181,10 +194,11 @@ function interact_get($pdo, $userId, $videoId) {
             'liked' => $liked, 
             'disliked' => $disliked, 
             'isWatched' => (bool)$res['isWatched'],
-            'isSkipped' => (bool)($res['isSkipped'] ?? false)
+            'isSkipped' => (bool)($res['isSkipped'] ?? false),
+            'skip_count' => (int)($res['skip_count'] ?? 0)
         ]);
     } else {
-        respond(true, ['liked' => false, 'disliked' => false, 'isWatched' => false, 'isSkipped' => false]);
+        respond(true, ['liked' => false, 'disliked' => false, 'isWatched' => false, 'isSkipped' => false, 'skip_count' => 0]);
     }
 }
 
@@ -206,8 +220,29 @@ function interact_mark_watched($pdo, $input) {
 }
 
 function interact_mark_skipped($pdo, $input) {
+    $uid = $input['userId']; $vid = $input['videoId'];
+    
+    // Obtenemos originalId para propagar el skip si es fragmento (según requerimiento de 3 skips)
+    $v = $pdo->prepare("SELECT originalId FROM videos WHERE id = ?");
+    $v->execute([$vid]);
+    $vMeta = $v->fetch();
+    $origId = $vMeta['originalId'] ?? $vid;
+
     // Solo marcar como saltado si NO ha sido visto antes
-    $pdo->prepare("INSERT INTO interactions (userId, videoId, isSkipped) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE isSkipped = CASE WHEN isWatched = 1 THEN 0 ELSE 1 END")->execute([$input['userId'], $input['videoId']]);
+    $pdo->prepare("INSERT INTO interactions (userId, videoId, isSkipped, skip_count) VALUES (?, ?, 1, 1) 
+                  ON DUPLICATE KEY UPDATE 
+                  isSkipped = CASE WHEN isWatched = 1 THEN 0 ELSE 1 END,
+                  skip_count = CASE WHEN isWatched = 1 THEN skip_count ELSE skip_count + 1 END")
+        ->execute([$uid, $vid, $uid, $vid]); // Corregido: ON DUPLICATE KEY no necesita re-pasar parámetros si no los usamos con VALUES, pero aquí sí usamos VALUES indirectamente o simplemente incrementamos
+
+    // Si es fragmento, incrementamos skip_count en el ORIGINAL también
+    if ($origId !== $vid) {
+         $pdo->prepare("INSERT INTO interactions (userId, videoId, isSkipped, skip_count) VALUES (?, ?, 1, 1) 
+                       ON DUPLICATE KEY UPDATE 
+                       skip_count = CASE WHEN isWatched = 1 THEN skip_count ELSE skip_count + 1 END")
+             ->execute([$uid, $origId]);
+    }
+    
     respond(true);
 }
 

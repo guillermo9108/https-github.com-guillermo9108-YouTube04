@@ -10,6 +10,7 @@ import { useSettings } from '../context/SettingsContext';
 import { getThumbnailUrl } from '../utils/image';
 import { generateThumbnail } from '../utils/videoGenerator';
 import ShareModal from './ShareModal';
+import { VideoTranscodeModal } from './Admin/VideoTranscodeModal';
 
 // Sistema de control global para no saturar el servidor
 let isAnyCardProcessing = false;
@@ -80,6 +81,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [isVisible, setIsVisible] = useState(false);
   const [shouldLoadImg, setShouldLoadImg] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -248,16 +250,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const handleSplitShorts = async (e: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!isAdmin) return;
-    try {
-        await db.request('action=admin_add_video_to_transcode_queue', {
-            method: 'POST',
-            body: JSON.stringify({ videoId: video.id, split: 1 })
-        });
-        toast.success("Video añadido a cola con fragmentación activa");
-        setShowMenu(false);
-    } catch (err: any) {
-        toast.error(err.message || "Error al añadir a la cola");
-    }
+    setShowConfigModal(true);
+    setShowMenu(false);
   };
 
   useEffect(() => {
@@ -520,7 +514,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                                     className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] text-[var(--text-primary)] text-left"
                                 >
                                     <Scissors size={16} className="text-amber-500" />
-                                    <span className="text-sm">Fragmentar para Shorts</span>
+                                    <span className="text-sm">Configurar Fragmentación</span>
                                 </button>
                             </>
                         )}
@@ -1081,6 +1075,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   </div>
               </div>
           </div>
+      )}
+      {showConfigModal && (
+        <VideoTranscodeModal 
+          video={video}
+          show={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          onSaved={() => {
+              // Si el padre pasó onConvert, podemos llamarlo si queremos que sepa que algo cambió
+              // pero el modal ya hace el db request de add_to_queue.
+              setShowMenu(false);
+          }}
+        />
       )}
     </div>
   );

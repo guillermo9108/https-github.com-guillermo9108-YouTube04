@@ -247,12 +247,14 @@ function video_get_all($pdo) {
     }
 
     // Filtros de visibilidad mejorados
-    // - Los fragmentos de serie (is_series_fragment=1) se muestran individualmente si el admin lo desea, 
-    //   pero generalmente los filtramos para que aparezcan dentro del reproductor.
-    //   SIN EMBARGO, el usuario pide que se publiquen como NUEVOS.
-    //   Si es fragmento de serie, lo mostramos.
-    // - Si el video original se marcó para shorts, lo ocultamos porque los fragmentos son los que importan.
+    // 1. Ocultar el video 'Padre' si se fragmentó para Shorts (ya que sus fragmentos van a la sección Reels)
     $where[] = "(v.split_shorts = 0 OR v.transcode_status != 'DONE')";
+    
+    // 2. Ocultar fragmentos de Shorts de la página principal y listados normales
+    //    Solo los fragmentos de serie (is_series_fragment = 1) se muestran en el feed principal.
+    if (!$isShorts && !$isAdmin) {
+        $where[] = "(v.originalId IS NULL OR v.is_series_fragment = 1)";
+    }
     
     // Si queremos que los fragmentos de serie aparezcan como nuevos, quitamos la restricción de is_series_fragment=0
     // Opcional: Podríamos querer ocultar el 'Padre' de una serie si ya están los fragmentos, 
@@ -264,7 +266,18 @@ function video_get_all($pdo) {
     }
 
     if ($onlyUnseen && !empty($userId)) {
-        $where[] = "NOT EXISTS (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND (i.isWatched = 1 OR i.isSkipped = 1))";
+        // Excluir si ya fue visto directamente, o si el video (o su original si es fragmento) recibió dislike o 3+ saltos
+        $where[] = "NOT EXISTS (
+            SELECT 1 FROM interactions i 
+            WHERE i.userId = ? 
+            AND (
+                (i.videoId = v.id AND i.isWatched = 1)
+                OR 
+                ( (i.videoId = v.id OR (v.originalId IS NOT NULL AND i.videoId = v.originalId)) 
+                  AND (i.disliked = 1 OR i.skip_count >= 3)
+                )
+            )
+        )";
         $params[] = $userId;
     }
 
@@ -538,7 +551,7 @@ function video_get_one($pdo, $id) {
 }
 
 function video_get_by_creator($pdo, $userId) {
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND is_series_fragment = 0 AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY createdAt DESC");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE creatorId = ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND (originalId IS NULL OR is_series_fragment = 1) AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY createdAt DESC");
     $stmt->execute([$userId]); 
     $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     video_process_rows($videos); 
@@ -586,7 +599,7 @@ function video_get_related($pdo, $videoId) {
         $orderBy = "createdAt DESC";
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND is_series_fragment = 0 AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY $orderBy LIMIT 12");
+    $stmt = $pdo->prepare("SELECT * FROM videos WHERE category = ? AND id != ? AND category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') AND (transcode_status = 'NONE' OR transcode_status = 'DONE') AND (originalId IS NULL OR is_series_fragment = 1) AND (split_shorts = 0 OR transcode_status != 'DONE') ORDER BY $orderBy LIMIT 12");
     $stmt->execute([$currentVideo['category'], $videoId]); 
     $videos = $stmt->fetchAll();
     video_process_rows($videos); 

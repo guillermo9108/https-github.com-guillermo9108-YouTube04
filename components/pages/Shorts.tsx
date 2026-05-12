@@ -367,6 +367,11 @@ export default function Shorts() {
         // Reordenar la cola para poner videos de esta carpeta a continuación
         reorderQueue(folder, true);
     } else if (isNegative) {
+        // En caso de dislike o quick skip, filtramos inmediatamente los que tengan el mismo originalId
+        // de la cola actual para que no vuelvan a aparecer en esta sesión.
+        const originalIdToRemove = video.originalId || video.id;
+        setVideos(prev => prev.filter(v => ((v.originalId || v.id) !== originalIdToRemove) || v.id === videoId));
+
         if (currentFolder === folder) {
             const newNegs = consecutiveNegatives + 1;
             setConsecutiveNegatives(newNegs);
@@ -484,14 +489,33 @@ export default function Shorts() {
     if (batch.length <= 1) return batch;
     const result: Video[] = [];
     const pool = [...batch];
-    let lastId = existing.length > 0 ? existing[existing.length - 1].creatorId : null;
+    
+    const last = existing.length > 0 ? existing[existing.length - 1] : null;
+    let lastCreatorId = last ? last.creatorId : null;
+    let lastOriginalId = last ? (last.originalId || last.id) : null;
+    let lastFolder = last ? getFolder(last) : null;
 
     while (pool.length > 0) {
-      let index = pool.findIndex(v => v.creatorId !== lastId);
+      // Prioridad 1: Diferente originalId Y Diferente Carpeta
+      let index = pool.findIndex(v => (v.originalId || v.id) !== lastOriginalId && getFolder(v) !== lastFolder);
+      
+      // Prioridad 2: Al menos diferente originalId
+      if (index === -1) {
+          index = pool.findIndex(v => (v.originalId || v.id) !== lastOriginalId);
+      }
+
+      // Prioridad 3: Al menos diferente creador
+      if (index === -1) {
+          index = pool.findIndex(v => v.creatorId !== lastCreatorId);
+      }
+
       if (index === -1) index = 0; // Si no hay opción, tomamos el siguiente
+      
       const [v] = pool.splice(index, 1);
       result.push(v);
-      lastId = v.creatorId;
+      lastCreatorId = v.creatorId;
+      lastOriginalId = v.originalId || v.id;
+      lastFolder = getFolder(v);
     }
     return result;
   };
