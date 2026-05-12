@@ -676,7 +676,11 @@ export default function Home() {
         const filteredCombined: Video[] = [];
         const originalCountMap = new Map<string, number>();
         for (const v of combined) {
-            const oid = v.originalId || v.id;
+            if (!v || typeof v !== 'object') continue;
+            // Solo procesar si tiene ID (evitar crasheos con objetos malformados)
+            if (!v.id) continue;
+            
+            const oid = (v as any).originalId || v.id;
             const count = originalCountMap.get(oid) || 0;
             if (count < 2) { // Máximo 2 fragmentos del mismo video original para dar variedad
                 filteredCombined.push(v);

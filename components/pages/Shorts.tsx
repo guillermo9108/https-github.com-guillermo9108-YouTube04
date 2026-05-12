@@ -370,7 +370,11 @@ export default function Shorts() {
         // En caso de dislike o quick skip, filtramos inmediatamente los que tengan el mismo originalId
         // de la cola actual para que no vuelvan a aparecer en esta sesión.
         const originalIdToRemove = video.originalId || video.id;
-        setVideos(prev => prev.filter(v => ((v.originalId || v.id) !== originalIdToRemove) || v.id === videoId));
+        setVideos(prev => prev.filter(v => {
+            if (!v || typeof v !== 'object') return false;
+            const vOid = (v as any).originalId || v.id;
+            return (vOid !== originalIdToRemove) || v.id === videoId;
+        }));
 
         if (currentFolder === folder) {
             const newNegs = consecutiveNegatives + 1;
@@ -497,25 +501,36 @@ export default function Shorts() {
 
     while (pool.length > 0) {
       // Prioridad 1: Diferente originalId Y Diferente Carpeta
-      let index = pool.findIndex(v => (v.originalId || v.id) !== lastOriginalId && getFolder(v) !== lastFolder);
+      let index = pool.findIndex(v => {
+          if (!v) return false;
+          return (v.originalId || v.id) !== lastOriginalId && getFolder(v) !== lastFolder;
+      });
       
       // Prioridad 2: Al menos diferente originalId
       if (index === -1) {
-          index = pool.findIndex(v => (v.originalId || v.id) !== lastOriginalId);
+          index = pool.findIndex(v => {
+              if (!v) return false;
+              return (v.originalId || v.id) !== lastOriginalId;
+          });
       }
 
       // Prioridad 3: Al menos diferente creador
       if (index === -1) {
-          index = pool.findIndex(v => v.creatorId !== lastCreatorId);
+          index = pool.findIndex(v => {
+              if (!v) return false;
+              return v.creatorId !== lastCreatorId;
+          });
       }
 
       if (index === -1) index = 0; // Si no hay opción, tomamos el siguiente
       
       const [v] = pool.splice(index, 1);
-      result.push(v);
-      lastCreatorId = v.creatorId;
-      lastOriginalId = v.originalId || v.id;
-      lastFolder = getFolder(v);
+      if (v) {
+          result.push(v);
+          lastCreatorId = v.creatorId;
+          lastOriginalId = v.originalId || v.id;
+          lastFolder = getFolder(v);
+      }
     }
     return result;
   };
