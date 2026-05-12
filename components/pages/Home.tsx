@@ -723,8 +723,13 @@ export default function Home() {
                     if (group.length > 0 && group.length < MAX_ROOT_SHORTS) {
                         const alreadyInResultIds = new Set<string>();
                         finalResult.forEach(res => {
-                            if (res.isShortsGroup) res.shorts.forEach((s: any) => alreadyInResultIds.add(s.id));
-                            else if (res.id) alreadyInResultIds.add(res.id);
+                            if (res && res.isShortsGroup && Array.isArray(res.shorts)) {
+                                res.shorts.forEach((s: any) => {
+                                    if (s && s.id) alreadyInResultIds.add(s.id);
+                                });
+                            } else if (res && res.id) {
+                                alreadyInResultIds.add(res.id);
+                            }
                         });
 
                         const fillPool = combined.filter(v => 

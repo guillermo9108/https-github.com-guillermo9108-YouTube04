@@ -373,6 +373,7 @@ export default function Shorts() {
         setVideos(prev => prev.filter(v => {
             if (!v || typeof v !== 'object') return false;
             const vOid = (v as any).originalId || v.id;
+            if (!vOid && !v.id) return false;
             return (vOid !== originalIdToRemove) || v.id === videoId;
         }));
 
