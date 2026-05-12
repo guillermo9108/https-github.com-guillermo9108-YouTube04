@@ -247,12 +247,13 @@ function video_get_all($pdo) {
     }
 
     // Filtros de visibilidad mejorados
-    // 1. Ocultar el video 'Padre' si se fragmentó para Shorts (ya que sus fragmentos van a la sección Reels)
+    // 2. Ocultar el video 'Padre' si se fragmentó para Shorts (ya que sus fragmentos van a la sección Reels)
     $where[] = "(v.split_shorts = 0 OR v.transcode_status != 'DONE')";
     
-    // 2. Ocultar fragmentos de Shorts de la página principal y listados normales
-    //    Solo los fragmentos de serie (is_series_fragment = 1) se muestran en el feed principal.
-    if (!$isShorts && !$isAdmin) {
+    // Permitimos que los fragmentos lleguen si estamos en el Home para que el agrupador de React los use,
+    // pero los filtramos en otros contextos si no es necesario.
+    if (!$isShorts && !$isAdmin && !empty($input['category'])) { 
+        // Si es una categoría específica (no el home general), mantenemos el filtro
         $where[] = "(v.originalId IS NULL OR v.is_series_fragment = 1)";
     }
     

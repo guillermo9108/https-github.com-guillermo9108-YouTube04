@@ -696,13 +696,52 @@ export default function Home() {
 
         while (k < filteredCombined.length) {
             const item = filteredCombined[k];
+            
+            // Si ya usamos este video en un grupo de shorts previo (por relleno), lo saltamos
+            const alreadyUsed = finalResult.some(res => 
+                res.isShortsGroup && res.shorts.some((gs: any) => gs.id === item.id)
+            );
+            
+            if (alreadyUsed) {
+                k++;
+                continue;
+            }
+
             if (isShort(item)) {
                 if (blocksSinceShorts >= 4 || k === 0) {
                     const group: any[] = [];
+                    const usedInThisBatchIds = new Set<string>();
+
+                    // 1. Tomar los shorts consecutivos en esta parte de la secuencia
                     while (k < filteredCombined.length && isShort(filteredCombined[k]) && group.length < MAX_ROOT_SHORTS) {
                         group.push(filteredCombined[k]);
+                        usedInThisBatchIds.add(filteredCombined[k].id);
                         k++;
                     }
+
+                    // 2. Rellenar hasta 10 con otros shorts aleatorios del pool original (combined)
+                    if (group.length > 0 && group.length < MAX_ROOT_SHORTS) {
+                        const alreadyInResultIds = new Set<string>();
+                        finalResult.forEach(res => {
+                            if (res.isShortsGroup) res.shorts.forEach((s: any) => alreadyInResultIds.add(s.id));
+                            else if (res.id) alreadyInResultIds.add(res.id);
+                        });
+
+                        const fillPool = combined.filter(v => 
+                            isShort(v) && 
+                            !usedInThisBatchIds.has(v.id) && 
+                            !alreadyInResultIds.has(v.id)
+                        );
+
+                        // Mezclamos el pool de relleno para variedad
+                        const shuffledFill = shuffleWithSeed(fillPool, "shorts-fill-" + k + "-" + (new Date().getHours()));
+                        
+                        for (const s of shuffledFill) {
+                            if (group.length >= MAX_ROOT_SHORTS) break;
+                            group.push(s);
+                        }
+                    }
+
                     if (group.length > 0) {
                         finalResult.push({ 
                             isShortsGroup: true, 
@@ -713,11 +752,15 @@ export default function Home() {
                         blocksSinceShorts = 0;
                     }
                 } else {
-                    // Temporarily skip or just treat as normal video if we want to force spacing?
-                    // Better to just push it as a regular video card if it's too soon for a "Shorts Shelf"
-                    finalResult.push(item);
-                    k++;
-                    blocksSinceShorts++;
+                    // Si es un fragmento de shorts (no de serie) y no toca grupo aún, lo saltamos
+                    // para cumplir con: "los fragmentos de shorts no se muestren en la principal [como cards grandes]"
+                    if (item.originalId && !item.is_series_fragment) {
+                        k++;
+                    } else {
+                        finalResult.push(item);
+                        k++;
+                        blocksSinceShorts++;
+                    }
                 }
             } else if (item) {
                 finalResult.push(item);

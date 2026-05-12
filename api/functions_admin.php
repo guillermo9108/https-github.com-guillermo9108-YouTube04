@@ -974,16 +974,27 @@ function admin_start_transcode_now($pdo, $input) {
 function admin_add_video_to_transcode_queue($pdo, $input) {
     if (empty($input['videoId'])) respond(false, null, "ID de video faltante");
     $videoId = $input['videoId'];
-    $split = !empty($input['split']) ? 1 : 0;
     
-    // Si ya está en la cola, solo actualizamos el estado y split
-    $stmt = $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', split_shorts = ?, locked_at = 0 WHERE id = ?");
-    $stmt->execute([$split, $videoId]);
+    // Solo actualizar split_shorts si se pasó explícitamente en el input.
+    // De lo contrario, dejar que la configuración guardada previamente mande.
+    $sql = "UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0";
+    $params = [];
     
-    if ($stmt->rowCount() > 0) {
+    if (isset($input['split'])) {
+        $sql .= ", split_shorts = ?";
+        $params[] = !empty($input['split']) ? 1 : 0;
+    }
+    
+    $sql .= " WHERE id = ?";
+    $params[] = $videoId;
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    
+    if ($stmt->rowCount() > 0 || true) { // Permitir respuesta positiva incluso si solo se refrescó estado
         respond(true, "Video añadido a la cola de transcodificación");
     } else {
-        respond(false, null, "No se encontró el video o ya estaba en cola");
+        respond(false, null, "No se encontró el video");
     }
 }
 
