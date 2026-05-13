@@ -1803,12 +1803,13 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         
         // Intentar obtener el PID real de ffmpeg (proc_open a veces devuelve el PID del shell)
         $realPid = $pid;
-        $childPs = @shell_exec("command -v pgrep >/dev/null 2>&1 && pgrep -P $pid");
+        // Silenciamos el error si pgrep no existe redirigiendo stderr
+        $childPs = @shell_exec("pgrep -P $pid 2>/dev/null");
         if ($childPs) {
             $realPid = (int)trim($childPs);
         } else {
             // Alternativa: usar ps si pgrep no existe
-            $psChild = @shell_exec("command -v ps >/dev/null 2>&1 && ps --ppid $pid -o pid=");
+            $psChild = @shell_exec("ps --ppid $pid -o pid= 2>/dev/null");
             if ($psChild) $realPid = (int)trim($psChild);
         }
         

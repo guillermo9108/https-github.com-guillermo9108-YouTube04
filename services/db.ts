@@ -181,11 +181,11 @@ class DBService {
     }
 
     public async getCategories(): Promise<Category[]> {
-        return this.request<Category[]>('action=get_categories');
+        return (await this.request<Category[]>('action=get_categories')) || [];
     }
 
     public async getFolders(path: string = ''): Promise<any[]> {
-        return this.request<any[]>(`action=get_folders&path=${encodeURIComponent(path)}`);
+        return (await this.request<any[]>(`action=get_folders&path=${encodeURIComponent(path)}`)) || [];
     }
 
     public async saveSearch(term: string): Promise<void> {
@@ -193,11 +193,11 @@ class DBService {
     }
 
     public async getSearchSuggestions(q: string, limit: number = 20): Promise<any[]> {
-        return this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
+        return (await this.request<any[]>(`action=get_search_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`)) || [];
     }
 
     public async getHashtagSuggestions(q: string, limit: number = 10): Promise<any[]> {
-        return this.request<any[]>(`action=get_hashtag_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`);
+        return (await this.request<any[]>(`action=get_hashtag_suggestions&q=${encodeURIComponent(q)}&limit=${limit}`)) || [];
     }
 
     public async checkInstallation(): Promise<{status: string}> {
@@ -265,15 +265,19 @@ class DBService {
 
     public async getVideo(id: string): Promise<Video | null> { return this.request<Video | null>(`action=get_video&id=${id}`); }
 
-    public async getVideosByCreator(userId: string): Promise<Video[]> { return this.request<Video[]>(`action=get_videos_by_creator&userId=${userId}`); }
+    public async getVideosByCreator(userId: string): Promise<Video[]> { return (await this.request<Video[]>(`action=get_videos_by_creator&userId=${userId}`)) || []; }
 
-    public async getRelatedVideos(videoId: string): Promise<Video[]> { return this.request<Video[]>(`action=get_related_videos&videoId=${videoId}`); }
+    public async getRelatedVideos(videoId: string): Promise<Video[]> { return (await this.request<Video[]>(`action=get_related_videos&videoId=${videoId}`)) || []; }
 
     public async getFolderVideos(videoId: string, sortOrder: string = '', userId: string = '', folder: string = ''): Promise<{videos: Video[], sortOrder: string}> { 
-        return this.request<{videos: Video[], sortOrder: string}>(`action=get_folder_videos&videoId=${videoId}&sort_order=${encodeURIComponent(sortOrder)}&userId=${userId}&folder=${encodeURIComponent(folder)}`); 
+        const res = await this.request<{videos: Video[], sortOrder: string}>(`action=get_folder_videos&videoId=${videoId}&sort_order=${encodeURIComponent(sortOrder)}&userId=${userId}&folder=${encodeURIComponent(folder)}`);
+        return {
+            videos: (res && res.videos) || [],
+            sortOrder: (res && res.sortOrder) || sortOrder
+        };
     }
 
-    public async getUnprocessedVideos(limit: number = 50, mode: string = 'normal'): Promise<Video[]> { return this.request<Video[]>(`action=get_unprocessed_videos&limit=${limit}&mode=${mode}`); }
+    public async getUnprocessedVideos(limit: number = 50, mode: string = 'normal'): Promise<Video[]> { return (await this.request<Video[]>(`action=get_unprocessed_videos&limit=${limit}&mode=${mode}`)) || []; }
     public async unlockVideo(id: string): Promise<void> { return this.request<void>(`action=unlock_video`, { method: 'POST', body: JSON.stringify({ id }) }); }
     public async lockVideoForProcessing(videoId: string, lockId: string): Promise<{success: boolean}> {
         return this.request<{success: boolean}>(`action=lock_video_for_processing`, {
@@ -293,7 +297,7 @@ class DBService {
     public async getSubscriptions(userId: string): Promise<string[]> { return this.request<string[]>(`action=get_subscriptions&userId=${userId}`); }
 
     public async getMutualFriends(userId: string, targetId: string): Promise<User[]> {
-        return this.request<User[]>(`action=get_mutual_friends&userId=${userId}&targetId=${targetId}`);
+        return (await this.request<User[]>(`action=get_mutual_friends&userId=${userId}&targetId=${targetId}`)) || [];
     }
 
     public async checkSubscription(userId: string, creatorId: string): Promise<boolean> {
@@ -343,11 +347,11 @@ class DBService {
     }
 
     public async getVideoLikers(videoId: string, userId?: string): Promise<{username: string, avatarUrl: string}[]> {
-        return this.request<{username: string, avatarUrl: string}[]>(`action=get_video_likers&videoId=${videoId}${userId ? `&userId=${userId}` : ''}`);
+        return (await this.request<{username: string, avatarUrl: string}[]>(`action=get_video_likers&videoId=${videoId}${userId ? `&userId=${userId}` : ''}`)) || [];
     }
 
     public async getUserFollowers(userId: string): Promise<User[]> {
-        return this.request<User[]>(`action=get_user_followers&userId=${userId}`);
+        return (await this.request<User[]>(`action=get_user_followers&userId=${userId}`)) || [];
     }
 
     public async rateVideo(userId: string, videoId: string, type: 'like' | 'dislike'): Promise<UserInteraction> {
@@ -456,7 +460,7 @@ class DBService {
     public async updateRequestStatus(id: string, status: string): Promise<void> { return this.request<void>(`action=update_request_status`, { method: 'POST', body: JSON.stringify({ id, status }) }); }
     public async deleteRequest(id: string): Promise<void> { return this.request<void>(`action=delete_request`, { method: 'POST', body: JSON.stringify({ id }) }); }
 
-    public async adminGetMarketplaceItems(): Promise<MarketplaceItem[]> { return this.request<MarketplaceItem[]>('action=admin_get_marketplace_items'); }
+    public async adminGetMarketplaceItems(): Promise<MarketplaceItem[]> { return (await this.request<MarketplaceItem[]>('action=admin_get_marketplace_items')) || []; }
     public async getMarketplaceItem(id: string): Promise<MarketplaceItem | null> { return this.request<MarketplaceItem | null>(`action=get_marketplace_item&id=${id}`); }
     public async createListing(formData: FormData): Promise<void> { return this.request<void>(`action=create_listing`, { method: 'POST', body: formData }); }
     public async editListing(id: string, userId: string, data: any): Promise<void> { return this.request<void>(`action=edit_listing`, { method: 'POST', body: JSON.stringify({ id, userId, data }) }); }
@@ -519,12 +523,12 @@ class DBService {
     public async adminGetServerStats(): Promise<any> { return this.request<any>('action=admin_get_server_stats'); }
     public async adminServerControl(action: 'shutdown' | 'reboot'): Promise<any> { return this.request<any>('action=admin_server_control', { method: 'POST', body: JSON.stringify({ serverAction: action }) }); }
 
-    public async getAllUsers(): Promise<User[]> { return this.request<User[]>('action=get_all_users'); }
+    public async getAllUsers(): Promise<User[]> { return (await this.request<User[]>('action=get_all_users')) || []; }
     public async searchUsers(query: string): Promise<User[]> {
-        return this.request<User[]>('action=search_users', {
+        return (await this.request<User[]>('action=search_users', {
             method: 'POST',
             body: JSON.stringify({ query })
-        });
+        })) || [];
     }
     public async updateUserProfile(userId: string, data: any): Promise<void> {
         if (data.avatar instanceof File || data.newPassword) {
@@ -571,9 +575,9 @@ class DBService {
         window.dispatchEvent(new CustomEvent('sp_home_dirty'));
     }
     public async getNotifications(userId: string, limit: number = 30): Promise<AppNotification[]> { 
-        return this.request<AppNotification[]>(`action=get_notifications&userId=${userId}&limit=${limit}`); 
+        return (await this.request<AppNotification[]>(`action=get_notifications&userId=${userId}&limit=${limit}`)) || []; 
     }
-    public async getUnreadNotifications(userId: string): Promise<AppNotification[]> { return this.request<AppNotification[]>(`action=get_unread_notifications&userId=${userId}`); }
+    public async getUnreadNotifications(userId: string): Promise<AppNotification[]> { return (await this.request<AppNotification[]>(`action=get_unread_notifications&userId=${userId}`)) || []; }
     public async getUnreadCount(userId: string): Promise<{count: number}> { return this.request<{count: number}>(`action=get_unread_count&userId=${userId}`); }
     public async markNotificationRead(id: string): Promise<void> { return this.request<void>(`action=mark_notification_read`, { method: 'POST', body: JSON.stringify({ id }) }); }
     public async markAllNotificationsRead(userId: string): Promise<void> { return this.request<void>(`action=mark_all_notifications_read`, { method: 'POST', body: JSON.stringify({ userId }) }); }
@@ -614,7 +618,7 @@ class DBService {
     }
 
     public async getStories(): Promise<any[]> {
-        return this.request<any[]>('action=get_stories');
+        return (await this.request<any[]>('action=get_stories')) || [];
     }
 
     public async deleteStory(id: string, userId: string): Promise<void> {
@@ -641,19 +645,19 @@ class DBService {
     }
 
     public async getTrendingVideos(): Promise<Video[]> {
-        return this.request<Video[]>('action=get_trending_videos');
+        return (await this.request<Video[]>('action=get_trending_videos')) || [];
     }
 
     public async getUserHistory(userId: string): Promise<Video[]> {
-        return this.request<Video[]>(`action=get_user_history&userId=${userId}`);
+        return (await this.request<Video[]>(`action=get_user_history&userId=${userId}`)) || [];
     }
 
     public async getChats(userId: string): Promise<any[]> {
-        return this.request<any[]>(`action=get_chats&userId=${userId}`);
+        return (await this.request<any[]>(`action=get_chats&userId=${userId}`)) || [];
     }
 
     public async getMessages(userId: string, otherId: string, limit: number = 20, offset: number = 0): Promise<ChatMessage[]> {
-        return this.request<ChatMessage[]>(`action=get_messages&userId=${userId}&otherId=${otherId}&limit=${limit}&offset=${offset}`);
+        return (await this.request<ChatMessage[]>(`action=get_messages&userId=${userId}&otherId=${otherId}&limit=${limit}&offset=${offset}`)) || [];
     }
 
     public async sendMessage(data: { userId: string, receiverId: string, text?: string, imageUrl?: string, videoUrl?: string, audioUrl?: string, fileUrl?: string, mediaType?: string }): Promise<any> {

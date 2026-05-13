@@ -699,7 +699,7 @@ export default function Home() {
             
             // Si ya usamos este video en un grupo de shorts previo (por relleno), lo saltamos
             const alreadyUsed = finalResult.some(res => 
-                res.isShortsGroup && res.shorts.some((gs: any) => gs.id === item.id)
+                res && res.isShortsGroup && Array.isArray(res.shorts) && res.shorts.some((gs: any) => gs && gs.id === item.id)
             );
             
             if (alreadyUsed) {
@@ -712,15 +712,35 @@ export default function Home() {
                     const group: any[] = [];
                     const usedInThisBatchIds = new Set<string>();
 
-                    // 1. Tomar los shorts consecutivos en esta parte de la secuencia
-                    while (k < filteredCombined.length && isShort(filteredCombined[k]) && group.length < MAX_ROOT_SHORTS) {
-                        group.push(filteredCombined[k]);
-                        usedInThisBatchIds.add(filteredCombined[k].id);
-                        k++;
+                    // 1. Tomar el actual y sus "hermanos" (mismo originalId) para cumplir con "poner los dos shorts correspondientes"
+                    const currentOriginalId = item.originalId || item.id;
+                    const siblings = filteredCombined.slice(k).filter(v => 
+                        isShort(v) && 
+                        (v.originalId === currentOriginalId || v.id === currentOriginalId) &&
+                        group.length < 2 // Priorizamos los 2 correspondientes
+                    );
+
+                    siblings.forEach(s => {
+                        if (s && s.id) {
+                            group.push(s);
+                            usedInThisBatchIds.add(s.id);
+                        }
+                    });
+
+                    // 2. Rellenar hasta MAX_ROOT_SHORTS (10) con otros shorts aleatorios
+                    // Primero intentamos con los que están cerca en la secuencia
+                    let searchIdx = k;
+                    while (searchIdx < filteredCombined.length && group.length < MAX_ROOT_SHORTS) {
+                        const cur = filteredCombined[searchIdx];
+                        if (cur && cur.id && isShort(cur) && !usedInThisBatchIds.has(cur.id)) {
+                            group.push(cur);
+                            usedInThisBatchIds.add(cur.id);
+                        }
+                        searchIdx++;
                     }
 
-                    // 2. Rellenar hasta 10 con otros shorts aleatorios del pool original (combined)
-                    if (group.length > 0 && group.length < MAX_ROOT_SHORTS) {
+                    // Si aún falta, buscamos en todo el pool original (combined)
+                    if (group.length < MAX_ROOT_SHORTS) {
                         const alreadyInResultIds = new Set<string>();
                         finalResult.forEach(res => {
                             if (res && res.isShortsGroup && Array.isArray(res.shorts)) {
@@ -733,6 +753,7 @@ export default function Home() {
                         });
 
                         const fillPool = combined.filter(v => 
+                            v && v.id &&
                             isShort(v) && 
                             !usedInThisBatchIds.has(v.id) && 
                             !alreadyInResultIds.has(v.id)
@@ -755,7 +776,9 @@ export default function Home() {
                             id: `root-shorts-${k}` 
                         });
                         blocksSinceShorts = 0;
+                        // No aumentamos k aquí, dejamos que el bucle principal lo haga tras saltar los ya usados
                     }
+                    k++;
                 } else {
                     // Si es un fragmento de shorts (no de serie) y no toca grupo aún, lo saltamos
                     // para cumplir con: "los fragmentos de shorts no se muestren en la principal [como cards grandes]"

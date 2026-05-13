@@ -32,11 +32,11 @@ export default function ShortsGrid({ shorts, isSingle }: ShortsGridProps) {
             </div>
 
             <div className={`flex gap-2 px-3 pb-1 ${isSingle ? '' : 'overflow-x-auto scrollbar-hide'}`}>
-                {shorts.map((short) => (
+                {shorts.map((short) => short && short.id && (
                     <div 
                         key={short.id}
                         onClick={() => {
-                            sessionStorage.setItem('shorts_context_queue', JSON.stringify(shorts));
+                            sessionStorage.setItem('shorts_context_queue', JSON.stringify(shorts.filter(Boolean)));
                             navigate(`/shorts?id=${short.id}&from=grid`);
                         }}
                         className={`relative bg-zinc-900 rounded-lg overflow-hidden shrink-0 cursor-pointer group active:scale-95 transition-transform shadow-sm border border-[var(--divider)] ${

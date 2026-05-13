@@ -35,9 +35,10 @@ export default function SearchPage() {
     const loadSuggestions = async (query: string) => {
         try {
             const results = await db.getSearchSuggestions(query, 20);
-            setSuggestions(results);
+            setSuggestions(Array.isArray(results) ? results : []);
         } catch (err) {
             console.error('Error loading suggestions:', err);
+            setSuggestions([]);
         }
     };
 
