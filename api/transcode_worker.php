@@ -39,19 +39,37 @@ if (!$isAuto) {
 }
 
 // 2. Protección: Verificar si ya hay procesos FFmpeg corriendo en el sistema
-$check = shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
-$count = (int)trim($check);
-if ($count >= 1) {
-    die("[INFO] Ya hay un proceso FFmpeg trabajando. Saltando ciclo para evitar saturación.\n");
+// Intentamos varios métodos para mayor compatibilidad
+$count = 0;
+$checkPs = @shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
+if ($checkPs !== null) {
+    $count = (int)trim($checkPs);
+} else {
+    // Si ps aux falla, intentar pgrep -c (si existe)
+    $checkPgrep = @shell_exec('pgrep -c ffmpeg');
+    if ($checkPgrep !== null) $count = (int)trim($checkPgrep);
 }
+
+if ($count >= 1) {
+    die("[INFO] Ya hay un proceso FFmpeg trabajando ($count). Saltando ciclo para evitar saturación.\n");
+}
+
+// 2.1 Protección adicional: Evitar que el worker mismo se solape (usando lock temporal)
+$lockFile = __DIR__ . '/transcode_worker.lock';
+if (file_exists($lockFile) && (time() - filemtime($lockFile) < 1800)) {
+    die("[INFO] El worker ya tiene un bloqueo activo reciente. Saltando.\n");
+}
+file_put_contents($lockFile, getmypid());
 
 // 3. Buscar siguiente video en cola WAITING
 $now = time();
-$stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND locked_at < ? ORDER BY queue_priority DESC, createdAt ASC LIMIT 1");
-$stmt->execute([$now - 300]); // No bloqueado en los últimos 5 minutos
+// Aceptamos locked_at = 0 o bloqueos de hace más de 10 minutos (por si el worker anterior crasheó)
+$stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND (locked_at = 0 OR locked_at < ?) ORDER BY queue_priority DESC, createdAt ASC LIMIT 1");
+$stmt->execute([$now - 600]); 
 $video = $stmt->fetch();
 
 if (!$video) {
+    @unlink($lockFile);
     die("[INFO] Cola vacía. No hay nada que convertir hoy.\n");
 }
 
@@ -63,9 +81,13 @@ echo "[START] Procesando: '{$video['title']}' (ID: {$video['id']})\n";
 $bins = get_ffmpeg_binaries($pdo);
 $success = _admin_perform_transcode_single($pdo, $video, $bins);
 
+@unlink($lockFile);
+
 if ($success) {
     echo "[SUCCESS] Conversión completada con éxito.\n";
+    // Si hay más en cola, disparar el siguiente ciclo
+    _admin_background_transcode_trigger($pdo);
 } else {
-    echo "[ERROR] La conversión falló. Revise api/transcode_log.txt para más detalles técnicos.\n";
+    echo "[ERROR] La conversión falló. Revise api/transcode_log.txt o log.txt para detalles.\n";
 }
 ?>

@@ -904,11 +904,16 @@ function admin_process_next_transcode($pdo) {
     // 2. Disparar el worker en segundo plano
     $workerPath = __DIR__ . '/transcode_worker.php';
     if (file_exists($workerPath)) {
+        $phpPath = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
         // En Linux usamos nohup y redirección para asegurar que siga corriendo
-        @shell_exec("php " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
-        respond(true, "Procesador disparado para el siguiente video en cola");
+        @shell_exec("$phpPath " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
+        if (function_exists('respond')) {
+            respond(true, "Procesador disparado para el siguiente video en cola");
+        }
     } else {
-        respond(false, null, "Script del worker no encontrado");
+        if (function_exists('respond')) {
+            respond(false, null, "Script del worker no encontrado");
+        }
     }
 }
 
@@ -960,13 +965,17 @@ function admin_reorder_transcode_queue($pdo, $input) {
 
 function admin_start_transcode_now($pdo, $input) {
     $videoId = $input['videoId'];
-    // Matar procesos actuales para forzar este
-    @shell_exec("ps aux | grep ffmpeg | grep -v grep | awk '{print $2}' | xargs kill -9");
+    // Matar procesos actuales para forzar este (intentar con pkill/killall si ps falla)
+    @shell_exec("pkill -9 ffmpeg 2>/dev/null || killall -9 ffmpeg 2>/dev/null");
+    
     // Poner al tope de prioridad y resetear lock
     $max = $pdo->query("SELECT MAX(queue_priority) FROM videos")->fetchColumn() ?: 0;
     $pdo->prepare("UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0, queue_priority = ? WHERE id = ?")->execute([$max + 1, $videoId]);
+    
     // Ejecutar worker
-    $cmd = "php " . __DIR__ . "/transcode_worker.php > /dev/null 2>&1 &";
+    $workerPath = __DIR__ . "/transcode_worker.php";
+    $phpPath = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+    $cmd = "$phpPath " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &";
     @shell_exec($cmd);
     respond(true, "Video priorizado y worker reiniciado.");
 }
@@ -976,7 +985,6 @@ function admin_add_video_to_transcode_queue($pdo, $input) {
     $videoId = $input['videoId'];
     
     // Solo actualizar split_shorts si se pasó explícitamente en el input.
-    // De lo contrario, dejar que la configuración guardada previamente mande.
     $sql = "UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0";
     $params = [];
     
@@ -991,10 +999,20 @@ function admin_add_video_to_transcode_queue($pdo, $input) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     
-    if ($stmt->rowCount() > 0 || true) { // Permitir respuesta positiva incluso si solo se refrescó estado
-        respond(true, "Video añadido a la cola de transcodificación");
-    } else {
-        respond(false, null, "No se encontró el video");
+    // IMPORTANTE: Disparar el worker inmediatamente
+    _admin_background_transcode_trigger($pdo);
+    
+    respond(true, "Video añadido a la cola de transcodificación y procesador activado");
+}
+
+/**
+ * Función interna para disparar el worker sin enviar respuesta HTTP aún
+ */
+function _admin_background_transcode_trigger($pdo) {
+    $workerPath = __DIR__ . '/transcode_worker.php';
+    if (file_exists($workerPath)) {
+        $phpPath = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+        @shell_exec("$phpPath " . escapeshellarg($workerPath) . " > /dev/null 2>&1 &");
     }
 }
 
