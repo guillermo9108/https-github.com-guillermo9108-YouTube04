@@ -952,20 +952,24 @@ export default function AdminTranscoder() {
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
                                             <Clock size={12}/> Tiempo de {configData.mode === 'SHORTS' ? 'Short' : 'Capítulo'}
                                         </label>
-                                        <span className="text-[12px] font-black text-white">{configData.fragTime} segundos</span>
+                                        <span className="text-[12px] font-black text-white">
+                                            {configData.fragTime >= 60 
+                                                ? `${Math.floor(configData.fragTime / 60)}m ${configData.fragTime % 60}s` 
+                                                : `${configData.fragTime}s`}
+                                        </span>
                                     </div>
                                     <input 
                                         type="range"
                                         min="15"
-                                        max="300"
-                                        step="1"
+                                        max={configData.mode === 'SERIES' ? 2700 : 300}
+                                        step="15"
                                         value={configData.fragTime}
                                         onChange={(e) => setConfigData(prev => ({ ...prev, fragTime: parseInt(e.target.value) }))}
                                         className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-[#1877f2]"
                                     />
                                     <div className="flex justify-between text-[8px] font-black text-slate-600 uppercase italic">
                                         <span>Mínima (15s)</span>
-                                        <span>Máxima (5m)</span>
+                                        <span>Máxima ({configData.mode === 'SERIES' ? '45m' : '5m'})</span>
                                     </div>
                                 </div>
                             )}

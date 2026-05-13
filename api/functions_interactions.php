@@ -233,9 +233,9 @@ function interact_mark_skipped($pdo, $input) {
                   ON DUPLICATE KEY UPDATE 
                   isSkipped = CASE WHEN isWatched = 1 THEN 0 ELSE 1 END,
                   skip_count = CASE WHEN isWatched = 1 THEN skip_count ELSE skip_count + 1 END")
-        ->execute([$uid, $vid, $uid, $vid]); // Corregido: ON DUPLICATE KEY no necesita re-pasar parámetros si no los usamos con VALUES, pero aquí sí usamos VALUES indirectamente o simplemente incrementamos
-
-    // Si es fragmento, incrementamos skip_count en el ORIGINAL también
+        ->execute([$uid, $vid]); 
+    
+    // Si es fragmento, incrementamos skip_count en el ORIGINAL también (pero no forzamos isSkipped)
     if ($origId !== $vid) {
          $pdo->prepare("INSERT INTO interactions (userId, videoId, isSkipped, skip_count) VALUES (?, ?, 1, 1) 
                        ON DUPLICATE KEY UPDATE 
@@ -594,18 +594,20 @@ function interact_get_messages($pdo, $input) {
     
     // Para paginación inversa (traer los últimos), traemos ordenados por timestamp DESC
     // El frontend luego puede invertirlos para mostrar en orden cronológico
-    $sql = "SELECT * FROM messages 
-            WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) 
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?";
+    $sql = "SELECT m.*, uS.username as senderName 
+            FROM messages m
+            LEFT JOIN users uS ON m.senderId = uS.id
+            WHERE (m.senderId = :u1 AND m.receiverId = :u2) OR (m.senderId = :u3 AND m.receiverId = :u4) 
+            ORDER BY m.timestamp DESC
+            LIMIT :limit OFFSET :offset";
             
     $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(1, $userId);
-    $stmt->bindParam(2, $otherId);
-    $stmt->bindParam(3, $otherId);
-    $stmt->bindParam(4, $userId);
-    $stmt->bindParam(5, $limit, PDO::PARAM_INT);
-    $stmt->bindParam(6, $offset, PDO::PARAM_INT);
+    $stmt->bindValue(':u1', $userId);
+    $stmt->bindValue(':u2', $otherId);
+    $stmt->bindValue(':u3', $otherId);
+    $stmt->bindValue(':u4', $userId);
+    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
     $stmt->execute();
     
     $messages = $stmt->fetchAll();

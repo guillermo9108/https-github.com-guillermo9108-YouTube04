@@ -1708,6 +1708,7 @@ function admin_deep_cleanup($pdo) {
  * Realiza la transcodificación de un solo video (Uso interno por worker)
  */
 function _admin_perform_transcode_single($pdo, $video, $bins) {
+    write_log("_admin_perform_transcode_single: Starting for " . ($video['id'] ?? 'unknown'), "INFO");
     @set_time_limit(0);
     @ignore_user_abort(true);
     
@@ -1718,8 +1719,8 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
     $isFtp = (strpos($videoId, 'ftp_') === 0);
     if (!$inputPath || (!$isFtp && !file_exists($inputPath))) {
-        write_log("Transcode: Archivo de entrada no encontrado: $videoUrl", 'ERROR');
-        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED' WHERE id = ?")->execute([$videoId]);
+        write_log("Transcode: Archivo de entrada no encontrado: $videoUrl (Path: $inputPath)", 'ERROR');
+        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED', reason = 'Source file missing' WHERE id = ?")->execute([$videoId]);
         return false;
     }
 

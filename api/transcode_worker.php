@@ -35,46 +35,59 @@ $stmtS = $pdo->query("SELECT autoTranscode FROM system_settings WHERE id = 1");
 $isAuto = (bool)$stmtS->fetchColumn();
 
 if (!$isAuto) {
+    write_log("Transcode Worker: Auto-transcode is disabled in settings", "INFO");
+    @unlink($lockFile);
     die("[INFO] Transcodificación automática desactivada en ajustes web.\n");
 }
 
 // 2. Protección: Verificar si ya hay procesos FFmpeg corriendo en el sistema
-// Intentamos varios métodos para mayor compatibilidad
 $count = 0;
+// Método más robusto para contar procesos FFmpeg
 $checkPs = @shell_exec('ps aux | grep ffmpeg | grep -v grep | wc -l');
-if ($checkPs !== null) {
+if ($checkPs !== null && trim($checkPs) !== '') {
     $count = (int)trim($checkPs);
 } else {
-    // Si ps aux falla, intentar pgrep -c (si existe)
     $checkPgrep = @shell_exec('pgrep -c ffmpeg');
-    if ($checkPgrep !== null) $count = (int)trim($checkPgrep);
+    if ($checkPgrep !== null && trim($checkPgrep) !== '') $count = (int)trim($checkPgrep);
 }
 
 if ($count >= 1) {
+    write_log("Transcode Worker: FFmpeg is already running ($count processes)", "INFO");
+    @unlink($lockFile);
     die("[INFO] Ya hay un proceso FFmpeg trabajando ($count). Saltando ciclo para evitar saturación.\n");
 }
 
 // 2.1 Protección adicional: Evitar que el worker mismo se solape (usando lock temporal)
 $lockFile = __DIR__ . '/transcode_worker.lock';
 if (file_exists($lockFile) && (time() - filemtime($lockFile) < 1800)) {
+    write_log("Transcode Worker: Lock file exists and is recent. Skipping.", "INFO");
     die("[INFO] El worker ya tiene un bloqueo activo reciente. Saltando.\n");
 }
 file_put_contents($lockFile, getmypid());
 
 // 3. Buscar siguiente video en cola WAITING
 $now = time();
-// Aceptamos locked_at = 0 o bloqueos de hace más de 10 minutos (por si el worker anterior crasheó)
+$lockThreshold = $now - 600; // 10 minutos
 $stmt = $pdo->prepare("SELECT * FROM videos WHERE transcode_status = 'WAITING' AND (locked_at = 0 OR locked_at < ?) ORDER BY queue_priority DESC, createdAt ASC LIMIT 1");
-$stmt->execute([$now - 600]); 
+$stmt->execute([$lockThreshold]); 
 $video = $stmt->fetch();
 
 if (!$video) {
+    write_log("Transcode Worker: Queue is empty", "INFO");
     @unlink($lockFile);
     die("[INFO] Cola vacía. No hay nada que convertir hoy.\n");
 }
 
-// Bloquear inmediatamente
-$pdo->prepare("UPDATE videos SET locked_at = ? WHERE id = ?")->execute([$now, $video['id']]);
+write_log("Transcode Worker: Starting transcoding for video ID " . $video['id'], "INFO");
+
+// Bloquear inmediatamente para que otros workers no lo tomen
+try {
+    $pdo->prepare("UPDATE videos SET locked_at = ? WHERE id = ?")->execute([$now, $video['id']]);
+} catch (Exception $e) {
+    write_log("Transcode Worker: Error locking video: " . $e->getMessage(), "ERROR");
+    @unlink($lockFile);
+    die("[FATAL] Error locking video\n");
+}
 
 echo "[START] Procesando: '{$video['title']}' (ID: {$video['id']})\n";
 
