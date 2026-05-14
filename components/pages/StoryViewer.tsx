@@ -126,9 +126,11 @@ export default function StoryViewer() {
     useEffect(() => {
         if (loading || !currentStory || paused) return;
 
-        const duration = currentStory.type === 'VIDEO' ? 0 : 5000; // 5s for images, dynamic for video
+        // Use duration from DB (converted to ms) or fallback to defaults
+        const dbDuration = (currentStory as any).duration ? (currentStory as any).duration * 1000 : null;
+        const duration = dbDuration || (currentStory.type === 'VIDEO' ? 0 : 5000); 
         
-        if (currentStory.type === 'IMAGE') {
+        if (currentStory.type === 'IMAGE' || (currentStory.type === 'VIDEO' && dbDuration)) {
             const step = 100 / (duration / 100);
             progressInterval.current = window.setInterval(() => {
                 setProgress(prev => {
@@ -139,6 +141,15 @@ export default function StoryViewer() {
                     }
                     return prev + step;
                 });
+                
+                // For videos, also check currentTime if we have a forced duration
+                if (currentStory.type === 'VIDEO' && videoRef.current && dbDuration) {
+                    const video = videoRef.current;
+                    if (video.currentTime * 1000 >= duration) {
+                        clearInterval(progressInterval.current!);
+                        nextStory();
+                    }
+                }
             }, 100);
         }
 
@@ -149,6 +160,11 @@ export default function StoryViewer() {
 
     const handleVideoMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
         const video = e.currentTarget;
+        const dbDuration = (currentStory as any).duration ? (currentStory as any).duration * 1000 : null;
+        
+        // If we have a forced duration from DB, we handle it in the main useEffect
+        if (dbDuration) return;
+
         const duration = video.duration * 1000;
         const step = 100 / (duration / 100);
         

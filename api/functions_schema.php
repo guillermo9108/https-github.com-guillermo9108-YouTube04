@@ -363,6 +363,7 @@ function getAppSchema() {
                 'audioUrl' => 'TEXT DEFAULT NULL',
                 'videoId' => 'VARCHAR(50) DEFAULT NULL',
                 'productId' => 'VARCHAR(50) DEFAULT NULL',
+                'duration' => 'INT DEFAULT 15',
                 'createdAt' => 'BIGINT',
                 'expiresAt' => 'BIGINT'
             ],

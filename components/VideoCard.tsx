@@ -130,7 +130,19 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   }, [video.videoUrl]);
 
   const watchUrl = useMemo(() => {
-    const base = `/watch/${video.id}`;
+    let targetId = video.id;
+    let path = '/watch/';
+
+    const isReshare = video.id.startsWith('reshare_') || (!video.is_series_fragment && video.originalId);
+    
+    if (isReshare && video.originalId) {
+        targetId = video.originalId;
+    } else if (video.originalMarketplaceId) {
+        targetId = video.originalMarketplaceId;
+        path = '/marketplace/item/';
+    }
+
+    const base = `${path}${targetId}`;
     const params = new URLSearchParams();
     if (context?.query) params.set('q', context.query);
     if (context?.folder) params.set('f', context.folder);

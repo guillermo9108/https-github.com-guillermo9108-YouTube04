@@ -1085,6 +1085,9 @@ function video_reshare($pdo, $input) {
     $title = '';
     $category = 'GENERAL';
     $thumbnail = null;
+    $duration = 0;
+    $isAudio = 0;
+    $price = 0;
 
     if ($originalId) {
         // Obtener datos del video original
@@ -1095,6 +1098,9 @@ function video_reshare($pdo, $input) {
         $title = $orig['title'];
         $category = $orig['category'];
         $thumbnail = $orig['thumbnailUrl'];
+        $duration = $orig['duration'] ?? 0;
+        $isAudio = $orig['is_audio'] ?? 0;
+        $price = $orig['price'] ?? 0;
     } else {
         // Obtener datos del producto original
         $stmtM = $pdo->prepare("SELECT * FROM marketplace_items WHERE id = ?");
@@ -1105,10 +1111,11 @@ function video_reshare($pdo, $input) {
         $category = 'MARKETPLACE';
         $imgs = json_decode($item['images'] ?? '[]', true);
         $thumbnail = count($imgs) > 0 ? $imgs[0] : null;
+        $price = $item['price'] ?? 0;
     }
     
     // Crear el nuevo post (repost)
-    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, creatorId, createdAt, originalId, originalMarketplaceId, category, thumbnailUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, creatorId, createdAt, originalId, originalMarketplaceId, category, thumbnailUrl, duration, is_audio, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $newId,
         $title,
@@ -1118,7 +1125,10 @@ function video_reshare($pdo, $input) {
         $originalId ?: null,
         $originalMarketplaceId ?: null,
         $category,
-        $thumbnail
+        $thumbnail,
+        $duration,
+        $isAudio,
+        $price
     ]);
     
     if ($originalId) {
@@ -1544,15 +1554,36 @@ function video_update($pdo, $input) {
         respond(false, null, "No tienes permiso para editar este video");
     }
     
+    // Prevent editing core metadata if it's a reshare
+    $isReshare = (strpos($id, 'reshare_') === 0 || !empty($video['originalId']) || !empty($video['originalMarketplaceId']));
+    
     $fields = [];
     $params = [];
     
-    if (isset($input['title'])) { $fields[] = "title = ?"; $params[] = $input['title']; }
+    if (isset($input['title'])) { 
+        if ($isReshare && $video['creatorId'] === $userId) {
+             // User trying to edit their own reshare - block title change
+        } else {
+            $fields[] = "title = ?"; $params[] = $input['title']; 
+        }
+    }
     if (isset($input['description'])) { $fields[] = "description = ?"; $params[] = $input['description']; }
-    if (isset($input['price'])) { $fields[] = "price = ?"; $params[] = floatval($input['price']); }
-    if (isset($input['category'])) { $fields[] = "category = ?"; $params[] = $input['category']; }
+    if (isset($input['price'])) { 
+        if ($isReshare && $video['creatorId'] === $userId) {
+            // Block price change on reshare
+        } else {
+            $fields[] = "price = ?"; $params[] = floatval($input['price']); 
+        }
+    }
+    if (isset($input['category'])) { 
+        if ($isReshare && $video['creatorId'] === $userId) {
+            // Block category change on reshare
+        } else {
+            $fields[] = "category = ?"; $params[] = $input['category']; 
+        }
+    }
     
-    if (empty($fields)) respond(false, null, "Nada que actualizar");
+    if (empty($fields)) respond(false, null, "Nada que actualizar o sin permisos para estos campos");
     
     $params[] = $id;
     $pdo->prepare("UPDATE videos SET " . implode(', ', $fields) . " WHERE id = ?")->execute($params);
@@ -1594,8 +1625,8 @@ function upload_story($pdo, $post, $files) {
                 
                 $storyType = ($video['category'] === 'IMAGES') ? 'IMAGE' : 'VIDEO';
                 
-                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, videoId, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$id, $userId, $video['videoUrl'], $storyType, $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['videoId'], $now, $expiry]);
+                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, videoId, createdAt, expiresAt, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$id, $userId, $video['videoUrl'], $storyType, $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['videoId'], $now, $expiry, 15]);
                 respond(true, ['id' => $id]);
                 return;
             }
@@ -1615,8 +1646,8 @@ function upload_story($pdo, $post, $files) {
                 $now = time();
                 $expiry = $now + (24 * 3600);
                 
-                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, productId, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$id, $userId, $contentUrl, 'IMAGE', $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['productId'], $now, $expiry]);
+                $stmt = $pdo->prepare("INSERT INTO stories (id, userId, contentUrl, type, overlayText, overlayColor, overlayBg, audioUrl, productId, createdAt, expiresAt, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$id, $userId, $contentUrl, 'IMAGE', $overlayText, $overlayColor, $overlayBg, $audioUrl, $post['productId'], $now, $expiry, 15]);
                 respond(true, ['id' => $id]);
                 return;
             }
