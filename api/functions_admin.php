@@ -632,13 +632,15 @@ function admin_get_local_stats($pdo) {
         
         while ($p = $stmtProc->fetch()) {
             $realProgress = 0;
-            $expectedSizeBytes = 0;
+            $expectedSizeBytes = (float)($p['estimatedTotalSize'] ?? 0);
             
-            $duration = (float)($p['duration'] ?? 0);
-            if ($duration > 0) {
-                $expectedSizeBytes = (1500 * 125) * $duration; // 1500 kbps promedio
-            } else if (($p['size_bytes'] ?? 0) > 0) {
-                $expectedSizeBytes = $p['size_bytes'] * 0.45;
+            if ($expectedSizeBytes <= 0) {
+                $duration = (float)($p['duration'] ?? 0);
+                if ($duration > 0) {
+                    $expectedSizeBytes = (1500 * 125) * $duration; // 1500 kbps promedio
+                } else if (($p['size_bytes'] ?? 0) > 0) {
+                    $expectedSizeBytes = $p['size_bytes'] * 0.45;
+                }
             }
 
             if ($expectedSizeBytes > 1024 && $p['lastSize'] > 0) {
@@ -656,9 +658,10 @@ function admin_get_local_stats($pdo) {
                 'size_fmt' => $p['size_fmt'],
                 'size_bytes' => (int)$p['size_bytes'],
                 'current_output_size' => (int)$p['lastSize'],
-                'expected_output_size' => $expectedSizeBytes,
+                'expected_output_size' => (int)$expectedSizeBytes,
                 'progress' => $realProgress,
-                'isDualCore' => true
+                'isDualCore' => true,
+                'hasEstimation' => ($p['estimatedTotalSize'] > 0)
             ];
         }
     } catch (Throwable $e) {
@@ -1849,19 +1852,39 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
 
             // Actualizar tamaño de salida periódicamente
             clearstatcache();
-            if (file_exists($checkPath)) {
-                $currentSize = filesize($checkPath);
-                // Si es split, intentamos sumar todos los fragmentos existentes para una mejor visualización de progreso
+            if (file_exists($checkPath) || $isSplit) {
+                $currentSize = 0;
+                $estimatedTotal = 0;
+                
                 if ($isSplit) {
                     $pattern = str_replace(['\\', '%03d'], ['/', '*'], $outputPath);
-                    $totalSize = 0;
-                    foreach (glob($pattern) as $f) {
-                        $totalSize += filesize($f);
+                    $totalFound = 0;
+                    $files = glob($pattern);
+                    $partsCount = count($files);
+                    foreach ($files as $f) {
+                        $totalFound += filesize($f);
                     }
-                    $currentSize = $totalSize;
+                    $currentSize = $totalFound;
+
+                    // Si hay duración, podemos proyectar el total real comparando partes vs duración
+                    if ($partsCount > 0 && ($video['duration'] ?? 0) > 0 && $fragTime > 0) {
+                        $expectedParts = max(1, ceil($video['duration'] / $fragTime));
+                        // La última parte puede ser más pequeña, pero como estimación sirve
+                        if ($partsCount < $expectedParts) {
+                            $estimatedTotal = ($totalFound / $partsCount) * $expectedParts;
+                        } else {
+                            $estimatedTotal = $totalFound;
+                        }
+                    } else {
+                        $estimatedTotal = $currentSize;
+                    }
+                } else if (file_exists($checkPath)) {
+                    $currentSize = filesize($checkPath);
+                    $estimatedTotal = $currentSize;
                 }
-                $pdo->prepare("UPDATE active_transcodes SET lastSize = ?, lastUpdated = ? WHERE videoId = ?")
-                    ->execute([$currentSize, time(), $videoId]);
+
+                $pdo->prepare("UPDATE active_transcodes SET lastSize = ?, estimatedTotalSize = ?, lastUpdated = ? WHERE videoId = ?")
+                    ->execute([$currentSize, (int)$estimatedTotal, time(), $videoId]);
             }
             
             // Vaciar stderr para evitar bloqueos

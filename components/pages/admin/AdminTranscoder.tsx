@@ -540,7 +540,7 @@ export default function AdminTranscoder() {
                                                 <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-2">
                                                     <span className="text-[10px] font-black text-white bg-[#1877f2] px-2.5 py-0.5 rounded-full shadow-lg shadow-[#1877f2]/20">PID {p.pid}</span>
                                                     <span className="text-[11px] text-slate-400 font-bold uppercase flex items-center gap-1.5">
-                                                         <Box size={12}/> {outSize} / <span className="text-slate-600">{estFinal}</span>
+                                                         <Box size={12}/> {outSize} / <span className={`text-slate-600 ${p.hasEstimation ? 'text-amber-500/50 italic' : ''}`}>{estFinal} {p.hasEstimation && '(Est. Total)'}</span>
                                                     </span>
                                                 </div>
                                             </div>

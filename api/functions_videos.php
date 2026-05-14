@@ -541,10 +541,17 @@ function video_get_one($pdo, $id) {
 
     $v['folderSortOrder'] = get_folder_sort_order($pdo, $relativePath, $v['category']);
 
-    // Obtener segmentos si existen (ordenados por createdAt)
-    $stmtSeg = $pdo->prepare("SELECT id, videoUrl, title, duration FROM videos WHERE originalId = ? ORDER BY createdAt ASC");
-    $stmtSeg->execute([$id]);
+    // Obtener segmentos si existen
+    // Si este video es un fragmento, queremos sus hermanos (otros fragmentos del mismo padre)
+    // Si este video es el padre, queremos sus fragmentos
+    $targetParentId = $v['originalId'] ?: $v['id'];
+    
+    $stmtSeg = $pdo->prepare("SELECT id, videoUrl, title, duration, is_series_fragment, thumbnailUrl FROM videos WHERE originalId = ? OR id = ? ORDER BY createdAt ASC");
+    $stmtSeg->execute([$targetParentId, $targetParentId]);
     $v['segments'] = $stmtSeg->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($v['segments'])) {
+        video_process_rows($v['segments']);
+    }
 
     $rows = [$v]; 
     video_process_rows($rows); 

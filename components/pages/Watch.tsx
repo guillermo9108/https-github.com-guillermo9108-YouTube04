@@ -70,12 +70,12 @@ export default function Watch() {
     const streamUrl = useMemo(() => {
         if (!id) return '';
         // Si hay una lista de segmentos y estamos en modo fragmentado
-        const activeSegments = (video as any)?.segments || [];
+        const activeSegments = video?.segments || [];
         const targetId = (currentSegmentIndex >= 0 && activeSegments[currentSegmentIndex])
             ? activeSegments[currentSegmentIndex].id 
             : id;
         return db.getStreamerUrl(targetId, user?.sessionToken);
-    }, [id, user?.sessionToken, currentSegmentIndex, (video as any)?.segments]);
+    }, [id, user?.sessionToken, currentSegmentIndex, video?.segments]);
 
     const isAudio = useMemo(() => {
         const path = (video as any)?.rawPath || video?.videoUrl || '';
@@ -243,8 +243,10 @@ export default function Watch() {
                 }
 
             setVideo(v); 
-                if ((v as any).segments && (v as any).segments.length > 0) {
-                    setCurrentSegmentIndex(0);
+                const segments = v.segments || [];
+                if (segments.length > 0) {
+                    const idx = segments.findIndex((s: any) => s.id === id);
+                    setCurrentSegmentIndex(idx);
                 } else {
                     setCurrentSegmentIndex(-1);
                 }
@@ -430,7 +432,7 @@ export default function Watch() {
         if (!video || !user) return;
 
         // --- Lógica de Fragmentación (Gapless Playback Simulation) ---
-        const activeSegments = (video as any)?.segments || [];
+        const activeSegments = video?.segments || [];
         if (activeSegments.length > 0) {
             const nextSegIdx = currentSegmentIndex + 1;
             if (nextSegIdx < activeSegments.length) {
@@ -687,7 +689,7 @@ export default function Watch() {
                         </div>
                     </div>
 
-                    {video.originalVideo && (
+                    {video.originalVideo && !video.segments?.length && (
                          <div className="bg-slate-900/40 p-4 mb-4 rounded-2xl border border-white/5 flex items-center gap-3">
                              <Link to={`/channel/${video.originalVideo.creatorId}`} className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 shrink-0">
                                  <img src={video.originalVideo.creatorAvatarUrl || settings?.defaultAvatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -703,6 +705,59 @@ export default function Watch() {
                                  <ArrowRightCircle size={20} />
                              </Link>
                          </div>
+                    )}
+
+                    {video.segments && video.segments.length > 1 && (
+                        <div className="mb-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <ListFilter size={14} className="text-indigo-500" /> Partes de la Serie
+                                </h3>
+                                <div className="text-[9px] font-black text-indigo-400/60 uppercase">
+                                    {video.segments.length} Elementos
+                                </div>
+                            </div>
+                            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 mask-fade-edges">
+                                {video.segments.map((seg: any) => {
+                                    const isCurrent = seg.id === id;
+                                    return (
+                                        <Link 
+                                            key={seg.id} 
+                                            to={`/watch/${seg.id}`}
+                                            className={`flex-shrink-0 w-36 group transition-all transform active:scale-95`}
+                                        >
+                                            <div className={`aspect-video relative rounded-2xl overflow-hidden bg-slate-900 border transition-all ${isCurrent ? 'border-indigo-500 shadow-lg shadow-indigo-500/20' : 'border-white/5 group-hover:border-white/20'} mb-2`}>
+                                                <img 
+                                                    src={seg.thumbnailUrl || video.thumbnailUrl} 
+                                                    className={`w-full h-full object-cover transition-transform duration-500 ${isCurrent ? 'opacity-40 animate-pulse' : 'group-hover:scale-110'}`} 
+                                                    referrerPolicy="no-referrer"
+                                                />
+                                                {isCurrent && (
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="flex gap-1 items-end h-3">
+                                                            <div className="w-1 h-3 bg-indigo-500 animate-[bounce_1s_infinite_0ms]"></div>
+                                                            <div className="w-1 h-3 bg-indigo-500 animate-[bounce_1s_infinite_200ms]"></div>
+                                                            <div className="w-1 h-3 bg-indigo-500 animate-[bounce_1s_infinite_400ms]"></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className={`absolute bottom-1 right-1 px-1.5 py-0.5 rounded-lg text-[8px] font-bold backdrop-blur-md ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-black/60 text-slate-300'}`}>
+                                                    {seg.duration > 0 ? `${Math.floor(seg.duration / 60)}:${(seg.duration % 60).toString().padStart(2, '0')}` : '??:??'}
+                                                </div>
+                                                {!seg.is_series_fragment && (
+                                                    <div className="absolute top-1 left-1 bg-amber-500 text-black text-[7px] font-black px-1.5 py-0.5 rounded-lg shadow-lg uppercase">
+                                                        Completo
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className={`text-[9px] font-black uppercase tracking-tighter line-clamp-2 leading-tight transition-colors ${isCurrent ? 'text-indigo-400' : 'text-slate-400 group-hover:text-white'}`}>
+                                                {!seg.is_series_fragment ? 'Video Completo' : seg.title}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
 
                     {video?.description && (

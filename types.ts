@@ -130,6 +130,7 @@ export interface Video {
   split_series?: boolean | number;
   is_series_fragment?: boolean | number;
   custom_fragmentation_time?: number;
+  segments?: Video[];
 }
 
 export interface Comment {
