@@ -122,7 +122,7 @@ function interact_purchase_vip_instant($pdo, $input) {
         $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$plan['price'], $uid]);
         $stmtU = $pdo->prepare("SELECT vipExpiry FROM users WHERE id = ?"); $stmtU->execute([$uid]); $curr = $stmtU->fetchColumn();
         $new = max($curr, $now) + ($plan['durationDays'] * 86400);
-        $pdo->prepare("UPDATE users SET vipExpiry = ? WHERE id = ?")->execute([$new, $uid]);
+        $pdo->prepare("UPDATE users SET vipExpiry = ?, paidVipExpiry = ? WHERE id = ?")->execute([$new, $new, $uid]);
         $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'VIP', ?, ?, 0)")->execute([uniqid('txv_'), $uid, $plan['price'], $now, $plan['name']]);
         $pdo->commit(); respond(true);
     } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
@@ -145,21 +145,86 @@ function interact_rate($pdo, $input) {
     $newLiked = ($type === 'like') ? 1 : 0;
     $newDisliked = ($type === 'dislike') ? 1 : 0;
     
+    $likeDiff = 0;
     if ($current) {
         if (($type === 'like' && $current['liked'] == 1) || ($type === 'dislike' && $current['disliked'] == 1)) {
             $pdo->prepare("UPDATE interactions SET liked = 0, disliked = 0 WHERE userId = ? AND videoId = ?")->execute([$uid, $vid]);
             $resLiked = false;
             $resDisliked = false;
+            if ($type === 'like') $likeDiff = -1;
         } else {
             $pdo->prepare("UPDATE interactions SET liked = ?, disliked = ? WHERE userId = ? AND videoId = ?")->execute([$newLiked, $newDisliked, $uid, $vid]);
             $resLiked = ($newLiked === 1);
             $resDisliked = ($newDisliked === 1);
+            if ($type === 'like') $likeDiff = 1;
+            else if ($current['liked'] == 1) $likeDiff = -1; // Was liked, now disliked
         }
     } else {
         $pdo->prepare("INSERT INTO interactions (userId, videoId, liked, disliked) VALUES (?, ?, ?, ?)")->execute([$uid, $vid, $newLiked, $newDisliked]);
         $resLiked = ($newLiked === 1);
         $resDisliked = ($newDisliked === 1);
+        if ($resLiked) $likeDiff = 1;
     }
+
+    // --- LOGICA DE PREMIO POR LIKES ---
+    if ($likeDiff !== 0) {
+        $creatorStmt = $pdo->prepare("SELECT creatorId FROM videos WHERE id = ?");
+        $creatorStmt->execute([$vid]);
+        $creatorId = $creatorStmt->fetchColumn();
+
+        if ($creatorId) {
+            // Actualizar likes acumulados del creador
+            $pdo->prepare("UPDATE users SET accumulatedLikes = GREATEST(0, accumulatedLikes + ?) WHERE id = ?")
+                ->execute([$likeDiff, $creatorId]);
+            
+            // Si el Like fue positivo, verificar si llegó a la meta
+            if ($likeDiff > 0) {
+                $settingsStmt = $pdo->query("SELECT likes_goal, max_monthly_extra_days FROM system_settings WHERE id = 1");
+                $sData = $settingsStmt->fetch();
+                $goal = (int)($sData['likes_goal'] ?? 20);
+                $maxExtra = (int)($sData['max_monthly_extra_days'] ?? 14);
+                
+                $userStmt = $pdo->prepare("SELECT accumulatedLikes, vipExpiry, monthlyExtraDaysCount, lastExtraDayMonth, totalExtraDaysWon FROM users WHERE id = ?");
+                $userStmt->execute([$creatorId]);
+                $userData = $userStmt->fetch();
+                
+                if ($userData && $userData['accumulatedLikes'] >= $goal) {
+                    $now = time();
+                    $currentMonth = date('Y-m');
+                    
+                    // Resetear contador si es un nuevo mes
+                    $monthlyCount = ($userData['lastExtraDayMonth'] === $currentMonth) ? (int)$userData['monthlyExtraDaysCount'] : 0;
+                    
+                    if ($monthlyCount < $maxExtra) {
+                        $newAcc = $userData['accumulatedLikes'] - $goal;
+                        $currentExpiry = (int)$userData['vipExpiry'];
+                        $baseTime = ($currentExpiry > $now) ? $currentExpiry : $now;
+                        $newExpiry = $baseTime + 86400; // +1 día
+                        $newMonthlyCount = $monthlyCount + 1;
+                        $newTotalWon = (int)($userData['totalExtraDaysWon'] ?? 0) + 1;
+                        
+                        $pdo->prepare("UPDATE users SET accumulatedLikes = ?, vipExpiry = ?, monthlyExtraDaysCount = ?, lastExtraDayMonth = ?, totalExtraDaysWon = ? WHERE id = ?")
+                            ->execute([$newAcc, $newExpiry, $newMonthlyCount, $currentMonth, $newTotalWon, $creatorId]);
+                            
+                        // Notificar al creador
+                        require_once __DIR__ . '/functions_app.php';
+                        send_direct_notification($pdo, $creatorId, 'SYSTEM', "¡Felicidades! Has ganado 1 día de Acceso Total. ({$newMonthlyCount}/{$maxExtra} este mes).", "/profile");
+                    } else {
+                        // Meta alcanzada pero límite mensual excedido
+                        // Opcionalmente podemos dejar los likes ahí para el siguiente mes o simplemente no dar el premio.
+                        // En este caso, restamos los likes para que el contador no se bloquee, pero avisamos.
+                        $newAcc = $userData['accumulatedLikes'] - $goal;
+                        $pdo->prepare("UPDATE users SET accumulatedLikes = ?, monthlyExtraDaysCount = ?, lastExtraDayMonth = ? WHERE id = ?")
+                            ->execute([$newAcc, $monthlyCount, $currentMonth, $creatorId]);
+                            
+                        require_once __DIR__ . '/functions_app.php';
+                        send_direct_notification($pdo, $creatorId, 'SYSTEM', "Has alcanzado la meta de likes, pero ya has ganado el máximo de {$maxExtra} días este mes. ¡Sigue así para el próximo mes!", "/profile");
+                    }
+                }
+            }
+        }
+    }
+    // ---------------------------------
 
     // SI ES DISLIKE Y ES FRAGMENTO: Marcar dislike también en el ORGINAL para que el filtro lo detecte
     if ($type === 'dislike' && $resDisliked && $origId !== $vid) {

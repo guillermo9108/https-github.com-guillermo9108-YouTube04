@@ -5,7 +5,7 @@ import { db } from '../../services/db';
 import { User, Video } from '../../types';
 import VideoCard from '../VideoCard';
 import { useAuth } from '../../context/AuthContext';
-import { User as UserIcon, Bell, Loader2, Check, Trash2, Upload, Play, Smartphone, Music, Image as ImageIcon, Layers, Plus } from 'lucide-react';
+import { User as UserIcon, Bell, Loader2, Check, Trash2, Upload, Play, Smartphone, Music, Image as ImageIcon, Layers, Plus, ThumbsUp, Eye, Video as VideoIcon } from 'lucide-react';
 import { Link, useNavigate } from '../Router';
 import ImageUploadModal from '../channel/ImageUploadModal';
 
@@ -27,7 +27,7 @@ export default function Channel() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   
   // User Interaction State
-  const [stats, setStats] = useState({ views: 0, uploads: 0 });
+  const [stats, setStats] = useState({ views: 0, uploads: 0, likes: 0 });
   const [purchases, setPurchases] = useState<string[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
@@ -52,9 +52,14 @@ export default function Channel() {
                 const content = await db.getChannelContent(userId, 'ALL');
                 setAllContent(content);
 
-                // 3. Calc Stats
-                const totalViews = content.reduce((acc: number, curr: Video) => acc + Number(curr.views), 0);
-                setStats({ views: totalViews, uploads: content.length });
+                // 3. Calc Stats (Using API values when available)
+                if (u) {
+                    setStats({ 
+                        views: u.totalViews ?? content.reduce((acc: number, curr: Video) => acc + Number(curr.views), 0), 
+                        uploads: u.totalVideos ?? content.length,
+                        likes: u.totalLikes ?? 0
+                    });
+                }
 
             } catch (e) {
                 console.error("Failed to load channel", e);
@@ -237,12 +242,22 @@ export default function Channel() {
            {/* Info */}
            <div className="text-center">
                <h1 className="text-3xl font-bold text-white mb-2">{channelUser.username}</h1>
-               <div className="text-slate-400 text-sm flex items-center justify-center gap-3 mb-6">
-                   <span>@{channelUser.username}</span>
-                   <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                   <span>{stats.uploads} contenidos</span>
-                   <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                   <span>{stats.views} views</span>
+               <div className="flex flex-wrap items-center justify-center gap-y-2 gap-x-4 mb-8">
+                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
+                       <VideoIcon size={14} className="text-indigo-400" />
+                       <span className="text-xs font-bold text-white">{stats.uploads}</span>
+                       <span className="text-[10px] text-slate-500 uppercase font-black tracking-tight">Videos</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
+                       <Eye size={14} className="text-emerald-400" />
+                       <span className="text-xs font-bold text-white">{stats.views.toLocaleString()}</span>
+                       <span className="text-[10px] text-slate-500 uppercase font-black tracking-tight">Views</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5">
+                       <ThumbsUp size={14} className="text-pink-400" />
+                       <span className="text-xs font-bold text-white">{stats.likes.toLocaleString()}</span>
+                       <span className="text-[10px] text-slate-500 uppercase font-black tracking-tight">Likes</span>
+                   </div>
                </div>
                
                {currentUser?.id !== channelUser.id && (

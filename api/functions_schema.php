@@ -20,7 +20,14 @@ function getAppSchema() {
                 'vipExpiry' => 'BIGINT DEFAULT 0',
                 'is_verified_seller' => 'TINYINT(1) DEFAULT 0',
                 'is_banned' => 'TINYINT(1) DEFAULT 0',
-                'apkVersion' => 'VARCHAR(20) DEFAULT NULL'
+                'apkVersion' => 'VARCHAR(20) DEFAULT NULL',
+                'accumulatedLikes' => 'INT DEFAULT 0',
+                'monthlyExtraDaysCount' => 'INT DEFAULT 0',
+                'lastExtraDayMonth' => 'VARCHAR(7) DEFAULT NULL',
+                'totalExtraDaysWon' => 'INT DEFAULT 0',
+                'weeklyUploadCount' => 'INT DEFAULT 0',
+                'lastUploadChallengeWeek' => 'VARCHAR(10) DEFAULT NULL',
+                'paidVipExpiry' => 'BIGINT DEFAULT 0'
             ]
         ],
         'videos' => [
@@ -257,7 +264,13 @@ function getAppSchema() {
                 'batteryConfig' => 'LONGTEXT',
                 'batteryHistory' => 'LONGTEXT',
                 'shortsPath' => "VARCHAR(255) DEFAULT ''",
-                'fragmentation_time' => 'INT DEFAULT 60'
+                'fragmentation_time' => 'INT DEFAULT 60',
+                'likes_goal' => 'INT DEFAULT 20',
+                'max_monthly_extra_days' => 'INT DEFAULT 14',
+                'weekly_challenge_enabled' => 'TINYINT(1) DEFAULT 0',
+                'weekly_challenge_goal' => 'INT DEFAULT 1',
+                'weekly_challenge_reward' => 'INT DEFAULT 1',
+                'expire_rewards_monthly' => 'TINYINT(1) DEFAULT 0'
             ]
         ],
         'transactions' => [

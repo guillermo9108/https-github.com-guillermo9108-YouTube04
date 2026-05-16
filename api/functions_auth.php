@@ -5,12 +5,37 @@
 
 // Helper para obtener datos completos de usuario
 function _get_user_data($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId, lastDeviceId, watchLater, defaultPrices FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, username, role, balance, avatarUrl, shippingDetails, vipExpiry, is_verified_seller, currentSessionId, lastDeviceId, watchLater, defaultPrices, accumulatedLikes, monthlyExtraDaysCount, lastExtraDayMonth, totalExtraDaysWon, weeklyUploadCount, lastUploadChallengeWeek, paidVipExpiry FROM users WHERE id = ?");
     $stmt->execute([$id]); 
     $u = $stmt->fetch();
     if ($u) {
+        $settings = get_system_settings($pdo);
+
+        // --- LÓGICA DE RESET MENSUAL Y EXPIRACIÓN ---
+        $currentMonth = date('Y-m');
+        if ($u['lastExtraDayMonth'] !== $currentMonth) {
+            $now = time();
+            $newExpiry = (int)$u['vipExpiry'];
+            
+            if (!empty($settings['expire_rewards_monthly'])) {
+                // Si expiran, volvemos a la fecha pagada (o a ahora si ya pasó)
+                $paidLimit = (int)($u['paidVipExpiry'] ?? 0);
+                $calculated = max($now, $paidLimit);
+                if ($newExpiry > $calculated) {
+                    $newExpiry = $calculated;
+                }
+            }
+
+            $pdo->prepare("UPDATE users SET vipExpiry = ?, monthlyExtraDaysCount = 0, lastExtraDayMonth = ? WHERE id = ?")
+                ->execute([$newExpiry, $currentMonth, $id]);
+            
+            $u['vipExpiry'] = $newExpiry;
+            $u['monthlyExtraDaysCount'] = 0;
+            $u['lastExtraDayMonth'] = $currentMonth;
+        }
+        // ---------------------------------------------
+
         if (empty($u['avatarUrl'])) {
-            $settings = get_system_settings($pdo);
             $u['avatarUrl'] = $settings['defaultAvatar'] ?? '';
         }
         $u['avatarUrl'] = fix_url($u['avatarUrl']);
@@ -33,6 +58,15 @@ function _get_user_data($pdo, $id) {
             }
         }
         $u['shippingDetails'] = $details;
+        
+        // Agregar estadísticas del canal
+        $stats = $pdo->prepare("SELECT SUM(likes) as totalLikes, SUM(views) as totalViews, COUNT(*) as totalVideos FROM videos WHERE creatorId = ? AND is_private = 0");
+        $stats->execute([$id]);
+        $s = $stats->fetch();
+        $u['totalLikes'] = (int)($s['totalLikes'] ?? 0);
+        $u['totalViews'] = (int)($s['totalViews'] ?? 0);
+        $u['totalVideos'] = (int)($s['totalVideos'] ?? 0);
+
         return $u;
     }
     return null;

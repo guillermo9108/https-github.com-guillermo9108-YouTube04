@@ -945,6 +945,12 @@ function video_upload($pdo, $post, $files) {
         $stmt->execute([$id, $title, $desc, $price, $category, $duration, $videoPath, $thumbPath, $creatorId, time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
         
         video_organize_single($pdo, $id, $settings);
+
+        // --- RETO SEMANAL ---
+        require_once __DIR__ . '/functions_challenges.php';
+        check_weekly_upload_challenge($pdo, $creatorId);
+        // --------------------
+
         respond(true, ['id' => $id, 'url' => $videoPath]);
     } catch (Exception $e) {
         respond(false, null, "Error en base de datos: " . $e->getMessage());

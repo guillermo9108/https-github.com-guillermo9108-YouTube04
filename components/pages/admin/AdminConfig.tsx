@@ -6,7 +6,7 @@ import { useToast } from '../../../context/ToastContext';
 import { 
     Save, Tag, Loader2, Trash2, Plus, PlusCircle, Sparkles, 
     CreditCard, ChevronRight, DollarSign, Database,
-    Clock, Percent, HardDrive, Crown, X, Info, Smartphone, Wallet, Globe,
+    Clock, Percent, HardDrive, Crown, X, Info, Smartphone, Wallet, Globe, Heart,
     Cpu, Settings2, Shield, Activity, Network, ListPlus, Bug, Watch, Maximize,
     Zap, Trash, SortAsc, Server, Banknote, Coins
 } from 'lucide-react';
@@ -196,6 +196,82 @@ export default function AdminConfig() {
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-indigo-400 uppercase flex items-center gap-1 ml-1"><Sparkles size={10}/> Gemini AI API Key</label>
                         <input type="password" value={settings?.geminiKey} onChange={e => updateValue('geminiKey', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-[10px] focus:border-indigo-500 outline-none" placeholder="Ingresa tu clave de Google AI..." />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-white/5">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-indigo-400 uppercase flex items-center gap-1 ml-1"><Heart size={10}/> Meta de Likes (x 1 día Gratis)</label>
+                            <input 
+                                type="number" 
+                                value={settings?.likes_goal || 20} 
+                                onChange={e => updateValue('likes_goal', parseInt(e.target.value))} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                                placeholder="Ej: 20"
+                            />
+                            <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">
+                                * Cantidad de likes acumulados necesarios para ganar 1 día de VIP.
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-indigo-400 uppercase flex items-center gap-1 ml-1"><Zap size={10}/> Límite Mensual (Días Gratis)</label>
+                            <input 
+                                type="number" 
+                                value={settings?.max_monthly_extra_days || 14} 
+                                onChange={e => updateValue('max_monthly_extra_days', parseInt(e.target.value))} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                                placeholder="Ej: 14"
+                            />
+                            <p className="text-[8px] text-slate-500 mt-1 ml-1 italic">
+                                * Máximo de días VIP que un usuario puede ganar al mes por likes.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-white/5">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-tight">Expiración Mensual</span>
+                                <span className="text-[8px] text-slate-500">Los días ganados caducan al fin de mes</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked={!!settings?.expire_rewards_monthly} onChange={e => updateValue('expire_rewards_monthly', e.target.checked ? 1 : 0)} className="sr-only peer"/>
+                                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-white/5">
+                        <div className="md:col-span-3 pb-2">
+                             <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                 <PlusCircle size={14} className="text-indigo-400"/>
+                                 Retos y Bonificaciones
+                             </h3>
+                        </div>
+                        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-white/5">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-white uppercase tracking-tight">Reto de Subida Semanal</span>
+                                <span className="text-[9px] text-slate-500">Gana días por subir videos</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked={!!settings?.weekly_challenge_enabled} onChange={e => updateValue('weekly_challenge_enabled', e.target.checked ? 1 : 0)} className="sr-only peer"/>
+                                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Metavideos / Semana</label>
+                            <input 
+                                type="number" 
+                                value={settings?.weekly_challenge_goal || 1} 
+                                onChange={e => updateValue('weekly_challenge_goal', parseInt(e.target.value))} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Días de Recompensa</label>
+                            <input 
+                                type="number" 
+                                value={settings?.weekly_challenge_reward || 1} 
+                                onChange={e => updateValue('weekly_challenge_reward', parseInt(e.target.value))} 
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                            />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-white/5">

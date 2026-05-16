@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { db } from '../../services/db';
 import { Transaction, Notification as AppNotification } from '../../types';
-import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, ChevronRight, User as UserIcon, RefreshCw, Smartphone, Loader2, Settings, Save, Zap, Heart, Truck, Camera, Lock, Eye, EyeOff, UserCheck, Bell, MessageSquare, Trash2, CheckCircle2, Crown, Calendar, Clock as ClockIcon, ShieldCheck, AlertTriangle, Fingerprint, MapPin, Smartphone as PhoneIcon, X, BarChart3, TrendingUp } from 'lucide-react';
+import { Wallet, Send, ArrowDownLeft, ArrowUpRight, History, Shield, LogOut, ChevronRight, User as UserIcon, RefreshCw, Smartphone, Loader2, Settings, Save, Zap, Heart, Truck, Camera, Lock, Eye, EyeOff, UserCheck, Bell, MessageSquare, Trash2, CheckCircle2, Crown, Calendar, Clock as ClockIcon, ShieldCheck, AlertTriangle, Fingerprint, MapPin, Smartphone as PhoneIcon, X, BarChart3, TrendingUp, ThumbsUp, Video as VideoIcon } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from '../Router';
 
@@ -203,6 +203,128 @@ export default function Profile() {
               </div>
           </div>
       </div>
+
+      {/* Channel Stats Row */}
+      <div className="grid grid-cols-3 gap-3">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col items-center justify-center text-center group hover:border-indigo-500/30 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-2">
+                  <VideoIcon size={20}/>
+              </div>
+              <p className="text-white font-black text-lg leading-none">{user.totalVideos || 0}</p>
+              <p className="text-slate-500 text-[9px] font-black uppercase mt-1 tracking-widest">Videos</p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col items-center justify-center text-center group hover:border-emerald-500/30 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-2">
+                  <Eye size={20}/>
+              </div>
+              <p className="text-white font-black text-lg leading-none">{(user.totalViews || 0).toLocaleString()}</p>
+              <p className="text-slate-500 text-[9px] font-black uppercase mt-1 tracking-widest">Views</p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col items-center justify-center text-center group hover:border-pink-500/30 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center mb-2">
+                  <ThumbsUp size={20}/>
+              </div>
+              <p className="text-white font-black text-lg leading-none">{(user.totalLikes || 0).toLocaleString()}</p>
+              <p className="text-slate-500 text-[9px] font-black uppercase mt-1 tracking-widest">Likes</p>
+          </div>
+      </div>
+
+      {/* Rewards Progress Bar */}
+      {systemSettings?.likes_goal && (
+          <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
+                          <Heart size={20} className="fill-pink-500/10"/>
+                      </div>
+                      <div>
+                          <h4 className="text-white font-black text-[10px] uppercase tracking-[0.1em]">Progreso de Recompensa</h4>
+                          <p className="text-slate-500 text-[8px] font-bold uppercase tracking-tight">Gana 1 día de VIP por cada {systemSettings.likes_goal} likes</p>
+                      </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                      {(() => {
+                          const totalDays = user.totalExtraDaysWon || 0;
+                          let level = { name: 'BRONCE', color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/20' };
+                          if (totalDays > 180) level = { name: 'DIAMANTE', color: 'text-cyan-400', bg: 'bg-cyan-400/10', border: 'border-cyan-400/20' };
+                          else if (totalDays > 90) level = { name: 'ORO', color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' };
+                          else if (totalDays > 30) level = { name: 'PLATA', color: 'text-slate-300', bg: 'bg-slate-300/10', border: 'border-slate-300/20' };
+                          
+                          return (
+                              <div className={`px-2 py-0.5 rounded-full ${level.bg} ${level.border} border ${level.color} text-[8px] font-black uppercase tracking-widest mb-1`}>
+                                  Nivel {level.name}
+                              </div>
+                          );
+                      })()}
+                      <span className="text-white font-black text-sm">{user.accumulatedLikes || 0} / {systemSettings.likes_goal}</span>
+                  </div>
+              </div>
+              
+              <div className="relative h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-rose-400 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                      style={{ width: `${Math.min(100, ((user.accumulatedLikes || 0) / systemSettings.likes_goal) * 100)}%` }}
+                  />
+              </div>
+              
+              <div className="flex justify-between items-center text-[8px] font-bold uppercase tracking-widest text-slate-500">
+                  <span>{(systemSettings.likes_goal - (user.accumulatedLikes || 0)) > 0 ? `Faltan ${systemSettings.likes_goal - (user.accumulatedLikes || 0)} para el próximo día gratis` : '¡Meta alcanzada!'}</span>
+                  <div className="flex items-center gap-1 text-pink-400">
+                      <Zap size={10}/>
+                      <span>Recompensa: +1 Día VIP</span>
+                  </div>
+              </div>
+
+              {user.lastExtraDayMonth === new Date().toISOString().substring(0, 7) && (
+                  <div className="pt-2 border-t border-white/5">
+                      <div className="flex justify-between items-center">
+                          <span className="text-[8px] font-black text-slate-500 uppercase">Límite Mensual</span>
+                          <span className="text-[9px] font-black text-white">{user.monthlyExtraDaysCount || 0} / {systemSettings.max_monthly_extra_days || 14} días ganados</span>
+                      </div>
+                      <div className="mt-1.5 h-1 bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                              className="h-full bg-indigo-500/50"
+                              style={{ width: `${Math.min(100, ((user.monthlyExtraDaysCount || 0) / (systemSettings.max_monthly_extra_days || 14)) * 100)}%` }}
+                          />
+                      </div>
+                  </div>
+              )}
+
+              {/* Weekly Challenge */}
+              {systemSettings?.weekly_challenge_enabled && (
+                  <div className="pt-4 border-t border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                                  <VideoIcon size={16}/>
+                              </div>
+                              <div>
+                                  <h4 className="text-white font-black text-[9px] uppercase tracking-wider">Reto Semanal</h4>
+                                  <p className="text-slate-500 text-[8px] font-bold uppercase">Sube {systemSettings.weekly_challenge_goal} {Number(systemSettings.weekly_challenge_goal) === 1 ? 'video' : 'videos'} esta semana</p>
+                              </div>
+                          </div>
+                          <div className="text-right">
+                               <span className="text-white font-black text-xs">
+                                   {user.lastUploadChallengeWeek === new Date().toISOString().substring(0, 10) /* Simplified week check logic for display */
+                                     ? 0 : (user.weeklyUploadCount || 0)} / {systemSettings.weekly_challenge_goal}
+                               </span>
+                          </div>
+                      </div>
+                      
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                              className="h-full bg-indigo-500 transition-all duration-1000"
+                              style={{ width: `${Math.min(100, ((user.weeklyUploadCount || 0) / (systemSettings.weekly_challenge_goal || 1)) * 100)}%` }}
+                          />
+                      </div>
+
+                      <p className="text-[8px] font-bold text-slate-500 uppercase italic">
+                          * Recompensa: +{systemSettings.weekly_challenge_reward} día(s) de Acceso Total.
+                      </p>
+                  </div>
+              )}
+          </div>
+      )}
 
       {/* Seller Dashboard Access */}
       <div className="bg-slate-900 border border-indigo-500/20 rounded-[32px] p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 group hover:border-indigo-500/40 transition-all">

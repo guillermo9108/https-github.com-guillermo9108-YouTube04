@@ -62,6 +62,15 @@ export interface User {
   is_banned?: boolean | number;
   apkVersion?: string;
   isOnline?: boolean;
+  totalLikes?: number;
+  totalViews?: number;
+  totalVideos?: number;
+  accumulatedLikes?: number;
+  monthlyExtraDaysCount?: number;
+  lastExtraDayMonth?: string;
+  totalExtraDaysWon?: number;
+  weeklyUploadCount?: number;
+  lastUploadChallengeWeek?: string;
 }
 
 export interface Story {
@@ -208,6 +217,12 @@ export interface SystemSettings {
   batteryConfig?: any;
   shortsPath?: string;
   fragmentation_time?: number;
+  likes_goal?: number;
+  max_monthly_extra_days?: number;
+  weekly_challenge_enabled?: number | boolean;
+  weekly_challenge_goal?: number;
+  weekly_challenge_reward?: number;
+  expire_rewards_monthly?: number | boolean;
 }
 
 export interface Transaction {
