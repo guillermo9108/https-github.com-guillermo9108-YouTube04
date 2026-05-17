@@ -131,6 +131,15 @@ function interact_purchase_vip_instant($pdo, $input) {
 function interact_rate($pdo, $input) {
     $uid = $input['userId']; $vid = $input['videoId']; $type = $input['type'];
     
+    // PREVENIR AUTOLIKE
+    if ($type === 'like') {
+        $creatorStmt = $pdo->prepare("SELECT creatorId FROM videos WHERE id = ?");
+        $creatorStmt->execute([$vid]);
+        if ($creatorStmt->fetchColumn() === $uid) {
+            respond(false, null, "No puedes dar like a tu propio contenido");
+        }
+    }
+    
     // Si es fragmento, obtenemos el originalId para marcar la interacción globalmente si se desea,
     // o simplemente para que la lógica de filtrado sepa que el "origen" fue rechazado.
     $v = $pdo->prepare("SELECT originalId FROM videos WHERE id = ?");
@@ -492,7 +501,18 @@ function interact_get_user_followers($pdo, $userId) {
 }
 
 function interact_transfer_balance($pdo, $input) {
-    $sid = $input['userId']; $term = $input['targetUsername']; $amt = floatval($input['amount']); $pdo->beginTransaction();
+    $sid = $input['userId']; $term = $input['targetUsername'];
+    $amtRaw = (string)($input['amount'] ?? '');
+    
+    // SEGURIDAD: Omitir operadores aritméticos para evitar manipulaciones
+    if (preg_match('/[\+\-\*\/×÷]/', $amtRaw)) {
+        respond(false, null, "Operación no permitida en el monto (caracteres especiales detectados)");
+    }
+    
+    $amt = floatval($amtRaw); 
+    if ($amt <= 0) respond(false, null, "El monto debe ser mayor a 0");
+    
+    $pdo->beginTransaction();
     try {
         $sBal = $pdo->query("SELECT balance FROM users WHERE id = '$sid'")->fetchColumn(); if ($sBal < $amt) throw new Exception("Saldo insuficiente");
         $tid = $pdo->query("SELECT id FROM users WHERE username = '$term'")->fetchColumn(); if (!$tid) throw new Exception("Usuario no encontrado");
