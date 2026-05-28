@@ -93,7 +93,7 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] ${isMenuMode ? '' : 'pt-[calc(104px+env(safe-area-inset-top,24px))]'}`}>
+    <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] pb-[env(safe-area-inset-bottom,0px)] ${isMenuMode ? '' : 'pt-[calc(104px+env(safe-area-inset-top,24px))]'}`}>
       {/* Facebook Lite Style Header */}
       {!isMenuMode && (
         <header 

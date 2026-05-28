@@ -6,6 +6,7 @@ import { Video } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useNavigate } from '../Router';
+import { isRunningInAPK, triggerNativeDownload } from '../../utils/platform';
 
 interface FolderNavigationModalProps {
     isOpen: boolean;
@@ -98,7 +99,7 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
             return;
         }
 
-        const isApp = (user?.deviceInfo?.includes('com.streampay.app') || 
+        const isApp = isRunningInAPK() || (user?.deviceInfo?.includes('com.streampay.app') || 
                        user?.lastDeviceId?.includes('com.streampay.app') || 
                        user?.deviceInfo?.includes('StreamPayAPK') || 
                        user?.lastDeviceId?.includes('StreamPayAPK'));
@@ -114,6 +115,14 @@ export default function FolderNavigationModal({ isOpen, onClose, currentPath, on
             const ext = video.is_audio ? 'mp3' : 'mp4';
             const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
             
+            if (isRunningInAPK()) {
+                const handled = triggerNativeDownload(downloadUrl, `${filename}.${ext}`);
+                if (handled) {
+                    toast.success("Descarga enviada al gestor de la APK...");
+                    return;
+                }
+            }
+
             const link = document.createElement('a');
             link.href = downloadUrl;
             link.download = "";

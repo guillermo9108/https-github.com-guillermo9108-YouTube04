@@ -13,6 +13,7 @@ import VideoCard from '../VideoCard';
 import { useToast } from '../../context/ToastContext';
 import { useGrid } from '../../context/GridContext';
 import { generateThumbnail } from '../../utils/videoGenerator';
+import { isRunningInAPK, triggerNativeDownload, sendNativeEvent } from '../../utils/platform';
 
 // Refactored Components
 import CommentSection from '../watch/CommentSection';
@@ -59,6 +60,7 @@ export default function Watch() {
     const isAdmin = useMemo(() => user?.role?.trim().toUpperCase() === 'ADMIN', [user?.role]);
     
     const isApp = useMemo(() => {
+        if (isRunningInAPK()) return true;
         const di = user?.deviceInfo || '';
         const ldi = user?.lastDeviceId || '';
         return di.includes('com.streampay.app') || ldi.includes('com.streampay.app') || 
@@ -344,6 +346,11 @@ export default function Watch() {
         const el = videoRef.current;
         if (!el || !video || !isUnlocked) return;
 
+        // Guardar progreso de reproducción de forma local para restaurar más tarde
+        if (el.duration > 0 && el.currentTime > 0) {
+            localStorage.setItem(`sp_progress_${video.id}`, String(el.currentTime));
+        }
+
         // 1. Seguimiento de Visualización (95%)
         if (el.duration > 0) {
             const progress = el.currentTime / el.duration;
@@ -430,6 +437,9 @@ export default function Watch() {
 
     const handleVideoEnded = async () => {
         if (!video || !user) return;
+        
+        // Notify native Android bridge of play completion
+        sendNativeEvent('video_completed', { id: video.id });
 
         // --- Lógica de Fragmentación (Gapless Playback Simulation) ---
         const activeSegments = video?.segments || [];
@@ -503,25 +513,45 @@ export default function Watch() {
         el.load();
 
         const onPlay = () => {
-            setThrottled(true);
-            if (!viewMarkedRef.current && video) {
-                db.incrementView(video.id).catch(() => {});
-                viewMarkedRef.current = true;
-            }
+             setThrottled(true);
+             if (video) {
+                 sendNativeEvent('video_play', { id: video.id });
+             }
+             if (!viewMarkedRef.current && video) {
+                 db.incrementView(video.id).catch(() => {});
+                 viewMarkedRef.current = true;
+             }
         };
 
-        const onPause = () => setThrottled(false);
+        const onPause = () => {
+             setThrottled(false);
+             if (video) {
+                 sendNativeEvent('video_pause', { id: video.id });
+             }
+        };
+
+        const onLoadedMetadata = () => {
+            const savedTime = localStorage.getItem(`sp_progress_${video.id}`);
+            if (savedTime && el.duration > 0) {
+                const parsed = parseFloat(savedTime);
+                if (parsed > 0 && parsed < el.duration - 5) {
+                    el.currentTime = parsed;
+                }
+            }
+        };
 
         el.addEventListener('play', onPlay);
         el.addEventListener('pause', onPause);
         el.addEventListener('ended', handleVideoEnded);
         el.addEventListener('timeupdate', handleTimeUpdate);
+        el.addEventListener('loadedmetadata', onLoadedMetadata);
 
         return () => {
             el.removeEventListener('play', onPlay);
             el.removeEventListener('pause', onPause);
             el.removeEventListener('ended', handleVideoEnded);
             el.removeEventListener('timeupdate', handleTimeUpdate);
+            el.removeEventListener('loadedmetadata', onLoadedMetadata);
         };
     }, [id, isUnlocked, !!video, streamUrl, posterUrl]);
 
@@ -547,6 +577,16 @@ export default function Watch() {
         if (!video) return;
 
         try {
+            if (isRunningInAPK()) {
+                const filename = encodeURIComponent((video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
+                const ext = video.is_audio ? 'mp3' : 'mp4';
+                const handled = triggerNativeDownload(downloadUrl, `${filename}.${ext}`);
+                if (handled) {
+                    toast.success("Descarga enviada al gestor de la APK...");
+                    return;
+                }
+            }
+
             const link = document.createElement('a');
             link.href = downloadUrl;
             link.download = "";

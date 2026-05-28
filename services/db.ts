@@ -56,12 +56,23 @@ class DBService {
         options.headers = headers;
         options.signal = controller.signal;
 
+        const method = (options.method || 'GET').toUpperCase();
+        const isReadRequest = method === 'GET' || 
+                              endpoint.includes('action=get_') || 
+                              endpoint.includes('action=check_') || 
+                              endpoint.includes('action=has_') || 
+                              endpoint.includes('action=list_');
+
+        const userId = localStorage.getItem('sp_current_user_id') || sessionStorage.getItem('sp_current_user_id') || 'guest';
+        const cacheKey = `sp_offline_cache_${userId}_${endpoint.replace(/[^a-zA-Z0-9_=-]/g, '_')}`;
+
         return fetch(url, options).then(async (response) => {
             clearTimeout(timeoutId);
             
             if (this.isOffline) {
                 this.isOffline = false;
                 window.dispatchEvent(new CustomEvent('sp_online'));
+                window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: false } }));
             }
 
             const rawText = await response.text();
@@ -80,6 +91,23 @@ class DBService {
                 throw new Error(`Respuesta inválida del servidor (Inicia con: ${preview.substring(0, 20)}...)`);
             }
             if (json.success === false) throw new Error(json.error || 'Error desconocido');
+
+            if (isReadRequest) {
+                try {
+                    localStorage.setItem(cacheKey, rawText);
+                } catch (e) {
+                    // Safe cleanup if localStorage is full
+                    console.warn("LocalStorage full, deleting oldest caches...");
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith('sp_offline_cache_')) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                    try { localStorage.setItem(cacheKey, rawText); } catch (_) {}
+                }
+            }
+
             return json.data as T;
         }).catch(err => {
             clearTimeout(timeoutId);
@@ -90,9 +118,27 @@ class DBService {
             if (isNetworkError && !this.isOffline) {
                 this.isOffline = true;
                 window.dispatchEvent(new CustomEvent('sp_offline'));
+                window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: true } }));
             }
 
-            if (err.name === 'AbortError') throw new Error("La petición ha tardado demasiado tiempo.");
+            if (isReadRequest) {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const json = JSON.parse(cached);
+                        console.log(`[Offline Fallback] Serving cache for endpoint: ${endpoint}`);
+                        
+                        // Emitir evento global de datos sin conexión cargados
+                        window.dispatchEvent(new CustomEvent('sp_offline_data_loaded', { detail: { endpoint } }));
+                        
+                        return json.data as T;
+                    } catch (e) {
+                        console.error("Failed to parse cached response for", endpoint, e);
+                    }
+                }
+            }
+
+            if (err.name === 'AbortError') throw new Error("La petición ha tardado demasiado tiempo o el servidor no responde.");
             throw err;
         });
     }

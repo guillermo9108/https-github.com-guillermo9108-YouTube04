@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { useSettings } from '../context/SettingsContext';
 import { getThumbnailUrl } from '../utils/image';
 import { generateThumbnail } from '../utils/videoGenerator';
+import { isRunningInAPK, triggerNativeDownload } from '../utils/platform';
 import ShareModal from './ShareModal';
 import { VideoTranscodeModal } from './Admin/VideoTranscodeModal';
 
@@ -302,7 +303,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
       }
 
       // 2. Comprobar App Oficial (Solo si no es Admin)
-      const isApp = (user?.deviceInfo?.includes('com.streampay.app') || 
+      const isApp = isRunningInAPK() || (user?.deviceInfo?.includes('com.streampay.app') || 
                      user?.lastDeviceId?.includes('com.streampay.app') || 
                      user?.deviceInfo?.includes('StreamPayAPK') || 
                      user?.lastDeviceId?.includes('StreamPayAPK'));
@@ -319,6 +320,14 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           const ext = video.is_audio ? 'mp3' : 'mp4';
           const downloadUrl = `${base}&download=1&filename=${filename}.${ext}`;
           
+          if (isRunningInAPK()) {
+              const handled = triggerNativeDownload(downloadUrl, `${filename}.${ext}`);
+              if (handled) {
+                  toast.success("Descarga enviada al gestor de la APK...");
+                  return;
+              }
+          }
+
           const link = document.createElement('a');
           link.href = downloadUrl;
           link.download = "";

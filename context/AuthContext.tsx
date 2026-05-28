@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { User } from '../types';
 import { db } from '../services/db';
 import { useToast } from './ToastContext';
+import { persistSessionCookie, clearSessionCookie } from '../utils/platform';
 
 interface AuthContextType {
   user: User | null;
@@ -133,6 +134,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
     localStorage.removeItem('sp_offline_user');
     sessionStorage.removeItem('sp_current_user_id');
     sessionStorage.removeItem('sp_session_token');
+    clearSessionCookie();
     if (heartbeatTimerRef.current) window.clearTimeout(heartbeatTimerRef.current);
     window.dispatchEvent(new Event('sp_logout'));
   };
@@ -156,6 +158,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
                     u.balance = Number(u.balance);
                     setUser(u);
                     db.saveOfflineUser(u);
+                    persistSessionCookie(savedToken);
                 } else {
                     logout();
                 }
@@ -246,6 +249,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
         if (u.sessionToken) {
             localStorage.setItem('sp_session_token', u.sessionToken);
             if (!rememberMe) sessionStorage.setItem('sp_session_token', u.sessionToken);
+            persistSessionCookie(u.sessionToken);
         }
     } finally {
         setIsLoading(false);
@@ -266,6 +270,7 @@ export const AuthProvider = ({ children }: { children?: React.ReactNode }) => {
         if (u.sessionToken) {
             localStorage.setItem('sp_session_token', u.sessionToken);
             if (!rememberMe) sessionStorage.setItem('sp_session_token', u.sessionToken);
+            persistSessionCookie(u.sessionToken);
         }
     } finally {
         setIsLoading(false);

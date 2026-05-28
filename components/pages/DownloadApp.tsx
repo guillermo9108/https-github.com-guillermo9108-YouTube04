@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../../services/db';
+import { isRunningInAPK } from '../../utils/platform';
 import { Smartphone, Download, ExternalLink, ShieldCheck, Zap, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -9,6 +10,10 @@ export default function DownloadApp() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (isRunningInAPK()) {
+            window.location.hash = '#/';
+            return;
+        }
         const check = async () => {
             try {
                 const latest = await db.getLatestVersion();
@@ -25,6 +30,10 @@ export default function DownloadApp() {
         };
         check();
     }, []);
+
+    if (isRunningInAPK()) {
+        return null;
+    }
 
     const handleOpenApp = () => {
         const currentOrigin = window.location.origin;

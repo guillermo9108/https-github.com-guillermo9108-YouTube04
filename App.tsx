@@ -44,6 +44,7 @@ import { AlertCircle, Download, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
 // Components & Context
+import { isRunningInAPK } from './utils/platform';
 import { HashRouter, Routes, Route, Navigate } from './components/Router';
 // Fix: Import missing Layout component
 import Layout from './components/Layout';
@@ -181,7 +182,7 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const [updateInfo, setUpdateInfo] = useState<{version: string, url: string} | null>(null);
     const [showUpdate, setShowUpdate] = useState(false);
-    const [isAPK, setIsAPK] = useState(false);
+    const [isAPK, setIsAPK] = useState(isRunningInAPK());
     const [isMobile, setIsMobile] = useState(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
     const hasChecked = useRef(false);
     
@@ -208,23 +209,23 @@ const AppGuard = ({ children }: { children: React.ReactNode }) => {
                 }
 
                 const latest = await db.getLatestVersion(user?.id, clientVersion);
-                setIsAPK(latest.isAPK);
+                setIsAPK(latest.isAPK || isRunningInAPK());
                 
                 // Si ya tenemos el ID del usuario y el servidor respondió, marcamos como chequeado
-                if (user?.id || !latest.isAPK) {
+                if (user?.id || !latest.isAPK || isRunningInAPK()) {
                     hasChecked.current = true;
                 }
                 
                 const currentHash = window.location.hash;
                 
                 // Redirigir a descarga si es móvil y NO es la APK
-                if (isMobile && !latest.isAPK && !currentHash.includes('/download')) {
+                if (isMobile && !latest.isAPK && !isRunningInAPK() && !currentHash.includes('/download')) {
                     window.location.hash = '#/download';
                     return;
                 }
 
                 // Si es la APK y está en descarga, volver al inicio
-                if (latest.isAPK && currentHash.includes('/download')) {
+                if ((latest.isAPK || isRunningInAPK()) && currentHash.includes('/download')) {
                     window.location.hash = '#/';
                 }
 
