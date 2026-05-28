@@ -6,21 +6,38 @@ import jsmediatags from 'jsmediatags';
  */
 const extractAudioCoverSafe = async (fileOrUrl: File | string): Promise<File | null> => {
     return new Promise((resolve) => {
+        // Optimización crítica: Si es un String (es decir, una URL remota de streaming),
+        // evitamos llamar a jsmediatags ya que realizará una petición CORS XmlHttpRequest que fallará,
+        // ralentizando el cliente e inundando la consola de WebViews con Script Error de JS.
+        if (typeof fileOrUrl === 'string') {
+            resolve(null);
+            return;
+        }
+
         const timeout = setTimeout(() => resolve(null), 5000); 
 
         try {
             const reader = (jsmediatags as any).read || jsmediatags;
+            if (!reader) {
+                clearTimeout(timeout);
+                resolve(null);
+                return;
+            }
             reader(fileOrUrl, {
                 onSuccess: (tag: any) => {
                     clearTimeout(timeout);
-                    const picture = tag.tags.picture;
-                    if (picture) {
-                        const { data, format } = picture;
-                        const byteArray = new Uint8Array(data);
-                        const contentType = format || "image/jpeg";
-                        const blob = new Blob([byteArray], { type: contentType });
-                        resolve(new File([blob], `cover.jpg`, { type: contentType }));
-                    } else {
+                    try {
+                        const picture = tag.tags.picture;
+                        if (picture) {
+                            const { data, format } = picture;
+                            const byteArray = new Uint8Array(data);
+                            const contentType = format || "image/jpeg";
+                            const blob = new Blob([byteArray], { type: contentType });
+                            resolve(new File([blob], `cover.jpg`, { type: contentType }));
+                        } else {
+                            resolve(null);
+                        }
+                    } catch (err) {
                         resolve(null);
                     }
                 },
