@@ -22,15 +22,41 @@ class DBService {
     public resetHomeDirty() { this.homeDirty = false; }
     private isOffline = false;
     private lastErrorTime = 0;
+    private isLogging = false;
+    private logCountInWindow = 0;
+    private lastLogResetTime = Date.now();
 
     public async logRemote(message: string, level: 'ERROR' | 'INFO' | 'WARNING' = 'ERROR') {
-        if (this.isOffline) return; // Don't try to log if offline
+        if (this.isOffline) return;
+        if (this.isLogging) return; // Recursion loop guard
+
+        // Rate limit: Max 10 remote logs per 10 seconds to protect network and cpu
+        const now = Date.now();
+        if (now - this.lastLogResetTime > 10000) {
+            this.logCountInWindow = 0;
+            this.lastLogResetTime = now;
+        }
+        if (this.logCountInWindow > 10) {
+            return; // Throttle to prevent flooding
+        }
+
+        this.isLogging = true;
+        this.logCountInWindow++;
         try {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 4000);
             await fetch(`/api/index.php?action=client_log`, {
                 method: 'POST',
-                body: JSON.stringify({ message, level })
-            });
-        } catch(e) {}
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, level }),
+                signal: controller.signal
+            }).then(r => r.text()).catch(() => {});
+            clearTimeout(id);
+        } catch (e) {
+            // Completely silent to prevent loops
+        } finally {
+            this.isLogging = false;
+        }
     }
 
     public request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

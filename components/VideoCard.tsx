@@ -220,7 +220,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           }
       };
 
-      const canQueue = isUnlocked && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !failedExtractions.has(video.id);
+      const canQueue = !isRunningInAPK() && isAdmin && isUnlocked && hasDefaultThumb && isVisible && !isProcessing && !localThumb && !failedExtractions.has(video.id);
       if (canQueue && !thumbnailQueue.includes(video.id)) {
           thumbnailQueue.push(video.id);
       }

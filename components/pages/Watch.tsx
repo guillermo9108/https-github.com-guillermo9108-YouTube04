@@ -545,6 +545,7 @@ export default function Watch() {
         el.addEventListener('ended', handleVideoEnded);
         el.addEventListener('timeupdate', handleTimeUpdate);
         el.addEventListener('loadedmetadata', onLoadedMetadata);
+        el.addEventListener('error', (e) => console.log('Watch: Player media error captured locally', e));
 
         return () => {
             el.removeEventListener('play', onPlay);
@@ -552,6 +553,7 @@ export default function Watch() {
             el.removeEventListener('ended', handleVideoEnded);
             el.removeEventListener('timeupdate', handleTimeUpdate);
             el.removeEventListener('loadedmetadata', onLoadedMetadata);
+            el.removeEventListener('error', (e) => console.log('Watch: Player media error captured locally', e));
         };
     }, [id, isUnlocked, !!video, streamUrl, posterUrl]);
 

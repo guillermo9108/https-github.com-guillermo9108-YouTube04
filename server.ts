@@ -393,6 +393,13 @@ async function startServer() {
       createdAt INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS fcm_tokens (
+      token TEXT PRIMARY KEY,
+      userId TEXT,
+      deviceModel TEXT,
+      createdAt INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS requests (
       id TEXT PRIMARY KEY,
       userId TEXT,
@@ -663,6 +670,81 @@ async function startServer() {
         return res.json({ success: true, data: { count: row?.count || 0 }});
       }
 
+      if (action === 'get_apk_background_data') {
+        const userId = req.query.userId || req.body.userId;
+        if (!userId) {
+          return res.json({ success: false, error: "Missing userId" });
+        }
+        try {
+          // 1. Unread notifications count and list
+          const notifRow = db.prepare("SELECT COUNT(*) as count FROM notifications WHERE userId = ? AND isRead = 0").get(userId) as any;
+          const unreadNotifsList = db.prepare("SELECT * FROM notifications WHERE userId = ? AND isRead = 0 ORDER BY timestamp DESC LIMIT 10").all(userId) as any[];
+          
+          // 2. Unread messages count and list
+          const msgRow = db.prepare("SELECT COUNT(*) as count FROM messages WHERE receiverId = ? AND isRead = 0").get(userId) as any;
+          const unreadMsgsList = db.prepare(`
+            SELECT m.*, u.username as senderName 
+            FROM messages m 
+            LEFT JOIN users u ON m.senderId = u.id 
+            WHERE m.receiverId = ? AND m.isRead = 0 
+            ORDER BY m.timestamp DESC 
+            LIMIT 20
+          `).all(userId) as any[];
+
+          return res.json({
+            success: true,
+            data: {
+              unreadNotificationsCount: notifRow?.count || 0,
+              unreadMessagesCount: msgRow?.count || 0,
+              unreadNotifications: unreadNotifsList.map(n => ({
+                ...n,
+                avatarUrl: fix_url(n.avatarUrl),
+                metadata: n.metadata ? JSON.parse(n.metadata) : null
+              })),
+              unreadMessages: unreadMsgsList.map(m => ({
+                ...m,
+                imageUrl: m.imageUrl ? fix_url(m.imageUrl) : null,
+                videoUrl: m.videoUrl ? fix_url(m.videoUrl) : null,
+                audioUrl: m.audioUrl ? fix_url(m.audioUrl) : null,
+                fileUrl: m.fileUrl ? fix_url(m.fileUrl) : null
+              }))
+            }
+          });
+        } catch (error: any) {
+          return res.json({ success: false, error: error.message });
+        }
+      }
+
+      if (action === 'register_fcm_token') {
+        const { userId, token, deviceModel = 'Unknown' } = req.body;
+        if (!userId || !token) {
+          return res.json({ success: false, error: "Missing userId or token" });
+        }
+        try {
+          db.prepare(`
+            INSERT INTO fcm_tokens (token, userId, deviceModel, createdAt)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(token) DO UPDATE SET userId = ?, deviceModel = ?, createdAt = ?
+          `).run(token, userId, deviceModel, Math.floor(Date.now() / 1000), userId, deviceModel, Math.floor(Date.now() / 1000));
+          return res.json({ success: true, message: "Token registered successfully" });
+        } catch (error: any) {
+          return res.json({ success: false, error: error.message });
+        }
+      }
+
+      if (action === 'get_receiver_fcm_tokens') {
+        const receiverId = req.query.receiverId || req.body.receiverId;
+        if (!receiverId) {
+          return res.json({ success: false, error: "Missing receiverId" });
+        }
+        try {
+          const tokens = db.prepare("SELECT token FROM fcm_tokens WHERE userId = ?").all(receiverId) as any[];
+          return res.json({ success: true, data: tokens.map((t: any) => t.token) });
+        } catch (error: any) {
+          return res.json({ success: false, error: error.message });
+        }
+      }
+
       if (action === 'mark_watched') {
         const { userId, videoId } = req.body;
         const now = Math.floor(Date.now() / 1000);
@@ -822,8 +904,24 @@ async function startServer() {
         const now = Math.floor(Date.now() / 1000);
         db.prepare("INSERT INTO messages (id, senderId, receiverId, text, mediaType, timestamp) VALUES (?, ?, ?, ?, ?, ?)")
           .run(id, userId, receiverId, text, mediaType, now);
+        
         const msg = db.prepare("SELECT * FROM messages WHERE id = ?").get(id) as any;
-        return res.json({ success: true, data: msg });
+        
+        // Fetch sender's name for immediate notification building
+        const sender = db.prepare("SELECT username FROM users WHERE id = ?").get(userId) as any;
+        
+        // Fetch receiver's FCM tokens
+        const tokens = db.prepare("SELECT token FROM fcm_tokens WHERE userId = ?").all(receiverId) as any[];
+        const fcmTokens = tokens.map((t: any) => t.token);
+
+        return res.json({ 
+          success: true, 
+          data: {
+            ...msg,
+            senderName: sender?.username || "Usuario",
+            receiverFcmTokens: fcmTokens
+          }
+        });
       }
 
       if (action === 'get_user_history') {

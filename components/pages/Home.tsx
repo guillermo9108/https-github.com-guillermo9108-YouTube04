@@ -198,6 +198,7 @@ export default function Home() {
 
     // 2. Cargador de Videos (Paginado)
     const isInitialMount = useRef(true);
+    const fetchingPageRef = useRef<number | null>(null);
 
     // Auto-refresh when home is dirty or event fired
     useEffect(() => {
@@ -216,9 +217,12 @@ export default function Home() {
 
     const fetchVideos = async (p: number, reset: boolean = false) => {
         if (loading || (loadingMore && !reset)) return;
+        if (!reset && fetchingPageRef.current === p) return;
         
         // Evitar múltiples peticiones simultáneas de reset
         if (reset && loading) return;
+
+        fetchingPageRef.current = p;
 
         if (reset) { 
             setLoading(true); 
@@ -311,7 +315,11 @@ export default function Home() {
                         groupedNew.push(item);
                     }
                 });
-                setVideos(prev => [...prev, ...groupedNew]); 
+                setVideos(prev => {
+                    const ids = new Set(prev.map(v => v.id));
+                    const uniqueNew = groupedNew.filter(v => !ids.has(v.id));
+                    return [...prev, ...uniqueNew];
+                }); 
             }
             setHasMore(res.hasMore); 
             setPage(p);
@@ -324,6 +332,7 @@ export default function Home() {
         finally { 
             setLoading(false); 
             setLoadingMore(false); 
+            fetchingPageRef.current = null;
         }
     };
 

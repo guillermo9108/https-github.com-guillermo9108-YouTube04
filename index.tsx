@@ -8,8 +8,8 @@ import { db } from './services/db';
 // Capture Global JS Errors and report to Server Log
 window.onerror = function(message, source, lineno, colno, error) {
     const msg = String(message);
-    // Ignorar errores de interrupción de video que son normales en navegación rápida
-    if (msg.includes('AbortError') || msg.includes('play()') || msg.includes('supported source')) {
+    // Ignorar errores de interrupción de video y errores de origen cruzado (Script error) sin valor de depuración
+    if (msg.includes('AbortError') || msg.includes('play()') || msg.includes('supported source') || msg.includes('Script error') || msg === 'Script error.') {
         return;
     }
     const report = `JS ERROR: ${message} at ${source}:${lineno}:${colno}`;
@@ -18,8 +18,8 @@ window.onerror = function(message, source, lineno, colno, error) {
 
 window.onunhandledrejection = function(event) {
     const reason = String(event.reason);
-    // Ignorar promesas rechazadas por interrupción de carga de medios
-    if (reason.includes('AbortError') || reason.includes('play()') || reason.includes('supported source')) {
+    // Ignorar promesas rechazadas por interrupción de carga de medios o Script error
+    if (reason.includes('AbortError') || reason.includes('play()') || reason.includes('supported source') || reason.includes('Script error') || reason === 'Script error.') {
         event.preventDefault();
         return;
     }

@@ -187,6 +187,7 @@ const ShortItem = ({ video, isActive, isNear, onOpenShare, onInteraction }: Shor
                 onTimeUpdate={handleTimeUpdate}
                 onPlaying={() => setIsPlaying(true)}
                 onWaiting={() => setIsPlaying(false)}
+                onError={(e) => console.log("Shorts: Video error captured locally", e)}
             />
         )}
         {isActive && shouldLoadVideo && !isPlaying && (
