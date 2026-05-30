@@ -108,9 +108,9 @@ require_once __DIR__ . '/functions_market.php';
 require_once __DIR__ . '/functions_admin.php';
 require_once __DIR__ . '/functions_portability.php';
 require_once __DIR__ . '/functions_analytics.php';
-// Verificar sincronización de esquema (periódico)
-$syncCache = sys_get_temp_dir() . '/sp_schema_synced_' . md5($configFile) . '.txt';
-if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 3600)) {
+// Verificar sincronización de esquema (periódico - optimizado a 24 horas y guardando en directorio local ejecutable para evitar fallos de lectura/escritura)
+$syncCache = __DIR__ . '/sp_schema_synced_' . md5($configFile) . '.txt';
+if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 86400)) {
     require_once __DIR__ . '/functions_schema.php';
     $schema = getAppSchema();
     foreach ($schema as $tableName => $def) {
