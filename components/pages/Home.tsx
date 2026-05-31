@@ -67,7 +67,7 @@ export default function Home() {
 
     // Filtros Persistentes - Leer desde configuración
     const mediaFilter: 'ALL' | 'VIDEO' | 'AUDIO' = (localStorage.getItem('sp_media_filter') as any) || 'ALL';
-    const showFoldersGrid: boolean = localStorage.getItem('sp_show_folders') === 'true' || localStorage.getItem('sp_show_folders') === null;
+    const showFoldersGrid: boolean = localStorage.getItem('sp_show_folders') === 'true';
 
     // Data State
     const [userSortOrder, setUserSortOrder] = useState<string>(localStorage.getItem('sp_user_sort') || '');
@@ -104,14 +104,14 @@ export default function Home() {
     useEffect(() => {
         const fetchStories = async () => {
             try {
-                const data = await db.getStories();
+                const data = await db.getStories(user?.id);
                 setStories(data);
             } catch (error) {
                 console.error("Error fetching stories", error);
             }
         };
         fetchStories();
-    }, []);
+    }, [user?.id]);
     
     // Filters State - Inicializar desde URL y Search Params
     const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -919,42 +919,6 @@ export default function Home() {
 
                 {/* Gutter */}
                 <div className="h-2 bg-[var(--bg-primary)]"></div>
-
-                {/* Sub-Header Toolbar */}
-                <div className="bg-[var(--bg-secondary)] border-b border-[var(--divider)] px-4 h-12 flex items-center justify-between">
-                    <div className="flex gap-4">
-                        <button 
-                            onClick={() => {
-                                if (selectionMode) {
-                                    setSelectionMode(false);
-                                    setSelectedIds(new Set());
-                                } else {
-                                    setSelectionMode(true);
-                                }
-                            }}
-                            className={`flex items-center gap-2 text-xs font-bold transition-colors ${selectionMode ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                        >
-                            {selectionMode ? <CheckSquare size={18} /> : <Square size={18} />}
-                            <span>{selectionMode ? 'Cancelar' : 'Seleccionar'}</span>
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        {queue.length > 0 && (
-                            <button 
-                                onClick={() => navigate('/download-queue')}
-                                className="flex items-center gap-2 text-[var(--accent)] text-xs font-bold animate-in bounce-in"
-                            >
-                                <Download size={18} />
-                                <span>Cola ({queue.length})</span>
-                            </button>
-                        )}
-                        <Link to="/folders" className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-bold">
-                            <Folder size={18} />
-                            <span>Carpetas</span>
-                        </Link>
-                    </div>
-                </div>
 
                 {/* Selection Action Bar */}
                 {selectionMode && selectedIds.size > 0 && (

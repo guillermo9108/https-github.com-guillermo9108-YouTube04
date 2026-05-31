@@ -69,7 +69,9 @@ export default function Upload() {
     
     setShowTags(false);
   };
-  const [bulkCategory, setBulkCategory] = useState<string>(VideoCategory.PERSONAL);
+  const queryParams = new URLSearchParams(window.location.search);
+  const preselectedCategory = queryParams.get('category') || '';
+  const [bulkCategory, setBulkCategory] = useState<string>(preselectedCategory || VideoCategory.PERSONAL);
   const [bulkPrice, setBulkPrice] = useState<string>('');
 
   const [availableCategories, setAvailableCategories] = useState<string[]>([VideoCategory.PERSONAL, ...Object.values(VideoCategory).filter(v => v !== VideoCategory.PERSONAL)]);
@@ -115,6 +117,7 @@ export default function Upload() {
       const newTitles = newFiles.map(f => f.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
       
       const newCategories = newFiles.map(f => {
+          if (bulkCategory) return bulkCategory;
           if (f.type.startsWith('image/')) return VideoCategory.IMAGES;
           return VideoCategory.PERSONAL;
       });

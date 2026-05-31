@@ -385,6 +385,39 @@ function getAppSchema() {
                 'idx_story_expiry' => 'expiresAt'
             ]
         ],
+        'story_views' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'storyId' => 'VARCHAR(50)',
+                'userId' => 'VARCHAR(50)',
+                'timestamp' => 'BIGINT'
+            ],
+            'indices' => [
+                'idx_st_view_story' => 'storyId',
+                'idx_st_view_user' => 'userId'
+            ]
+        ],
+        'story_reactions' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'storyId' => 'VARCHAR(50)',
+                'userId' => 'VARCHAR(50)',
+                'reaction' => 'VARCHAR(20)',
+                'timestamp' => 'BIGINT'
+            ],
+            'indices' => [
+                'idx_st_react_story' => 'storyId',
+                'idx_st_react_user' => 'userId'
+            ]
+        ],
+        'group_subscriptions' => [
+            'cols' => [
+                'userId' => 'VARCHAR(50)',
+                'folderPath' => 'VARCHAR(255)',
+                'createdAt' => 'BIGINT'
+            ],
+            'pk' => 'PRIMARY KEY (userId, folderPath)'
+        ],
         'active_transcodes' => [
             'cols' => [
                 'videoId' => 'VARCHAR(50) PRIMARY KEY',

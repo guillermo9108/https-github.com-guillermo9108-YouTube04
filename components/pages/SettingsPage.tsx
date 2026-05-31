@@ -20,7 +20,7 @@ export default function SettingsPage() {
     // Mostrar carpetas
     const [showFolders, setShowFolders] = useState<boolean>(() => {
         const saved = localStorage.getItem('sp_show_folders');
-        return saved === 'true' || saved === null; // Por defecto true
+        return saved === 'true'; // Por defecto false (oculto)
     });
 
     useEffect(() => {

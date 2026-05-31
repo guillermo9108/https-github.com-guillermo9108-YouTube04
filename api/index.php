@@ -304,6 +304,9 @@ try {
         case 'upload_story': upload_story($pdo, $_POST, $_FILES); break;
         case 'get_stories': get_stories($pdo); break;
         case 'delete_story': delete_story($pdo, $input); break;
+        case 'story_view': story_view($pdo, $input); break;
+        case 'story_react': story_react($pdo, $input); break;
+        case 'get_story_interactions_data': get_story_interactions_data($pdo); break;
         case 'get_trending_videos': video_get_trending($pdo); break;
         case 'get_user_history': interact_get_history($pdo, $_GET['userId'] ?? ''); break;
         case 'get_chats': interact_get_chats($pdo, $_GET['userId'] ?? ''); break;
@@ -315,6 +318,9 @@ try {
         case 'admin_add_balance': admin_add_balance($pdo, $input); break;
         case 'admin_get_marketplace_items': market_admin_get_items($pdo); break;
         case 'submit_balance_request': interact_submit_balance_request($pdo, $input); break;
+        case 'group_subscribe': group_subscribe($pdo, $input); break;
+        case 'group_unsubscribe': group_unsubscribe($pdo, $input); break;
+        case 'get_group_subscriptions': get_group_subscriptions($pdo); break;
         case 'get_balance_requests': admin_get_finance_requests($pdo); break;
         case 'handle_balance_request': admin_handle_balance_request($pdo, $input); break;
         case 'handle_vip_request': admin_handle_vip_request($pdo, $input); break;

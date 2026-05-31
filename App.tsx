@@ -30,6 +30,7 @@ import HelpPage from './components/pages/HelpPage';
 import ReportPage from './components/pages/ReportPage';
 import EditVideo from './components/pages/EditVideo';
 import TrendingPage from './components/pages/TrendingPage';
+import GroupsPage from './components/pages/GroupsPage';
 import ChatPage from './components/pages/ChatPage';
 import ChatDetailPage from './components/pages/ChatDetailPage';
 import CreatePost from './components/pages/CreatePost';
@@ -336,6 +337,7 @@ export default function App() {
                                 <Route path="/help" element={<SetupGuard><ProtectedRoute><HelpPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/report" element={<SetupGuard><ProtectedRoute><ReportPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/trending" element={<SetupGuard><ProtectedRoute><TrendingPage /></ProtectedRoute></SetupGuard>} />
+                                <Route path="/groups" element={<SetupGuard><ProtectedRoute><GroupsPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/chat" element={<SetupGuard><ProtectedRoute><ChatPage /></ProtectedRoute></SetupGuard>} />
                                 <Route path="/chat/:id" element={<SetupGuard><ProtectedRoute><ChatDetailPage /></ProtectedRoute></SetupGuard>} />
                                 

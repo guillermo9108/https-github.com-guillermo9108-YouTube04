@@ -750,3 +750,37 @@ function interact_send_message($pdo, $input) {
         'isDelivered' => 0
     ]);
 }
+
+function group_subscribe($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    $folderPath = $input['folderPath'] ?? '';
+    if (!$userId || !$folderPath) respond(false, null, "Faltan datos");
+
+    $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, createdAt) VALUES (?, ?, ?)");
+    try {
+        $stmt->execute([$userId, $folderPath, time()]);
+        respond(true, "Suscripción a grupo exitosa");
+    } catch (Exception $e) {
+        respond(false, null, "Ya estás suscrito o error general");
+    }
+}
+
+function group_unsubscribe($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    $folderPath = $input['folderPath'] ?? '';
+    if (!$userId || !$folderPath) respond(false, null, "Faltan datos");
+
+    $stmt = $pdo->prepare("DELETE FROM group_subscriptions WHERE userId = ? AND folderPath = ?");
+    $stmt->execute([$userId, $folderPath]);
+    respond(true, "Cancelación de suscripción exitosa");
+}
+
+function get_group_subscriptions($pdo) {
+    $userId = $_GET['userId'] ?? '';
+    if (!$userId) respond(false, null, "Falta userId");
+
+    $stmt = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ?");
+    $stmt->execute([$userId]);
+    $subs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    respond(true, $subs);
+}

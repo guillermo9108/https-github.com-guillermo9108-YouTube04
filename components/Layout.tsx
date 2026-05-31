@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon, Wallet, Plus, Users, MessageCircle, PlaySquare, TrendingUp } from 'lucide-react';
+import { Home, Upload, User, ShieldCheck, Smartphone, Bell, X, Menu, DownloadCloud, LogOut, ShoppingBag, Server, ChevronRight, Crown, Smartphone as MobileIcon, MonitorDown, AlertTriangle, CheckCircle2, Clock, ShoppingCart as SaleIcon, Zap, User as UserIcon, Search, Menu as MenuIcon, Wallet, Plus, Users, MessageCircle, PlaySquare, TrendingUp, Folders } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { useCart } from '../context/CartContext';
@@ -158,8 +158,8 @@ export default function Layout() {
                 )}
               </div>
             </Link>
-            <Link to="/trending" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/trending' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
-              <TrendingUp size={28} strokeWidth={location.pathname === '/trending' ? 2.5 : 2} />
+            <Link to="/groups" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all ${location.pathname === '/groups' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
+              <Folders size={28} strokeWidth={location.pathname === '/groups' ? 2.5 : 2} />
             </Link>
             <Link to="/shorts" className={`flex-1 flex flex-col items-center justify-center h-full border-b-2 transition-all relative ${location.pathname === '/shorts' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent text-[var(--text-secondary)]'}`}>
               <div className="relative">

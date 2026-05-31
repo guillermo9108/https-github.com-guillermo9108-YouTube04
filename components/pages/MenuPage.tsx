@@ -36,7 +36,7 @@ export default function MenuPage() {
     const gridItems: GridMenuItem[] = [
         { icon: BarChart3, label: 'Panel Admin', path: '/admin', iconColor: 'text-blue-500', badge: isAdmin ? '!' : null },
         { icon: MessageCircle, label: 'Mensajes', path: '/messages', iconColor: 'text-pink-500' },
-        { icon: Users, label: 'Grupos', path: '/folders', iconColor: 'text-blue-400' },
+        { icon: Users, label: 'Grupos', path: '/groups', iconColor: 'text-blue-400' },
         { icon: User, label: 'Amigos', path: '/friends', iconColor: 'text-blue-500' },
         { icon: PlaySquare, label: 'Shorts', path: '/shorts', iconColor: 'text-red-500' },
         { icon: Flag, label: 'Mi Canal', path: `/channel/${user?.id}`, iconColor: 'text-orange-500' },
@@ -44,7 +44,7 @@ export default function MenuPage() {
         { icon: Gift, label: 'Marketplace', path: '/marketplace', iconColor: 'text-blue-400' },
         { icon: Calendar, label: 'Categorías', path: '/categories', iconColor: 'text-red-400' },
         { icon: CheckCircle2, label: 'VIP Status', path: '/vip', iconColor: 'text-blue-500', badge: isVip ? '✓' : null },
-        { icon: List, label: 'Tendencias', path: '/?sort=trending', iconColor: 'text-orange-400' },
+        { icon: TrendingUp, label: 'Tendencias', path: '/trending', iconColor: 'text-orange-400' },
         { icon: Smartphone, label: 'Recargar', path: '/recharge', iconColor: 'text-pink-500' },
         { icon: History, label: 'Historial', path: '/history', iconColor: 'text-blue-400' },
     ];

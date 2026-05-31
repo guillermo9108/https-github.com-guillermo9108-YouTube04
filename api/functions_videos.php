@@ -321,6 +321,27 @@ function video_get_all($pdo) {
         if (!empty($clauses)) {
             $where[] = "(" . implode(" OR ", $clauses) . ")";
         }
+    } else {
+        // FASE 3: Lógica especial para la página principal (Feed)
+        // Si no se está explorando una carpeta, ni una categoría, ni haciendo una búsqueda, 
+        // y tenemos un userId de sesión, solo mostramos contenido de los grupos suscritos y de los amigos.
+        if (empty($category) && empty($search) && !$isShorts && !empty($userId) && !$isAdmin) {
+            $where[] = " (
+                v.creatorId = ? 
+                OR v.creatorId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?)
+                OR EXISTS (
+                    SELECT 1 FROM group_subscriptions gs 
+                    WHERE gs.userId = ? 
+                    AND (
+                        REPLACE(v.videoUrl, '\\\\', '/') LIKE CONCAT('%/', gs.folderPath, '/%')
+                        OR v.category = gs.folderPath
+                    )
+                )
+            ) ";
+            $params[] = $userId;
+            $params[] = $userId;
+            $params[] = $userId;
+        }
     }
 
     // Filtro de Media Type
@@ -885,6 +906,15 @@ function video_upload($pdo, $post, $files) {
     $ext = pathinfo($files['video']['name'], PATHINFO_EXTENSION); 
     $videoName = "{$id}.{$ext}";
     $videoDir = 'uploads/videos/';
+    $folderParam = trim($post['folder'] ?? '');
+    if (!empty($folderParam)) {
+        $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+        $sSet = $stmtSet->fetch();
+        $localPath = $sSet['localLibraryPath'] ?? '';
+        if (!empty($localPath)) {
+            $videoDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . trim($folderParam, '/') . '/';
+        }
+    }
     if (!is_dir($videoDir)) mkdir($videoDir, 0777, true);
     
     if (!move_uploaded_file($files['video']['tmp_name'], $videoDir . $videoName)) {
@@ -1431,7 +1461,18 @@ function upload_channel_images($pdo, $post, $files) {
             $isVid = in_array($ext, $videoExts);
             
             $filename = uniqid($isVid ? 'vid_' : 'img_') . '.' . $ext;
-            $target = 'uploads/videos/' . $filename; 
+            $targetDir = 'uploads/videos/';
+            $folderParam = trim($post['folder'] ?? '');
+            if (!empty($folderParam)) {
+                $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+                $sSet = $stmtSet->fetch();
+                $localPath = $sSet['localLibraryPath'] ?? '';
+                if (!empty($localPath)) {
+                    $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . trim($folderParam, '/') . '/';
+                }
+            }
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+            $target = $targetDir . $filename; 
             
             if (move_uploaded_file($files[$key]['tmp_name'], $target)) {
                 // Individual metadata or fallback to batch
@@ -1719,19 +1760,24 @@ function upload_story($pdo, $post, $files) {
 
 function get_stories($pdo) {
     $now = time();
-    $sql = "SELECT s.*, u.username, u.avatarUrl 
+    $userId = $_GET['userId'] ?? '';
+
+    // Priorizar amigos (subscriptions)
+    $sql = "SELECT s.*, u.username, u.avatarUrl,
+            (CASE WHEN s.userId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?) THEN 1 ELSE 0 END) as isFriend
             FROM stories s 
             JOIN users u ON s.userId = u.id 
             WHERE s.expiresAt > ? 
-            ORDER BY s.createdAt DESC";
+            ORDER BY isFriend DESC, s.createdAt DESC";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$now]);
+    $stmt->execute([$userId, $now]);
     $stories = $stmt->fetchAll();
     
     foreach ($stories as &$s) {
         $s['contentUrl'] = fix_url($s['contentUrl']);
         $s['avatarUrl'] = fix_url($s['avatarUrl']);
         $s['audioUrl'] = fix_url($s['audioUrl']);
+        $s['isFriend'] = (int)($s['isFriend'] ?? 0);
 
         if (!empty($s['videoId'])) {
             $stmtV = $pdo->prepare("SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl, u.role as creatorRole FROM videos v LEFT JOIN users u ON v.creatorId = u.id WHERE v.id = ?");
@@ -1758,8 +1804,137 @@ function get_stories($pdo) {
             }
         }
     }
+
+    // Después, publicar aleatoriamente videos como historias, simulando historias de otros usuarios
+    $mockVideos = [];
+    try {
+        $sqlV = "SELECT v.id as videoId, v.title, v.videoUrl, v.thumbnailUrl, v.createdAt, v.duration,
+                        u.id as userId, u.username, u.avatarUrl
+                 FROM videos v
+                 JOIN users u ON v.creatorId = u.id
+                 WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
+                   AND v.is_private = 0
+                   AND (v.is_audio = 0 OR v.is_audio IS NULL)
+                 LIMIT 40";
+        $stmtV = $pdo->query($sqlV);
+        if ($stmtV) {
+            $mockVideos = $stmtV->fetchAll();
+            shuffle($mockVideos);
+            $mockVideos = array_slice($mockVideos, 0, 10);
+        }
+    } catch (Exception $e) {
+        // En caso de fallar, ignorar mock
+    }
+
+    foreach ($mockVideos as $mv) {
+        // No duplicar si el usuario ya tiene historias reales o ya lo añadimos
+        $userExists = false;
+        foreach ($stories as $existingStory) {
+            if ($existingStory['userId'] === $mv['userId']) {
+                $userExists = true;
+                break;
+            }
+        }
+        if ($userExists) continue;
+
+        $stories[] = [
+            'id' => 'st_mock_' . $mv['videoId'],
+            'userId' => $mv['userId'],
+            'username' => $mv['username'],
+            'avatarUrl' => fix_url($mv['avatarUrl']),
+            'contentUrl' => fix_url($mv['videoUrl']),
+            'type' => 'VIDEO',
+            'overlayText' => NULL,
+            'overlayColor' => NULL,
+            'overlayBg' => NULL,
+            'audioUrl' => NULL,
+            'videoId' => $mv['videoId'],
+            'productId' => NULL,
+            'duration' => $mv['duration'] > 0 ? min($mv['duration'], 15) : 15,
+            'createdAt' => (int)$mv['createdAt'],
+            'expiresAt' => time() + 86400,
+            'isFriend' => 0,
+            'thumbnailUrl' => fix_url($mv['thumbnailUrl']),
+            'originalVideo' => [
+                'id' => $mv['videoId'],
+                'title' => $mv['title'],
+                'thumbnailUrl' => fix_url($mv['thumbnailUrl']),
+                'videoUrl' => fix_url($mv['videoUrl']),
+                'creatorName' => $mv['username'],
+                'creatorAvatarUrl' => fix_url($mv['avatarUrl'])
+            ]
+        ];
+    }
     
     respond(true, $stories);
+}
+
+function story_view($pdo, $input) {
+    $storyId = $input['storyId'] ?? '';
+    $userId = $input['userId'] ?? '';
+    if (!$storyId || !$userId) respond(false, null, "Faltan datos");
+
+    // Verificar si ya vio la historia
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM story_views WHERE storyId = ? AND userId = ?");
+    $stmt->execute([$storyId, $userId]);
+    if ($stmt->fetchColumn() == 0) {
+        $id = 'sv_' . uniqid();
+        $stmtIns = $pdo->prepare("INSERT INTO story_views (id, storyId, userId, timestamp) VALUES (?, ?, ?, ?)");
+        $stmtIns->execute([$id, $storyId, $userId, time()]);
+    }
+    respond(true, "Visto registrado");
+}
+
+function story_react($pdo, $input) {
+    $storyId = $input['storyId'] ?? '';
+    $userId = $input['userId'] ?? '';
+    $reaction = $input['reaction'] ?? ''; // LIKE, LOVE, CARE, HAHA, WOW, SAD, ANGRY
+    if (!$storyId || !$userId || !$reaction) respond(false, null, "Faltan datos");
+
+    // Borrar reacción previa si existe
+    $stmtDel = $pdo->prepare("DELETE FROM story_reactions WHERE storyId = ? AND userId = ?");
+    $stmtDel->execute([$storyId, $userId]);
+
+    // Insertar nueva reacción
+    $id = 'sr_' . uniqid();
+    $stmtIns = $pdo->prepare("INSERT INTO story_reactions (id, storyId, userId, reaction, timestamp) VALUES (?, ?, ?, ?, ?)");
+    $stmtIns->execute([$id, $storyId, $userId, $reaction, time()]);
+
+    respond(true, "Reacción guardada");
+}
+
+function get_story_interactions_data($pdo) {
+    $storyId = $_GET['storyId'] ?? '';
+    if (!$storyId) respond(false, null, "Falta storyId");
+
+    // Vistas con info de usuario
+    $stmtV = $pdo->prepare("SELECT v.*, u.username, u.avatarUrl 
+                            FROM story_views v 
+                            JOIN users u ON v.userId = u.id 
+                            WHERE v.storyId = ? 
+                            ORDER BY v.timestamp DESC");
+    $stmtV->execute([$storyId]);
+    $views = $stmtV->fetchAll();
+    foreach ($views as &$v) {
+        $v['avatarUrl'] = fix_url($v['avatarUrl']);
+    }
+
+    // Reacciones con info de usuario
+    $stmtR = $pdo->prepare("SELECT r.*, u.username, u.avatarUrl 
+                            FROM story_reactions r 
+                            JOIN users u ON r.userId = u.id 
+                            WHERE r.storyId = ? 
+                            ORDER BY r.timestamp DESC");
+    $stmtR->execute([$storyId]);
+    $reactions = $stmtR->fetchAll();
+    foreach ($reactions as &$r) {
+        $r['avatarUrl'] = fix_url($r['avatarUrl']);
+    }
+
+    respond(true, [
+        'views' => $views,
+        'reactions' => $reactions
+    ]);
 }
 
 function delete_story($pdo, $input) {

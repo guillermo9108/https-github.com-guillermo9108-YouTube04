@@ -689,8 +689,44 @@ class DBService {
         });
     }
 
-    public async getStories(): Promise<any[]> {
-        return (await this.request<any[]>('action=get_stories')) || [];
+    public async getStories(userId?: string): Promise<any[]> {
+        return (await this.request<any[]>(`action=get_stories${userId ? `&userId=${userId}` : ''}`)) || [];
+    }
+
+    public async registerStoryView(storyId: string, userId: string): Promise<any> {
+        return this.request<any>('action=story_view', {
+            method: 'POST',
+            body: JSON.stringify({ storyId, userId })
+        });
+    }
+
+    public async reactToStory(storyId: string, userId: string, reaction: string): Promise<any> {
+        return this.request<any>('action=story_react', {
+            method: 'POST',
+            body: JSON.stringify({ storyId, userId, reaction })
+        });
+    }
+
+    public async getStoryInteractions(storyId: string): Promise<{ views: any[], reactions: any[] }> {
+        return (await this.request<any>(`action=get_story_interactions_data&storyId=${storyId}`)) || { views: [], reactions: [] };
+    }
+
+    public async subscribeGroup(userId: string, folderPath: string): Promise<any> {
+        return this.request<any>('action=group_subscribe', {
+            method: 'POST',
+            body: JSON.stringify({ userId, folderPath })
+        });
+    }
+
+    public async unsubscribeGroup(userId: string, folderPath: string): Promise<any> {
+        return this.request<any>('action=group_unsubscribe', {
+            method: 'POST',
+            body: JSON.stringify({ userId, folderPath })
+        });
+    }
+
+    public async getGroupSubscriptions(userId: string): Promise<string[]> {
+        return (await this.request<string[]>(`action=get_group_subscriptions&userId=${userId}`)) || [];
     }
 
     public async deleteStory(id: string, userId: string): Promise<void> {

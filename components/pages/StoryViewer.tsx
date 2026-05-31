@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, ChevronLeft, ChevronRight, Play, Pause, Loader2, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Play, Pause, Loader2, Trash2, Heart, Smile, Send, Eye, MessageCircle } from 'lucide-react';
 import { Story } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from '../Router';
+import { getThumbnailUrl } from '../../utils/image';
 
 export default function StoryViewer() {
     const { user } = useAuth();
@@ -16,6 +17,11 @@ export default function StoryViewer() {
     const [paused, setPaused] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const progressInterval = useRef<number | null>(null);
+
+    // Reactions & Views states
+    const [interactions, setInteractions] = useState<{ views: any[], reactions: any[] }>({ views: [], reactions: [] });
+    const [showInteractionsList, setShowInteractionsList] = useState(false);
+    const [replyText, setReplyText] = useState('');
 
     // Group stories by user
     const groupedStories = useMemo(() => {
@@ -34,7 +40,8 @@ export default function StoryViewer() {
     useEffect(() => {
         const fetchStories = async () => {
             try {
-                const res = await db.getStories();
+                // Pass user?.id to prioritize friends' stories
+                const res = await db.getStories(user?.id);
                 setStories(res);
                 
                 // Check if we should start at a specific user (from URL)
@@ -60,7 +67,7 @@ export default function StoryViewer() {
             }
         };
         fetchStories();
-    }, []);
+    }, [user?.id]);
 
     const currentGroup = groupedStories[currentUserIndex] || [];
     const currentStory = currentGroup[currentStoryIndex];
@@ -120,6 +127,63 @@ export default function StoryViewer() {
         } catch (e) {
             console.error("Failed to delete story:", e);
             alert("Error al eliminar la historia");
+        }
+    };
+
+    // Register active story view in DB
+    useEffect(() => {
+        if (currentStory && user) {
+            db.registerStoryView(currentStory.id, user.id).catch(() => {});
+        }
+    }, [currentStory?.id, user?.id]);
+
+    // Handle reactions submitting
+    const handleReact = async (reactionType: string) => {
+        if (!user || !currentStory) return;
+        try {
+            await db.reactToStory(currentStory.id, user.id, reactionType);
+            // Re-fetch details to show immediate update if owner
+            if (showInteractionsList) {
+                const updated = await db.getStoryInteractions(currentStory.id);
+                setInteractions(updated);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    // Query interactions when viewer counts drawer is toggled
+    useEffect(() => {
+        if (currentStory && showInteractionsList) {
+            db.getStoryInteractions(currentStory.id)
+                .then(setInteractions)
+                .catch(() => {});
+        }
+    }, [currentStory?.id, showInteractionsList]);
+
+    // Send story text replies inside chat
+    const handleSendReply = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!replyText.trim() || !user || !currentStory) return;
+        
+        const receiverId = currentStory.userId;
+        if (receiverId === user.id) {
+            alert("No puedes responder a tu propia historia");
+            return;
+        }
+
+        try {
+            const textToSend = `[Respondió a tu historia 🎬] "${replyText}"`;
+            await db.sendMessage({
+                userId: user.id,
+                receiverId,
+                text: textToSend
+            });
+            setReplyText('');
+            alert("Respuesta enviada al chat");
+        } catch (err) {
+            console.error("Failed to send reply:", err);
+            alert("Error al enviar la respuesta.");
         }
     };
 
@@ -197,6 +261,9 @@ export default function StoryViewer() {
         );
     }
 
+    // Resolve poster or thumbnail accurately
+    const posterUrl = currentStory.originalVideo?.thumbnailUrl || (currentStory as any).thumbnailUrl || currentStory.contentUrl;
+
     return (
         <div className="fixed inset-0 bg-black z-[1000] flex flex-col select-none">
             {/* Progress Bars */}
@@ -214,11 +281,11 @@ export default function StoryViewer() {
             </div>
 
             {/* Header */}
-            <div className="absolute top-4 left-0 right-0 p-4 flex items-center justify-between z-50">
+            <div className="absolute top-4 left-0 right-0 p-4 flex items-center justify-between z-50 bg-gradient-to-b from-black/60 to-transparent">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-slate-800">
                         {currentStory.avatarUrl ? (
-                            <img src={currentStory.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <img src={getThumbnailUrl(currentStory.avatarUrl)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white font-bold">
                                 {currentStory.username?.[0]?.toUpperCase()}
@@ -254,7 +321,7 @@ export default function StoryViewer() {
                     currentStory.type === 'IMAGE' ? (
                         <img 
                             src={currentStory.contentUrl} 
-                            className="max-w-full max-h-full object-contain" 
+                            className="max-w-full max-h-full object-contain animate-in fade-in duration-300" 
                             referrerPolicy="no-referrer"
                             alt="Story content"
                         />
@@ -262,6 +329,7 @@ export default function StoryViewer() {
                         <video 
                             ref={videoRef}
                             src={currentStory.contentUrl} 
+                            poster={getThumbnailUrl(posterUrl)}
                             className="max-w-full max-h-full object-contain"
                             autoPlay
                             playsInline
@@ -277,9 +345,9 @@ export default function StoryViewer() {
 
                 {/* Shared Content Overlay (Facebook style) */}
                 {(currentStory.originalVideo || currentStory.originalMarketplaceItem) && (
-                    <div className="absolute inset-x-0 bottom-24 flex justify-center p-4 z-50 pointer-events-none">
+                    <div className="absolute inset-x-0 bottom-36 flex justify-center p-4 z-50 pointer-events-none">
                         <div 
-                            className="bg-black/60 backdrop-blur-md border border-white/20 rounded-2xl w-full max-w-[300px] overflow-hidden pointer-events-auto shadow-2xl active:scale-95 transition-transform"
+                            className="bg-black/80 backdrop-blur-md border border-white/20 rounded-2xl w-full max-w-[300px] overflow-hidden pointer-events-auto shadow-2xl active:scale-95 transition-transform"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (currentStory.originalVideo) navigate(`/watch/${currentStory.videoId}`);
@@ -289,7 +357,7 @@ export default function StoryViewer() {
                             <div className="flex p-2 gap-3 items-center">
                                 <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-800">
                                     <img 
-                                        src={currentStory.originalVideo ? currentStory.originalVideo.thumbnailUrl : (currentStory.originalMarketplaceItem?.images?.[0] || '')} 
+                                        src={getThumbnailUrl(currentStory.originalVideo ? currentStory.originalVideo.thumbnailUrl : (currentStory.originalMarketplaceItem?.images?.[0] || ''))} 
                                         className="w-full h-full object-cover"
                                         referrerPolicy="no-referrer"
                                     />
@@ -316,7 +384,7 @@ export default function StoryViewer() {
                 {currentStory.overlayText && (
                     <div className="absolute inset-0 flex items-center justify-center p-8 pointer-events-none">
                         <p 
-                            className="text-3xl md:text-5xl font-bold text-center break-words px-4 py-2 rounded-lg"
+                            className="text-3xl md:text-5xl font-bold text-center break-words px-4 py-2 rounded-lg shadow-xl"
                             style={{ 
                                 color: currentStory.overlayColor || '#ffffff',
                                 backgroundColor: currentStory.overlayBg || 'transparent'
@@ -370,6 +438,144 @@ export default function StoryViewer() {
                     <ChevronRight size={32} />
                 </button>
             </div>
+
+            {/* Bottom Panel Actions: Facebook style input & reaction bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent z-[60] flex flex-col gap-3">
+                {/* Facebook Reactions Floating Row */}
+                {user && (
+                    <div className="flex items-center gap-2 justify-center py-1.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10 px-3 self-center shadow-lg transform transition-transform hover:scale-105">
+                        {[
+                            { emoji: '👍', name: 'LIKE', label: 'Me gusta' },
+                            { emoji: '❤️', name: 'LOVE', label: 'Me encanta' },
+                            { emoji: '🥰', name: 'CARE', label: 'Me importa' },
+                            { emoji: '😆', name: 'HAHA', label: 'Me divierte' },
+                            { emoji: '😮', name: 'WOW', label: 'Me asombra' },
+                            { emoji: '😢', name: 'SAD', label: 'Me entristece' },
+                            { emoji: '😡', name: 'ANGRY', label: 'Me enoja' }
+                        ].map((react) => (
+                            <button 
+                                key={react.name}
+                                onClick={(e) => { e.stopPropagation(); handleReact(react.name); }}
+                                className="text-2xl hover:scale-130 active:scale-95 transition-all p-1"
+                                title={react.label}
+                            >
+                                {react.emoji}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 max-w-lg mx-auto w-full">
+                    {/* Send direct reply in chat */}
+                    {user && currentStory.userId !== user.id ? (
+                        <form onSubmit={handleSendReply} className="flex-1 flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
+                            <input 
+                                type="text"
+                                placeholder={`Responder a ${currentStory.username}...`}
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                onFocus={() => setPaused(true)}
+                                onBlur={() => setTimeout(() => setPaused(false), 500)}
+                                className="flex-1 h-10 bg-white/10 border border-white/20 rounded-full px-4 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#1877f2] focus:bg-white/20 transition-all font-sans"
+                            />
+                            <button 
+                                type="submit"
+                                className="w-10 h-10 flex items-center justify-center bg-[#1877f2] hover:bg-blue-600 rounded-full text-white active:scale-90 transition-transform"
+                                title="Enviar respuesta"
+                            >
+                                <Send size={16} />
+                            </button>
+                        </form>
+                    ) : (
+                        <div className="flex-1" />
+                    )}
+
+                    {/* Owner stats checking */}
+                    {user && user.id === currentStory.userId && (
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setPaused(true);
+                                setShowInteractionsList(true);
+                            }}
+                            className="bg-white/15 hover:bg-white/25 border border-white/20 text-white rounded-full px-4 py-2 text-xs font-bold flex items-center gap-1.5 transition-all ml-auto"
+                        >
+                            <Eye size={16} />
+                            <span>Ver vistas</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Interactions Overlaid Drawer */}
+            {showInteractionsList && (
+                <div className="fixed inset-0 z-[1100] bg-black/95 flex flex-col p-safe animate-in fade-in slide-in-from-bottom duration-250">
+                    <div className="flex items-center justify-between p-4 border-b border-white/10 bg-slate-950">
+                        <h3 className="text-white font-bold text-base flex items-center gap-2">
+                            <Eye size={18} className="text-[#1877f2]" />
+                            Estadísticas de la Historia
+                        </h3>
+                        <button 
+                            onClick={() => {
+                                setShowInteractionsList(false);
+                                setPaused(false);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center bg-white/10 text-white rounded-full hover:bg-white/20 active:scale-90 transition-transform"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                        {/* Reactions Breakdown */}
+                        <div>
+                            <span className="text-xs font-bold tracking-wider uppercase text-white/50">Reacciones</span>
+                            {interactions.reactions.length === 0 ? (
+                                <p className="text-sm text-white/40 mt-1">Nadie ha reaccionado todavía</p>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-2.5 mt-2">
+                                    {interactions.reactions.map((react: any, i: number) => {
+                                        const reactionEmojis: Record<string, string> = {
+                                            LIKE: '👍', LOVE: '❤️', CARE: '🥰', HAHA: '😆', WOW: '😮', SAD: '😢', ANGRY: '😡'
+                                        };
+                                        return (
+                                            <div key={i} className="flex items-center gap-3 bg-white/5 p-2 rounded-xl">
+                                                <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800">
+                                                    {react.avatarUrl ? <img src={getThumbnailUrl(react.avatarUrl)} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 uppercase flex items-center justify-center font-bold text-white">{react.username?.[0]}</div>}
+                                                </div>
+                                                <span className="text-white font-medium text-sm flex-1">{react.username}</span>
+                                                <span className="text-2xl">{reactionEmojis[react.reaction] || '👍'}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Views Breakdown */}
+                        <div>
+                            <span className="text-xs font-bold tracking-wider uppercase text-white/50">Vistas ({interactions.views.length})</span>
+                            {interactions.views.length === 0 ? (
+                                <p className="text-sm text-white/40 mt-1">Ningún usuario ha visualizado esta historia</p>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-2.5 mt-2">
+                                    {interactions.views.map((viewer: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-3 bg-white/5 p-2 rounded-xl">
+                                            <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800">
+                                                {viewer.avatarUrl ? <img src={getThumbnailUrl(viewer.avatarUrl)} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-700 uppercase flex items-center justify-center font-bold text-white">{viewer.username?.[0]}</div>}
+                                            </div>
+                                            <div className="flex flex-col flex-1">
+                                                <span className="text-white font-medium text-sm">{viewer.username}</span>
+                                                <span className="text-white/40 text-[10px]">{viewer.timestamp ? new Date(viewer.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
