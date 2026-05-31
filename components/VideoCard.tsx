@@ -130,6 +130,18 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     return null;
   }, [video.videoUrl]);
 
+  const groupLabel = useMemo(() => {
+    const isSpecialCategory = video.category && !['TODOS', 'SHORT_VIDEOS', 'AUDIOS', 'IMAGES', 'VIP', 'MOVIES', 'SERIES'].includes(video.category.toUpperCase());
+    if (isSpecialCategory) {
+        return video.category;
+    }
+    const path = (video as any).rawPath || video.videoUrl || '';
+    if (path.includes('/uploads/videos/')) {
+        return locationLabel;
+    }
+    return null;
+  }, [video.category, video.videoUrl, locationLabel]);
+
   const watchUrl = useMemo(() => {
     let targetId = video.id;
     let path = '/watch/';
@@ -474,11 +486,23 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
               </div>
           </Link>
           <div className="flex flex-col">
-            <div className="flex items-center gap-1">
-              <Link to={`/channel/${video.creatorId}`} className="text-[15px] font-bold text-white hover:underline truncate max-w-[200px] leading-tight">
-                {video.creatorName || 'Usuario'}
-              </Link>
-              <CheckCircle2 size={14} className="text-[#1877f2] fill-[#1877f2]/10" />
+            <div className="flex items-center gap-1 flex-wrap">
+              {groupLabel ? (
+                <>
+                  <Link to="/groups" className="text-[14px] font-extrabold text-[#1877f2] hover:underline leading-tight">
+                    {groupLabel}
+                  </Link>
+                  <span className="text-[12px] text-[var(--text-secondary)] font-bold">›</span>
+                  <Link to={`/channel/${video.creatorId}`} className="text-[13px] font-bold text-white hover:underline truncate max-w-[120px] leading-tight">
+                    {video.creatorName || 'Usuario'}
+                  </Link>
+                </>
+              ) : (
+                <Link to={`/channel/${video.creatorId}`} className="text-[15px] font-bold text-white hover:underline truncate max-w-[200px] leading-tight">
+                  {video.creatorName || 'Usuario'}
+                </Link>
+              )}
+              <CheckCircle2 size={13} className="text-[#1877f2] fill-[#1877f2]/10" />
             </div>
             <div className="flex items-center gap-1 text-[12px] text-[var(--text-secondary)] leading-tight">
               <span>{formatTimeAgo(video.createdAt)}</span>

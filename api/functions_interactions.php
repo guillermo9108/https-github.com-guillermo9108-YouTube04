@@ -784,3 +784,42 @@ function get_group_subscriptions($pdo) {
     $subs = $stmt->fetchAll(PDO::FETCH_COLUMN);
     respond(true, $subs);
 }
+
+function group_create($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    $groupName = trim($input['name'] ?? '');
+    if (!$userId || !$groupName) respond(false, null, "Faltan datos");
+
+    // Clean up name
+    $groupName = preg_replace('/[^A-Za-z0-9 _-]/', '', $groupName);
+    if (empty($groupName)) respond(false, null, "Nombre de grupo inválido");
+
+    // Create the physical subdirectory in the local Library path
+    $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+    $sSet = $stmtSet->fetch();
+    $localPath = $sSet['localLibraryPath'] ?? '';
+    if (empty($localPath)) {
+        $localPath = 'uploads/videos/';
+    }
+
+    $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $groupName;
+    if (is_dir($targetDir)) {
+        respond(false, null, "El grupo (carpeta) ya existe");
+    }
+
+    if (!is_dir($targetDir)) {
+        if (!mkdir($targetDir, 0777, true)) {
+            respond(false, null, "No se pudo crear el directorio del grupo");
+        }
+    }
+
+    // Automatically auto-subscribe creator to this new group!
+    $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, createdAt) VALUES (?, ?, ?)");
+    try {
+        $stmt->execute([$userId, $groupName, time()]);
+    } catch (Exception $e) {
+        // En caso de fallar suscripción automática, no importa
+    }
+
+    respond(true, ['name' => $groupName], "Grupo creado exitosamente");
+}

@@ -729,6 +729,13 @@ class DBService {
         return (await this.request<string[]>(`action=get_group_subscriptions&userId=${userId}`)) || [];
     }
 
+    public async createGroup(userId: string, name: string): Promise<any> {
+        return this.request<any>('action=group_create', {
+            method: 'POST',
+            body: JSON.stringify({ userId, name })
+        });
+    }
+
     public async deleteStory(id: string, userId: string): Promise<void> {
         return this.request<void>('action=delete_story', {
             method: 'POST',

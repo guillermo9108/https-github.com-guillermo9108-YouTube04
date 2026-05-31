@@ -1806,6 +1806,7 @@ function get_stories($pdo) {
     }
 
     // Después, publicar aleatoriamente videos como historias, simulando historias de otros usuarios
+    // Se prioriza mostrar videos de los grupos (carpetas) que sigue el usuario
     $mockVideos = [];
     try {
         $sqlV = "SELECT v.id as videoId, v.title, v.videoUrl, v.thumbnailUrl, v.createdAt, v.duration,
@@ -1814,13 +1815,62 @@ function get_stories($pdo) {
                  JOIN users u ON v.creatorId = u.id
                  WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
                    AND v.is_private = 0
-                   AND (v.is_audio = 0 OR v.is_audio IS NULL)
-                 LIMIT 40";
-        $stmtV = $pdo->query($sqlV);
+                   AND (v.is_audio = 0 OR v.is_audio IS NULL) ";
+        
+        $paramsV = [];
+        if (!empty($userId)) {
+            // Check if subscribed to any groups
+            $stmtGs = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ?");
+            $stmtGs->execute([$userId]);
+            $subs = $stmtGs->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($subs)) {
+                // We have subscribed groups. Build a clause for category OR videoUrl
+                $subClauses = [];
+                foreach ($subs as $sub) {
+                    $subClauses[] = "(v.category = ? OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ?)";
+                    $paramsV[] = $sub;
+                    $paramsV[] = "%/" . $sub . "/%";
+                }
+                $sqlV .= " AND (" . implode(" OR ", $subClauses) . ") ";
+            }
+        }
+        $sqlV .= " LIMIT 40";
+        $stmtV = $pdo->prepare($sqlV);
+        $stmtV->execute($paramsV);
+        
         if ($stmtV) {
             $mockVideos = $stmtV->fetchAll();
             shuffle($mockVideos);
             $mockVideos = array_slice($mockVideos, 0, 10);
+        }
+        
+        // Si no se encontraron suficientes videos de grupos, rellenar con videos públicos generales
+        if (count($mockVideos) < 5) {
+            $sqlFallback = "SELECT v.id as videoId, v.title, v.videoUrl, v.thumbnailUrl, v.createdAt, v.duration,
+                            u.id as userId, u.username, u.avatarUrl
+                     FROM videos v
+                     JOIN users u ON v.creatorId = u.id
+                     WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
+                       AND v.is_private = 0
+                       AND (v.is_audio = 0 OR v.is_audio IS NULL)";
+            $fbParams = [];
+            if (!empty($mockVideos)) {
+                $excludeIds = [];
+                foreach ($mockVideos as $mv) {
+                    $excludeIds[] = $mv['videoId'];
+                }
+                $sqlFallback .= " AND v.id NOT IN (" . implode(',', array_fill(0, count($excludeIds), '?')) . ")";
+                $fbParams = $excludeIds;
+            }
+            $sqlFallback .= " LIMIT 30";
+            $stmtFb = $pdo->prepare($sqlFallback);
+            $stmtFb->execute($fbParams);
+            $fbVideos = $stmtFb->fetchAll();
+            shuffle($fbVideos);
+            $needed = 10 - count($mockVideos);
+            if ($needed > 0) {
+                $mockVideos = array_merge($mockVideos, array_slice($fbVideos, 0, $needed));
+            }
         }
     } catch (Exception $e) {
         // En caso de fallar, ignorar mock

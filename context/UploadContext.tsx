@@ -19,7 +19,7 @@ interface UploadContextType {
   currentFileIndex: number;
   totalFiles: number;
   uploadSpeed: string; // "1.2 MB/s"
-  addToQueue: (items: UploadItem[], user: User) => Promise<void>;
+  addToQueue: (items: UploadItem[], user: User, folder?: string) => Promise<void>;
   cancelUploads: () => void;
 }
 
@@ -43,7 +43,7 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
   const lastLoaded = useRef(0);
   const lastTime = useRef(0);
 
-  const addToQueue = useCallback(async (items: UploadItem[], user: User) => {
+  const addToQueue = useCallback(async (items: UploadItem[], user: User, folder?: string) => {
     if (isUploading) {
         alert("Wait for current upload to finish");
         return;
@@ -62,6 +62,9 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
         fd.append('userId', user.id);
         fd.append('count', String(items.length));
         fd.append('type', items.length > 1 ? 'ALBUM' : 'INDEPENDENT');
+        if (folder) {
+            fd.append('folder', folder);
+        }
         
         // Use the first item's title/desc as batch defaults
         fd.append('title', items[0].title);

@@ -321,6 +321,7 @@ try {
         case 'group_subscribe': group_subscribe($pdo, $input); break;
         case 'group_unsubscribe': group_unsubscribe($pdo, $input); break;
         case 'get_group_subscriptions': get_group_subscriptions($pdo); break;
+        case 'group_create': group_create($pdo, $input); break;
         case 'get_balance_requests': admin_get_finance_requests($pdo); break;
         case 'handle_balance_request': admin_handle_balance_request($pdo, $input); break;
         case 'handle_vip_request': admin_handle_vip_request($pdo, $input); break;
