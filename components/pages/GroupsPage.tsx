@@ -63,7 +63,7 @@ export default function GroupsPage() {
     const loadGroups = async () => {
         try {
             setLoading(true);
-            const result = await db.getFolders('');
+            const result = await db.getFolders('', true);
             setGroups(result);
 
             if (user?.id) {
@@ -418,7 +418,9 @@ export default function GroupsPage() {
                         <ArrowLeft size={18} />
                         <span>Grupos</span>
                     </button>
-                    <span className="font-bold text-sm truncate max-w-[200px] text-white">Grupo · {activeGroup.name}</span>
+                    <span className="font-bold text-sm truncate max-w-[200px] text-white">
+                        Grupo · {activeGroup.name.includes('/') ? activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1) : activeGroup.name}
+                    </span>
                     <button 
                         onClick={(e) => handleToggleSubscribe(null, activeGroup.name)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
@@ -442,7 +444,18 @@ export default function GroupsPage() {
                         <div className="absolute inset-0 bg-black/40"></div>
                         <div className="relative text-center p-4">
                             <span className="bg-[#1877f2] text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider mb-2 inline-block shadow-md">FB Grupo Público</span>
-                            <h1 className="text-2xl font-extrabold text-white tracking-tight">{activeGroup.name}</h1>
+                            <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                                {activeGroup.name.includes('/') ? (
+                                    <>
+                                        <span className="text-slate-400 font-bold block text-xs tracking-wider uppercase mb-1">
+                                            {activeGroup.name.substring(0, activeGroup.name.lastIndexOf('/')).replace(/\//g, ' › ')}
+                                        </span>
+                                        {activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1)}
+                                    </>
+                                ) : (
+                                    activeGroup.name
+                                )}
+                            </h1>
                             <p className="text-xs text-white/90 font-semibold mt-1 flex items-center justify-center gap-2">
                                 <span>{getGroupMembersCount(activeGroup.name)} Miembros</span>
                                 <span className="opacity-50">•</span>
@@ -1263,8 +1276,17 @@ function GroupCard({ group, joined, membersCount, newPosts, onClick, onToggle }:
             
             <div className="p-3.5 flex flex-col flex-1 justify-between gap-3 bg-[#242526]">
                 <div>
-                    <h3 className="font-extrabold text-sm text-[#e4e6eb] truncate leading-tight flex items-center gap-1 hover:underline">
-                        <span>{group.name}</span>
+                    <h3 className="font-extrabold text-[#e4e6eb] truncate leading-tight flex flex-col gap-0.5 select-none">
+                        {group.name.includes('/') ? (
+                            <>
+                                <span className="text-[9px] text-[#1877f2] font-bold tracking-wider uppercase leading-none">
+                                    {group.name.substring(0, group.name.lastIndexOf('/')).replace(/\//g, ' › ')}
+                                </span>
+                                <span className="text-sm font-extrabold text-[#e4e6eb]">{group.name.substring(group.name.lastIndexOf('/') + 1)}</span>
+                            </>
+                        ) : (
+                            <span className="text-sm font-extrabold hover:underline">{group.name}</span>
+                        )}
                     </h3>
                     <p className="text-[10px] text-[#b0b3b8] font-semibold mt-1 flex items-center gap-1.5">
                         <Users size={12} className="text-slate-400" />

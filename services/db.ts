@@ -256,8 +256,8 @@ class DBService {
         return (await this.request<Category[]>('action=get_categories')) || [];
     }
 
-    public async getFolders(path: string = ''): Promise<any[]> {
-        return (await this.request<any[]>(`action=get_folders&path=${encodeURIComponent(path)}`)) || [];
+    public async getFolders(path: string = '', recursive: boolean = false): Promise<any[]> {
+        return (await this.request<any[]>(`action=get_folders&path=${encodeURIComponent(path)}${recursive ? '&recursive=1' : ''}`)) || [];
     }
 
     public async saveSearch(term: string): Promise<void> {
