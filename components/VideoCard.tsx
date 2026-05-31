@@ -142,7 +142,32 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     return null;
   }, [video.category, video.videoUrl, locationLabel]);
 
+  const isHomePage = useMemo(() => {
+    const hash = window.location.hash || '';
+    return !hash || hash === '#/' || hash.startsWith('#/?') || hash.startsWith('#/index');
+  }, [window.location.hash]);
+
+  const videoGroupPath = useMemo(() => {
+    const path = (video as any).rawPath || video.videoUrl || '';
+    const normalized = path.replace(/\\/g, '/');
+    const prefix = 'uploads/videos/';
+    const index = normalized.indexOf(prefix);
+    if (index !== -1) {
+        const afterPrefix = normalized.substring(index + prefix.length);
+        const parts = afterPrefix.split('/');
+        if (parts.length > 1) {
+            parts.pop(); // Remove filename
+            return parts.join('/');
+        }
+    }
+    return null;
+  }, [video.videoUrl]);
+
   const watchUrl = useMemo(() => {
+    if (isHomePage && videoGroupPath) {
+        return `/groups?folder=${encodeURIComponent(videoGroupPath)}&play=${video.id}`;
+    }
+
     let targetId = video.id;
     let path = '/watch/';
 
@@ -165,7 +190,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     
     const qs = params.toString();
     return qs ? `${base}?${qs}` : base;
-  }, [video.id, context]);
+  }, [video.id, context, isHomePage, videoGroupPath]);
 
   // Observer para carga perezosa de imágenes y procesamiento
   useEffect(() => {
@@ -489,7 +514,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             <div className="flex items-center gap-1 flex-wrap">
               {groupLabel ? (
                 <>
-                  <Link to="/groups" className="text-[14px] font-extrabold text-[#1877f2] hover:underline leading-tight">
+                  <Link to={`/groups?folder=${encodeURIComponent(videoGroupPath || groupLabel)}`} className="text-[14px] font-extrabold text-[#1877f2] hover:underline leading-tight">
                     {groupLabel}
                   </Link>
                   <span className="text-[12px] text-[var(--text-secondary)] font-bold">›</span>

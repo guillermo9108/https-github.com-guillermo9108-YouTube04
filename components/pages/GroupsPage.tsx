@@ -3,9 +3,9 @@ import {
     ChevronLeft, Folder, Users, Star, Plus, Share2, Compass, 
     CheckCircle, LogOut, ArrowLeft, Image as ImageIcon, Zap, Loader2, 
     Calendar, FileText, MessageSquare, ThumbsUp, Heart, Smile, Sparkles, 
-    MoreHorizontal, Send, RefreshCw, Upload, Video, Globe, Lock, Check, Gift, Play, X
+    MoreHorizontal, Send, RefreshCw, Upload, Video, Globe, Lock, Check, Gift, Play, X, Music
 } from 'lucide-react';
-import { useNavigate } from '../Router';
+import { useNavigate, useLocation } from '../Router';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { useToast } from '../../context/ToastContext';
@@ -14,6 +14,7 @@ import { useDownload } from '../../context/DownloadContext';
 
 export default function GroupsPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const toast = useToast();
     const { addToQueue, isUploading, progress } = useUpload();
@@ -26,6 +27,7 @@ export default function GroupsPage() {
     const [activeGroup, setActiveGroup] = useState<any | null>(null);
     const [groupContent, setGroupContent] = useState<any[]>([]);
     const [loadingContent, setLoadingContent] = useState(false);
+    const [playingVideo, setPlayingVideo] = useState<any | null>(null);
     
     // Group active tab: 'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES'
     const [groupSubTab, setGroupSubTab] = useState<'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES'>('FEED');
@@ -60,11 +62,39 @@ export default function GroupsPage() {
         loadGroups();
     }, [user?.id]);
 
+    // Handle query parameter folder & play video redirections
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const folderParam = queryParams.get('folder');
+        const playParam = queryParams.get('play');
+
+        if (groups.length > 0 && folderParam) {
+            const foundGroup = groups.find((g: any) => g.name === folderParam || g.relativePath === folderParam || g.name.toLowerCase() === folderParam.toLowerCase());
+            if (foundGroup) {
+                if (!activeGroup || activeGroup.name !== foundGroup.name) {
+                    setActiveGroup(foundGroup);
+                    setGroupSubTab('FEED');
+                    loadGroupContent(foundGroup.name);
+                }
+                
+                if (playParam && (!playingVideo || playingVideo.id !== playParam)) {
+                    db.getVideo(playParam).then(v => {
+                        if (v) setPlayingVideo(v);
+                    }).catch(err => {
+                        console.error("Failed to load overlay player video:", err);
+                    });
+                }
+            }
+        }
+    }, [location.search, groups]);
+
     const loadGroups = async () => {
         try {
             setLoading(true);
             const result = await db.getFolders('', true);
-            setGroups(result);
+            // Strictly show folders with content, hiding empty parent folders
+            const activeGroups = (result || []).filter((g: any) => g.count > 0);
+            setGroups(activeGroups);
 
             if (user?.id) {
                 const subs = await db.getGroupSubscriptions(user.id);
@@ -1218,6 +1248,106 @@ export default function GroupsPage() {
                                 <span>Crear Grupo</span>
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Direct Video Player Overlay Modal for FASE 4 redirections */}
+            {playingVideo && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-[#18191a] max-w-4xl w-full rounded-2xl border border-[#3e4042] overflow-hidden shadow-2xl flex flex-col md:flex-row relative">
+                        {/* Close button */}
+                        <button 
+                            onClick={() => {
+                                setPlayingVideo(null);
+                                // Clean up URL query parameters cleanly
+                                const q = new URLSearchParams(location.search);
+                                q.delete('play');
+                                const route = q.toString() ? `/groups?${q.toString()}` : '/groups';
+                                navigate(route, { replace: true });
+                            }}
+                            className="absolute top-4 right-4 z-50 bg-black/60 text-white hover:bg-black/80 rounded-full p-2 transition-all cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+                        
+                        {/* Left Side: Video/Audio Player */}
+                        <div className="flex-1 bg-black aspect-video md:aspect-auto md:h-[500px] flex items-center justify-center relative">
+                            {playingVideo.is_audio ? (
+                                <div className="flex flex-col items-center justify-center p-8 text-center w-full h-full bg-gradient-to-b from-[#242526] to-black">
+                                    <div className="w-24 h-24 rounded-2xl bg-[#1877f2]/10 border border-[#1877f2]/20 flex items-center justify-center mb-4 text-[#1877f2] shadow-inner">
+                                        <Music size={44} className="animate-pulse" />
+                                    </div>
+                                    <p className="text-sm font-bold text-white max-w-[200px] truncate">{playingVideo.title}</p>
+                                    <p className="text-[10px] text-slate-400 mt-1 font-semibold">{playingVideo.creatorName}</p>
+                                    <audio 
+                                        controls 
+                                        autoPlay 
+                                        src={db.getStreamerUrl(playingVideo.id, user?.sessionToken)} 
+                                        className="w-full max-w-[260px] mt-6 accent-[#1877f2]" 
+                                    />
+                                </div>
+                            ) : (
+                                <video 
+                                    controls 
+                                    autoPlay 
+                                    src={db.getStreamerUrl(playingVideo.id, user?.sessionToken)} 
+                                    className="w-full h-full object-contain"
+                                />
+                            )}
+                        </div>
+
+                        {/* Right Side: Details, Like Action and Facebook Format info */}
+                        <div className="w-full md:w-[320px] bg-[#18191a] border-l border-[#3e4042]/50 flex flex-col p-4 justify-between min-h-[250px] md:min-h-0 md:h-[500px]">
+                            <div className="flex flex-col gap-3 overflow-y-auto pr-1">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 border border-[#3e4042]">
+                                        <img src={playingVideo.creatorAvatarUrl || 'uploads/avatars/default.png'} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'uploads/avatars/default.png'; }} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white leading-tight">{playingVideo.creatorName}</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold">{playingVideo.category || 'GRUPO'}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-base font-extrabold text-white leading-snug">{playingVideo.title}</h4>
+                                    <p className="text-xs text-slate-300 mt-2 whitespace-pre-wrap leading-relaxed max-h-[160px] overflow-y-auto pr-1">{playingVideo.description || 'Sin descripción.'}</p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-[#3e4042] pt-4 mt-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-center text-xs text-slate-400">
+                                    <span className="font-semibold flex items-center gap-1"><ThumbsUp size={12} className="text-[#1877f2]" /> {playingVideo.likes || 0} Likes</span>
+                                    <span className="font-semibold">{playingVideo.comments || 0} Comentarios</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                await db.rateVideo(user?.id || '', playingVideo.id, 'like');
+                                                setPlayingVideo((prev: any) => prev ? { ...prev, likes: (prev.likes || 0) + 1 } : null);
+                                                toast.success("¡Reaccionado con me gusta!");
+                                            } catch (err) {
+                                                toast.error("Error al dar like");
+                                            }
+                                        }}
+                                        className="flex-1 py-2 rounded-lg bg-[#242526] hover:bg-[#323436] text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                        <ThumbsUp size={14} className="text-[#1877f2]" fill="#1877f2" />
+                                        <span>Me gusta</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            setPlayingVideo(null);
+                                            navigate(`/watch/${playingVideo.id}`);
+                                        }}
+                                        className="flex-1 py-2 rounded-lg bg-[#1877f2] hover:bg-blue-600 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                    >
+                                        <span>Detalles</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

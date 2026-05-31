@@ -166,14 +166,25 @@ export default function StoryViewer() {
         e.preventDefault();
         if (!replyText.trim() || !user || !currentStory) return;
         
-        const receiverId = currentStory.userId;
+        let receiverId = currentStory.userId;
+        let textToSend = `[Respondió a tu historia 🎬] "${replyText}"`;
+
+        if (receiverId.startsWith('group_')) {
+            const origCreatorId = currentStory.originalVideo?.creatorId;
+            if (!origCreatorId) {
+                alert("No se puede responder a esta historia de grupo pues no tiene un creador asociado.");
+                return;
+            }
+            receiverId = origCreatorId;
+            textToSend = `[Respondió a tu publicación en ${currentStory.username} 🎬] "${replyText}"`;
+        }
+
         if (receiverId === user.id) {
             alert("No puedes responder a tu propia historia");
             return;
         }
 
         try {
-            const textToSend = `[Respondió a tu historia 🎬] "${replyText}"`;
             await db.sendMessage({
                 userId: user.id,
                 receiverId,

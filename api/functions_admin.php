@@ -360,6 +360,28 @@ function admin_repair_db($pdo, $input) {
     respond(true, "Base de datos sincronizada. Se repararon $fixed registros de audio.");
 }
 
+function admin_repair_groups($pdo, $input) {
+    require_once 'functions_schema.php';
+    require_once 'functions_videos.php';
+    
+    $schema = getAppSchema();
+    if (isset($schema['group_subscriptions'])) {
+        syncTable($pdo, 'group_subscriptions', $schema['group_subscriptions']);
+    }
+    
+    $stmtDel = $pdo->query("DELETE FROM group_subscriptions WHERE userId NOT IN (SELECT id FROM users)");
+    $orphansRemoved = $stmtDel->rowCount();
+    
+    $subfolders = video_discover_subfolders($pdo);
+    $activeFoldersCount = count($subfolders);
+    
+    respond(true, [
+        'orphansRemoved' => $orphansRemoved,
+        'activeFoldersCount' => $activeFoldersCount,
+        'message' => "Reparación de grupos finalizada: se sincronizó la tabla 'group_subscriptions', se eliminaron $orphansRemoved suscripciones de usuarios huérfanos, y se identificaron $activeFoldersCount subcarpetas con contenido activas como grupos independientes."
+    ]);
+}
+
 function admin_cleanup_files($pdo) {
     $videos = $pdo->query("SELECT videoUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);
     $thumbs = $pdo->query("SELECT thumbnailUrl FROM videos")->fetchAll(PDO::FETCH_COLUMN);

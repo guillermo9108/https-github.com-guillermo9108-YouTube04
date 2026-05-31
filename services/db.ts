@@ -624,6 +624,7 @@ class DBService {
     public async fixLibraryMetadata(): Promise<any> { return this.request<any>(`action=fix_library_metadata`, { method: 'POST' }); }
     public async adminCleanupSystemFiles(): Promise<any> { return this.request<any>(`action=admin_cleanup_files`, { method: 'POST' }); }
     public async adminRepairDb(): Promise<any> { return this.request<any>(`action=admin_repair_db`, { method: 'POST' }); }
+    public async adminRepairGroups(): Promise<any> { return this.request<any>(`action=admin_repair_groups`, { method: 'POST' }); }
     public async adminBanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_ban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async adminUnbanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_unban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async adminChangeUserRole(userId: string, role: string): Promise<void> { return this.request<void>(`action=admin_change_user_role`, { method: 'POST', body: JSON.stringify({ userId, role }) }); }
@@ -689,8 +690,16 @@ class DBService {
         });
     }
 
-    public async getStories(userId?: string): Promise<any[]> {
-        return (await this.request<any[]>(`action=get_stories${userId ? `&userId=${userId}` : ''}`)) || [];
+    public async getStories(userId?: string, limit?: number, offset?: number): Promise<any[]> {
+        let url = `action=get_stories`;
+        const params: string[] = [];
+        if (userId) params.push(`userId=${userId}`);
+        if (limit !== undefined) params.push(`limit=${limit}`);
+        if (offset !== undefined) params.push(`offset=${offset}`);
+        if (params.length > 0) {
+            url += `&${params.join('&')}`;
+        }
+        return (await this.request<any[]>(url)) || [];
     }
 
     public async registerStoryView(storyId: string, userId: string): Promise<any> {

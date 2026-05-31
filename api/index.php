@@ -330,6 +330,7 @@ try {
         case 'handle_vip_request': admin_handle_vip_request($pdo, $input); break;
         case 'get_global_transactions': admin_get_global_transactions($pdo); break;
         case 'admin_repair_db': admin_repair_db($pdo, $input); break;
+        case 'admin_repair_groups': admin_repair_groups($pdo, $input); break;
         case 'admin_cleanup_files': admin_cleanup_files($pdo); break;
         case 'admin_get_local_stats': admin_get_local_stats($pdo); break;
         case 'admin_get_server_stats': admin_get_server_stats($pdo); break;

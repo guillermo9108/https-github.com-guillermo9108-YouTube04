@@ -325,7 +325,7 @@ function video_get_all($pdo) {
         // FASE 3: Lógica especial para la página principal (Feed)
         // Si no se está explorando una carpeta, ni una categoría, ni haciendo una búsqueda, 
         // y tenemos un userId de sesión, solo mostramos contenido de los grupos suscritos y de los amigos.
-        if (empty($category) && empty($search) && !$isShorts && !empty($userId) && !$isAdmin) {
+        if ((empty($category) || $category === 'TODOS') && empty($search) && !$isShorts && !empty($userId) && !$isAdmin) {
             $where[] = " (
                 v.creatorId = ? 
                 OR v.creatorId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?)
@@ -334,6 +334,7 @@ function video_get_all($pdo) {
                     WHERE gs.userId = ? 
                     AND (
                         REPLACE(v.videoUrl, '\\\\', '/') LIKE CONCAT('%/', gs.folderPath, '/%')
+                        OR REPLACE(v.videoUrl, '\\\\', '/') LIKE CONCAT('%/', gs.folderPath)
                         OR v.category = gs.folderPath
                     )
                 )
@@ -811,27 +812,52 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
                 $parts = explode('/', $relPath);
 
                 if ($recursive) {
-                    // Si es recursivo, listamos cada segmento de la ruta acumulada como grupo independiente
-                    $currentAccum = "";
-                    for ($i = 0; $i < count($parts); $i++) {
-                        $currentAccum = $currentAccum === "" ? $parts[$i] : $currentAccum . '/' . $parts[$i];
-                        $folderKey = strtolower($currentAccum);
+                    // Solo listamos la carpeta final de contenido real (evitando las principales intermedias vacías)
+                    $folderKey = strtolower($relPath);
+                    
+                    // Obtener miniatura inteligente
+                    $targetThumb = '';
+                    if (!empty($v['thumbnailUrl']) && strpos($v['thumbnailUrl'], 'default') === false) {
+                        $targetThumb = fix_url($v['thumbnailUrl']);
+                    } else {
+                        $isImgCandidate = preg_match('/\.(png|jpg|jpeg|gif|webp)$/i', $v['videoUrl']) || (isset($v['category']) && strcasecmp($v['category'], 'IMAGES') === 0);
+                        if ($isImgCandidate) {
+                            $targetThumb = fix_url($v['videoUrl']);
+                        } else if (!empty($v['thumbnailUrl'])) {
+                            $targetThumb = fix_url($v['thumbnailUrl']);
+                        } else {
+                            $targetThumb = 'api/uploads/thumbnails/default.jpg';
+                        }
+                    }
 
-                        if (!isset($folderMap[$folderKey])) {
-                            $folderMap[$folderKey] = [
-                                'name' => $currentAccum,
-                                'relativePath' => $currentAccum,
-                                'count' => 0,
-                                'thumbnailUrl' => ($v['thumbnailUrl'] ? fix_url($v['thumbnailUrl']) : '')
-                            ];
-                        }
-                        $folderMap[$folderKey]['count']++;
-                        if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($v['thumbnailUrl'])) {
-                            $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
-                        }
+                    if (!isset($folderMap[$folderKey])) {
+                        $folderMap[$folderKey] = [
+                            'name' => $relPath,
+                            'relativePath' => $relPath,
+                            'count' => 0,
+                            'thumbnailUrl' => $targetThumb
+                        ];
+                    }
+                    $folderMap[$folderKey]['count']++;
+                    if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($targetThumb)) {
+                        $folderMap[$folderKey]['thumbnailUrl'] = $targetThumb;
                     }
                 } else {
                     // No recursivo: Se comporta de manera jerárquica (para la pantalla de Home Explorer)
+                    $targetThumb = '';
+                    if (!empty($v['thumbnailUrl']) && strpos($v['thumbnailUrl'], 'default') === false) {
+                        $targetThumb = fix_url($v['thumbnailUrl']);
+                    } else {
+                        $isImgCandidate = preg_match('/\.(png|jpg|jpeg|gif|webp)$/i', $v['videoUrl']) || (isset($v['category']) && strcasecmp($v['category'], 'IMAGES') === 0);
+                        if ($isImgCandidate) {
+                            $targetThumb = fix_url($v['videoUrl']);
+                        } else if (!empty($v['thumbnailUrl'])) {
+                            $targetThumb = fix_url($v['thumbnailUrl']);
+                        } else {
+                            $targetThumb = 'api/uploads/thumbnails/default.jpg';
+                        }
+                    }
+
                     if ($currentRelPath === '') {
                         $folderName = $parts[0];
                         $folderKey = strtolower($folderName);
@@ -840,12 +866,12 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
                                 'name' => $folderName,
                                 'relativePath' => $folderName,
                                 'count' => 0,
-                                'thumbnailUrl' => ($v['thumbnailUrl'] ? fix_url($v['thumbnailUrl']) : '')
+                                'thumbnailUrl' => $targetThumb
                             ];
                         }
                         $folderMap[$folderKey]['count']++;
-                        if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($v['thumbnailUrl'])) {
-                            $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
+                        if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($targetThumb)) {
+                            $folderMap[$folderKey]['thumbnailUrl'] = $targetThumb;
                         }
                     } else {
                         if (strpos($relPath, $currentRelPath) === 0) {
@@ -860,12 +886,12 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
                                         'name' => $folderName,
                                         'relativePath' => $relativePath,
                                         'count' => 0,
-                                        'thumbnailUrl' => ($v['thumbnailUrl'] ? fix_url($v['thumbnailUrl']) : '')
+                                        'thumbnailUrl' => $targetThumb
                                     ];
                                 }
                                 $folderMap[$folderKey]['count']++;
-                                if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($v['thumbnailUrl'])) {
-                                    $folderMap[$folderKey]['thumbnailUrl'] = fix_url($v['thumbnailUrl']);
+                                if ((empty($folderMap[$folderKey]['thumbnailUrl']) || strpos($folderMap[$folderKey]['thumbnailUrl'], 'default') !== false) && !empty($targetThumb)) {
+                                    $folderMap[$folderKey]['thumbnailUrl'] = $targetThumb;
                                 }
                             }
                         }
@@ -1750,19 +1776,23 @@ function upload_story($pdo, $post, $files) {
 function get_stories($pdo) {
     $now = time();
     $userId = $_GET['userId'] ?? '';
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 200;
+    $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
 
-    // Priorizar amigos (subscriptions)
+    $oneDayAgo = $now - 86400;
+
+    // 1. Obtener historias reales de la base de datos (duración < 24 horas)
     $sql = "SELECT s.*, u.username, u.avatarUrl,
             (CASE WHEN s.userId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?) THEN 1 ELSE 0 END) as isFriend
             FROM stories s 
             JOIN users u ON s.userId = u.id 
-            WHERE s.expiresAt > ? 
-            ORDER BY isFriend DESC, s.createdAt DESC";
+            WHERE s.createdAt >= ? AND s.expiresAt > ? 
+            ORDER BY s.createdAt DESC";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$userId, $now]);
-    $stories = $stmt->fetchAll();
-    
-    foreach ($stories as &$s) {
+    $stmt->execute([$userId, $oneDayAgo, $now]);
+    $realStories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($realStories as &$s) {
         $s['contentUrl'] = fix_url($s['contentUrl']);
         $s['avatarUrl'] = fix_url($s['avatarUrl']);
         $s['audioUrl'] = fix_url($s['audioUrl']);
@@ -1794,174 +1824,187 @@ function get_stories($pdo) {
         }
     }
 
-    // Después, publicar aleatoriamente videos como historias, simulando historias de otros usuarios
-    // Se prioriza mostrar videos de los grupos (carpetas y subcarpetas) que sigue el usuario
-    $finalSelection = [];
-    try {
-        $followedGroups = [];
-        if (!empty($userId)) {
-            // Check if subscribed to any groups or subfolders
-            $stmtGs = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ?");
-            $stmtGs->execute([$userId]);
-            $followedGroups = $stmtGs->fetchAll(PDO::FETCH_COLUMN);
-        }
-
-        $mockCandidates = [];
-
-        if (!empty($followedGroups)) {
-            // Obtener contenido aleatorio de cada grupo/subcarpeta que el usuario sigue
-            foreach ($followedGroups as $groupPath) {
-                // Selecciona videos o imágenes que pertenezcan a esta carpeta o a sus subcarpetas
-                $sqlGroup = "SELECT v.id as videoId, v.title, v.videoUrl, v.thumbnailUrl, v.createdAt, v.duration, v.category,
-                                    u.id as userId, u.username, u.avatarUrl, u.role as creatorRole
-                             FROM videos v
-                             JOIN users u ON v.creatorId = u.id
-                             WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
-                               AND v.is_private = 0
-                               AND (
-                                   v.category = ?
-                                   OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ?
-                                   OR REPLACE(v.videoUrl, '\\\\', '/') LIKE ?
-                               )
-                             ORDER BY RAND() LIMIT 10";
-                
-                $stmtGroup = $pdo->prepare($sqlGroup);
-                $stmtGroup->execute([
-                    $groupPath,
-                    "%/" . $groupPath . "/%",
-                    "%/" . $groupPath
-                ]);
-                $groupVids = $stmtGroup->fetchAll(PDO::FETCH_ASSOC);
-                if (!empty($groupVids)) {
-                    $mockCandidates = array_merge($mockCandidates, $groupVids);
-                }
-            }
-        }
-
-        // Si tenemos menos candidatos, o para dar variedad si el usuario no sigue suficientes grupos, 
-        // rellenar con videos públicos generales de cualquier grupo/carpeta
-        if (count($mockCandidates) < 20) {
-            $sqlAll = "SELECT v.id as videoId, v.title, v.videoUrl, v.thumbnailUrl, v.createdAt, v.duration, v.category,
-                              u.id as userId, u.username, u.avatarUrl, u.role as creatorRole
-                       FROM videos v
-                       JOIN users u ON v.creatorId = u.id
-                       WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA')
-                         AND v.is_private = 0
-                       ORDER BY RAND() LIMIT 45";
-            $stmtAll = $pdo->query($sqlAll);
-            $allVids = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
-            $mockCandidates = array_merge($mockCandidates, $allVids);
-        }
-
-        // --- DISTRIBUCIÓN INTELIGENTE DE CREADORES PARA EVITAR MONOPOLIO DEL ADMIN ---
-        // Agrupar candidatos dividiéndolos en no-administradores y administradores
-        $nonAdmins = [];
-        $admins = [];
-        
-        foreach ($mockCandidates as $cand) {
-            $isCandAdmin = isset($cand['creatorRole']) && strcasecmp($cand['creatorRole'], 'ADMIN') === 0;
-            $cUid = $cand['userId'];
-            
-            // Tampoco queremos autorecomendarnos videos del propio usuario como "historias de amigos" si los podemos simular de otros
-            if (!empty($userId) && $cUid == $userId) {
-                continue; 
-            }
-
-            if ($isCandAdmin) {
-                if (!isset($admins[$cUid])) $admins[$cUid] = [];
-                $admins[$cUid][] = $cand;
-            } else {
-                if (!isset($nonAdmins[$cUid])) $nonAdmins[$cUid] = [];
-                $nonAdmins[$cUid][] = $cand;
-            }
-        }
-        
-        // Alternar creadores para máxima variedad en el carrusel de historias
-        while (count($finalSelection) < 15 && (!empty($nonAdmins) || !empty($admins))) {
-            $progress = false;
-            
-            // Priorizar creadores normales (no administradores)
-            foreach ($nonAdmins as $cUid => &$cands) {
-                if (!empty($cands)) {
-                    $finalSelection[] = array_shift($cands);
-                    $progress = true;
-                    if (count($finalSelection) >= 15) break;
-                } else {
-                    unset($nonAdmins[$cUid]);
-                }
-            }
-            
-            if (count($finalSelection) >= 15) break;
-            
-            // Añadir creadores administradores para rellenar
-            foreach ($admins as $cUid => &$cands) {
-                if (!empty($cands)) {
-                    $finalSelection[] = array_shift($cands);
-                    $progress = true;
-                    if (count($finalSelection) >= 15) break;
-                } else {
-                    unset($admins[$cUid]);
-                }
-            }
-            
-            if (!$progress) break;
-        }
-
-    } catch (Exception $e) {
-        write_log("Error in mock story selection logic: " . $e->getMessage(), 'ERROR');
+    // 2. Obtener grupos/subcarpetas que sigue el usuario
+    $followedGroups = [];
+    if (!empty($userId)) {
+        $stmtGs = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ?");
+        $stmtGs->execute([$userId]);
+        $followedGroups = $stmtGs->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    foreach ($finalSelection as $mv) {
-        // No duplicar si el usuario ya tiene historias reales de este mismo usuario
-        $userExists = false;
-        foreach ($stories as $existingStory) {
-            if ($existingStory['userId'] === $mv['userId']) {
-                $userExists = true;
+    // 3. Obtener raíces del sistema de archivos para determinar relPath de los videos
+    $stmtRoots = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
+    $sRoots = $stmtRoots->fetch();
+    $paths = json_decode($sRoots['libraryPaths'] ?: '[]', true);
+    if ($sRoots['localLibraryPath']) $paths[] = $sRoots['localLibraryPath'];
+    $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
+
+    // 4. Obtener todos los videos de las subcarpetas con contenido
+    $sqlV = "SELECT v.*, u.username as creatorName, u.avatarUrl as creatorAvatarUrl 
+             FROM videos v 
+             LEFT JOIN users u ON v.creatorId = u.id 
+             WHERE v.category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') 
+               AND v.is_private = 0";
+    $stmtV = $pdo->query($sqlV);
+    $allVideos = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+
+    // Agrupar videos por su subcarpeta
+    $videosBySubfolder = [];
+    foreach ($allVideos as $v) {
+        $videoUrl = trim(str_replace('\\', '/', $v['videoUrl']), '/');
+        $videoDir = dirname($videoUrl);
+        $videoDir = trim(str_replace('\\', '/', $videoDir), '/');
+
+        $relPath = '';
+        foreach ($roots as $root) {
+            $cleanedRoot = trim($root, '/');
+            if (empty($cleanedRoot)) continue;
+
+            if (strpos($videoDir, $cleanedRoot) === 0) {
+                $relPath = trim(substr($videoDir, strlen($cleanedRoot)), '/');
                 break;
             }
         }
-        if ($userExists) continue;
 
-        // Determinar miniatura de la historia y el video real
-        $storyThumb = isset($mv['thumbnailUrl']) ? $mv['thumbnailUrl'] : '';
-        $isImg = preg_match('/\.(png|jpg|jpeg|gif|webp)$/i', $mv['videoUrl']) || (isset($mv['category']) && strpos($mv['category'], 'IMAGE') !== false);
-        if (empty($storyThumb) && $isImg) {
-            $storyThumb = $mv['videoUrl'];
+        if ($relPath !== '' && $relPath !== '.') {
+            $vKey = strtolower($relPath);
+            if (!isset($videosBySubfolder[$vKey])) {
+                $videosBySubfolder[$vKey] = [
+                    'relativePath' => $relPath,
+                    'videos' => []
+                ];
+            }
+            $videosBySubfolder[$vKey]['videos'][] = $v;
         }
-        if (empty($storyThumb)) {
-            $storyThumb = 'api/uploads/thumbnails/default.jpg';
-        }
-
-        $stories[] = [
-            'id' => 'st_mock_' . $mv['videoId'],
-            'userId' => $mv['userId'],
-            'username' => $mv['username'],
-            'avatarUrl' => fix_url($mv['avatarUrl']),
-            'contentUrl' => fix_url($mv['videoUrl']),
-            'type' => $isImg ? 'IMAGE' : 'VIDEO',
-            'overlayText' => NULL,
-            'overlayColor' => NULL,
-            'overlayBg' => NULL,
-            'audioUrl' => NULL,
-            'videoId' => $mv['videoId'],
-            'productId' => NULL,
-            'duration' => isset($mv['duration']) && $mv['duration'] > 0 ? min($mv['duration'], 15) : 15,
-            'createdAt' => (int)$mv['createdAt'],
-            'expiresAt' => time() + 86400,
-            'isFriend' => 0,
-            'thumbnailUrl' => fix_url($storyThumb),
-            'originalVideo' => [
-                'id' => $mv['videoId'],
-                'title' => $mv['title'],
-                'thumbnailUrl' => fix_url($storyThumb),
-                'videoUrl' => fix_url($mv['videoUrl']),
-                'creatorName' => $mv['username'],
-                'creatorAvatarUrl' => fix_url($mv['avatarUrl'])
-            ]
-        ];
     }
-    
-    respond(true, $stories);
+
+    // 5. Generar historias de subcarpetas (grupos) con contenido
+    $groupStories = [];
+    foreach ($videosBySubfolder as $vKey => $folderData) {
+        $relPath = $folderData['relativePath'];
+        $folderVideos = $folderData['videos'];
+
+        // Ordenar videos por fecha u otros criterios de frescura
+        usort($folderVideos, function($a, $b) {
+            return (int)$b['createdAt'] <=> (int)$a['createdAt'];
+        });
+
+        // Tomar hasta 5 videos recientes para representarlos como historias del grupo
+        $selectedVideos = array_slice($folderVideos, 0, 5);
+        $isSubscribed = in_array($relPath, $followedGroups) ? 1 : 0;
+
+        foreach ($selectedVideos as $index => $mv) {
+            // Determinar miniatura inteligente
+            $storyThumb = isset($mv['thumbnailUrl']) ? $mv['thumbnailUrl'] : '';
+            $isImg = preg_match('/\.(png|jpg|jpeg|gif|webp)$/i', $mv['videoUrl']) || (isset($mv['category']) && strcasecmp($mv['category'], 'IMAGES') === 0);
+            if (empty($storyThumb) && $isImg) {
+                $storyThumb = $mv['videoUrl'];
+            }
+            if (empty($storyThumb)) {
+                $storyThumb = 'api/uploads/thumbnails/default.jpg';
+            }
+
+            // Nombre del grupo (subcarpeta)
+            $grpName = basename($relPath);
+
+            // Simular un creador basado en el grupo
+            $simulatedCreatedAt = $now - (2 * 3600) - ($index * 3600); // Strictly within 24 hours
+
+            // Procesar fila del video para tener campos completos en originalVideo
+            $temp = [$mv];
+            video_process_rows($temp);
+            $processedVideo = $temp[0];
+
+            $groupStories[] = [
+                'id' => 'st_group_' . $relPath . '_' . $mv['id'],
+                'userId' => 'group_' . $relPath, // El identificador de usuario es el grupo
+                'username' => 'Grupo · ' . $grpName, 
+                'avatarUrl' => fix_url($storyThumb),
+                'contentUrl' => fix_url($mv['videoUrl']),
+                'type' => $isImg ? 'IMAGE' : 'VIDEO',
+                'overlayText' => $mv['title'],
+                'overlayColor' => '#ffffff',
+                'overlayBg' => 'bg-black/50',
+                'audioUrl' => NULL,
+                'videoId' => $mv['id'],
+                'productId' => NULL,
+                'duration' => isset($mv['duration']) && $mv['duration'] > 0 ? min($mv['duration'], 15) : 15,
+                'createdAt' => $simulatedCreatedAt,
+                'expiresAt' => $simulatedCreatedAt + 86400,
+                'isFriend' => $isSubscribed,
+                'thumbnailUrl' => fix_url($storyThumb),
+                'originalVideo' => $processedVideo
+            ];
+        }
+    }
+
+    // 6. Consolidar todas las historias en una lista única organizada por usuarios/grupos
+    // Agrupamos en un map temporal por el identificador de usuario (userId)
+    $allGroups = [];
+
+    // Agrupar historias reales por userId
+    foreach ($realStories as $rs) {
+        $uId = $rs['userId'];
+        if (!isset($allGroups[$uId])) {
+            $allGroups[$uId] = [
+                'userId' => $uId,
+                'isFriend' => $rs['isFriend'],
+                'maxCreatedAt' => $rs['createdAt'],
+                'stories' => []
+            ];
+        }
+        $allGroups[$uId]['stories'][] = $rs;
+        if ($rs['createdAt'] > $allGroups[$uId]['maxCreatedAt']) {
+            $allGroups[$uId]['maxCreatedAt'] = $rs['createdAt'];
+        }
+    }
+
+    // Agrupar historias de subcarpetas por de grupo userId
+    foreach ($groupStories as $gs) {
+        $uId = $gs['userId'];
+        if (!isset($allGroups[$uId])) {
+            $allGroups[$uId] = [
+                'userId' => $uId,
+                'isFriend' => $gs['isFriend'],
+                'maxCreatedAt' => $gs['createdAt'],
+                'stories' => []
+            ];
+        }
+        $allGroups[$uId]['stories'][] = $gs;
+        if ($gs['createdAt'] > $allGroups[$uId]['maxCreatedAt']) {
+            $allGroups[$uId]['maxCreatedAt'] = $gs['createdAt'];
+        }
+    }
+
+    // Ordenar los bloques de historias
+    // Primero, los bloques seguidos (isFriend = 1).
+    // Segundo, los bloques no seguidos (isFriend = 0).
+    // Dentro de cada grupo, ordenar por el maxCreatedAt descendente.
+    uasort($allGroups, function($a, $b) {
+        if ($a['isFriend'] !== $b['isFriend']) {
+            return $b['isFriend'] <=> $a['isFriend'];
+        }
+        return $b['maxCreatedAt'] <=> $a['maxCreatedAt'];
+    });
+
+    // Aplanar de retorno a un array plano de historias individuales en el orden sorteado
+    $flattenedStories = [];
+    foreach ($allGroups as $groupBlock) {
+        // Ordenar historias dentro del mismo bloque por createdAt
+        $grpStories = $groupBlock['stories'];
+        usort($grpStories, function($s1, $s2) {
+            return (int)$s1['createdAt'] <=> (int)$s2['createdAt'];
+        });
+        foreach ($grpStories as $s) {
+            $flattenedStories[] = $s;
+        }
+    }
+
+    // 7. Aplicar paginación (limit y offset) para soporte de scroll infinito
+    $totalStories = count($flattenedStories);
+    $paginatedStories = array_slice($flattenedStories, $offset, $limit);
+
+    respond(true, $paginatedStories);
 }
 
 function story_view($pdo, $input) {

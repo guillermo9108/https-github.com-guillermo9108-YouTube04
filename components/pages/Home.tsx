@@ -100,12 +100,43 @@ export default function Home() {
         return Object.values(groups).map(group => group[0]); // Show first story of each user
     }, [stories]);
 
-    // Fetch stories
+    const [loadingMoreStories, setLoadingMoreStories] = useState(false);
+    const [hasMoreStories, setHasMoreStories] = useState(true);
+
+    const loadMoreStories = async () => {
+        if (loadingMoreStories || !hasMoreStories || !user?.id) return;
+        setLoadingMoreStories(true);
+        try {
+            const nextOffset = stories.length;
+            const nextBatch = await db.getStories(user.id, 10, nextOffset);
+            if (nextBatch.length === 0) {
+                setHasMoreStories(false);
+            } else {
+                setStories(prev => {
+                    const existingIds = new Set(prev.map(s => s.id));
+                    const filteredNext = nextBatch.filter(s => !existingIds.has(s.id));
+                    if (filteredNext.length === 0) {
+                        setHasMoreStories(false);
+                        return prev;
+                    }
+                    return [...prev, ...filteredNext];
+                });
+            }
+        } catch (e) {
+            console.error("Error loading more stories", e);
+        } finally {
+            setLoadingMoreStories(false);
+        }
+    };
+
+    // Fetch stories initially
     useEffect(() => {
         const fetchStories = async () => {
+            if (!user?.id) return;
             try {
-                const data = await db.getStories(user?.id);
+                const data = await db.getStories(user.id, 10, 0);
                 setStories(data);
+                setHasMoreStories(data.length >= 10);
             } catch (error) {
                 console.error("Error fetching stories", error);
             }
@@ -947,7 +978,15 @@ export default function Home() {
 
                 {/* Stories Section */}
                 <div className="bg-[var(--bg-secondary)] py-3 overflow-hidden">
-                    <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
+                    <div 
+                        onScroll={(e) => {
+                            const target = e.currentTarget;
+                            if (target.scrollWidth - target.scrollLeft - target.clientWidth < 100) {
+                                loadMoreStories();
+                            }
+                        }}
+                        className="flex gap-2 px-3 overflow-x-auto scrollbar-hide"
+                    >
                         {/* Create Story */}
                         <div 
                             onClick={() => navigate('/create-story')}
@@ -1010,6 +1049,12 @@ export default function Home() {
                                 )}
                             </div>
                         ))}
+
+                        {loadingMoreStories && (
+                            <div className="flex items-center justify-center w-[105px] h-44 bg-[var(--bg-tertiary)]/50 rounded-xl shrink-0">
+                                <Loader2 className="animate-spin text-blue-500" size={20} />
+                            </div>
+                        )}
                     </div>
                 </div>
 
