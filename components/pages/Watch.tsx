@@ -236,6 +236,50 @@ export default function Watch() {
                 if (!v) { setLoading(false); return; }
 
                 const path = (v as any).rawPath || v.videoUrl || '';
+
+                // Grupos privados: Solo miembros aprobados, el creador o el administrador pueden ver contenido
+                const getGroupPath = (vObj: any) => {
+                    const videoUrl = vObj.rawPath || vObj.videoUrl || '';
+                    const normalized = videoUrl.replace(/\\/g, '/');
+                    const prefix = 'uploads/videos/';
+                    const idx = normalized.indexOf(prefix);
+                    if (idx !== -1) {
+                        const afterPrefix = normalized.substring(idx + prefix.length);
+                        const parts = afterPrefix.split('/');
+                        if (parts.length > 1) {
+                            parts.pop(); // Remove filename
+                            return parts.join('/');
+                        }
+                    }
+                    return null;
+                };
+
+                const groupPath = getGroupPath(v);
+                if (groupPath) {
+                    const folders = await db.getFolders('', true);
+                    const groupMeta = folders.find((g: any) => g.name?.toLowerCase() === groupPath.toLowerCase() || g.relativePath?.toLowerCase() === groupPath.toLowerCase());
+                    if (groupMeta && groupMeta.isPrivate) {
+                        const isCreator = user?.id && groupMeta.creatorId === user.id;
+                        let authorized = false;
+                        if (isAdmin || isCreator) {
+                            authorized = true;
+                        } else if (user?.id) {
+                            const userSubs = await db.getUserAllSubscriptions(user.id);
+                            const groupSub = userSubs.find((s: any) => s.folderPath.toLowerCase() === groupPath.toLowerCase());
+                            if (groupSub && groupSub.approved === 1) {
+                                authorized = true;
+                            }
+                        }
+
+                        if (!authorized) {
+                            toast.error("Contenido privado. Debes ser un miembro aprobado de este grupo para verlo.");
+                            window.location.hash = `/groups?folder=${encodeURIComponent(groupPath)}`;
+                            setLoading(false);
+                            return;
+                        }
+                    }
+                }
+
                 const isImage = v.category === 'IMAGES' || path.match(/\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i);
                 if (isImage) {
                     setLoading(false);

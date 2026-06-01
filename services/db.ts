@@ -749,10 +749,10 @@ class DBService {
         });
     }
 
-    public async editGroup(userId: string, folderPath: string, name?: string, description?: string, isPrivate?: boolean, coverUrl?: string): Promise<any> {
+    public async editGroup(userId: string, folderPath: string, name?: string, description?: string, isPrivate?: boolean, coverUrl?: string, isUnified?: boolean): Promise<any> {
         return this.request<any>('action=group_edit', {
             method: 'POST',
-            body: JSON.stringify({ userId, folderPath, name, description, isPrivate, coverUrl })
+            body: JSON.stringify({ userId, folderPath, name, description, isPrivate, coverUrl, isUnified })
         });
     }
 

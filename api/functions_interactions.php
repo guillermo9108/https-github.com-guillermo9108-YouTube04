@@ -888,6 +888,7 @@ function group_edit($pdo, $input) {
     $description = $input['description'] ?? null;
     $coverUrl = $input['coverUrl'] ?? null;
     $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
+    $isUnified = !empty($input['isUnified']) ? 1 : 0;
     $newName = trim($input['name'] ?? '');
 
     if (!empty($newName) && $newName !== $folderPath) {
@@ -910,8 +911,8 @@ function group_edit($pdo, $input) {
         }
 
         // update db records
-        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ? WHERE folderPath = ?");
-        $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $folderPath]);
+        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
+        $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
 
         $stmtSub = $pdo->prepare("UPDATE group_subscriptions SET folderPath = ? WHERE folderPath = ?");
         $stmtSub->execute([$folderNameForDir, $folderPath]);
@@ -928,8 +929,8 @@ function group_edit($pdo, $input) {
 
         $folderPath = $folderNameForDir;
     } else {
-        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ? WHERE folderPath = ?");
-        $stmtMeta->execute([$description, $coverUrl, $isPrivate, $folderPath]);
+        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
+        $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
     }
 
     respond(true, ['folderPath' => $folderPath], "Grupo actualizado con éxito");

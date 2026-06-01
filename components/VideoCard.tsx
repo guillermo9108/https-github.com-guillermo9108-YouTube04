@@ -84,6 +84,58 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showMenu, setShowMenu] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [inlinePlaying, setInlinePlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Auto-register on window global array for smart slider autoplay
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).globalVideoCardList = (window as any).globalVideoCardList || [];
+    
+    const cardEntry = {
+      id: video.id,
+      play: () => setInlinePlaying(true),
+      stop: () => setInlinePlaying(false)
+    };
+    
+    (window as any).globalVideoCardList.push(cardEntry);
+    
+    return () => {
+      if ((window as any).globalVideoCardList) {
+        (window as any).globalVideoCardList = (window as any).globalVideoCardList.filter(
+          (item: any) => item.id !== video.id
+        );
+      }
+    };
+  }, [video.id]);
+
+  // Observer to pause video if it leaves the viewport
+  useEffect(() => {
+    if (!inlinePlaying) return;
+    const videoElem = videoRef.current;
+    if (!videoElem) return;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) {
+                try {
+                    videoElem.pause();
+                } catch(e){}
+            } else {
+                try {
+                    videoElem.play().catch(()=>{});
+                } catch(e){}
+            }
+        });
+    }, { threshold: 0.1 });
+
+    observer.observe(videoElem);
+
+    return () => {
+        observer.unobserve(videoElem);
+        observer.disconnect();
+    };
+  }, [inlinePlaying]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -821,10 +873,55 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                         </>
                     )}
                 </div>
+            ) : inlinePlaying ? (
+                <div className="absolute inset-0 z-10 bg-black flex items-center justify-center">
+                    <video
+                        ref={videoRef}
+                        src={db.getStreamerUrl(video.id, user?.sessionToken)}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-contain"
+                        onPlay={() => {
+                            if (window && (window as any).globalVideoCardList) {
+                                (window as any).globalVideoCardList.forEach((item: any) => {
+                                    if (item.id !== video.id) {
+                                        item.stop();
+                                    }
+                                });
+                            }
+                        }}
+                        onEnded={() => {
+                            setInlinePlaying(false);
+                            if (window && (window as any).globalVideoCardList) {
+                                const myIndex = (window as any).globalVideoCardList.findIndex((item: any) => item.id === video.id);
+                                if (myIndex !== -1 && myIndex + 1 < (window as any).globalVideoCardList.length) {
+                                    (window as any).globalVideoCardList[myIndex + 1].play();
+                                }
+                            }
+                        }}
+                    />
+                    <button 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setInlinePlaying(false); }}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white z-20 hover:bg-black/90 transition shadow-lg border border-white/10"
+                        title="Cerrar reproductor"
+                    >
+                        <X size={12} />
+                    </button>
+                </div>
             ) : (
                 <Link 
-                    to={video.isCategoryCard ? '#' : (isImage ? '#' : watchUrl)} 
-                    onClick={video.isCategoryCard ? (e) => { e.preventDefault(); onCategoryClick?.(); } : (isImage ? handleImageClick : undefined)}
+                    to="#" 
+                    onClick={(e) => { 
+                        e.preventDefault(); 
+                        if (video.isCategoryCard) { 
+                            onCategoryClick?.(); 
+                        } else if (isImage) { 
+                            handleImageClick(e); 
+                        } else { 
+                            setInlinePlaying(true); 
+                        } 
+                    }}
                     className="absolute inset-0 z-0 group/media"
                 >
                     {displayThumb ? (

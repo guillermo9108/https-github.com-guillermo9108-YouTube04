@@ -313,10 +313,23 @@ function video_get_all($pdo) {
     $roots = array_unique(array_filter(array_map(function($p) { return rtrim(str_replace('\\', '/', $p), '/'); }, $paths)));
 
     if (!empty($folder)) {
+        $isUnified = false;
+        try {
+            $stmtUni = $pdo->prepare("SELECT isUnified FROM groups_metadata WHERE folderPath = ?");
+            $stmtUni->execute([$folder]);
+            $isUnified = (bool)$stmtUni->fetchColumn();
+        } catch (Exception $e) {}
+
         $clauses = [];
         foreach ($roots as $root) {
-            $clauses[] = "REPLACE(v.videoUrl, '\\\\', '/') LIKE ?";
-            $params[] = $root . '/' . $folder . '/%';
+            if ($isUnified) {
+                $clauses[] = "REPLACE(v.videoUrl, '\\\\', '/') LIKE ?";
+                $params[] = $root . '/' . $folder . '/%';
+            } else {
+                $clauses[] = "(REPLACE(v.videoUrl, '\\\\', '/') LIKE ? AND REPLACE(v.videoUrl, '\\\\', '/') NOT LIKE ?)";
+                $params[] = $root . '/' . $folder . '/%';
+                $params[] = $root . '/' . $folder . '/%/%';
+            }
         }
         if (!empty($clauses)) {
             $where[] = "(" . implode(" OR ", $clauses) . ")";
@@ -854,7 +867,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     $folderMap = [];
 
     // Cargar todos los videos de la base de datos para determinar carpetas con contenido
-    $sql = "SELECT id, videoUrl, category, thumbnailUrl, is_audio, title FROM videos 
+    $sql = "SELECT id, videoUrl, category, thumbnailUrl, is_audio, title, createdAt FROM videos 
             WHERE category NOT IN ('PENDING', 'PROCESSING', 'FAILED_METADATA') 
             AND is_private = 0";
     $stmtV = $pdo->prepare($sql);
@@ -1007,7 +1020,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     // Load all metadata from groups_metadata
     $metaMap = [];
     try {
-        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, createdAt FROM groups_metadata");
+        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, createdAt FROM groups_metadata");
         $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
         foreach ($allMeta as $m) {
             $metaMap[strtolower($m['folderPath'])] = $m;
@@ -1033,12 +1046,14 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $f['description'] = $metaMap[$key]['description'];
             $f['coverUrl'] = $metaMap[$key]['coverUrl'] ? fix_url($metaMap[$key]['coverUrl']) : null;
             $f['isPrivate'] = (int)$metaMap[$key]['isPrivate'];
+            $f['isUnified'] = (int)($metaMap[$key]['isUnified'] ?? 0);
             $f['createdAt'] = (int)$metaMap[$key]['createdAt'];
         } else {
             $f['creatorId'] = 'admin';
             $f['description'] = 'Grupo sin descripción.';
             $f['coverUrl'] = null;
             $f['isPrivate'] = 0;
+            $f['isUnified'] = 0;
             $f['createdAt'] = time();
         }
 
@@ -1058,12 +1073,18 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $grpVideos = $folderVideosList[$key];
             // Sort by createdAt descending
             usort($grpVideos, function($a, $b) {
-                return (int)$b['createdAt'] <=> (int)$a['createdAt'];
+                $aTime = isset($a['createdAt']) ? (is_numeric($a['createdAt']) ? (int)$a['createdAt'] : strtotime($a['createdAt'])) : strtotime(date("Y-m-d H:i:s"));
+                $bTime = isset($b['createdAt']) ? (is_numeric($b['createdAt']) ? (int)$b['createdAt'] : strtotime($b['createdAt'])) : strtotime(date("Y-m-d H:i:s"));
+                return $bTime <=> $aTime;
             });
 
             $oneDayAgo = time() - 86400;
             foreach ($grpVideos as $gv) {
-                if ((int)$gv['createdAt'] >= $oneDayAgo) {
+                if (!isset($gv['createdAt'])) {
+                    $gv['createdAt'] = date("Y-m-d H:i:s");
+                }
+                $gvTime = is_numeric($gv['createdAt']) ? (int)$gv['createdAt'] : strtotime($gv['createdAt']);
+                if ($gvTime >= $oneDayAgo) {
                     $f['newPosts']++;
                 }
 
@@ -2100,6 +2121,9 @@ function get_stories($pdo) {
         }
 
         $isSubscribed = in_array($relPath, $followedGroups) ? 1 : 0;
+        if (!$isSubscribed) {
+            continue;
+        }
 
         foreach ($selectedVideos as $index => $mv) {
             // Determinar miniatura inteligente

@@ -51,6 +51,7 @@ export default function GroupsPage() {
     const [editGroupDesc, setEditGroupDesc] = useState('');
     const [editGroupPrivacy, setEditGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
     const [editGroupCover, setEditGroupCover] = useState('');
+    const [editGroupUnified, setEditGroupUnified] = useState(false);
     const [updatingGroup, setUpdatingGroup] = useState(false);
 
     // Composer posting state
@@ -297,6 +298,7 @@ export default function GroupsPage() {
         setEditGroupDesc(activeGroup.description || '');
         setEditGroupPrivacy(activeGroup.isPrivate === 1 ? 'PRIVATE' : 'PUBLIC');
         setEditGroupCover(activeGroup.coverUrl || '');
+        setEditGroupUnified(activeGroup.isUnified === 1);
         setShowEditModal(true);
     };
 
@@ -315,7 +317,8 @@ export default function GroupsPage() {
                 editGroupName.trim(),
                 editGroupDesc.trim(),
                 editGroupPrivacy === 'PRIVATE',
-                editGroupCover.trim()
+                editGroupCover.trim(),
+                editGroupUnified
             );
             toast.success("Grupo actualizado con éxito");
             setShowEditModal(false);
@@ -328,6 +331,7 @@ export default function GroupsPage() {
                 name: updatedName,
                 description: editGroupDesc.trim(),
                 isPrivate: editGroupPrivacy === 'PRIVATE' ? 1 : 0,
+                isUnified: editGroupUnified ? 1 : 0,
                 coverUrl: editGroupCover.trim()
             }));
         } catch (err: any) {
@@ -1160,7 +1164,7 @@ export default function GroupsPage() {
                                                         <ThumbsUp size={12} className="text-blue-500 fill-current" />
                                                         <Heart size={12} className="text-red-500 fill-current" />
                                                     </span>
-                                                    <span>{react ? 12 + react.count : 12} personas reaccionaron</span>
+                                                    <span>{react ? 1 + react.count : 1} reacción • {v.views || 0} reproducciones</span>
                                                 </div>
                                                 <button onClick={() => toggleComments(v.id)} className="hover:underline">
                                                     Ver comentarios
@@ -1171,7 +1175,10 @@ export default function GroupsPage() {
                                             <div className="flex border-b border-[#3e4042]/20 relative">
                                                 {/* Reacciones FB Hover Menu */}
                                                 <div className="flex-1 relative group py-2">
-                                                    <button className="w-full flex items-center justify-center gap-1.5 text-xs font-extrabold text-[#b0b3b8] hover:text-[#1877f2] transition-colors py-1">
+                                                    <button 
+                                                        onClick={() => handleReact(v.id, '👍')}
+                                                        className="w-full flex items-center justify-center gap-1.5 text-xs font-extrabold text-[#b0b3b8] hover:text-[#1877f2] transition-colors py-1"
+                                                    >
                                                         {react ? (
                                                             <span className="flex items-center gap-1 text-[#1877f2]">
                                                                 <span>{react.type}</span>
@@ -1601,6 +1608,21 @@ export default function GroupsPage() {
                                         </div>
                                     </label>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={editGroupUnified}
+                                        onChange={(e) => setEditGroupUnified(e.target.checked)}
+                                        className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
+                                    />
+                                    <div>
+                                        <span className="text-xs font-bold text-white block">Unificar como grupo</span>
+                                        <span className="text-[9px] text-slate-400 block">Integra las publicaciones de todas sus subcarpetas como contenido de este feed de grupo.</span>
+                                    </div>
+                                </label>
                             </div>
 
                             <button

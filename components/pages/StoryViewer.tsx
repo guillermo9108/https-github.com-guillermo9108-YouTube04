@@ -233,6 +233,16 @@ export default function StoryViewer() {
         };
     }, [currentStory, currentUserIndex, currentStoryIndex, paused, loading]);
 
+    useEffect(() => {
+        if (videoRef.current && currentStory?.type === 'VIDEO') {
+            try {
+                videoRef.current.currentTime = 0;
+                videoRef.current.load();
+                videoRef.current.play().catch(() => {});
+            } catch (e) {}
+        }
+    }, [currentUserIndex, currentStoryIndex, currentStory?.id, currentStory?.type]);
+
     const handleVideoMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
         const video = e.currentTarget;
         const dbDuration = (currentStory as any).duration ? (currentStory as any).duration * 1000 : null;

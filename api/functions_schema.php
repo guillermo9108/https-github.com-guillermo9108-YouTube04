@@ -426,6 +426,7 @@ function getAppSchema() {
                 'description' => 'TEXT DEFAULT NULL',
                 'coverUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'isPrivate' => 'TINYINT(1) DEFAULT 0',
+                'isUnified' => 'TINYINT(1) DEFAULT 0',
                 'createdAt' => 'BIGINT'
             ]
         ],

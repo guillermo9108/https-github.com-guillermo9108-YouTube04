@@ -1,6 +1,9 @@
 
 # Historial de Actualizaciones Técnicas - StreamPay
 
+## v1.7.1 - Corrección en Backend y Estabilidad de Índices
+*   **Corrección de Error en Backend (FASE 1):** Resuelto el error `Undefined index: createdAt` en `/api/functions_videos.php` (Línea 1066). Se agregó validación de existencia del índice con `isset($gv['createdAt'])` y se asignó un valor por defecto usando `date("Y-m-d H:i:s")` cuando no está definido. Adicionalmente se aseguró la obtención de la columna `createdAt` en la consulta SQL de `video_discover_subfolders`.
+
 ## v1.7.0 - Sistema de Resiliencia y Organización Instantánea
 
 Esta actualización resuelve problemas de estancamiento en el procesamiento y acelera la disponibilidad de contenido nuevo.
