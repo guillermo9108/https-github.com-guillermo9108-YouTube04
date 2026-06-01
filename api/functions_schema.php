@@ -414,9 +414,20 @@ function getAppSchema() {
             'cols' => [
                 'userId' => 'VARCHAR(50)',
                 'folderPath' => 'VARCHAR(255)',
+                'approved' => 'TINYINT(1) DEFAULT 1',
                 'createdAt' => 'BIGINT'
             ],
             'pk' => 'PRIMARY KEY (userId, folderPath)'
+        ],
+        'groups_metadata' => [
+            'cols' => [
+                'folderPath' => 'VARCHAR(255) PRIMARY KEY',
+                'creatorId' => 'VARCHAR(50)',
+                'description' => 'TEXT DEFAULT NULL',
+                'coverUrl' => 'VARCHAR(255) DEFAULT NULL',
+                'isPrivate' => 'TINYINT(1) DEFAULT 0',
+                'createdAt' => 'BIGINT'
+            ]
         ],
         'active_transcodes' => [
             'cols' => [

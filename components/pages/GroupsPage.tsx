@@ -3,7 +3,8 @@ import {
     ChevronLeft, Folder, Users, Star, Plus, Share2, Compass, 
     CheckCircle, LogOut, ArrowLeft, Image as ImageIcon, Zap, Loader2, 
     Calendar, FileText, MessageSquare, ThumbsUp, Heart, Smile, Sparkles, 
-    MoreHorizontal, Send, RefreshCw, Upload, Video, Globe, Lock, Check, Gift, Play, X, Music
+    MoreHorizontal, Send, RefreshCw, Upload, Video, Globe, Lock, Check, Gift, Play, X, Music, Search,
+    Clock, Settings
 } from 'lucide-react';
 import { useNavigate, useLocation } from '../Router';
 import { useAuth } from '../../context/AuthContext';
@@ -22,26 +23,50 @@ export default function GroupsPage() {
     
     const [groups, setGroups] = useState<any[]>([]);
     const [subscribedPaths, setSubscribedPaths] = useState<string[]>([]);
+    const [allSubscriptions, setAllSubscriptions] = useState<{ folderPath: string; approved: number }[]>([]);
+    const [pendingSubscriptions, setPendingSubscriptions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<'MY_GROUPS' | 'EXPLORE' | 'MOST_VISITED'>('MY_GROUPS');
     const [activeGroup, setActiveGroup] = useState<any | null>(null);
     const [groupContent, setGroupContent] = useState<any[]>([]);
     const [loadingContent, setLoadingContent] = useState(false);
     const [playingVideo, setPlayingVideo] = useState<any | null>(null);
+    const [groupSearchQuery, setGroupSearchQuery] = useState('');
     
-    // Group active tab: 'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES'
-    const [groupSubTab, setGroupSubTab] = useState<'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES'>('FEED');
+    // Group active tab: 'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES' | 'SOLICITUDES'
+    const [groupSubTab, setGroupSubTab] = useState<'FEED' | 'PHOTOS' | 'EVENTS' | 'FILES' | 'SOLICITUDES'>('FEED');
     const [sortBy, setSortBy] = useState<'RECENT' | 'FEATURED'>('RECENT');
 
     // Create Group modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupPrivacy, setNewGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+    const [newGroupDescription, setNewGroupDescription] = useState('');
+    const [newGroupCover, setNewGroupCover] = useState('');
     const [creatingGroup, setCreatingGroup] = useState(false);
+
+    // Edit Group Modal States
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editGroupName, setEditGroupName] = useState('');
+    const [editGroupDesc, setEditGroupDesc] = useState('');
+    const [editGroupPrivacy, setEditGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+    const [editGroupCover, setEditGroupCover] = useState('');
+    const [updatingGroup, setUpdatingGroup] = useState(false);
 
     // Composer posting state
     const [postText, setPostText] = useState('');
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
+
+    // Load pending subscriptions list
+    const loadPendingSubscriptions = async () => {
+        if (!user?.id) return;
+        try {
+            const list = await db.getPendingGroupSubscriptions(user.id);
+            setPendingSubscriptions(list);
+        } catch (e) {
+            console.error("Error loading pending subscriptions:", e);
+        }
+    };
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Comments & reactions locally loaded map
@@ -99,6 +124,9 @@ export default function GroupsPage() {
             if (user?.id) {
                 const subs = await db.getGroupSubscriptions(user.id);
                 setSubscribedPaths(subs);
+                const allSubs = await db.getUserAllSubscriptions(user.id);
+                setAllSubscriptions(allSubs);
+                await loadPendingSubscriptions();
                 if (subs.length === 0) {
                     setTab('EXPLORE');
                 }
@@ -163,6 +191,10 @@ export default function GroupsPage() {
         return subscribedPaths.some(p => p.toLowerCase() === groupName.toLowerCase());
     };
 
+    const isGroupPending = (groupName: string) => {
+        return allSubscriptions.some(sub => sub.folderPath.toLowerCase() === groupName.toLowerCase() && sub.approved === 0);
+    };
+
     const handleToggleSubscribe = async (e: React.MouseEvent | null, groupName: string) => {
         if (e) e.stopPropagation();
         if (!user?.id) {
@@ -171,19 +203,31 @@ export default function GroupsPage() {
         }
 
         const currentlySubbed = isSubscribed(groupName);
+        const pending = isGroupPending(groupName);
         try {
             if (currentlySubbed) {
                 await db.unsubscribeGroup(user.id, groupName);
                 setSubscribedPaths(prev => prev.filter(p => p.toLowerCase() !== groupName.toLowerCase()));
+                setAllSubscriptions(prev => prev.filter(sub => sub.folderPath.toLowerCase() !== groupName.toLowerCase()));
                 toast.success(`Saliendo del grupo ${groupName}...`);
+            } else if (pending) {
+                await db.unsubscribeGroup(user.id, groupName);
+                setAllSubscriptions(prev => prev.filter(sub => sub.folderPath.toLowerCase() !== groupName.toLowerCase()));
+                toast.success(`Solicitud de unión para el grupo ${groupName} cancelada`);
             } else {
-                await db.subscribeGroup(user.id, groupName);
-                setSubscribedPaths(prev => [...prev, groupName]);
-                toast.success(`¡Te has unido al grupo ${groupName}!`);
+                const res = await db.subscribeGroup(user.id, groupName);
+                if (res && res.approved === false) {
+                    setAllSubscriptions(prev => [...prev, { folderPath: groupName, approved: 0 }]);
+                    toast.success("Solicitud de unión enviada. Esperando aprobación del administrador.");
+                } else {
+                    setSubscribedPaths(prev => [...prev, groupName]);
+                    setAllSubscriptions(prev => [...prev, { folderPath: groupName, approved: 1 }]);
+                    toast.success(`¡Te has unido al grupo ${groupName}!`);
+                }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Group action failed:', err);
-            toast.error("Error en la operación del grupo");
+            toast.error(err.message || "Error en la operación del grupo");
         }
     };
 
@@ -214,17 +258,29 @@ export default function GroupsPage() {
 
         try {
             setCreatingGroup(true);
-            const res = await db.createGroup(user.id, newGroupName.trim());
+            const res = await db.createGroup(
+                user.id,
+                newGroupName.trim(),
+                newGroupDescription.trim(),
+                newGroupPrivacy === 'PRIVATE',
+                newGroupCover.trim()
+            );
             toast.success(`Grupo "${newGroupName}" creado con éxito`);
             setShowCreateModal(false);
             setNewGroupName('');
+            setNewGroupDescription('');
+            setNewGroupCover('');
             await loadGroups();
             
             // Auto open the new group
             const newGroupObj = {
-                name: newGroupName.trim(),
+                name: res.name || newGroupName.trim(),
                 count: 0,
-                thumbnailUrl: null
+                thumbnailUrl: newGroupCover.trim() || null,
+                creatorId: user.id,
+                description: newGroupDescription.trim() || 'Grupo sin descripción.',
+                isPrivate: newGroupPrivacy === 'PRIVATE' ? 1 : 0,
+                membersCount: 1
             };
             handleGroupClick(newGroupObj);
         } catch (err: any) {
@@ -232,6 +288,79 @@ export default function GroupsPage() {
             toast.error(err.message || "Error al crear el grupo");
         } finally {
             setCreatingGroup(false);
+        }
+    };
+
+    const handleOpenEditModal = () => {
+        if (!activeGroup) return;
+        setEditGroupName(activeGroup.name);
+        setEditGroupDesc(activeGroup.description || '');
+        setEditGroupPrivacy(activeGroup.isPrivate === 1 ? 'PRIVATE' : 'PUBLIC');
+        setEditGroupCover(activeGroup.coverUrl || '');
+        setShowEditModal(true);
+    };
+
+    const handleEditGroupSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.id || !activeGroup) return;
+        if (!editGroupName.trim()) {
+            toast.error("El nombre del grupo no puede estar vacío");
+            return;
+        }
+        try {
+            setUpdatingGroup(true);
+            const res = await db.editGroup(
+                user.id,
+                activeGroup.name,
+                editGroupName.trim(),
+                editGroupDesc.trim(),
+                editGroupPrivacy === 'PRIVATE',
+                editGroupCover.trim()
+            );
+            toast.success("Grupo actualizado con éxito");
+            setShowEditModal(false);
+            
+            const updatedName = res.folderPath || activeGroup.name;
+            await loadGroups();
+            
+            setActiveGroup((prev: any) => ({
+                ...prev,
+                name: updatedName,
+                description: editGroupDesc.trim(),
+                isPrivate: editGroupPrivacy === 'PRIVATE' ? 1 : 0,
+                coverUrl: editGroupCover.trim()
+            }));
+        } catch (err: any) {
+            console.error("Error updating group:", err);
+            toast.error(err.message || "Error al actualizar grupo");
+        } finally {
+            setUpdatingGroup(false);
+        }
+    };
+
+    const handleApproveSub = async (sub: any) => {
+        if (!user?.id) return;
+        try {
+            await db.approveGroupSubscription(user.id, sub.userId, sub.folderPath);
+            toast.success(`Suscripción de ${sub.username} aprobada con éxito`);
+            await loadPendingSubscriptions();
+            await loadGroups();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || "Error al aprobar");
+        }
+    };
+
+    const handleDeclineSub = async (sub: any) => {
+        if (!user?.id) return;
+        try {
+            await db.declineGroupSubscription(user.id, sub.userId, sub.folderPath);
+            toast.success(`Solicitud de ${sub.username} rechazada`);
+            await loadPendingSubscriptions();
+            await loadGroups();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || "Error al rechazar");
         }
     };
 
@@ -391,20 +520,29 @@ export default function GroupsPage() {
         toast.success("¡Evento grupal programado exitosamente!");
     };
 
-    // Categorize groups based on sub status
+    // Categorize groups based on sub status with search query integration
+    const filteredGroups = useMemo(() => {
+        if (!groupSearchQuery.trim()) return groups;
+        const q = groupSearchQuery.toLowerCase();
+        return groups.filter(g => 
+            g.name.toLowerCase().includes(q) || 
+            (g.relativePath && g.relativePath.toLowerCase().includes(q))
+        );
+    }, [groups, groupSearchQuery]);
+
     const myGroups = useMemo(() => {
-        return groups.filter(g => isSubscribed(g.name));
-    }, [groups, subscribedPaths]);
+        return filteredGroups.filter(g => isSubscribed(g.name));
+    }, [filteredGroups, subscribedPaths]);
 
     const suggestedGroups = useMemo(() => {
         // Suggested are groups not subscribed, optionally sorted or filtered
-        return groups.filter(g => !isSubscribed(g.name));
-    }, [groups, subscribedPaths]);
+        return filteredGroups.filter(g => !isSubscribed(g.name));
+    }, [filteredGroups, subscribedPaths]);
 
     const mostVisitedGroups = useMemo(() => {
         // Copy list and sort by posts count descending (count of items / interactions)
-        return [...groups].sort((a,b) => b.count - a.count);
-    }, [groups]);
+        return [...filteredGroups].sort((a,b) => b.count - a.count);
+    }, [filteredGroups]);
 
     // Handle Photo/Files feed categorization filters
     const filteredContent = useMemo(() => {
@@ -439,6 +577,11 @@ export default function GroupsPage() {
     if (activeGroup) {
         const joined = isSubscribed(activeGroup.name);
         const isAdmin = user?.role === 'ADMIN';
+        const isCreator = user?.id && activeGroup.creatorId === user.id;
+        const isAuthorizedToView = !activeGroup.isPrivate || joined || isCreator || isAdmin;
+
+        const groupPendingCount = pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase()).length;
+        const groupPendingList = pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase());
 
         return (
             <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
@@ -448,32 +591,38 @@ export default function GroupsPage() {
                         <ArrowLeft size={18} />
                         <span>Grupos</span>
                     </button>
-                    <span className="font-bold text-sm truncate max-w-[200px] text-white">
-                        Grupo · {activeGroup.name.includes('/') ? activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1) : activeGroup.name}
+                    <span className="font-bold text-sm truncate max-w-[200px] text-white flex items-center gap-1">
+                        {activeGroup.isPrivate ? <Lock size={13} className="text-amber-500" /> : <Globe size={13} className="text-[#1877f2]" />}
+                        {activeGroup.name.includes('/') ? activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1) : activeGroup.name}
                     </span>
                     <button 
-                        onClick={(e) => handleToggleSubscribe(null, activeGroup.name)}
+                        onClick={(e) => handleToggleSubscribe(e, activeGroup.name)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                             joined 
                             ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb]' 
+                            : isGroupPending(activeGroup.name)
+                            ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
                             : 'bg-[#1877f2] hover:bg-blue-600 text-white'
                         }`}
+                        disabled={!joined && isGroupPending(activeGroup.name)}
                     >
-                        {joined ? 'Siguiendo ✓' : 'Unirte'}
+                        {joined ? 'Siguiendo ✓' : isGroupPending(activeGroup.name) ? 'Pendiente ⌛' : 'Unirte'}
                     </button>
                 </div>
 
                 {/* Group Cover Style Banner */}
                 <div className="bg-[#242526] border-b border-[#3e4042]">
                     <div className="relative h-44 bg-slate-800 flex items-center justify-center overflow-hidden">
-                        {activeGroup.thumbnailUrl ? (
-                            <img src={activeGroup.thumbnailUrl} className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
+                        {activeGroup.coverUrl || activeGroup.thumbnailUrl ? (
+                            <img src={activeGroup.coverUrl || activeGroup.thumbnailUrl} className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
                         ) : (
                             <div className="absolute inset-0 bg-gradient-to-r from-[#1e3c72] to-[#2a5298] opacity-70" />
                         )}
                         <div className="absolute inset-0 bg-black/40"></div>
                         <div className="relative text-center p-4">
-                            <span className="bg-[#1877f2] text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider mb-2 inline-block shadow-md">FB Grupo Público</span>
+                            <span className={`text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider mb-2 inline-block shadow-md ${activeGroup.isPrivate ? 'bg-amber-600' : 'bg-[#1877f2]'}`}>
+                                {activeGroup.isPrivate ? '🔒 FB Grupo Privado' : '🌎 FB Grupo Público'}
+                            </span>
                             <h1 className="text-2xl font-extrabold text-white tracking-tight">
                                 {activeGroup.name.includes('/') ? (
                                     <>
@@ -492,12 +641,24 @@ export default function GroupsPage() {
                                 <span>{activeGroup.count} Publicaciones</span>
                             </p>
                         </div>
+                        {(isCreator || isAdmin) && (
+                            <button 
+                                onClick={handleOpenEditModal}
+                                className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 rounded-full p-2.5 text-white transition-all shadow-md active:scale-95 z-10"
+                                title="Editar Grupo"
+                            >
+                                <Settings size={16} />
+                            </button>
+                        )}
                     </div>
 
                     {/* Facebook style Group description & actions */}
                     <div className="max-w-xl mx-auto px-4 py-3 border-b border-[#3e4042]/50 flex items-center justify-between">
                         <div>
-                            <p className="text-xs text-slate-400">Grupo de cooperación y contenido mutuo para el directorio <strong className="text-slate-200">/{activeGroup.name}</strong> en servidor local.</p>
+                            <p className="text-xs text-slate-300 italic mb-1">Ruta de almacenamiento: /{activeGroup.name}</p>
+                            <p className="text-xs text-slate-400">
+                                {activeGroup.description || 'Grupo de cooperación y contenido mutuo en servidor local.'}
+                            </p>
                         </div>
                     </div>
 
@@ -510,57 +671,141 @@ export default function GroupsPage() {
                             <span>Conversación</span>
                         </button>
                         <button 
-                            onClick={() => setGroupSubTab('PHOTOS')}
-                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${groupSubTab === 'PHOTOS' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
+                            onClick={() => { if (isAuthorizedToView) setGroupSubTab('PHOTOS'); else toast.error('Debes ser miembro para ver fotos'); }}
+                            disabled={!isAuthorizedToView}
+                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${!isAuthorizedToView ? 'opacity-30' : ''} ${groupSubTab === 'PHOTOS' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
                         >
                             <span>Fotos</span>
                         </button>
                         <button 
-                            onClick={() => setGroupSubTab('EVENTS')}
-                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${groupSubTab === 'EVENTS' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
+                            onClick={() => { if (isAuthorizedToView) setGroupSubTab('EVENTS'); else toast.error('Debes ser miembro para ver eventos'); }}
+                            disabled={!isAuthorizedToView}
+                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${!isAuthorizedToView ? 'opacity-30' : ''} ${groupSubTab === 'EVENTS' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
                         >
                             <span className="flex items-center gap-1">Eventos <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" /></span>
                         </button>
                         <button 
-                            onClick={() => setGroupSubTab('FILES')}
-                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${groupSubTab === 'FILES' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
+                            onClick={() => { if (isAuthorizedToView) setGroupSubTab('FILES'); else toast.error('Debes ser miembro para ver archivos'); }}
+                            disabled={!isAuthorizedToView}
+                            className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${!isAuthorizedToView ? 'opacity-30' : ''} ${groupSubTab === 'FILES' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
                         >
                             <span>Archivos</span>
                         </button>
+                        {(isCreator || isAdmin) && (
+                            <button 
+                                onClick={() => setGroupSubTab('SOLICITUDES')}
+                                className={`flex-1 flex flex-col items-center justify-center border-b-4 transition-all ${groupSubTab === 'SOLICITUDES' ? 'border-[#1877f2] text-[#1877f2]' : 'border-transparent hover:text-white'}`}
+                            >
+                                <span className="flex items-center gap-1">
+                                    Solicitudes
+                                    {groupPendingCount > 0 && (
+                                        <span className="bg-red-500 text-white rounded-full text-[9px] px-1 min-w-[14px] h-3.5 flex items-center justify-center font-extrabold animate-pulse">
+                                            {groupPendingCount}
+                                        </span>
+                                    )}
+                                </span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 <div className="max-w-xl mx-auto p-4 space-y-4">
-                    {/* Secondary menu tabs (Miembro, Invitar, etc) */}
-                    <div className="flex gap-2 bg-[#242526] p-2 rounded-xl border border-[#3e4042] shadow-sm justify-around text-xs">
-                        <button 
-                            onClick={(e) => handleToggleSubscribe(null, activeGroup.name)} 
-                            className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-300 font-bold hover:bg-[#3a3b3c] ${joined ? 'text-green-500 bg-[#3a3b3c]/20' : ''}`}
-                        >
-                            <Check size={16} />
-                            <span>{joined ? 'Unido' : 'Unirse'}</span>
-                        </button>
-                        <button 
-                            onClick={handleCopyInviteLink} 
-                            className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                        >
-                            <Share2 size={16} />
-                            <span>Invitar</span>
-                        </button>
-                        <button 
-                            onClick={() => setGroupSubTab('PHOTOS')} 
-                            className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                        >
-                            <ImageIcon size={16} />
-                            <span>Fotos</span>
-                        </button>
-                        <button 
-                            onClick={() => setGroupSubTab('FILES')} 
-                            className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                        >
-                            <FileText size={16} />
-                            <span>Archivos</span>
-                        </button>
+                    {!isAuthorizedToView ? (
+                        <div className="bg-[#242526] rounded-2xl p-8 border border-[#3e4042] text-center max-w-sm mx-auto shadow-xl space-y-4 my-8 animate-in zoom-in-95 duration-200">
+                            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-pulse">
+                                <Lock size={32} />
+                            </div>
+                            <h3 className="font-extrabold text-[#e4e6eb] text-base">Grupo de Acceso Privado</h3>
+                            <p className="text-xs text-[#b0b3b8] leading-relaxed">
+                                Este grupo es privado. El contenido compartido, las fotos, los videos y los archivos están restringidos exclusivamente para los miembros aprobados por el administrador.
+                            </p>
+                            {isGroupPending(activeGroup.name) ? (
+                                <div className="inline-flex items-center gap-1.5 bg-[#3a3b3c] text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow">
+                                    <Clock size={16} className="text-amber-500 animate-pulse" />
+                                    <span>Solicitud pendiente de aprobación</span>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={(e) => handleToggleSubscribe(e, activeGroup.name)}
+                                    className="bg-[#1877f2] hover:bg-blue-600 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all inline-flex items-center gap-1.5 shadow-md animate-bounce"
+                                >
+                                    <Plus size={16} />
+                                    <span>Solicitar Unirse al Grupo</span>
+                                </button>
+                            )}
+                        </div>
+                    ) : groupSubTab === 'SOLICITUDES' ? (
+                        <div className="bg-[#242526] rounded-xl p-4 border border-[#3e4042] shadow-md space-y-4 animate-in fade-in duration-200">
+                            <h3 className="font-extrabold text-sm text-white border-b border-[#3e4042] pb-2 flex items-center gap-1.5">
+                                <Clock size={16} className="text-amber-400" />
+                                Solicitudes de Suscripción Pendientes
+                            </h3>
+                            {groupPendingList.length === 0 ? (
+                                <p className="text-xs text-slate-400 text-center py-6">No hay solicitudes pendientes para este grupo.</p>
+                            ) : (
+                                <div className="divide-y divide-[#3e4042]/50">
+                                    {groupPendingList.map((sub: any) => (
+                                        <div key={sub.userId} className="flex items-center justify-between py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-9 h-9 rounded-full bg-[#1877f2] text-white font-extrabold flex items-center justify-center text-xs">
+                                                    {sub.username?.[0]?.toUpperCase() || 'U'}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-white">{sub.username}</p>
+                                                    <p className="text-[10px] text-slate-400">Solicitado el {new Date(sub.requestedAt).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => handleApproveSub(sub)}
+                                                    className="bg-green-600 hover:bg-green-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors shadow"
+                                                >
+                                                    Aprobar
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeclineSub(sub)}
+                                                    className="bg-[#3a3b3c] hover:bg-red-700 text-slate-200 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors border border-[#4e4f50]"
+                                                >
+                                                    Rechazar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Secondary menu tabs (Miembro, Invitar, etc) */}
+                            <div className="flex gap-2 bg-[#242526] p-2 rounded-xl border border-[#3e4042] shadow-sm justify-around text-xs animate-in slide-in-from-top-1">
+                                <button 
+                                    onClick={(e) => handleToggleSubscribe(e, activeGroup.name)} 
+                                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-300 font-bold hover:bg-[#3a3b3c] ${joined ? 'text-green-500 bg-[#3a3b3c]/20' : ''}`}
+                                >
+                                    <Check size={16} />
+                                    <span>{joined ? 'Unido' : isGroupPending(activeGroup.name) ? 'Pendiente' : 'Unirse'}</span>
+                                </button>
+                                <button 
+                                    onClick={handleCopyInviteLink} 
+                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
+                                >
+                                    <Share2 size={16} />
+                                    <span>Invitar</span>
+                                </button>
+                                <button 
+                                    onClick={() => setGroupSubTab('PHOTOS')} 
+                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
+                                >
+                                    <ImageIcon size={16} />
+                                    <span>Fotos</span>
+                                </button>
+                                <button 
+                                    onClick={() => setGroupSubTab('FILES')} 
+                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
+                                >
+                                    <FileText size={16} />
+                                    <span>Archivos</span>
+                                </button>
                     </div>
 
                     {/* FB Compositor Box for posting DIRECT to group */}
@@ -1032,6 +1277,8 @@ export default function GroupsPage() {
                             </div>
                         )
                     )}
+                    </>
+                )}
                 </div>
             </div>
         );
@@ -1053,6 +1300,28 @@ export default function GroupsPage() {
                         <Plus size={16} />
                         Crear grupo
                     </button>
+                </div>
+
+                {/* Subheader Search input */}
+                <div className="px-4 pb-3">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Buscar grupos por nombre o ruta..."
+                            value={groupSearchQuery}
+                            onChange={(e) => setGroupSearchQuery(e.target.value)}
+                            className="w-full bg-[#3a3b3c] hover:bg-[#4e4f50] focus:bg-[#3a3b3c] text-sm text-[#e4e6eb] placeholder-slate-400 pl-10 pr-4 py-2 rounded-xl border border-transparent focus:border-[#1877f2] transition-colors focus:outline-none"
+                        />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        {groupSearchQuery && (
+                            <button 
+                                onClick={() => setGroupSearchQuery('')} 
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b0b3b8] hover:text-white"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* FB styled tab headers */}
@@ -1147,6 +1416,7 @@ export default function GroupsPage() {
                                             key={group.name} 
                                             group={group} 
                                             joined={false}
+                                            pending={isGroupPending(group.name)}
                                             membersCount={getGroupMembersCount(group.name)}
                                             newPosts={getNewPostsCount(group.name)}
                                             onClick={handleGroupClick} 
@@ -1160,11 +1430,13 @@ export default function GroupsPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {mostVisitedGroups.map((group) => {
                                     const joined = isSubscribed(group.name);
+                                    const pending = isGroupPending(group.name);
                                     return (
                                         <GroupCard 
                                             key={group.name} 
                                             group={group} 
                                             joined={joined}
+                                            pending={pending}
                                             membersCount={getGroupMembersCount(group.name)}
                                             newPosts={getNewPostsCount(group.name)}
                                             onClick={handleGroupClick} 
@@ -1246,6 +1518,98 @@ export default function GroupsPage() {
                             >
                                 {creatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                                 <span>Crear Grupo</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT GROUP DIALOG MODAL */}
+            {showEditModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm overflow-hidden text-left animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between">
+                            <h3 className="font-extrabold text-white text-sm flex items-center gap-1.5">
+                                <Settings size={18} className="text-[#1877f2]" />
+                                Editar Detalles de Grupo
+                            </h3>
+                            <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditGroupSubmit} className="p-4 space-y-4">
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre de la carpeta</label>
+                                <input
+                                    type="text"
+                                    value={editGroupName}
+                                    onChange={(e) => setEditGroupName(e.target.value)}
+                                    placeholder="Nombre de la carpeta"
+                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2]"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción</label>
+                                <textarea
+                                    value={editGroupDesc}
+                                    onChange={(e) => setEditGroupDesc(e.target.value)}
+                                    placeholder="Describe el propósito del grupo para los nuevos miembros..."
+                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] h-20 resize-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">URL de la foto de portada</label>
+                                <input
+                                    type="text"
+                                    value={editGroupCover}
+                                    onChange={(e) => setEditGroupCover(e.target.value)}
+                                    placeholder="https://ejemplo.com/banner.jpg"
+                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2]"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Privacidad del grupo</label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                        <input
+                                            type="radio"
+                                            name="editPrivacy"
+                                            checked={editGroupPrivacy === 'PUBLIC'}
+                                            onChange={() => setEditGroupPrivacy('PUBLIC')}
+                                            className="accent-[#1877f2]"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Globe size={12} />Público</span>
+                                            <span className="text-[9px] text-slate-400 block">Cualquiera puede unirse y ver publicaciones.</span>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                        <input
+                                            type="radio"
+                                            name="editPrivacy"
+                                            checked={editGroupPrivacy === 'PRIVATE'}
+                                            onChange={() => setEditGroupPrivacy('PRIVATE')}
+                                            className="accent-[#1877f2]"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Lock size={12} />Privado (Suscripciones aprobadas)</span>
+                                            <span className="text-[9px] text-slate-400 block">Requiere aprobación del administrador del grupo.</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={updatingGroup}
+                                className="w-full bg-[#1877f2] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-xs font-bold mt-2 hover:shadow-lg transition-all flex items-center justify-center gap-1"
+                            >
+                                {updatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                <span>Guardar Cambios</span>
                             </button>
                         </form>
                     </div>
@@ -1359,13 +1723,14 @@ export default function GroupsPage() {
 interface GroupCardProps {
     group: any;
     joined: boolean;
+    pending?: boolean;
     membersCount: number;
     newPosts: number;
     onClick: (g: any) => void;
     onToggle: (e: React.MouseEvent, n: string) => void;
 }
 
-function GroupCard({ group, joined, membersCount, newPosts, onClick, onToggle }: GroupCardProps) {
+function GroupCard({ group, joined, pending = false, membersCount, newPosts, onClick, onToggle }: GroupCardProps) {
     // Elegant random bg gradients for groups without thumbnails
     const gradient = useMemo(() => {
         const presets = [
@@ -1412,10 +1777,16 @@ function GroupCard({ group, joined, membersCount, newPosts, onClick, onToggle }:
                                 <span className="text-[9px] text-[#1877f2] font-bold tracking-wider uppercase leading-none">
                                     {group.name.substring(0, group.name.lastIndexOf('/')).replace(/\//g, ' › ')}
                                 </span>
-                                <span className="text-sm font-extrabold text-[#e4e6eb]">{group.name.substring(group.name.lastIndexOf('/') + 1)}</span>
+                                <span className="text-sm font-extrabold text-[#e4e6eb] flex items-center gap-1">
+                                    {group.isPrivate === 1 && <Lock size={12} className="text-amber-500 fill-amber-500/10 flex-shrink-0" />}
+                                    {group.name.substring(group.name.lastIndexOf('/') + 1)}
+                                </span>
                             </>
                         ) : (
-                            <span className="text-sm font-extrabold hover:underline">{group.name}</span>
+                            <span className="text-sm font-extrabold hover:underline flex items-center gap-1 text-[#e4e6eb]">
+                                {group.isPrivate === 1 && <Lock size={12} className="text-amber-500 fill-amber-500/10 flex-shrink-0" />}
+                                {group.name}
+                            </span>
                         )}
                     </h3>
                     <p className="text-[10px] text-[#b0b3b8] font-semibold mt-1 flex items-center gap-1.5">
@@ -1423,6 +1794,9 @@ function GroupCard({ group, joined, membersCount, newPosts, onClick, onToggle }:
                         <span>{membersCount} Miembros</span>
                         <span>•</span>
                         <span>{group.count} publicaciones</span>
+                        {group.isPrivate === 1 && (
+                            <span className="text-amber-500 font-bold bg-amber-500/10 px-1 py-0.5 rounded text-[8px]">Privado</span>
+                        )}
                     </p>
                 </div>
                 
@@ -1431,10 +1805,12 @@ function GroupCard({ group, joined, membersCount, newPosts, onClick, onToggle }:
                     className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
                         joined 
                         ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb]' 
+                        : pending
+                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         : 'bg-[#1877f2] hover:bg-blue-600 text-white'
                     }`}
                 >
-                    {joined ? 'Miembro ✓' : 'Unirse al Grupo'}
+                    {joined ? 'Miembro ✓' : pending ? 'Pendiente ⌛' : 'Unirse al Grupo'}
                 </button>
             </div>
         </div>

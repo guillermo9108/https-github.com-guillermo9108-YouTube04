@@ -738,10 +738,42 @@ class DBService {
         return (await this.request<string[]>(`action=get_group_subscriptions&userId=${userId}`)) || [];
     }
 
-    public async createGroup(userId: string, name: string): Promise<any> {
+    public async getUserAllSubscriptions(userId: string): Promise<{ folderPath: string; approved: number }[]> {
+        return (await this.request<{ folderPath: string; approved: number }[]>(`action=get_user_all_subscriptions&userId=${userId}`)) || [];
+    }
+
+    public async createGroup(userId: string, name: string, description?: string, isPrivate?: boolean, coverUrl?: string): Promise<any> {
         return this.request<any>('action=group_create', {
             method: 'POST',
-            body: JSON.stringify({ userId, name })
+            body: JSON.stringify({ userId, name, description, isPrivate, coverUrl })
+        });
+    }
+
+    public async editGroup(userId: string, folderPath: string, name?: string, description?: string, isPrivate?: boolean, coverUrl?: string): Promise<any> {
+        return this.request<any>('action=group_edit', {
+            method: 'POST',
+            body: JSON.stringify({ userId, folderPath, name, description, isPrivate, coverUrl })
+        });
+    }
+
+    public async getPendingGroupSubscriptions(userId: string): Promise<any[]> {
+        return (await this.request<any[]>(`action=group_get_pending_subs`, {
+            method: 'POST',
+            body: JSON.stringify({ userId })
+        })) || [];
+    }
+
+    public async approveGroupSubscription(userId: string, subscriberId: string, folderPath: string): Promise<any> {
+        return this.request<any>('action=group_approve_sub', {
+            method: 'POST',
+            body: JSON.stringify({ userId, subscriberId, folderPath })
+        });
+    }
+
+    public async declineGroupSubscription(userId: string, subscriberId: string, folderPath: string): Promise<any> {
+        return this.request<any>('action=group_decline_sub', {
+            method: 'POST',
+            body: JSON.stringify({ userId, subscriberId, folderPath })
         });
     }
 

@@ -452,70 +452,78 @@ export default function StoryViewer() {
 
             {/* Bottom Panel Actions: Facebook style input & reaction bar */}
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent z-[60] flex flex-col gap-3">
-                {/* Facebook Reactions Floating Row */}
-                {user && (
-                    <div className="flex items-center gap-2 justify-center py-1.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10 px-3 self-center shadow-lg transform transition-transform hover:scale-105">
-                        {[
-                            { emoji: '👍', name: 'LIKE', label: 'Me gusta' },
-                            { emoji: '❤️', name: 'LOVE', label: 'Me encanta' },
-                            { emoji: '🥰', name: 'CARE', label: 'Me importa' },
-                            { emoji: '😆', name: 'HAHA', label: 'Me divierte' },
-                            { emoji: '😮', name: 'WOW', label: 'Me asombra' },
-                            { emoji: '😢', name: 'SAD', label: 'Me entristece' },
-                            { emoji: '😡', name: 'ANGRY', label: 'Me enoja' }
-                        ].map((react) => (
-                            <button 
-                                key={react.name}
-                                onClick={(e) => { e.stopPropagation(); handleReact(react.name); }}
-                                className="text-2xl hover:scale-130 active:scale-95 transition-all p-1"
-                                title={react.label}
-                            >
-                                {react.emoji}
-                            </button>
-                        ))}
+                {currentStory.userId && currentStory.userId.startsWith('group_') ? (
+                    <div className="text-center text-slate-300 text-xs font-bold py-3 px-4 select-none w-full bg-black/40 backdrop-blur-sm rounded-xl border border-white/5 shadow-inner">
+                        💬 Comentarios desactivados para historias de grupo
                     </div>
+                ) : (
+                    <>
+                        {/* Facebook Reactions Floating Row */}
+                        {user && (
+                            <div className="flex items-center gap-2 justify-center py-1.5 bg-black/45 backdrop-blur-md rounded-full border border-white/10 px-3 self-center shadow-lg transform transition-transform hover:scale-105">
+                                {[
+                                    { emoji: '👍', name: 'LIKE', label: 'Me gusta' },
+                                    { emoji: '❤️', name: 'LOVE', label: 'Me encanta' },
+                                    { emoji: '🥰', name: 'CARE', label: 'Me importa' },
+                                    { emoji: '😆', name: 'HAHA', label: 'Me divierte' },
+                                    { emoji: '😮', name: 'WOW', label: 'Me asombra' },
+                                    { emoji: '😢', name: 'SAD', label: 'Me entristece' },
+                                    { emoji: '😡', name: 'ANGRY', label: 'Me enoja' }
+                                ].map((react) => (
+                                    <button 
+                                        key={react.name}
+                                        onClick={(e) => { e.stopPropagation(); handleReact(react.name); }}
+                                        className="text-2xl hover:scale-130 active:scale-95 transition-all p-1"
+                                        title={react.label}
+                                    >
+                                        {react.emoji}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2 max-w-lg mx-auto w-full">
+                            {/* Send direct reply in chat */}
+                            {user && currentStory.userId !== user.id ? (
+                                <form onSubmit={handleSendReply} className="flex-1 flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
+                                    <input 
+                                        type="text"
+                                        placeholder={`Responder a ${currentStory.username}...`}
+                                        value={replyText}
+                                        onChange={(e) => setReplyText(e.target.value)}
+                                        onFocus={() => setPaused(true)}
+                                        onBlur={() => setTimeout(() => setPaused(false), 500)}
+                                        className="flex-1 h-10 bg-white/10 border border-white/20 rounded-full px-4 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#1877f2] focus:bg-white/20 transition-all font-sans"
+                                    />
+                                    <button 
+                                        type="submit"
+                                        className="w-10 h-10 flex items-center justify-center bg-[#1877f2] hover:bg-blue-600 rounded-full text-white active:scale-90 transition-transform"
+                                        title="Enviar respuesta"
+                                    >
+                                        <Send size={16} />
+                                    </button>
+                                </form>
+                            ) : (
+                                <div className="flex-1" />
+                            )}
+
+                            {/* Owner stats checking */}
+                            {user && user.id === currentStory.userId && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPaused(true);
+                                        setShowInteractionsList(true);
+                                    }}
+                                    className="bg-white/15 hover:bg-white/25 border border-white/20 text-white rounded-full px-4 py-2 text-xs font-bold flex items-center gap-1.5 transition-all ml-auto"
+                                >
+                                    <Eye size={16} />
+                                    <span>Ver vistas</span>
+                                </button>
+                            )}
+                        </div>
+                    </>
                 )}
-
-                <div className="flex items-center gap-2 max-w-lg mx-auto w-full">
-                    {/* Send direct reply in chat */}
-                    {user && currentStory.userId !== user.id ? (
-                        <form onSubmit={handleSendReply} className="flex-1 flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                                type="text"
-                                placeholder={`Responder a ${currentStory.username}...`}
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                onFocus={() => setPaused(true)}
-                                onBlur={() => setTimeout(() => setPaused(false), 500)}
-                                className="flex-1 h-10 bg-white/10 border border-white/20 rounded-full px-4 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#1877f2] focus:bg-white/20 transition-all font-sans"
-                            />
-                            <button 
-                                type="submit"
-                                className="w-10 h-10 flex items-center justify-center bg-[#1877f2] hover:bg-blue-600 rounded-full text-white active:scale-90 transition-transform"
-                                title="Enviar respuesta"
-                            >
-                                <Send size={16} />
-                            </button>
-                        </form>
-                    ) : (
-                        <div className="flex-1" />
-                    )}
-
-                    {/* Owner stats checking */}
-                    {user && user.id === currentStory.userId && (
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setPaused(true);
-                                setShowInteractionsList(true);
-                            }}
-                            className="bg-white/15 hover:bg-white/25 border border-white/20 text-white rounded-full px-4 py-2 text-xs font-bold flex items-center gap-1.5 transition-all ml-auto"
-                        >
-                            <Eye size={16} />
-                            <span>Ver vistas</span>
-                        </button>
-                    )}
-                </div>
             </div>
 
             {/* Interactions Overlaid Drawer */}

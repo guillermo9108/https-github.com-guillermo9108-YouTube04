@@ -756,12 +756,33 @@ function group_subscribe($pdo, $input) {
     $folderPath = $input['folderPath'] ?? '';
     if (!$userId || !$folderPath) respond(false, null, "Faltan datos");
 
-    $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, createdAt) VALUES (?, ?, ?)");
+    // Check if the group is private
+    $isPrivate = 0;
     try {
-        $stmt->execute([$userId, $folderPath, time()]);
-        respond(true, "Suscripción a grupo exitosa");
+        $stmtM = $pdo->prepare("SELECT isPrivate, creatorId FROM groups_metadata WHERE folderPath = ?");
+        $stmtM->execute([$folderPath]);
+        $meta = $stmtM->fetch(PDO::FETCH_ASSOC);
+        if ($meta) {
+            $isPrivate = (int)$meta['isPrivate'];
+            // Creator is always auto-approved
+            if ($meta['creatorId'] === $userId) {
+                $isPrivate = 0;
+            }
+        }
+    } catch (Exception $e) {}
+
+    $approved = $isPrivate === 1 ? 0 : 1;
+
+    try {
+        $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$userId, $folderPath, $approved, time()]);
+        if ($approved === 0) {
+            respond(true, ['approved' => false], "Solicitud de suscripción enviada. Esperando aprobación del administrador.");
+        } else {
+            respond(true, ['approved' => true], "Suscripción a grupo exitosa");
+        }
     } catch (Exception $e) {
-        respond(false, null, "Ya estás suscrito o error general");
+        respond(false, null, "Ya estás suscrito o tienes una solicitud pendiente");
     }
 }
 
@@ -779,22 +800,46 @@ function get_group_subscriptions($pdo) {
     $userId = $_GET['userId'] ?? '';
     if (!$userId) respond(false, null, "Falta userId");
 
-    $stmt = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ?");
+    // Return approved folderPaths
+    $stmt = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ? AND approved = 1");
     $stmt->execute([$userId]);
     $subs = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    respond(true, $subs);
+}
+
+function get_user_all_subscriptions($pdo) {
+    $userId = $_GET['userId'] ?? '';
+    if (!$userId) respond(false, null, "Falta userId");
+
+    $stmt = $pdo->prepare("SELECT folderPath, approved FROM group_subscriptions WHERE userId = ?");
+    $stmt->execute([$userId]);
+    $subs = $stmt->fetchAll(PDO::FETCH_ASSOC);
     respond(true, $subs);
 }
 
 function group_create($pdo, $input) {
     $userId = $input['userId'] ?? '';
     $groupName = trim($input['name'] ?? '');
+    $description = trim($input['description'] ?? 'Grupo sin descripción.');
+    $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
+    $coverUrl = $input['coverUrl'] ?? null;
+
     if (!$userId || !$groupName) respond(false, null, "Faltan datos");
 
-    // Clean up name
-    $groupName = preg_replace('/[^A-Za-z0-9 _-]/', '', $groupName);
-    if (empty($groupName)) respond(false, null, "Nombre de grupo inválido");
+    // Bloquear nombres reservados
+    $reserved = ["PRINCIPAL", "PRIVADO", "PERSONAL", "GENERAL", "TODOS", "ALL", "uploads", "admin", "config", "shared"];
+    if (in_array(strtoupper($groupName), $reserved)) {
+        respond(false, null, "Ese nombre de grupo está reservado.");
+    }
 
-    // Create the physical subdirectory in the local Library path
+    // Clean up name but allow unicode/emojis!
+    // Safe filesystem path: replace / \ ? * : " ' < > | . with empty string, preserving Russian/Spanish letters/emojis
+    $folderNameForDir = preg_replace('/[\/\\\\\?\*\:\"\'\<\>\|\.]/u', '', $groupName);
+    if (empty($folderNameForDir)) {
+        respond(false, null, "Nombre de grupo inválido");
+    }
+
+    // Create physical subdirectory
     $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
     $sSet = $stmtSet->fetch();
     $localPath = $sSet['localLibraryPath'] ?? '';
@@ -802,9 +847,9 @@ function group_create($pdo, $input) {
         $localPath = 'uploads/videos/';
     }
 
-    $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $groupName;
+    $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $folderNameForDir;
     if (is_dir($targetDir)) {
-        respond(false, null, "El grupo (carpeta) ya existe");
+        respond(false, null, "El grupo (carpeta) ya existe física o virtualmente");
     }
 
     if (!is_dir($targetDir)) {
@@ -813,13 +858,136 @@ function group_create($pdo, $input) {
         }
     }
 
-    // Automatically auto-subscribe creator to this new group!
-    $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, createdAt) VALUES (?, ?, ?)");
+    // Register metadata
     try {
-        $stmt->execute([$userId, $groupName, time()]);
+        $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, createdAt) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, time()]);
     } catch (Exception $e) {
-        // En caso de fallar suscripción automática, no importa
+        // En caso de que falle la tabla, seguimos adelante
     }
 
-    respond(true, ['name' => $groupName], "Grupo creado exitosamente");
+    // Automatically auto-subscribe creator with approved=1
+    $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, 1, ?)");
+    try {
+        $stmt->execute([$userId, $folderNameForDir, time()]);
+    } catch (Exception $e) {}
+
+    respond(true, ['name' => $folderNameForDir], "Grupo creado exitosamente");
+}
+
+function group_edit($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    $folderPath = $input['folderPath'] ?? '';
+    if (!$userId || !$folderPath) respond(false, null, "Faltan datos");
+
+    $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
+    $stmt->execute([$folderPath]);
+    $creatorId = $stmt->fetchColumn();
+    if ($creatorId !== $userId) respond(false, null, "No tienes permisos de administrador para este grupo");
+
+    $description = $input['description'] ?? null;
+    $coverUrl = $input['coverUrl'] ?? null;
+    $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
+    $newName = trim($input['name'] ?? '');
+
+    if (!empty($newName) && $newName !== $folderPath) {
+        $reserved = ["PRINCIPAL", "PRIVADO", "PERSONAL", "GENERAL", "TODOS", "ALL", "uploads", "admin", "config", "shared"];
+        if (in_array(strtoupper($newName), $reserved)) {
+            respond(false, null, "Ese nombre de grupo está reservado.");
+        }
+        $folderNameForDir = preg_replace('/[\/\\\\\?\*\:\"\'\<\>\|\.]/u', '', $newName);
+        if (empty($folderNameForDir)) respond(false, null, "Nombre de grupo inválido");
+
+        $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+        $sSet = $stmtSet->fetch();
+        $localPath = $sSet['localLibraryPath'] ?? 'uploads/videos/';
+        $oldDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $folderPath;
+        $newDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $folderNameForDir;
+
+        if (is_dir($oldDir)) {
+            if (is_dir($newDir)) respond(false, null, "El nuevo nombre ya existe física o virtualmente.");
+            rename($oldDir, $newDir);
+        }
+
+        // update db records
+        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ? WHERE folderPath = ?");
+        $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $folderPath]);
+
+        $stmtSub = $pdo->prepare("UPDATE group_subscriptions SET folderPath = ? WHERE folderPath = ?");
+        $stmtSub->execute([$folderNameForDir, $folderPath]);
+
+        // update videos
+        $stmtV = $pdo->prepare("SELECT id, videoUrl FROM videos WHERE category = ? OR videoUrl LIKE ?");
+        $stmtV->execute([$folderPath, "%/{$folderPath}/%"]);
+        $vids = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($vids as $v) {
+            $newVideoUrl = str_replace("/{$folderPath}/", "/{$folderNameForDir}/", $v['videoUrl']);
+            $stmtUp = $pdo->prepare("UPDATE videos SET category = ?, videoUrl = ? WHERE id = ?");
+            $stmtUp->execute([$folderNameForDir, $newVideoUrl, $v['id']]);
+        }
+
+        $folderPath = $folderNameForDir;
+    } else {
+        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ? WHERE folderPath = ?");
+        $stmtMeta->execute([$description, $coverUrl, $isPrivate, $folderPath]);
+    }
+
+    respond(true, ['folderPath' => $folderPath], "Grupo actualizado con éxito");
+}
+
+function group_get_pending_subs($pdo, $input) {
+    $userId = $input['userId'] ?? '';
+    if (!$userId) respond(false, null, "Faltan datos");
+
+    // Fetch all pending subscriptions for groups created by $userId
+    $stmt = $pdo->prepare("
+        SELECT gs.userId, gs.folderPath, gs.createdAt, u.username, u.avatarUrl 
+        FROM group_subscriptions gs
+        JOIN users u ON gs.userId = u.id
+        JOIN groups_metadata gm ON gs.folderPath = gm.folderPath
+        WHERE gs.approved = 0 AND gm.creatorId = ?
+    ");
+    $stmt->execute([$userId]);
+    $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($pending as &$p) {
+        $p['avatarUrl'] = $p['avatarUrl'] ? fix_url($p['avatarUrl']) : 'uploads/avatars/default.png';
+    }
+
+    respond(true, $pending);
+}
+
+function group_approve_sub($pdo, $input) {
+    $adminId = $input['userId'] ?? '';
+    $subscriberId = $input['subscriberId'] ?? '';
+    $folderPath = $input['folderPath'] ?? '';
+    if (!$adminId || !$subscriberId || !$folderPath) respond(false, null, "Faltan datos");
+
+    // Confirm that adminId is indeed the creator
+    $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
+    $stmt->execute([$folderPath]);
+    $creatorId = $stmt->fetchColumn();
+    if ($creatorId !== $adminId) respond(false, null, "No tienes permisos");
+
+    $stmtUp = $pdo->prepare("UPDATE group_subscriptions SET approved = 1 WHERE userId = ? AND folderPath = ?");
+    $stmtUp->execute([$subscriberId, $folderPath]);
+
+    respond(true, null, "Suscripción aprobada");
+}
+
+function group_decline_sub($pdo, $input) {
+    $adminId = $input['userId'] ?? '';
+    $subscriberId = $input['subscriberId'] ?? '';
+    $folderPath = $input['folderPath'] ?? '';
+    if (!$adminId || !$subscriberId || !$folderPath) respond(false, null, "Faltan datos");
+
+    $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
+    $stmt->execute([$folderPath]);
+    $creatorId = $stmt->fetchColumn();
+    if ($creatorId !== $adminId) respond(false, null, "No tienes permisos");
+
+    $stmtDel = $pdo->prepare("DELETE FROM group_subscriptions WHERE userId = ? AND folderPath = ?");
+    $stmtDel->execute([$subscriberId, $folderPath]);
+
+    respond(true, null, "Solicitud rechazada");
 }

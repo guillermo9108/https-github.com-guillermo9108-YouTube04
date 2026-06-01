@@ -331,7 +331,7 @@ function video_get_all($pdo) {
                 OR v.creatorId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?)
                 OR EXISTS (
                     SELECT 1 FROM group_subscriptions gs 
-                    WHERE gs.userId = ? 
+                    WHERE gs.userId = ? AND gs.approved = 1
                     AND (
                         REPLACE(v.videoUrl, '\\\\', '/') LIKE CONCAT('%/', gs.folderPath, '/%')
                         OR REPLACE(v.videoUrl, '\\\\', '/') LIKE CONCAT('%/', gs.folderPath)
@@ -488,6 +488,87 @@ function video_get_all($pdo) {
     $activeCategories = $activeCatsStmt->fetchAll(PDO::FETCH_COLUMN);
 
     video_process_rows($videos);
+
+    // Determine user approved subscriptions map
+    $userApprovedSubs = [];
+    if (!empty($userId)) {
+        try {
+            $stmtSub = $pdo->prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ? AND approved = 1");
+            $stmtSub->execute([$userId]);
+            $userApprovedSubs = $stmtSub->fetchAll(PDO::FETCH_COLUMN);
+            $userApprovedSubs = array_map('strtolower', $userApprovedSubs);
+        } catch (Exception $e) {}
+    }
+
+    // Load private groups map
+    $privateGroups = [];
+    try {
+        $stmtPriv = $pdo->query("SELECT folderPath, creatorId FROM groups_metadata WHERE isPrivate = 1");
+        $privMeta = $stmtPriv->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($privMeta as $pm) {
+            $privateGroups[strtolower($pm['folderPath'])] = $pm['creatorId'];
+        }
+    } catch (Exception $e) {}
+
+    foreach ($videos as &$v) {
+        $vCategory = isset($v['category']) ? strtolower($v['category']) : '';
+        $belongToPrivateGroup = false;
+        $groupCreatorId = null;
+        $matchedGroupPath = '';
+
+        if (isset($privateGroups[$vCategory])) {
+            $belongToPrivateGroup = true;
+            $groupCreatorId = $privateGroups[$vCategory];
+            $matchedGroupPath = $v['category'];
+        } else {
+            // Check url segments
+            $vUrl = str_replace('\\', '/', $v['videoUrl']);
+            foreach ($privateGroups as $gPath => $cId) {
+                if (strpos(strtolower($vUrl), '/' . $gPath . '/') !== false) {
+                    $belongToPrivateGroup = true;
+                    $groupCreatorId = $cId;
+                    $matchedGroupPath = $gPath;
+                    break;
+                }
+            }
+        }
+
+        if ($belongToPrivateGroup) {
+            $v['belongsToGroup'] = $matchedGroupPath;
+            $isPostCreator = ($userId && $v['creatorId'] === $userId);
+            $isGroupCreator = ($userId && $groupCreatorId === $userId);
+            $isSubscribed = in_array(strtolower($matchedGroupPath), $userApprovedSubs);
+
+            if (!$isAdmin && !$isPostCreator && !$isGroupCreator && !$isSubscribed) {
+                // User does not have access! Censured!
+                $v['isCensored'] = 1;
+                $v['originalVideoUrl'] = $v['videoUrl']; // backup
+                $v['videoUrl'] = ''; // Empty video file
+                $v['streamUrl'] = '';
+                $v['is_private'] = 1;
+            } else {
+                $v['isCensored'] = 0;
+            }
+        } else {
+            $v['isCensored'] = 0;
+            // Add group path if matched with regular public groups
+            // Just extract the folder name from any subfolder
+            $vUrl = str_replace('\\', '/', $v['videoUrl']);
+            if (isset($roots)) {
+                foreach ($roots as $root) {
+                    $cleaned = trim($root, '/');
+                    if (empty($cleaned)) continue;
+                    if (strpos($vUrl, $cleaned . '/') === 0) {
+                        $remaining = trim(substr($vUrl, strlen($cleaned)), '/');
+                        $parts = explode('/', $remaining);
+                        if (count($parts) > 1) {
+                            $v['belongsToGroup'] = $parts[0];
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Información adicional de navegación
     $navigationInfo = null;
@@ -903,6 +984,110 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     }
 
     $folders = array_values($folderMap);
+
+    // Group videos by lowercase relativePath to identify last thumbs and new posts count
+    $folderVideosList = [];
+    foreach ($videos as $v) {
+        $videoUrl = trim(str_replace('\\', '/', $v['videoUrl']), '/');
+        $videoDir = dirname($videoUrl);
+        $videoDir = trim(str_replace('\\', '/', $videoDir), '/');
+        
+        foreach ($roots as $root) {
+            $cleanedRoot = trim($root, '/');
+            if (empty($cleanedRoot)) continue;
+            if (strpos($videoDir, $cleanedRoot) === 0) {
+                $relPath = trim(substr($videoDir, strlen($cleanedRoot)), '/');
+                if ($relPath === '' || $relPath === '.') continue;
+                $folderVideosList[strtolower($relPath)][] = $v;
+                break;
+            }
+        }
+    }
+
+    // Load all metadata from groups_metadata
+    $metaMap = [];
+    try {
+        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, createdAt FROM groups_metadata");
+        $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($allMeta as $m) {
+            $metaMap[strtolower($m['folderPath'])] = $m;
+        }
+    } catch (Exception $e) {}
+
+    // Load members count map from group_subscriptions where approved = 1
+    $membersMap = [];
+    try {
+        $stmtMem = $pdo->query("SELECT folderPath, COUNT(*) as count FROM group_subscriptions WHERE approved = 1 GROUP BY folderPath");
+        $allMem = $stmtMem->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($allMem as $m) {
+            $membersMap[strtolower($m['folderPath'])] = (int)$m['count'];
+        }
+    } catch (Exception $e) {}
+
+    foreach ($folders as &$f) {
+        $key = strtolower($f['relativePath']);
+        
+        // Metadata
+        if (isset($metaMap[$key])) {
+            $f['creatorId'] = $metaMap[$key]['creatorId'];
+            $f['description'] = $metaMap[$key]['description'];
+            $f['coverUrl'] = $metaMap[$key]['coverUrl'] ? fix_url($metaMap[$key]['coverUrl']) : null;
+            $f['isPrivate'] = (int)$metaMap[$key]['isPrivate'];
+            $f['createdAt'] = (int)$metaMap[$key]['createdAt'];
+        } else {
+            $f['creatorId'] = 'admin';
+            $f['description'] = 'Grupo sin descripción.';
+            $f['coverUrl'] = null;
+            $f['isPrivate'] = 0;
+            $f['createdAt'] = time();
+        }
+
+        // Subscriptions count
+        $f['membersCount'] = isset($membersMap[$key]) ? $membersMap[$key] : 0;
+        if ($f['membersCount'] === 0) {
+            $f['membersCount'] = 1; // At least the creator
+        }
+
+        // Miniatures
+        $f['lastVideoThumb'] = null;
+        $f['lastAudioThumb'] = null;
+        $f['lastImageThumb'] = null;
+        $f['newPosts'] = 0;
+
+        if (isset($folderVideosList[$key])) {
+            $grpVideos = $folderVideosList[$key];
+            // Sort by createdAt descending
+            usort($grpVideos, function($a, $b) {
+                return (int)$b['createdAt'] <=> (int)$a['createdAt'];
+            });
+
+            $oneDayAgo = time() - 86400;
+            foreach ($grpVideos as $gv) {
+                if ((int)$gv['createdAt'] >= $oneDayAgo) {
+                    $f['newPosts']++;
+                }
+
+                $gvThumb = !empty($gv['thumbnailUrl']) ? fix_url($gv['thumbnailUrl']) : null;
+                $isImage = preg_match('/\.(png|jpg|jpeg|gif|webp)$/i', $gv['videoUrl']) || (isset($gv['category']) && strcasecmp($gv['category'], 'IMAGES') === 0);
+                $isAudio = isset($gv['is_audio']) && $gv['is_audio'] == 1;
+
+                if ($isImage) {
+                    if (!$f['lastImageThumb']) {
+                        $f['lastImageThumb'] = fix_url($gv['videoUrl']);
+                    }
+                } else if ($isAudio) {
+                    if (!$f['lastAudioThumb']) {
+                        $f['lastAudioThumb'] = $gvThumb ?: 'api/uploads/thumbnails/default.jpg';
+                    }
+                } else {
+                    if (!$f['lastVideoThumb']) {
+                        $f['lastVideoThumb'] = $gvThumb ?: 'api/uploads/thumbnails/default.jpg';
+                    }
+                }
+            }
+        }
+    }
+
     usort($folders, function($a, $b) {
         return strcasecmp($a['name'], $b['name']);
     });
@@ -928,6 +1113,8 @@ function video_upload($pdo, $post, $files) {
         $localPath = $sSet['localLibraryPath'] ?? '';
         if (!empty($localPath)) {
             $videoDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . trim($folderParam, '/') . '/';
+        } else {
+            $videoDir = 'uploads/videos/' . trim($folderParam, '/') . '/';
         }
     }
     if (!is_dir($videoDir)) mkdir($videoDir, 0777, true);
@@ -1484,6 +1671,8 @@ function upload_channel_images($pdo, $post, $files) {
                 $localPath = $sSet['localLibraryPath'] ?? '';
                 if (!empty($localPath)) {
                     $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . trim($folderParam, '/') . '/';
+                } else {
+                    $targetDir = 'uploads/videos/' . trim($folderParam, '/') . '/';
                 }
             }
             if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
@@ -1884,13 +2073,32 @@ function get_stories($pdo) {
         $relPath = $folderData['relativePath'];
         $folderVideos = $folderData['videos'];
 
-        // Ordenar videos por fecha u otros criterios de frescura
+        // Deterministic seeding based on current 24-hour day block and relPath to achieve:
+        // - "Generar entre 1 y 5 historias aleatorias por grupo."
+        // - "Mantenerse fijas durante 24 horas y regenerarse automáticamente de forma determinista."
+        $dayBlock = floor($now / 86400); 
+        $hash = md5($relPath . '_' . $dayBlock);
+        
+        // Count to select: between 1 and 5
+        $numStoriesToSelect = (hexdec(substr($hash, 0, 4)) % 5) + 1;
+        $numStoriesToSelect = min($numStoriesToSelect, count($folderVideos));
+        
+        // Sort folderVideos by ID so starting order is 100% stable
         usort($folderVideos, function($a, $b) {
-            return (int)$b['createdAt'] <=> (int)$a['createdAt'];
+            return (int)$a['id'] <=> (int)$b['id'];
         });
+        
+        // Now pick $numStoriesToSelect videos deterministically using the hash
+        $selectedVideos = [];
+        $tempVideos = $folderVideos;
+        for ($i = 0; $i < $numStoriesToSelect; $i++) {
+            if (empty($tempVideos)) break;
+            $subSeed = hexdec(substr($hash, 4 + $i * 4, 4));
+            $idx = $subSeed % count($tempVideos);
+            $selectedVideos[] = $tempVideos[$idx];
+            array_splice($tempVideos, $idx, 1);
+        }
 
-        // Tomar hasta 5 videos recientes para representarlos como historias del grupo
-        $selectedVideos = array_slice($folderVideos, 0, 5);
         $isSubscribed = in_array($relPath, $followedGroups) ? 1 : 0;
 
         foreach ($selectedVideos as $index => $mv) {
@@ -1976,14 +2184,27 @@ function get_stories($pdo) {
         }
     }
 
-    // Ordenar los bloques de historias
-    // Primero, los bloques seguidos (isFriend = 1).
-    // Segundo, los bloques no seguidos (isFriend = 0).
-    // Dentro de cada grupo, ordenar por el maxCreatedAt descendente.
-    uasort($allGroups, function($a, $b) {
-        if ($a['isFriend'] !== $b['isFriend']) {
-            return $b['isFriend'] <=> $a['isFriend'];
+    // Ordenar los bloques de historias coordinadamente por el orden solicitado:
+    // 1) Historia del usuario activo ($userId).
+    // 2) Historias de usuarios que sigue el usuario ($isFriend === 1 y no es grupo).
+    // 3) Historias de grupos (subcarpetas) ($userId empieza con "group_").
+    uasort($allGroups, function($a, $b) use ($userId) {
+        $aIsSelf = (!empty($userId) && $a['userId'] === $userId) ? 1 : 0;
+        $bIsSelf = (!empty($userId) && $b['userId'] === $userId) ? 1 : 0;
+        if ($aIsSelf !== $bIsSelf) {
+            return $bIsSelf <=> $aIsSelf; // Self goes first
         }
+        
+        $aIsGroup = (strpos($a['userId'], 'group_') === 0) ? 1 : 0;
+        $bIsGroup = (strpos($b['userId'], 'group_') === 0) ? 1 : 0;
+        if ($aIsGroup !== $bIsGroup) {
+            return $aIsGroup <=> $bIsGroup; // Non-group goes before group
+        }
+        
+        if ($a['isFriend'] !== $b['isFriend']) {
+            return $b['isFriend'] <=> $a['isFriend']; // Friends first
+        }
+        
         return $b['maxCreatedAt'] <=> $a['maxCreatedAt'];
     });
 
