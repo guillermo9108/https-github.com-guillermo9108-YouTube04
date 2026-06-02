@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Video, User } from '../types';
-import { Link } from './Router';
+import { Link, useNavigate } from './Router';
+import CommentSection from './watch/CommentSection';
 import { CheckCircle2, Clock, MoreVertical, Play, Music, RefreshCw, Folder, Share2, Download, Eye, Edit3, Trash2, ExternalLink, Image as ImageIcon, X, Layers, ChevronLeft, ChevronRight, ThumbsUp, MessageCircle, UserPlus, Heart, Globe, X as CloseIcon, Wand2, Scissors } from 'lucide-react';
 import InteractiveDescription from './InteractiveDescription';
 import { db } from '../services/db';
@@ -86,6 +87,68 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [inlinePlaying, setInlinePlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const navigate = useNavigate();
+  const [showMembershipRequiredModal, setShowMembershipRequiredModal] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentsList, setCommentsList] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+
+  const [reaction, setReaction] = useState<{ emoji: string; text: string }>(() => {
+      try {
+          const raw = localStorage.getItem('sp_reaction_' + video.id);
+          if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return { emoji: '👍', text: 'Me gusta' };
+  });
+
+  const [showReactionsMenu, setShowReactionsMenu] = useState(false);
+  const reactionTimerRef = useRef<any>(null);
+
+  const handleStartPress = (e: React.MouseEvent | React.TouchEvent) => {
+      if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+      reactionTimerRef.current = setTimeout(() => {
+          setShowReactionsMenu(true);
+      }, 500); 
+  };
+
+  const handleReleasePress = () => {
+      if (reactionTimerRef.current) {
+          clearTimeout(reactionTimerRef.current);
+          reactionTimerRef.current = null;
+      }
+  };
+
+  const handleSelectReaction = async (emoji: string, text: string) => {
+      try {
+          localStorage.setItem('sp_reaction_' + video.id, JSON.stringify({ emoji, text }));
+          setReaction({ emoji, text });
+      } catch (e) {}
+
+      if (!liked) {
+          await handleLike();
+      }
+      setShowReactionsMenu(false);
+  };
+
+  const handleToggleComments = async () => {
+      setShowComments(!showComments);
+      if (!showComments) {
+          setLoadingComments(true);
+          try {
+              const list = await db.getComments(video.id);
+              setCommentsList(list || []);
+          } catch (e) {
+              console.error(e);
+          } finally {
+              setLoadingComments(false);
+          }
+      }
+  };
+
+  const handleCommentAdded = (newComment: any) => {
+      setCommentsList(prev => [newComment, ...prev]);
+  };
 
   // Auto-register on window global array for smart slider autoplay
   useEffect(() => {
@@ -432,7 +495,8 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   const handlePurchase = async () => {
       if (!user || !video) return;
       if (Number(user.balance) < Number(video.price)) {
-          toast.error("Saldo insuficiente");
+          setShowMembershipRequiredModal(true);
+          setShowPurchaseModal(false);
           return;
       }
       try {
@@ -523,9 +587,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
     }
   }, [user?.id, video.id]);
 
-  const handleLike = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleLike = async (e?: React.MouseEvent) => {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
     if (!user) {
         toast.error("Inicia sesión para reaccionar");
         return;
@@ -891,6 +957,21 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                                 });
                             }
                         }}
+                        onLoadedMetadata={(e) => {
+                            try {
+                                const videoElem = e.currentTarget;
+                                const savedTime = localStorage.getItem(`sp_progress_${video.id}`);
+                                if (savedTime) {
+                                    videoElem.currentTime = parseFloat(savedTime);
+                                }
+                            } catch (err) {}
+                        }}
+                        onTimeUpdate={(e) => {
+                            try {
+                                const videoElem = e.currentTarget;
+                                localStorage.setItem(`sp_progress_${video.id}`, String(videoElem.currentTime));
+                            } catch (err) {}
+                        }}
                         onEnded={() => {
                             setInlinePlaying(false);
                             if (window && (window as any).globalVideoCardList) {
@@ -919,7 +1000,13 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                         } else if (isImage) { 
                             handleImageClick(e); 
                         } else { 
-                            setInlinePlaying(true); 
+                            const isVip = user?.role?.trim().toUpperCase() === 'VIP' || user?.role?.trim().toUpperCase() === 'ADMIN';
+                            const hasAccess = isAdmin || isOwner || isVip || isUnlocked;
+                            if (!hasAccess && Number(video.price) > 0) {
+                                setShowPurchaseModal(true);
+                            } else {
+                                setInlinePlaying(true); 
+                            }
                         } 
                     }}
                     className="absolute inset-0 z-0 group/media"
@@ -957,11 +1044,16 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                         </div>
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 text-slate-700 p-4">
-                            <div className="relative">
+                            <div className="relative flex flex-col items-center justify-center">
                                 {isAudio ? <Music size={48} className="opacity-10 mb-2" /> : isImage ? <ImageIcon size={48} className="opacity-10 mb-2" /> : <Play size={48} className="opacity-10 mb-2"/>}
                                 {isProcessing && (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-[2px] rounded-xl p-2 select-none">
+                                        <span className="text-indigo-400 text-xs font-black animate-pulse">
+                                            {video.transcode_progress !== undefined && video.transcode_progress > 0 
+                                                ? `${video.transcode_progress}%` 
+                                                : `${Math.floor(Math.random() * 20) + 40}%`
+                                            }
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -1089,23 +1181,82 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
         
         <div className="h-px bg-[var(--divider)] mx-2 mb-1"></div>
         
-        <div className="flex items-center gap-1 px-1 pb-1">
+        <div className="flex items-center gap-1 px-1 pb-1 relative">
+          {/* Long-press Reactions Menu Overlay */}
+          {showReactionsMenu && (
+            <div className="absolute bottom-[48px] left-2 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-full px-3 py-2 flex items-center gap-3.5 shadow-2xl z-[60] animate-in fade-in slide-in-from-bottom-2 duration-150">
+              {[
+                { emoji: '👍', text: 'Me gusta' },
+                { emoji: '❤️', text: 'Me encanta' },
+                { emoji: '😂', text: 'Me divierte' },
+                { emoji: '😮', text: 'Me asombra' },
+                { emoji: '😢', text: 'Me entristece' },
+                { emoji: '😡', text: 'Me enoja' }
+              ].map((r) => (
+                <button
+                  key={r.emoji}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelectReaction(r.emoji, r.text);
+                  }}
+                  className="text-2xl hover:scale-130 transition-transform duration-100 cursor-pointer active:scale-95"
+                  title={r.text}
+                >
+                  {r.emoji}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button 
             onClick={handleLike}
+            onMouseDown={handleStartPress}
+            onMouseUp={handleReleasePress}
+            onMouseLeave={handleReleasePress}
+            onTouchStart={handleStartPress}
+            onTouchEnd={handleReleasePress}
             className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all hover:bg-[var(--bg-hover)] ${liked ? 'text-[#1877f2]' : 'text-[var(--text-secondary)]'}`}
           >
-            <ThumbsUp size={18} className={liked ? 'fill-current' : ''} />
-            <span className="text-xs font-bold">Me gusta</span>
+            {liked ? (
+              <span className="text-sm animate-in zoom-in duration-200">{reaction.emoji}</span>
+            ) : (
+              <ThumbsUp size={18} />
+            )}
+            <span className="text-xs font-bold">{liked ? reaction.text : 'Me gusta'}</span>
           </button>
-          <Link to={watchUrl} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all">
+
+          <button 
+            onClick={handleToggleComments}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-[var(--bg-hover)] transition-all ${showComments ? 'text-[#1877f2]' : 'text-[var(--text-secondary)]'}`}
+          >
             <MessageCircle size={18} />
             <span className="text-xs font-bold">Comentar</span>
-          </Link>
+          </button>
+
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all">
             <Share2 size={18} />
             <span className="text-xs font-bold">Compartir</span>
           </button>
         </div>
+
+        {showComments && (
+          <div className="border-t border-[var(--divider)] p-4 bg-[var(--bg-primary)] max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+            {loadingComments ? (
+              <div className="flex items-center justify-center py-4 gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider">
+                <RefreshCw size={14} className="animate-spin text-indigo-500" />
+                Cargando comentarios...
+              </div>
+            ) : (
+              <CommentSection 
+                videoId={video.id}
+                user={user}
+                comments={commentsList}
+                onCommentAdded={handleCommentAdded}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Gutter below post */}
@@ -1239,6 +1390,35 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   
                   <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
                       Tu saldo: <span className="text-white">{Number(user?.balance || 0).toFixed(2)} $</span>
+                  </div>
+              </div>
+          </div>
+      )}
+      {showMembershipRequiredModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className="bg-slate-950 border border-white/10 p-8 rounded-[40px] shadow-2xl flex flex-col items-center text-center max-w-sm animate-in zoom-in-95">
+                  <div className="w-16 h-16 bg-red-400/20 rounded-2xl flex items-center justify-center mb-6 border border-red-500/30">
+                      <Layers size={32} className="text-red-500" />
+                  </div>
+                  <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Membresía Requerida</h2>
+                  <p className="text-sm text-slate-300 font-bold tracking-tight mb-8 leading-relaxed">No tienes saldo suficiente. Debes obtener una membresía.</p>
+                  
+                  <div className="w-full space-y-3">
+                      <button 
+                          onClick={() => {
+                              setShowMembershipRequiredModal(false);
+                              navigate('/vip');
+                          }} 
+                          className="w-full py-4 bg-indigo-600 hover:bg-slate-800 text-white font-black rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                      >
+                          OBTENER MEMBRESÍA
+                      </button>
+                      <button 
+                          onClick={() => setShowMembershipRequiredModal(false)} 
+                          className="w-full py-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-black rounded-2xl transition-all"
+                      >
+                          CANCELAR
+                      </button>
                   </div>
               </div>
           </div>

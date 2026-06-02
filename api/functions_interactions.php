@@ -839,7 +839,7 @@ function group_create($pdo, $input) {
         respond(false, null, "Nombre de grupo inválido");
     }
 
-    // Create physical subdirectory
+    // Create physical/virtual directory
     $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
     $sSet = $stmtSet->fetch();
     $localPath = $sSet['localLibraryPath'] ?? '';
@@ -847,15 +847,54 @@ function group_create($pdo, $input) {
         $localPath = 'uploads/videos/';
     }
 
-    $targetDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . $folderNameForDir;
-    if (is_dir($targetDir)) {
+    $basePath = rtrim(str_replace('\\', '/', $localPath), '/');
+    $targetDir = $basePath . '/' . $folderNameForDir;
+
+    if (is_dir($targetDir) || file_exists($targetDir)) {
         respond(false, null, "El grupo (carpeta) ya existe física o virtualmente");
     }
 
-    if (!is_dir($targetDir)) {
-        if (!mkdir($targetDir, 0777, true)) {
-            respond(false, null, "No se pudo crear el directorio del grupo");
+    // Try detecting alternative disks/volumes in Synology NAS to prevent filling up the system volume
+    $synologyOtherVolumes = ['/volume2', '/volume3', '/volume4', '/volumeUSB1', '/volumeUSB2'];
+    $externalFolder = null;
+    foreach ($synologyOtherVolumes as $vol) {
+        if (is_dir($vol) && is_writable($vol)) {
+            $externalFolder = $vol . '/streamplay_media';
+            if (!is_dir($externalFolder)) {
+                @mkdir($externalFolder, 0777, true);
+            }
+            break;
         }
+    }
+
+    $folderCreated = false;
+    if ($externalFolder !== null && is_dir($externalFolder) && is_writable($externalFolder)) {
+        // Physical directory on the other disk
+        $realExtDir = $externalFolder . '/' . $folderNameForDir;
+        if (!is_dir($realExtDir)) {
+            if (mkdir($realExtDir, 0777, true)) {
+                // Now create a symlink (virtual folder) inside $localPath pointing to the external directory
+                if (@symlink($realExtDir, $targetDir)) {
+                    $folderCreated = true;
+                } else {
+                    // Fallback to standard creation if symlink fails
+                    @rmdir($realExtDir);
+                }
+            }
+        }
+    }
+
+    if (!$folderCreated) {
+        if (!is_dir($targetDir)) {
+            if (!mkdir($targetDir, 0777, true)) {
+                respond(false, null, "No se pudo crear el directorio del grupo");
+            }
+        }
+    }
+
+    // Confirm that the folder was created successfully and is accessible
+    if (!is_dir($targetDir)) {
+        respond(false, null, "Error: El directorio no pudo ser verificado como creado.");
     }
 
     // Register metadata

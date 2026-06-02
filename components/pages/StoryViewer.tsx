@@ -72,6 +72,55 @@ export default function StoryViewer() {
     const currentGroup = groupedStories[currentUserIndex] || [];
     const currentStory = currentGroup[currentStoryIndex];
 
+    const saveProgress = (userId: string, index: number, total: number) => {
+        try {
+            const savedRaw = localStorage.getItem('sp_stories_progress');
+            const progressObj = savedRaw ? JSON.parse(savedRaw) : {};
+            const completed = index === total - 1;
+            progressObj[userId] = {
+                lastSeenStoryIndex: index,
+                completed: completed || (progressObj[userId]?.completed ?? false),
+                timestamp: Date.now()
+            };
+            localStorage.setItem('sp_stories_progress', JSON.stringify(progressObj));
+        } catch (e) {
+            console.error("Error saving story progress", e);
+        }
+    };
+
+    // Auto-save progress
+    useEffect(() => {
+        if (currentGroup && currentGroup.length > 0 && currentStoryIndex !== undefined) {
+            const creatorId = currentGroup[0].userId;
+            saveProgress(creatorId, currentStoryIndex, currentGroup.length);
+        }
+    }, [currentUserIndex, currentStoryIndex, currentGroup]);
+
+    // Resume progress when the active user group loads
+    useEffect(() => {
+        if (currentGroup && currentGroup.length > 0) {
+            const creatorId = currentGroup[0].userId;
+            try {
+                const savedRaw = localStorage.getItem('sp_stories_progress');
+                if (savedRaw) {
+                    const progressObj = JSON.parse(savedRaw);
+                    if (progressObj[creatorId]) {
+                        const { lastSeenStoryIndex, completed } = progressObj[creatorId];
+                        if (!completed && lastSeenStoryIndex > 0 && lastSeenStoryIndex < currentGroup.length) {
+                            setCurrentStoryIndex(lastSeenStoryIndex);
+                        } else {
+                            setCurrentStoryIndex(0);
+                        }
+                    } else {
+                        setCurrentStoryIndex(0);
+                    }
+                }
+            } catch (e) {
+                console.error("Error loading story progress", e);
+            }
+        }
+    }, [currentUserIndex, currentGroup?.length]);
+
     const nextStory = () => {
         if (currentStoryIndex < currentGroup.length - 1) {
             setCurrentStoryIndex(prev => prev + 1);

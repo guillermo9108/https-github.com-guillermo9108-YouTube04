@@ -417,6 +417,56 @@ async function startServer() {
       createdAt INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS groups_metadata (
+      folderPath TEXT PRIMARY KEY,
+      creatorId TEXT,
+      description TEXT,
+      coverUrl TEXT,
+      isPrivate INTEGER DEFAULT 0,
+      isUnified INTEGER DEFAULT 0,
+      allowMemberUploads INTEGER DEFAULT 1,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS group_subscriptions (
+      userId TEXT,
+      folderPath TEXT,
+      approved INTEGER DEFAULT 1,
+      createdAt INTEGER,
+      PRIMARY KEY (userId, folderPath)
+    );
+
+    CREATE TABLE IF NOT EXISTS stories (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      contentUrl TEXT,
+      type TEXT DEFAULT 'IMAGE',
+      overlayText TEXT,
+      overlayColor TEXT,
+      overlayBg TEXT,
+      audioUrl TEXT,
+      videoId TEXT,
+      productId TEXT,
+      duration INTEGER DEFAULT 15,
+      createdAt INTEGER,
+      expiresAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS story_views (
+      id TEXT PRIMARY KEY,
+      storyId TEXT,
+      userId TEXT,
+      timestamp INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS story_reactions (
+      id TEXT PRIMARY KEY,
+      storyId TEXT,
+      userId TEXT,
+      reaction TEXT,
+      timestamp INTEGER
+    );
+
     INSERT OR IGNORE INTO system_settings (id, categories) VALUES (1, '[{"id":"c1","name":"Gaming","price":0.5},{"id":"c2","name":"Music","price":0.8},{"id":"c3","name":"Tech","price":1.0}]');
   `);
 
@@ -1120,8 +1170,194 @@ async function startServer() {
         return res.json({ success: true, data: JSON.parse(settings?.categories || '[]') });
       }
 
+      if (action === 'group_create') {
+        const { userId, name, description, isPrivate, coverUrl } = req.body;
+        if (!userId || !name) {
+          return res.json({ success: false, error: "Faltan datos" });
+        }
+        const reserved = ["PRINCIPAL", "PRIVADO", "PERSONAL", "GENERAL", "TODOS", "ALL", "uploads", "admin", "config", "shared", "system", "local", "root"];
+        if (reserved.includes(name.toUpperCase())) {
+          return res.json({ success: false, error: "Ese nombre de grupo está reservado." });
+        }
+        const folderNameForDir = name.replace(/[\/\\?\*:\"'<>|\.]/g, '');
+        if (!folderNameForDir) {
+          return res.json({ success: false, error: "Nombre de grupo inválido" });
+        }
+
+        // Register in DB
+        try {
+          db.prepare("INSERT OR REPLACE INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowMemberUploads, createdAt) VALUES (?, ?, ?, ?, ?, 0, 1, ?)")
+            .run(folderNameForDir, userId, description || 'Grupo sin descripción.', coverUrl || null, isPrivate ? 1 : 0, Math.floor(Date.now() / 1000));
+          
+          db.prepare("INSERT OR IGNORE INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, 1, ?)")
+            .run(userId, folderNameForDir, Math.floor(Date.now() / 1000));
+          
+          return res.json({ success: true, data: { name: folderNameForDir }, message: "Grupo creado exitosamente" });
+        } catch (err: any) {
+          return res.json({ success: false, error: err.message });
+        }
+      }
+
+      if (action === 'group_edit') {
+        const { userId, folderPath, name, description, isPrivate, coverUrl, isUnified, allowMemberUploads } = req.body;
+        if (!userId || !folderPath) {
+          return res.json({ success: false, error: "Faltan datos" });
+        }
+
+        // Verify creator
+        const meta = db.prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?").get(folderPath) as any;
+        if (!meta || meta.creatorId !== userId) {
+          return res.json({ success: false, error: "No tienes permisos para editar este grupo" });
+        }
+
+        try {
+          db.prepare(`
+            UPDATE groups_metadata 
+            SET description = COALESCE(?, description),
+                coverUrl = COALESCE(?, coverUrl),
+                isPrivate = COALESCE(?, isPrivate),
+                isUnified = COALESCE(?, isUnified),
+                allowMemberUploads = COALESCE(?, allowMemberUploads)
+            WHERE folderPath = ?
+          `).run(
+            description !== undefined ? description : null,
+            coverUrl !== undefined ? coverUrl : null,
+            isPrivate !== undefined ? (isPrivate ? 1 : 0) : null,
+            isUnified !== undefined ? (isUnified ? 1 : 0) : null,
+            allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : null,
+            folderPath
+          );
+          return res.json({ success: true, message: "Grupo actualizado exitosamente" });
+        } catch (err: any) {
+          return res.json({ success: false, error: err.message });
+        }
+      }
+
+      if (action === 'group_subscribe') {
+        const { userId, folderPath } = req.body;
+        const meta = db.prepare("SELECT isPrivate FROM groups_metadata WHERE folderPath = ?").get(folderPath) as any;
+        const approved = meta?.isPrivate ? 0 : 1;
+        db.prepare("INSERT OR REPLACE INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, ?, ?)")
+          .run(userId, folderPath, approved, Math.floor(Date.now() / 1000));
+        return res.json({ success: true, data: { approved } });
+      }
+
+      if (action === 'group_unsubscribe') {
+        const { userId, folderPath } = req.body;
+        db.prepare("DELETE FROM group_subscriptions WHERE userId = ? AND folderPath = ?").run(userId, folderPath);
+        return res.json({ success: true });
+      }
+
+      if (action === 'get_group_subscriptions') {
+        const { userId } = req.query;
+        const rows = db.prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ? AND approved = 1").all(userId) as any[];
+        return res.json({ success: true, data: rows.map(r => r.folderPath) });
+      }
+
       if (action === 'get_stories') {
-        return res.json({ success: true, data: [] });
+        const { userId } = req.query;
+        const nowSec = Math.floor(Date.now() / 1000);
+        const dayAgo = nowSec - 86400;
+
+        // Fetch real stories
+        const realStories = db.prepare(`
+          SELECT s.*, u.username, u.avatarUrl,
+                 (CASE WHEN s.userId IN (SELECT creatorId FROM subscriptions WHERE subscriberId = ?) THEN 1 ELSE 0 END) as isFriend
+          FROM stories s
+          JOIN users u ON s.userId = u.id
+          WHERE s.createdAt >= ? AND s.expiresAt > ?
+          ORDER BY s.createdAt DESC
+        `).all(userId, dayAgo, nowSec) as any[];
+
+        // Process real stories to match PHP signature
+        for (const story of realStories) {
+          story.isFriend = Number(story.isFriend || 0);
+          if (story.videoId) {
+            story.originalVideo = db.prepare("SELECT * FROM videos WHERE id = ?").get(story.videoId);
+          }
+        }
+
+        // Build dynamic group stories
+        const followedGroupsRows = db.prepare("SELECT folderPath FROM group_subscriptions WHERE userId = ? AND approved = 1").all(userId) as any[];
+        const followedGroups = followedGroupsRows.map(f => f.folderPath);
+
+        const allVideos = db.prepare("SELECT * FROM videos WHERE category != 'PENDING' AND is_private = 0").all() as any[];
+        const videosBySubfolder: Record<string, any[]> = {};
+
+        for (const v of allVideos) {
+          const videoUrl = (v.videoUrl || '').replace(/\\/g, '/');
+          const parts = videoUrl.split('/');
+          if (parts.length > 2) {
+            const relPath = parts[parts.length - 2];
+            const vKey = relPath.toLowerCase();
+            if (!videosBySubfolder[vKey]) {
+              videosBySubfolder[vKey] = [];
+            }
+            videosBySubfolder[vKey].push(v);
+          }
+        }
+
+        const groupStories: any[] = [];
+        const dayBlock = Math.floor(Date.now() / 86400000);
+        const hashCode = (str: string) => {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = (hash << 5) - hash + str.charCodeAt(i);
+            hash |= 0;
+          }
+          return Math.abs(hash);
+        };
+
+        for (const folder of followedGroups) {
+          const vKey = folder.toLowerCase();
+          const folderVideos = videosBySubfolder[vKey];
+          if (!folderVideos || folderVideos.length === 0) continue;
+
+          // Deterministic seed select: between 1 and 5
+          const seed = hashCode(folder + '_' + dayBlock);
+          let numStoriesSelect = (seed % 5) + 1;
+          numStoriesSelect = Math.min(numStoriesSelect, folderVideos.length);
+
+          // Get group metadata for title and other visual assets
+          const meta = db.prepare("SELECT * FROM groups_metadata WHERE folderPath = ?").get(folder) as any;
+          const isPrivateGrp = meta?.isPrivate || 0;
+
+          // Pick deterministically
+          const selectedVideos = [...folderVideos]
+            .sort((a,b) => a.id.localeCompare(b.id))
+            .slice(0, numStoriesSelect);
+
+          selectedVideos.forEach((v, index) => {
+            const storyThumb = v.thumbnailUrl || 'api/uploads/thumbnails/default.jpg';
+            const grpName = folder;
+            const simulatedCreatedAt = nowSec - (2 * 3600) - (index * 3600);
+
+            groupStories.push({
+              id: `st_group_${folder}_${v.id}`,
+              userId: `group_${folder}`,
+              username: `Grupo · ${grpName}`,
+              avatarUrl: storyThumb,
+              contentUrl: v.videoUrl,
+              type: 'VIDEO',
+              overlayText: v.title,
+              overlayColor: '#ffffff',
+              overlayBg: 'bg-black/50',
+              audioUrl: null,
+              videoId: v.id,
+              productId: null,
+              duration: v.duration && v.duration > 0 ? Math.min(v.duration, 15) : 15,
+              createdAt: simulatedCreatedAt,
+              expiresAt: simulatedCreatedAt + 86400,
+              isFriend: 1,
+              thumbnailUrl: storyThumb,
+              originalVideo: v
+            });
+          });
+        }
+
+        // Combine
+        const combined = [...realStories, ...groupStories];
+        return res.json({ success: true, data: combined });
       }
 
       // Default response for other actions to prevent 501 errors

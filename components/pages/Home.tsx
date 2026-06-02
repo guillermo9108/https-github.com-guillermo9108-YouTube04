@@ -97,7 +97,44 @@ export default function Home() {
             if (!groups[s.userId]) groups[s.userId] = [];
             groups[s.userId].push(s);
         });
-        return Object.values(groups).map(group => group[0]); // Show first story of each user
+
+        // Resolve each grouped user's story set
+        const list = Object.values(groups).map(group => {
+            // Sort stories inside group by createdAt
+            group.sort((a, b) => a.createdAt - b.createdAt);
+            return group;
+        });
+
+        // Determine which groups are completed reading localStorage progress
+        let progressMap: Record<string, any> = {};
+        try {
+            const savedRaw = localStorage.getItem('sp_stories_progress');
+            if (savedRaw) progressMap = JSON.parse(savedRaw);
+        } catch (e) {}
+
+        const completedGroups: Story[][] = [];
+        const activeGroups: Story[][] = [];
+
+        list.forEach(g => {
+            if (g.length === 0) return;
+            const creatorId = g[0].userId;
+            const isCompleted = progressMap[creatorId]?.completed === true;
+            if (isCompleted) {
+                completedGroups.push(g);
+            } else {
+                activeGroups.push(g);
+            }
+        });
+
+        // Combined: Active ones first, completed ones at the end
+        const sortedList = [...activeGroups, ...completedGroups];
+
+        // Return first story of each group for the slider circle representation
+        return sortedList.map(group => {
+            const firstStory = { ...group[0] };
+            (firstStory as any).isCompleted = progressMap[firstStory.userId]?.completed === true;
+            return firstStory;
+        });
     }, [stories]);
 
     const [loadingMoreStories, setLoadingMoreStories] = useState(false);
@@ -1020,7 +1057,7 @@ export default function Home() {
                                         <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Play size={24} className="text-white opacity-20"/></div>
                                     );
                                 })()}
-                                <div className="absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] border-[#1877f2] p-0.5 overflow-hidden bg-indigo-600">
+                                <div className={`absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] ${(story as any).isCompleted ? 'border-slate-500' : 'border-[#1877f2]'} p-0.5 overflow-hidden bg-indigo-600`}>
                                     {story.avatarUrl ? (
                                         <img src={getThumbnailUrl(story.avatarUrl) || ''} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                                     ) : (

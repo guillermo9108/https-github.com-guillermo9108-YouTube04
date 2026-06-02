@@ -86,7 +86,7 @@ function admin_bulk_edit_folder($pdo, $input) {
                 $stmtU->execute([$isUnified, $path]);
             } else {
                 $stmtI = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmtI->execute([$path, 'admin', '', '', 0, $isUnified, date('Y-m-d H:i:s')]);
+                $stmtI->execute([$path, 'admin', '', '', 0, $isUnified, time()]);
             }
         }
 
