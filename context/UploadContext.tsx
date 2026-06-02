@@ -7,7 +7,7 @@ export interface UploadItem {
   title: string;
   description: string;
   price: number;
-  category: VideoCategory;
+  category: string;
   duration: number;
   file: File;
   thumbnail: File | null;
@@ -45,7 +45,7 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
 
   const addToQueue = useCallback(async (items: UploadItem[], user: User, folder?: string) => {
     if (isUploading) {
-        alert("Wait for current upload to finish");
+        alert("En progreso. Espera a que termine la subida actual.");
         return;
     }
 
@@ -54,70 +54,94 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
     setCurrentFileIndex(0);
     setProgress(0);
 
-    // According to user request, we use the "Qué estás pensando" method (Batch Upload)
-    // for reliability, but we can still show overall progress.
-    
     try {
-        const fd = new FormData();
-        fd.append('userId', user.id);
-        fd.append('count', String(items.length));
-        fd.append('type', items.length > 1 ? 'ALBUM' : 'INDEPENDENT');
-        if (folder) {
-            fd.append('folder', folder);
-        }
-        
-        // Use the first item's title/desc as batch defaults
-        fd.append('title', items[0].title);
-        fd.append('description', items[0].description);
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            setCurrentFileIndex(i + 1);
+            setProgress(0);
+            setUploadSpeed("0 MB/s");
 
-        items.forEach((item, i) => {
-            fd.append(`image_${i}`, item.file);
-            fd.append(`title_${i}`, item.title);
-            fd.append(`description_${i}`, item.description);
-            fd.append(`category_${i}`, item.category);
-            fd.append(`price_${i}`, String(item.price));
-            fd.append(`duration_${i}`, String(item.duration));
-            if (item.thumbnail) {
-                // Note: the backend upload_channel_images doesn't currently handle custom thumbnails per index easily, 
-                // but we send it anyway or prioritize extractor
-                fd.append(`thumbnail_${i}`, item.thumbnail);
-            }
-        });
+            lastLoaded.current = 0;
+            lastTime.current = Date.now();
 
-        lastLoaded.current = 0;
-        lastTime.current = Date.now();
-
-        await db.uploadBatch(fd, (percent, loaded, total) => {
-            setProgress(percent);
-            
-            // Calculate speed
-            const now = Date.now();
-            const diffTime = now - lastTime.current;
-            if (diffTime >= 1000) {
-                const diffLoaded = loaded - lastLoaded.current;
-                const mbps = (diffLoaded / 1024 / 1024) / (diffTime / 1000);
-                setUploadSpeed(`${mbps.toFixed(1)} MB/s`);
+            // Perform single upload sequentially
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const fd = new FormData();
+                fd.append('action', 'upload_video');
+                fd.append('title', item.title);
+                fd.append('description', item.description);
+                fd.append('price', String(item.price));
+                fd.append('category', item.category);
+                fd.append('duration', String(item.duration));
+                fd.append('userId', user.id);
+                fd.append('video', item.file);
+                if (item.thumbnail) {
+                    fd.append('thumbnail', item.thumbnail);
+                }
                 
-                lastLoaded.current = loaded;
-                lastTime.current = now;
-            }
-            
-            // Estimate current file index based on loaded bytes
-            // This is a rough estimation but satisfies "maintaining multiple files" feel
-            const estimatedIndex = Math.floor((loaded / total) * items.length);
-            setCurrentFileIndex(Math.min(estimatedIndex + 1, items.length));
-        });
+                // Set folder if custom folder parameter is provided or if category represents a group
+                const targetFolder = folder || (item.category !== 'PERSONAL' ? item.category : '');
+                if (targetFolder) {
+                    fd.append('folder', targetFolder);
+                }
 
-        alert("¡Carga masiva completada con éxito!");
+                const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
+                xhr.open('POST', '/api/index.php');
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        setProgress(percent);
+
+                        // Speed computation
+                        const now = Date.now();
+                        const diffTime = now - lastTime.current;
+                        if (diffTime >= 1000) {
+                            const diffLoaded = e.loaded - lastLoaded.current;
+                            const mbps = (diffLoaded / 1024 / 1024) / (diffTime / 1000);
+                            setUploadSpeed(`${mbps.toFixed(1)} MB/s`);
+                            
+                            lastLoaded.current = e.loaded;
+                            lastTime.current = now;
+                        }
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const res = JSON.parse(xhr.responseText);
+                            if (res.success) {
+                                resolve();
+                            } else {
+                                reject(new Error(res.error || 'Subida errónea de archivo'));
+                            }
+                        } catch (e) {
+                            reject(new Error("Respuesta inválida del servidor"));
+                        }
+                    } else reject(new Error(`Servicio devolvió código ${xhr.status}`));
+                };
+
+                xhr.onerror = () => reject(new Error("Error de red durante la subida"));
+                xhr.send(fd);
+            });
+        }
+
+        db.invalidateCache('sp_cache_videos');
+        db.setHomeDirty();
     } catch (error: any) {
-        console.error(`Batch upload failed`, error);
-        alert(`Error en la subida: ${error.message}`);
+        console.error(`Sequential upload failed`, error);
+        throw error;
+    } finally {
+        setIsUploading(false);
+        setUploadSpeed("0 MB/s");
+        setTotalFiles(0);
+        setCurrentFileIndex(0);
     }
-
-    setIsUploading(false);
-    setUploadSpeed("0 MB/s");
-    setTotalFiles(0);
-    setCurrentFileIndex(0);
   }, [isUploading]);
 
   const cancelUploads = () => {

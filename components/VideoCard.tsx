@@ -246,7 +246,14 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   }, [video.videoUrl]);
 
   const groupLabel = useMemo(() => {
-    const isSpecialCategory = video.category && !['TODOS', 'SHORT_VIDEOS', 'AUDIOS', 'IMAGES', 'VIP', 'MOVIES', 'SERIES'].includes(video.category.toUpperCase());
+    const cat = (video.category || '').toUpperCase();
+    if (cat === 'PERSONAL' || cat === 'VIDEOS') {
+        return null;
+    }
+    if (locationLabel && (locationLabel.toUpperCase() === 'PERSONAL' || locationLabel.toUpperCase() === 'VIDEOS')) {
+        return null;
+    }
+    const isSpecialCategory = video.category && !['TODOS', 'SHORT_VIDEOS', 'AUDIOS', 'IMAGES', 'VIP', 'MOVIES', 'SERIES'].includes(cat);
     if (isSpecialCategory) {
         return video.category;
     }
@@ -1145,7 +1152,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
             
             {!isUnlocked && !isWatched && (
                 <div className="absolute bottom-2 left-2 bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg flex items-center gap-1.5 border border-amber-500/20 pointer-events-none">
-                    {video.price} $
+                    {video.price} cr
                 </div>
             )}
           </div>
@@ -1381,7 +1388,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   
                   <div className="w-full space-y-3">
                       <button onClick={handlePurchase} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2">
-                          COMPRAR POR {video.price} $
+                          COMPRAR POR {video.price} cr
                       </button>
                       <button onClick={() => setShowPurchaseModal(false)} className="w-full py-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] font-black rounded-2xl transition-all">
                           CANCELAR
@@ -1389,7 +1396,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
                   </div>
                   
                   <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-500 font-black uppercase tracking-widest">
-                      Tu saldo: <span className="text-white">{Number(user?.balance || 0).toFixed(2)} $</span>
+                      Tu saldo: <span className="text-white">{Number(user?.balance || 0).toFixed(2)} cr</span>
                   </div>
               </div>
           </div>

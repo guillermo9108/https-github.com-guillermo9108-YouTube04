@@ -625,6 +625,7 @@ class DBService {
     public async adminCleanupSystemFiles(): Promise<any> { return this.request<any>(`action=admin_cleanup_files`, { method: 'POST' }); }
     public async adminRepairDb(): Promise<any> { return this.request<any>(`action=admin_repair_db`, { method: 'POST' }); }
     public async adminRepairGroups(): Promise<any> { return this.request<any>(`action=admin_repair_groups`, { method: 'POST' }); }
+    public async adminRepairPrices(): Promise<any> { return this.request<any>(`action=admin_repair_prices`, { method: 'POST' }); }
     public async adminBanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_ban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async adminUnbanUser(userId: string): Promise<void> { return this.request<void>(`action=admin_unban_user`, { method: 'POST', body: JSON.stringify({ userId }) }); }
     public async adminChangeUserRole(userId: string, role: string): Promise<void> { return this.request<void>(`action=admin_change_user_role`, { method: 'POST', body: JSON.stringify({ userId, role }) }); }
@@ -742,17 +743,17 @@ class DBService {
         return (await this.request<{ folderPath: string; approved: number }[]>(`action=get_user_all_subscriptions&userId=${userId}`)) || [];
     }
 
-    public async createGroup(userId: string, name: string, description?: string, isPrivate?: boolean, coverUrl?: string): Promise<any> {
+    public async createGroup(userId: string, name: string, description?: string, isPrivate?: boolean, coverUrl?: string, allowUpload?: boolean): Promise<any> {
         return this.request<any>('action=group_create', {
             method: 'POST',
-            body: JSON.stringify({ userId, name, description, isPrivate, coverUrl })
+            body: JSON.stringify({ userId, name, description, isPrivate, coverUrl, allowUpload: allowUpload ? 1 : 0 })
         });
     }
 
-    public async editGroup(userId: string, folderPath: string, name?: string, description?: string, isPrivate?: boolean, coverUrl?: string, isUnified?: boolean): Promise<any> {
+    public async editGroup(userId: string, folderPath: string, name?: string, description?: string, isPrivate?: boolean, coverUrl?: string, isUnified?: boolean, allowUpload?: boolean): Promise<any> {
         return this.request<any>('action=group_edit', {
             method: 'POST',
-            body: JSON.stringify({ userId, folderPath, name, description, isPrivate, coverUrl, isUnified })
+            body: JSON.stringify({ userId, folderPath, name, description, isPrivate, coverUrl, isUnified, allowUpload: allowUpload ? 1 : 0 })
         });
     }
 

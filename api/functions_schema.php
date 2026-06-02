@@ -234,6 +234,8 @@ function getAppSchema() {
                 'tropipayClientId' => 'VARCHAR(255)',
                 'tropipayClientSecret' => 'VARCHAR(255)',
                 'currencyConversion' => 'DECIMAL(10, 2) DEFAULT 300.00',
+                'etecsaCostGB' => 'DECIMAL(10, 4) DEFAULT 0.3500',
+                'etecsaDiscount' => 'DECIMAL(10, 2) DEFAULT 0.70',
                 'enableYoutube' => 'TINYINT(1) DEFAULT 0',
                 'autoTranscode' => 'TINYINT(1) DEFAULT 0',
                 'transcodePreset' => "VARCHAR(50) DEFAULT 'ultrafast'",
@@ -427,6 +429,7 @@ function getAppSchema() {
                 'coverUrl' => 'VARCHAR(255) DEFAULT NULL',
                 'isPrivate' => 'TINYINT(1) DEFAULT 0',
                 'isUnified' => 'TINYINT(1) DEFAULT 0',
+                'allowUpload' => 'TINYINT(1) DEFAULT 1',
                 'createdAt' => 'BIGINT'
             ]
         ],

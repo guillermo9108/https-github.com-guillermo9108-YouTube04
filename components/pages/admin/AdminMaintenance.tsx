@@ -96,6 +96,16 @@ export default function AdminMaintenance() {
         finally { setCleaning(false); }
     };
 
+    const handleRepairPrices = async () => {
+        setCleaning(true);
+        try {
+            const res = await db.adminRepairPrices();
+            toast.success(res.message || "Precios de archivos recalculados y reparados con éxito.");
+            fetchData();
+        } catch (e: any) { toast.error(e.message); }
+        finally { setCleaning(false); }
+    };
+
     const handleRepairBrokenVideos = async () => {
         if (!confirm("Esto buscará videos eliminados, sin miniatura o sin imagen y los reparará. ¿Continuar?")) return;
         setCleaning(true);
@@ -303,6 +313,10 @@ export default function AdminMaintenance() {
                         <button onClick={handleRepairGroups} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-xl transition-all">
                              <Wrench size={18} className="text-violet-500" />
                              <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Grupos</span><span className="block text-[9px] text-slate-500">SUSCRIPCIONES Y VERIFICACIÓN</span></div>
+                        </button>
+                        <button onClick={handleRepairPrices} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl transition-all">
+                             <Percent size={18} className="text-emerald-500" />
+                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Precios</span><span className="block text-[9px] text-slate-500">CÁLCULO AUTOMÁTICO ETECSA</span></div>
                         </button>
                         <button onClick={handleRepairBrokenVideos} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
                              <ShieldAlert size={18} className="text-amber-500" />

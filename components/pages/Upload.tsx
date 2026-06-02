@@ -74,7 +74,10 @@ export default function Upload() {
   const [bulkCategory, setBulkCategory] = useState<string>(preselectedCategory || VideoCategory.PERSONAL);
   const [bulkPrice, setBulkPrice] = useState<string>('');
 
-  const [availableCategories, setAvailableCategories] = useState<string[]>([VideoCategory.PERSONAL, ...Object.values(VideoCategory).filter(v => v !== VideoCategory.PERSONAL)]);
+  const [uploadTargets, setUploadTargets] = useState<{ name: string; isGroup: boolean }[]>([
+    { name: 'PERSONAL', isGroup: false }
+  ]);
+  const [filterQuery, setFilterQuery] = useState('');
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -85,21 +88,51 @@ export default function Upload() {
 
   useEffect(() => {
       isMounted.current = true;
-      const loadConfig = async () => {
+      const loadTargets = async () => {
+          if (!user?.id) return;
           try {
               const settings = await db.getSystemSettings();
               if (isMounted.current && settings) {
                 setSystemSettings(settings);
-                const sysCatNames = (settings.categories || []).map(c => c.name);
-                const standard = Object.values(VideoCategory) as string[];
-                const combined = Array.from(new Set([VideoCategory.PERSONAL, ...sysCatNames, ...standard]));
-                setAvailableCategories(combined);
+              }
+              
+              const [allGroups, userSubs] = await Promise.all([
+                  db.getFolders('', true),
+                  db.getUserAllSubscriptions(user.id)
+              ]);
+              
+              const approvedPaths = userSubs
+                  .filter((s: any) => Number(s.approved) === 1)
+                  .map((s: any) => s.folderPath.toLowerCase());
+
+              const allowedGroups = allGroups.filter((g: any) => {
+                  const pathLower = (g.relativePath || g.name || '').toLowerCase();
+                  const isCreator = g.creatorId === user.id;
+                  const isApprovedSub = approvedPaths.includes(pathLower);
+                  const isUploadAllowed = Number(g.allowUpload) === 1;
+                  const isAdmin = user?.role === 'ADMIN';
+
+                  return isAdmin || isCreator || (isApprovedSub && isUploadAllowed);
+              });
+
+              const targets = [
+                  { name: 'PERSONAL', isGroup: false },
+                  ...allowedGroups.map((g: any) => ({
+                      name: g.relativePath || g.name || '',
+                      isGroup: true
+                  }))
+              ];
+
+              if (isMounted.current) {
+                  setUploadTargets(targets);
+                  const preselected = preselectedCategory || 'PERSONAL';
+                  setBulkCategory(preselected);
               }
           } catch(e) {}
       };
-      loadConfig();
+      loadTargets();
       return () => { isMounted.current = false; };
-  }, []);
+  }, [user?.id]);
 
   const getPriceForCategory = (catName: string) => {
       if (user?.defaultPrices && user.defaultPrices[catName] !== undefined) return Number(user.defaultPrices[catName]);
@@ -315,25 +348,35 @@ export default function Upload() {
                         </div>
                     )}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-1">
-                        <label className="block text-[9px] font-bold text-[#b0b3b8] uppercase">Categoría</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-xl px-3 py-2 flex flex-col justify-between">
+                        <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Buscar / Filtrar Destino</label>
+                        <input 
+                            type="text" 
+                            placeholder="Ej: PRINCIPAL, Humor..." 
+                            value={filterQuery} 
+                            onChange={e => setFilterQuery(e.target.value)} 
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-[#e4e6eb] outline-none focus:border-indigo-500 mb-2 placeholder-slate-600"
+                        />
+                        <label className="block text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">Elegir Destino Final</label>
                         <select 
                             value={bulkCategory}
                             onChange={e => setBulkCategory(e.target.value)}
-                            className="w-full bg-transparent text-xs font-bold outline-none text-[#e4e6eb]"
+                            className="w-full bg-transparent text-xs font-bold outline-none text-[#e4e6eb] border-t border-white/5 pt-1"
                         >
-                            {availableCategories.map(c => <option key={c} value={c} className="bg-[#242526]">{c.replace('_', ' ')}</option>)}
+                            {uploadTargets
+                                .filter(t => t.name.toLowerCase().includes(filterQuery.toLowerCase()))
+                                .map(t => <option key={t.name} value={t.name} className="bg-[#242526]">{t.name === 'PERSONAL' ? '👤 PUBLICACIÓN PERSONAL' : `👥 GRUPO: ${t.name}`}</option>)}
                         </select>
                     </div>
-                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-md px-2 py-1">
-                        <label className="block text-[9px] font-bold text-[#b0b3b8] uppercase">Precio Sugerido ($)</label>
+                    <div className="bg-[#3a3b3c] border border-[#3e4042] rounded-xl px-3 py-2 flex flex-col justify-end">
+                        <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">Precio Sugerido (cr)</label>
                         <input 
                             type="number" 
                             value={bulkPrice}
                             onChange={e => setBulkPrice(e.target.value)}
-                            placeholder="Ej: 5.00"
-                            className="w-full bg-transparent text-xs font-bold outline-none text-[#e4e6eb]"
+                            placeholder="Ej: 5.0"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-bold outline-none text-[#e4e6eb]"
                         />
                     </div>
                 </div>
@@ -415,17 +458,21 @@ export default function Upload() {
                         
                         <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col bg-[#3a3b3c] px-3 py-1.5 rounded border border-[#3e4042]">
-                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Carpeta</span>
+                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Carpeta / Grupo</span>
                                 <select 
                                     value={categories[idx]}
                                     onChange={e => updateCategory(idx, e.target.value)}
                                     className="bg-transparent text-xs font-bold text-[#e4e6eb] outline-none truncate"
                                 >
-                                    {availableCategories.map(c => <option key={c} value={c} className="bg-[#242526]">{c.replace('_', ' ')}</option>)}
+                                    {uploadTargets.map(t => (
+                                        <option key={t.name} value={t.name} className="bg-[#242526]">
+                                            {t.name === 'PERSONAL' ? '👤 Personal' : `👥 ${t.name}`}
+                                         </option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="flex flex-col bg-[#3a3b3c] px-3 py-1.5 rounded border border-[#3e4042]">
-                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Precio ($)</span>
+                                <span className="text-[9px] font-bold text-[#b0b3b8] uppercase">Precio (cr)</span>
                                 <input 
                                     type="number"
                                     step="0.1"

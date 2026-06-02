@@ -193,6 +193,8 @@ export interface SystemSettings {
   vipPlans?: VipPlan[];
   paymentInstructions?: string;
   currencyConversion?: number;
+  etecsaCostGB?: number;
+  etecsaDiscount?: number;
   enableDebugLog?: boolean;
   autoTranscode?: boolean | number;
   defaultVideoThumb?: string;

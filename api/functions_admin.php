@@ -45,7 +45,7 @@ function admin_update_settings($pdo, $input) {
     $allowed = [
         'downloadStartTime', 'downloadEndTime', 'isQueuePaused', 'batchSize', 'maxDuration', 'maxResolution',
         'ytDlpPath', 'ffmpegPath', 'geminiKey', 'pexelsKey', 'pixabayKey', 'tropipayClientId', 'tropipayClientSecret',
-        'currencyConversion', 'enableYoutube', 'autoTranscode', 'transcodePreset', 'proxyUrl', 'categories',
+        'currencyConversion', 'etecsaCostGB', 'etecsaDiscount', 'enableYoutube', 'autoTranscode', 'transcodePreset', 'proxyUrl', 'categories',
         'categoryPrices', 'customCategories', 'libraryPaths', 'ftpSettings', 'paymentInstructions',
         'categoryHierarchy', 'autoGroupFolders', 'localLibraryPath', 'videoCommission', 'marketCommission',
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
@@ -394,6 +394,78 @@ function admin_repair_groups($pdo, $input) {
         'activeFoldersCount' => $activeFoldersCount,
         'message' => "Reparación de grupos finalizada: se sincronizó la tabla 'group_subscriptions', se eliminaron $orphansRemoved suscripciones de usuarios huérfanos, y se identificaron $activeFoldersCount subcarpetas con contenido activas como grupos independientes."
     ]);
+}
+
+function admin_repair_prices($pdo) {
+    // Load settings
+    $stmtS = $pdo->query("SELECT currencyConversion, etecsaCostGB, etecsaDiscount, categories FROM system_settings WHERE id = 1");
+    $settings = $stmtS->fetch();
+    
+    $currencyConversion = floatval($settings['currencyConversion'] ?? 300.00);
+    $etecsaCostGB = floatval($settings['etecsaCostGB'] ?? 0.3500);
+    $etecsaDiscount = floatval($settings['etecsaDiscount'] ?? 0.70);
+    
+    $categories = json_decode($settings['categories'] ?: '[]', true);
+    
+    // Find folders that are set to AUTO price (-1)
+    $autoFolders = [];
+    foreach ($categories as $cat) {
+        if (isset($cat['price']) && floatval($cat['price']) < 0) {
+            $autoFolders[] = strtolower($cat['name']);
+        }
+    }
+    
+    // Select all videos
+    $stmtV = $pdo->query("SELECT id, videoUrl, size_bytes, price FROM videos");
+    $videos = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+    
+    $repairedCount = 0;
+    $stmtUpdate = $pdo->prepare("UPDATE videos SET price = ? WHERE id = ?");
+    
+    foreach ($videos as $v) {
+        $shouldRepair = false;
+        
+        // 1. If video price is negative (auto)
+        if (floatval($v['price'] ?? 0) < 0) {
+            $shouldRepair = true;
+        } else {
+            // 2. If it belongs to an auto folder
+            $urlLower = strtolower($v['videoUrl'] ?? '');
+            foreach ($autoFolders as $f) {
+                if ($f !== '' && strpos($urlLower, '/' . $f . '/') !== false) {
+                    $shouldRepair = true;
+                    break;
+                }
+            }
+        }
+        
+        if ($shouldRepair) {
+            $sizeMB = floatval($v['size_bytes'] ?? 0) / (1024.0 * 1024.0);
+            if ($sizeMB <= 0) {
+                $sizeMB = 1.0; // Minimum 1MB
+            }
+            // PrecioArchivo = ((TamañoMB ÷ 1024) × (CostoGB × CambioAdmin)) × D
+            $computedPrice = (($sizeMB / 1024.0) * ($etecsaCostGB * $currencyConversion)) * $etecsaDiscount;
+            
+            // Ensure minimum price of 1 credit
+            if ($computedPrice < 1.0) {
+                $computedPrice = 1.0;
+            }
+            $computedPrice = round($computedPrice, 2);
+            
+            $stmtUpdate->execute([$computedPrice, $v['id']]);
+            $repairedCount++;
+        }
+    }
+    
+    respond(true, [
+        'repairedCount' => $repairedCount,
+        'settings' => [
+            'currencyConversion' => $currencyConversion,
+            'etecsaCostGB' => $etecsaCostGB,
+            'etecsaDiscount' => $etecsaDiscount
+        ]
+    ], "Precios calculados y reparados con éxito según fórmula ETECSA ($repairedCount archivos actualizados).");
 }
 
 function admin_cleanup_files($pdo) {

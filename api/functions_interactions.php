@@ -98,6 +98,31 @@ function interact_purchase($pdo, $input) {
         $v = $pdo->query("SELECT * FROM videos WHERE id = '$vid'")->fetch();
         $buyerName = $pdo->query("SELECT username FROM users WHERE id = '$bid'")->fetchColumn();
         $bal = $pdo->query("SELECT balance FROM users WHERE id = '$bid'")->fetchColumn();
+        
+        $price = floatval($v['price']);
+        if ($price < 0) {
+            // Compute real-time ETECSA dynamic formula
+            $stmtS = $pdo->query("SELECT currencyConversion, etecsaCostGB, etecsaDiscount FROM system_settings WHERE id = 1");
+            $settings = $stmtS->fetch();
+            $currencyConversion = floatval($settings['currencyConversion'] ?? 300.00);
+            $etecsaCostGB = floatval($settings['etecsaCostGB'] ?? 0.3500);
+            $etecsaDiscount = floatval($settings['etecsaDiscount'] ?? 0.70);
+
+            $sizeMB = floatval($v['size_bytes'] ?? 0) / (1024.0 * 1024.0);
+            if ($sizeMB <= 0) {
+                $sizeMB = 1.0;
+            }
+            $computedPrice = (($sizeMB / 1024.0) * ($etecsaCostGB * $currencyConversion)) * $etecsaDiscount;
+            if ($computedPrice < 1.0) {
+                $computedPrice = 1.0;
+            }
+            $price = round($computedPrice, 2);
+            
+            // Persist the calculated price directly so it becomes static for subsequent actions
+            $pdo->query("UPDATE videos SET price = $price WHERE id = '$vid'");
+            $v['price'] = $price;
+        }
+
         if ($bal < $v['price']) throw new Exception("Saldo insuficiente");
         $fee = $v['price'] * 0.20; $part = $v['price'] - $fee;
         $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$v['price'], $bid]);
@@ -822,6 +847,7 @@ function group_create($pdo, $input) {
     $groupName = trim($input['name'] ?? '');
     $description = trim($input['description'] ?? 'Grupo sin descripción.');
     $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
+    $allowUpload = !isset($input['allowUpload']) || !empty($input['allowUpload']) ? 1 : 0;
     $coverUrl = $input['coverUrl'] ?? null;
 
     if (!$userId || !$groupName) respond(false, null, "Faltan datos");
@@ -886,23 +912,32 @@ function group_create($pdo, $input) {
 
     if (!$folderCreated) {
         if (!is_dir($targetDir)) {
-            if (!mkdir($targetDir, 0777, true)) {
-                respond(false, null, "No se pudo crear el directorio del grupo");
+            if (!is_dir($basePath)) {
+                @mkdir($basePath, 0777, true);
+            }
+            if (!@mkdir($targetDir, 0777, true)) {
+                // Fallback to local writable path inside app directory:
+                $fallbackPath = __DIR__ . '/uploads/videos';
+                @mkdir($fallbackPath, 0777, true);
+                $targetDir = $fallbackPath . '/' . $folderNameForDir;
+                @mkdir($targetDir, 0777, true);
             }
         }
     }
 
-    // Confirm that the folder was created successfully and is accessible
-    if (!is_dir($targetDir)) {
-        respond(false, null, "Error: El directorio no pudo ser verificado como creado.");
-    }
-
     // Register metadata
     try {
-        $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, createdAt) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, time()]);
+        $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, allowUpload, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, $allowUpload, time()]);
     } catch (Exception $e) {
-        // En caso de que falle la tabla, seguimos adelante
+        // En caso de que falle de otra manera, intentamos sin el campo allowUpload o registramos el error
+        try {
+            $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, createdAt) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, time()]);
+            // Intentar alterar la tabla dinámicamente si falta la columna
+            $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
+            $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
+        } catch (Exception $ex) {}
     }
 
     // Automatically auto-subscribe creator with approved=1
@@ -928,6 +963,7 @@ function group_edit($pdo, $input) {
     $coverUrl = $input['coverUrl'] ?? null;
     $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
     $isUnified = !empty($input['isUnified']) ? 1 : 0;
+    $allowUpload = !isset($input['allowUpload']) || !empty($input['allowUpload']) ? 1 : 0;
     $newName = trim($input['name'] ?? '');
 
     if (!empty($newName) && $newName !== $folderPath) {
@@ -950,8 +986,17 @@ function group_edit($pdo, $input) {
         }
 
         // update db records
-        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
-        $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
+        try {
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $folderPath]);
+        } catch (Exception $e) {
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
+            try {
+                $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
+                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
+            } catch (Exception $ex) {}
+        }
 
         $stmtSub = $pdo->prepare("UPDATE group_subscriptions SET folderPath = ? WHERE folderPath = ?");
         $stmtSub->execute([$folderNameForDir, $folderPath]);
@@ -968,8 +1013,17 @@ function group_edit($pdo, $input) {
 
         $folderPath = $folderNameForDir;
     } else {
-        $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
-        $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
+        try {
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $folderPath]);
+        } catch (Exception $e) {
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
+            try {
+                $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
+                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderPath) . "'");
+            } catch (Exception $ex) {}
+        }
     }
 
     respond(true, ['folderPath' => $folderPath], "Grupo actualizado con éxito");

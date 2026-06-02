@@ -198,6 +198,44 @@ export default function AdminConfig() {
                         <input type="password" value={settings?.geminiKey} onChange={e => updateValue('geminiKey', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono text-[10px] focus:border-indigo-500 outline-none" placeholder="Ingresa tu clave de Google AI..." />
                     </div>
 
+                    <div className="bg-slate-950/45 p-4 rounded-2xl border border-white/5 space-y-3">
+                        <h4 className="text-[10px] font-black text-white uppercase tracking-wider flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Cálculos de Precios (ETECSA)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Cambio Admin ($ CUP / USD)</label>
+                                <input 
+                                    type="number" 
+                                    value={settings?.currencyConversion ?? 300} 
+                                    onChange={e => updateValue('currencyConversion', parseFloat(e.target.value) || 300)} 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                                />
+                                <span className="text-[7px] text-slate-500 block uppercase font-bold ml-1">Cambio de CUP en admin</span>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Costo ETECSA 1 GB (USD)</label>
+                                <input 
+                                    type="number" step="0.001"
+                                    value={settings?.etecsaCostGB ?? 0.35} 
+                                    onChange={e => updateValue('etecsaCostGB', parseFloat(e.target.value) || 0.35)} 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                                />
+                                <span className="text-[7px] text-slate-500 block uppercase font-bold ml-1">Costo base por GB</span>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Descuento aplicado (D)</label>
+                                <input 
+                                    type="number" step="0.01"
+                                    value={settings?.etecsaDiscount ?? 0.7} 
+                                    onChange={e => updateValue('etecsaDiscount', parseFloat(e.target.value) || 0.7)} 
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold text-xs focus:border-indigo-500 outline-none" 
+                                />
+                                <span className="text-[7px] text-slate-500 block uppercase font-bold ml-1">Multiplicador (0.7 = 30%)</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-white/5">
                         <div className="space-y-1">
                             <label className="text-[9px] font-black text-indigo-400 uppercase flex items-center gap-1 ml-1"><Heart size={10}/> Meta de Likes (x 1 día Gratis)</label>

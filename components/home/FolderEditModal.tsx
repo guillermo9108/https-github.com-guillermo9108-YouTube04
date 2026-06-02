@@ -11,15 +11,26 @@ interface FolderEditModalProps {
 
 const FolderEditModal: React.FC<FolderEditModalProps> = ({ folder, initialPrice, initialSortOrder, onClose, onSave }) => {
     const [price, setPrice] = useState<number>(initialPrice);
+    const [isAuto, setIsAuto] = useState<boolean>(initialPrice === -1);
     const [sortOrder, setSortOrder] = useState<string>(initialSortOrder);
     const [isUnified, setIsUnified] = useState<boolean>(!!folder.isUnified);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setPrice(initialPrice);
+        setIsAuto(initialPrice === -1);
         setSortOrder(initialSortOrder);
         setIsUnified(!!folder.isUnified);
     }, [folder.relativePath, initialPrice, initialSortOrder, folder.isUnified]);
+
+    const handleToggleAuto = (checked: boolean) => {
+        setIsAuto(checked);
+        if (checked) {
+            setPrice(-1);
+        } else {
+            setPrice(1.0);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
@@ -33,13 +44,30 @@ const FolderEditModal: React.FC<FolderEditModalProps> = ({ folder, initialPrice,
                 </div>
                 <div className="p-6 space-y-6">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Precio Sugerido ($)</label>
+                        <div className="flex items-center justify-between ml-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase">Precio Sugerido ($)</label>
+                            <label className="flex items-center gap-1 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={isAuto} 
+                                    onChange={(e) => handleToggleAuto(e.target.checked)}
+                                    className="w-3.5 h-3.5 text-indigo-500 bg-slate-950 border-slate-800 rounded accent-indigo-500 cursor-pointer"
+                                />
+                                <span className="text-[10px] font-black text-indigo-400 uppercase">AUTO</span>
+                            </label>
+                        </div>
                         <div className="relative">
-                            < DollarSign className="absolute left-4 top-3.5 text-emerald-500" size={18}/>
-                            <input 
-                                type="number" step="0.1" value={price} onChange={e => setPrice(parseFloat(e.target.value))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-4 text-white font-black text-2xl focus:border-emerald-500 outline-none transition-all shadow-inner"
-                            />
+                            <DollarSign className="absolute left-4 top-3.5 text-emerald-500" size={18}/>
+                            {isAuto ? (
+                                <div className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-4 text-indigo-400 font-extrabold text-xs flex items-center h-[62px]">
+                                    Cálculo Automático (ETECSA)
+                                </div>
+                            ) : (
+                                <input 
+                                    type="number" step="0.1" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-4 text-white font-black text-2xl focus:border-emerald-500 outline-none transition-all shadow-inner"
+                                />
+                            )}
                         </div>
                     </div>
                     <div className="space-y-2">

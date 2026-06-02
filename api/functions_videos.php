@@ -1020,7 +1020,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     // Load all metadata from groups_metadata
     $metaMap = [];
     try {
-        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, createdAt FROM groups_metadata");
+        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, createdAt FROM groups_metadata");
         $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
         foreach ($allMeta as $m) {
             $metaMap[strtolower($m['folderPath'])] = $m;
@@ -1047,6 +1047,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $f['coverUrl'] = $metaMap[$key]['coverUrl'] ? fix_url($metaMap[$key]['coverUrl']) : null;
             $f['isPrivate'] = (int)$metaMap[$key]['isPrivate'];
             $f['isUnified'] = (int)($metaMap[$key]['isUnified'] ?? 0);
+            $f['allowUpload'] = isset($metaMap[$key]['allowUpload']) ? (int)$metaMap[$key]['allowUpload'] : 1;
             $f['createdAt'] = (int)$metaMap[$key]['createdAt'];
         } else {
             $f['creatorId'] = 'admin';
@@ -1054,6 +1055,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $f['coverUrl'] = null;
             $f['isPrivate'] = 0;
             $f['isUnified'] = 0;
+            $f['allowUpload'] = 1;
             $f['createdAt'] = time();
         }
 
