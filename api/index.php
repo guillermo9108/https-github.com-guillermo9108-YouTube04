@@ -227,6 +227,7 @@ try {
         case 'get_unprocessed_videos': video_get_unprocessed($pdo, $_GET); break;
         case 'unlock_video': video_unlock($pdo, $input); break;
         case 'upload_video': video_upload($pdo, $_POST, $_FILES); break;
+        case 'upload_chunk': video_upload_chunk($pdo, $_POST, $_FILES); break;
         case 'update_video_metadata': video_update_metadata($pdo, $_POST, $_FILES); break;
         case 'update_video': video_update($pdo, $input); break;
         case 'delete_video': video_delete($pdo, $input); break;

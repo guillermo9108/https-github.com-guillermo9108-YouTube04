@@ -315,7 +315,7 @@ function video_get_all($pdo) {
     if (!empty($folder)) {
         $isUnified = false;
         try {
-            $stmtUni = $pdo->prepare("SELECT isUnified FROM groups_metadata WHERE folderPath = ?");
+            $stmtUni = $pdo->prepare("SELECT isUnified FROM groups_metadata WHERE LOWER(folderPath) = LOWER(?)");
             $stmtUni->execute([$folder]);
             $isUnified = (bool)$stmtUni->fetchColumn();
         } catch (Exception $e) {}
@@ -996,7 +996,16 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         }
     }
 
-    $folders = array_values($folderMap);
+    // Load all metadata from groups_metadata first
+    $allMeta = [];
+    $metaMap = [];
+    try {
+        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, createdAt FROM groups_metadata");
+        $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($allMeta as $m) {
+            $metaMap[strtolower($m['folderPath'])] = $m;
+        }
+    } catch (Exception $e) {}
 
     // Group videos by lowercase relativePath to identify last thumbs and new posts count
     $folderVideosList = [];
@@ -1017,15 +1026,60 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
         }
     }
 
-    // Load all metadata from groups_metadata
-    $metaMap = [];
-    try {
-        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, createdAt FROM groups_metadata");
-        $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($allMeta as $m) {
-            $metaMap[strtolower($m['folderPath'])] = $m;
+    // 1. Ensure all metadata groups exist in $folderMap (so user-created empty/private groups are shown!)
+    foreach ($allMeta as $m) {
+        $key = strtolower($m['folderPath']);
+        if (!isset($folderMap[$key])) {
+            $folderMap[$key] = [
+                'name' => $m['folderPath'],
+                'relativePath' => $m['folderPath'],
+                'count' => 0,
+                'thumbnailUrl' => $m['coverUrl'] ? fix_url($m['coverUrl']) : 'api/uploads/thumbnails/default.jpg'
+            ];
         }
-    } catch (Exception $e) {}
+    }
+
+    // 2. Multi-subfolder unification: if folder isUnified = 1, aggregate all videos from its subfolders
+    foreach ($allMeta as $m) {
+        if (!empty($m['isUnified'])) {
+            $parentKey = strtolower($m['folderPath']);
+            $parentPathSegment = $parentKey . '/';
+            
+            $unifiedVideos = $folderVideosList[$parentKey] ?? [];
+            foreach ($folderVideosList as $childKey => $childVideos) {
+                if (strpos($childKey, $parentPathSegment) === 0) {
+                    $unifiedVideos = array_merge($unifiedVideos, $childVideos);
+                }
+            }
+            
+            if (!empty($unifiedVideos)) {
+                // Remove duplicates by video id
+                $uniqueVideos = [];
+                $seenIds = [];
+                foreach ($unifiedVideos as $uv) {
+                    if (!in_array($uv['id'], $seenIds)) {
+                        $seenIds[] = $uv['id'];
+                        $uniqueVideos[] = $uv;
+                    }
+                }
+                
+                $folderVideosList[$parentKey] = $uniqueVideos;
+                $folderMap[$parentKey]['count'] = count($uniqueVideos);
+                
+                // If parent has no thumbnail yet and we have a video, set a thumbnail from the unified videos
+                if (empty($folderMap[$parentKey]['thumbnailUrl']) || strpos($folderMap[$parentKey]['thumbnailUrl'], 'default') !== false) {
+                    foreach ($uniqueVideos as $uv) {
+                        if (!empty($uv['thumbnailUrl']) && strpos($uv['thumbnailUrl'], 'default') === false) {
+                            $folderMap[$parentKey]['thumbnailUrl'] = fix_url($uv['thumbnailUrl']);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $folders = array_values($folderMap);
 
     // Load members count map from group_subscriptions where approved = 1
     $membersMap = [];
@@ -1207,6 +1261,144 @@ function video_upload($pdo, $post, $files) {
         // --------------------
 
         respond(true, ['id' => $id, 'url' => $videoPath]);
+    } catch (Exception $e) {
+        respond(false, null, "Error en base de datos: " . $e->getMessage());
+    }
+}
+
+function video_upload_chunk($pdo, $post, $files) {
+    $uploadId = trim($post['uploadId'] ?? '');
+    $chunkIndex = intval($post['chunkIndex'] ?? 0);
+    $totalChunks = intval($post['totalChunks'] ?? 1);
+    $fileName = trim($post['fileName'] ?? 'video.mp4');
+
+    if (!$uploadId) {
+        respond(false, null, "uploadId es requerido para subida por fragmentos");
+    }
+
+    if (!isset($files['file']) || $files['file']['error'] !== UPLOAD_ERR_OK) {
+        respond(false, null, "Error en el fragmento de la subida: " . ($files['file']['error'] ?? 'No enviado'));
+    }
+
+    $tempDir = 'uploads/temp_chunks/' . $uploadId . '/';
+    if (!is_dir($tempDir)) {
+        mkdir($tempDir, 0777, true);
+    }
+
+    $chunkFile = $tempDir . sprintf('%05d', $chunkIndex) . '.part';
+    if (!move_uploaded_file($files['file']['tmp_name'], $chunkFile)) {
+        respond(false, null, "No se pudo guardar el fragmento en el servidor");
+    }
+
+    $uploadedCount = 0;
+    $filesInTemp = glob($tempDir . '*.part');
+    if ($filesInTemp) {
+        $uploadedCount = count($filesInTemp);
+    }
+
+    if ($uploadedCount < $totalChunks) {
+        respond(true, ['status' => 'chunk_saved', 'chunkIndex' => $chunkIndex]);
+    }
+
+    // Assemble Chunks
+    $id = 'v_' . uniqid();
+    $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+    $videoName = "{$id}.{$ext}";
+    $videoDir = 'uploads/videos/';
+    $folderParam = trim($post['folder'] ?? '');
+
+    if (!empty($folderParam)) {
+        $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+        $sSet = $stmtSet->fetch();
+        $localPath = $sSet['localLibraryPath'] ?? '';
+        if (!empty($localPath)) {
+            $videoDir = rtrim(str_replace('\\', '/', $localPath), '/') . '/' . trim($folderParam, '/') . '/';
+        } else {
+            $videoDir = 'uploads/videos/' . trim($folderParam, '/') . '/';
+        }
+    }
+    if (!is_dir($videoDir)) {
+        mkdir($videoDir, 0777, true);
+    }
+
+    $finalVideoPath = $videoDir . $videoName;
+    $out = fopen($finalVideoPath, 'wb');
+    if (!$out) {
+        respond(false, null, "No se pudo crear el archivo final de video");
+    }
+
+    for ($i = 0; $i < $totalChunks; $i++) {
+        $chunkPath = $tempDir . sprintf('%05d', $i) . '.part';
+        if (!file_exists($chunkPath)) {
+            fclose($out);
+            unlink($finalVideoPath);
+            respond(false, null, "Falta el fragmento número " . $i);
+        }
+        $in = fopen($chunkPath, 'rb');
+        if ($in) {
+            while ($buff = fread($in, 4096000)) {
+                fwrite($out, $buff);
+            }
+            fclose($in);
+        }
+        unlink($chunkPath);
+    }
+    fclose($out);
+    @rmdir($tempDir);
+
+    $thumbPath = 'api/uploads/thumbnails/default.jpg'; 
+    $thumbDir = 'uploads/thumbnails/';
+    if (!is_dir($thumbDir)) mkdir($thumbDir, 0777, true);
+
+    if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
+        $thumbName = "{$id}.jpg"; 
+        $dest = $thumbDir . $thumbName;
+        if (move_uploaded_file($files['thumbnail']['tmp_name'], $dest)) {
+            $thumbPath = 'api/' . $dest;
+            create_thumbnail($dest);
+        }
+    } else if ($finalVideoPath) {
+        $bins = get_ffmpeg_binaries($pdo);
+        $thumbName = "{$id}.jpg";
+        $thumbDest = $thumbDir . $thumbName;
+        if (extract_video_thumbnail($finalVideoPath, $thumbDest, $bins['ffmpeg'])) {
+            $thumbPath = 'api/' . $thumbDest;
+            create_thumbnail($thumbDest);
+        }
+    }
+
+    $settings = get_system_settings($pdo);
+    $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
+
+    $price = floatval($post['price'] ?? 0);
+    $transcodeStatus = 'NONE';
+    $extLower = strtolower($ext);
+    $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
+    $isAudio = in_array($extLower, $audioExts) ? 1 : 0;
+    if ($extLower === 'mp4') $isAudio = 0;
+
+    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3') {
+        $transcodeStatus = 'WAITING';
+    }
+
+    $category = $post['category'] ?? 'PERSONAL';
+    $collection = $post['collection'] ?? null;
+    $isPrivate = !empty($post['is_private']) ? 1 : 0;
+    $duration = intval($post['duration'] ?? 0);
+    $title = !empty($post['title']) ? $post['title'] : "Video $id";
+    $desc = $post['description'] ?? '';
+    $creatorId = $post['userId'] ?? 'anonymous';
+
+    try {
+        $stmt = $pdo->prepare("INSERT INTO videos (id, title, description, price, category, duration, videoUrl, thumbnailUrl, creatorId, createdAt, transcode_status, collection, is_audio, is_private) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$id, $title, $desc, $price, $category, $duration, $finalVideoPath, $thumbPath, $creatorId, time(), $transcodeStatus, $collection, $isAudio, $isPrivate]);
+        
+        video_organize_single($pdo, $id, $settings);
+
+        require_once __DIR__ . '/functions_challenges.php';
+        check_weekly_upload_challenge($pdo, $creatorId);
+
+        respond(true, ['id' => $id, 'url' => $finalVideoPath]);
     } catch (Exception $e) {
         respond(false, null, "Error en base de datos: " . $e->getMessage());
     }

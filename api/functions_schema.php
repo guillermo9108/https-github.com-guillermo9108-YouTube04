@@ -488,6 +488,16 @@ function syncTable($pdo, $tableName, $def) {
                         $pdo->exec("ALTER TABLE marketplace_order_items MODIFY COLUMN status ENUM('PENDING', 'PAID', 'REJECTED', 'CANCELLED') DEFAULT 'PENDING'");
                     } catch(Throwable $e) {}
                 }
+                if ($tableName === 'group_subscriptions') {
+                    try {
+                        $stmtKeys = $pdo->query("SHOW KEYS FROM group_subscriptions WHERE Key_name = 'PRIMARY'");
+                        $keys = $stmtKeys->fetchAll();
+                        if ($keys && count($keys) === 1 && $keys[0]['Column_name'] === 'userId') {
+                            $pdo->exec("ALTER TABLE group_subscriptions DROP PRIMARY KEY");
+                            $pdo->exec("ALTER TABLE group_subscriptions ADD PRIMARY KEY (userId, folderPath)");
+                        }
+                    } catch(Throwable $e) {}
+                }
             }
 
             if ($driver === 'mysql') {

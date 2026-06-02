@@ -121,8 +121,8 @@ export default function GroupsPage() {
         try {
             setLoading(true);
             const result = await db.getFolders('', true);
-            // Strictly show folders with content, hiding empty parent folders
-            const activeGroups = (result || []).filter((g: any) => g.count > 0);
+            // Show folders with content, or empty folders if they are explicitly created groups (have creatorId)
+            const activeGroups = (result || []).filter((g: any) => g.count > 0 || (g.creatorId !== undefined && g.creatorId !== null));
             setGroups(activeGroups);
 
             if (user?.id) {
@@ -1296,8 +1296,9 @@ export default function GroupsPage() {
             {/* CREATE GROUP DIALOG MODAL */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm overflow-hidden text-left animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between">
+                    <div id="create-group-modal" className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden text-left animate-in zoom-in-95 duration-200 shadow-2xl">
+                        {/* Fixed Header */}
+                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between shrink-0">
                             <h3 className="font-extrabold text-white text-sm flex items-center gap-1.5">
                                 <Users size={18} className="text-[#1877f2]" />
                                 Crear nuevo Grupo (Carpeta)
@@ -1306,126 +1307,133 @@ export default function GroupsPage() {
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={handleCreateGroup} className="p-4 space-y-4">
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre de la carpeta / grupo</label>
-                                <input
-                                    type="text"
-                                    value={newGroupName}
-                                    onChange={(e) => setNewGroupName(e.target.value)}
-                                    placeholder="Ej: VideosGraciosos"
-                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] placeholder-slate-500 focus:outline-none focus:border-[#1877f2]"
-                                    required
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                                    Esto creará físicamente un subdirectorio en el servidor de almacenamiento. Los archivos subidos se dirigirán ahí.
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Privacidad del grupo</label>
-                                <div className="space-y-2">
-                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
-                                        <input
-                                            type="radio"
-                                            name="privacy"
-                                            checked={newGroupPrivacy === 'PUBLIC'}
-                                            onChange={() => setNewGroupPrivacy('PUBLIC')}
-                                            className="accent-[#1877f2]"
-                                        />
-                                        <div>
-                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Globe size={12} />Público</span>
-                                            <span className="text-[9px] text-slate-400 block">Cualquiera puede unirse y ver publicaciones.</span>
-                                        </div>
-                                    </label>
-                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
-                                        <input
-                                            type="radio"
-                                            name="privacy"
-                                            checked={newGroupPrivacy === 'PRIVATE'}
-                                            onChange={() => setNewGroupPrivacy('PRIVATE')}
-                                            className="accent-[#1877f2]"
-                                        />
-                                        <div>
-                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Lock size={12} />Privado (Suscritos)</span>
-                                            <span className="text-[9px] text-slate-400 block">Solo miembros invitados.</span>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción</label>
-                                <textarea
-                                    value={newGroupDescription}
-                                    onChange={(e) => setNewGroupDescription(e.target.value)}
-                                    placeholder="Describe el propósito del grupo para los nuevos miembros..."
-                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] h-16 resize-none placeholder-slate-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Portada del grupo</label>
-                                <div className="space-y-2">
+                        
+                        {/* Scrollable Content */}
+                        <form onSubmit={handleCreateGroup} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-700">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre de la carpeta / grupo</label>
                                     <input
                                         type="text"
-                                        value={newGroupCover}
-                                        onChange={(e) => setNewGroupCover(e.target.value)}
-                                        placeholder="Enlace o URL de portada (https://...)"
-                                        className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] placeholder-slate-500"
+                                        value={newGroupName}
+                                        onChange={(e) => setNewGroupName(e.target.value)}
+                                        placeholder="Ej: VideosGraciosos"
+                                        className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] placeholder-slate-500 focus:outline-none focus:border-[#1877f2]"
+                                        required
                                     />
-                                    <div className="flex items-center gap-2">
-                                        <label className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 transition-all text-xs font-bold text-[#e4e6eb] rounded-xl py-2 px-3 border border-[#3e4042] cursor-pointer">
-                                            <ImageIcon size={14} className="text-blue-500" />
-                                            <span>Subir desde dispositivo</span>
+                                    <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                                        Esto creará físicamente un subdirectorio en el servidor de almacenamiento. Los archivos subidos se dirigirán ahí.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Privacidad del grupo</label>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
                                             <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={(e) => handleCoverFileChange(e, false)}
-                                                className="hidden"
+                                                type="radio"
+                                                name="privacy"
+                                                checked={newGroupPrivacy === 'PUBLIC'}
+                                                onChange={() => setNewGroupPrivacy('PUBLIC')}
+                                                className="accent-[#1877f2]"
                                             />
+                                            <div>
+                                                <span className="text-xs font-bold text-white flex items-center gap-1"><Globe size={12} />Público</span>
+                                                <span className="text-[9px] text-slate-400 block">Cualquiera puede unirse y ver publicaciones.</span>
+                                            </div>
                                         </label>
-                                        {newGroupCover && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setNewGroupCover('')}
-                                                className="bg-red-950/40 hover:bg-red-950 text-red-500 border border-red-500/20 text-xs font-bold rounded-xl py-2 px-3 transition-all"
-                                            >
-                                                Quitar
-                                            </button>
+                                        <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                            <input
+                                                type="radio"
+                                                name="privacy"
+                                                checked={newGroupPrivacy === 'PRIVATE'}
+                                                onChange={() => setNewGroupPrivacy('PRIVATE')}
+                                                className="accent-[#1877f2]"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-white flex items-center gap-1"><Lock size={12} />Privado (Suscritos)</span>
+                                                <span className="text-[9px] text-slate-400 block">Solo miembros invitados.</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción</label>
+                                    <textarea
+                                        value={newGroupDescription}
+                                        onChange={(e) => setNewGroupDescription(e.target.value)}
+                                        placeholder="Describe el propósito del grupo para los nuevos miembros..."
+                                        className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] h-16 resize-none placeholder-slate-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Portada del grupo</label>
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            value={newGroupCover}
+                                            onChange={(e) => setNewGroupCover(e.target.value)}
+                                            placeholder="Enlace o URL de portada (https://...)"
+                                            className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] placeholder-slate-500"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 transition-all text-xs font-bold text-[#e4e6eb] rounded-xl py-2 px-3 border border-[#3e4042] cursor-pointer">
+                                                <ImageIcon size={14} className="text-blue-500" />
+                                                <span>Subir desde dispositivo</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleCoverFileChange(e, false)}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                            {newGroupCover && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewGroupCover('')}
+                                                    className="bg-red-950/40 hover:bg-red-950 text-red-500 border border-red-500/20 text-xs font-bold rounded-xl py-2 px-3 transition-all"
+                                                >
+                                                    Quitar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {newGroupCover && newGroupCover.length > 0 && (
+                                            <div className="relative rounded-lg overflow-hidden border border-[#3e4042] aspect-video w-full bg-slate-950">
+                                                <img src={newGroupCover} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                            </div>
                                         )}
                                     </div>
-                                    {newGroupCover && newGroupCover.startsWith('data:') && (
-                                        <div className="relative rounded-lg overflow-hidden border border-[#3e4042] aspect-video w-full bg-slate-950">
-                                            <img src={newGroupCover} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={newGroupAllowUpload}
+                                            onChange={(e) => setNewGroupAllowUpload(e.target.checked)}
+                                            className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
+                                            <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
                                         </div>
-                                    )}
+                                    </label>
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={newGroupAllowUpload}
-                                        onChange={(e) => setNewGroupAllowUpload(e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
-                                    />
-                                    <div>
-                                        <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
-                                        <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
-                                    </div>
-                                </label>
+                            {/* Fixed Footer */}
+                            <div className="p-4 border-t border-[#3e4042] bg-[#242526] shrink-0">
+                                <button
+                                    type="submit"
+                                    disabled={creatingGroup}
+                                    className="w-full bg-[#1877f2] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-xs font-bold hover:shadow-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                    {creatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                    <span>Crear Grupo</span>
+                                </button>
                             </div>
-
-                            <button
-                                type="submit"
-                                disabled={creatingGroup}
-                                className="w-full bg-[#1877f2] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-xs font-bold mt-2 hover:shadow-lg transition-all flex items-center justify-center gap-1"
-                            >
-                                {creatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                <span>Crear Grupo</span>
-                            </button>
                         </form>
                     </div>
                 </div>
@@ -1434,8 +1442,9 @@ export default function GroupsPage() {
             {/* EDIT GROUP DIALOG MODAL */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm overflow-hidden text-left animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between">
+                    <div id="edit-group-modal" className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden text-left animate-in zoom-in-95 duration-200 shadow-2xl">
+                        {/* Fixed Header */}
+                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between shrink-0">
                             <h3 className="font-extrabold text-white text-sm flex items-center gap-1.5">
                                 <Settings size={18} className="text-[#1877f2]" />
                                 Editar Detalles de Grupo
@@ -1444,136 +1453,143 @@ export default function GroupsPage() {
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={handleEditGroupSubmit} className="p-4 space-y-4">
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre de la carpeta</label>
-                                <input
-                                    type="text"
-                                    value={editGroupName}
-                                    onChange={(e) => setEditGroupName(e.target.value)}
-                                    placeholder="Nombre de la carpeta"
-                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2]"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción</label>
-                                <textarea
-                                    value={editGroupDesc}
-                                    onChange={(e) => setEditGroupDesc(e.target.value)}
-                                    placeholder="Describe el propósito del grupo para los nuevos miembros..."
-                                    className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] h-20 resize-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto de portada</label>
-                                <div className="space-y-2">
+                        
+                        {/* Scrollable Content */}
+                        <form onSubmit={handleEditGroupSubmit} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="p-4 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-700">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre de la carpeta</label>
                                     <input
                                         type="text"
-                                        value={editGroupCover}
-                                        onChange={(e) => setEditGroupCover(e.target.value)}
-                                        placeholder="https://ejemplo.com/banner.jpg"
+                                        value={editGroupName}
+                                        onChange={(e) => setEditGroupName(e.target.value)}
+                                        placeholder="Nombre de la carpeta"
                                         className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2]"
+                                        required
                                     />
-                                    <div className="flex items-center gap-2">
-                                        <label className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 transition-all text-xs font-bold text-[#e4e6eb] rounded-xl py-2 px-3 border border-[#3e4042] cursor-pointer">
-                                            <ImageIcon size={14} className="text-blue-500" />
-                                            <span>Subir desde dispositivo</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={(e) => handleCoverFileChange(e, true)}
-                                                className="hidden"
-                                            />
-                                        </label>
-                                        {editGroupCover && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setEditGroupCover('')}
-                                                className="bg-red-950/40 hover:bg-red-950 text-red-500 border border-red-500/20 text-xs font-bold rounded-xl py-2 px-3 transition-all"
-                                            >
-                                                Quitar
-                                            </button>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción</label>
+                                    <textarea
+                                        value={editGroupDesc}
+                                        onChange={(e) => setEditGroupDesc(e.target.value)}
+                                        placeholder="Describe el propósito del grupo para los nuevos miembros..."
+                                        className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2] h-20 resize-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto de portada</label>
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            value={editGroupCover}
+                                            onChange={(e) => setEditGroupCover(e.target.value)}
+                                            placeholder="https://ejemplo.com/banner.jpg"
+                                            className="w-full bg-slate-900 border border-[#3e4042] rounded-xl p-2.5 text-xs text-[#e4e6eb] focus:outline-none focus:border-[#1877f2]"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 transition-all text-xs font-bold text-[#e4e6eb] rounded-xl py-2 px-3 border border-[#3e4042] cursor-pointer">
+                                                <ImageIcon size={14} className="text-blue-500" />
+                                                <span>Subir desde dispositivo</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleCoverFileChange(e, true)}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                            {editGroupCover && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditGroupCover('')}
+                                                    className="bg-red-950/40 hover:bg-red-950 text-red-500 border border-red-500/20 text-xs font-bold rounded-xl py-2 px-3 transition-all"
+                                                >
+                                                    Quitar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {editGroupCover && editGroupCover.length > 0 && (
+                                            <div className="relative rounded-lg overflow-hidden border border-[#3e4042] aspect-video w-full bg-slate-950">
+                                                <img src={editGroupCover} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                            </div>
                                         )}
                                     </div>
-                                    {editGroupCover && editGroupCover.startsWith('data:') && (
-                                        <div className="relative rounded-lg overflow-hidden border border-[#3e4042] aspect-video w-full bg-slate-950">
-                                            <img src={editGroupCover} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                        </div>
-                                    )}
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Privacidad del grupo</label>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Privacidad del grupo</label>
+                                    <div className="space-y-2">
+                                        <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                            <input
+                                                type="radio"
+                                                name="editPrivacy"
+                                                checked={editGroupPrivacy === 'PUBLIC'}
+                                                onChange={() => setEditGroupPrivacy('PUBLIC')}
+                                                className="accent-[#1877f2]"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-white flex items-center gap-1"><Globe size={12} />Público</span>
+                                                <span className="text-[9px] text-slate-400 block">Cualquiera puede unirse y ver publicaciones.</span>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                            <input
+                                                type="radio"
+                                                name="editPrivacy"
+                                                checked={editGroupPrivacy === 'PRIVATE'}
+                                                onChange={() => setEditGroupPrivacy('PRIVATE')}
+                                                className="accent-[#1877f2]"
+                                            />
+                                            <div>
+                                                <span className="text-xs font-bold text-white flex items-center gap-1"><Lock size={12} />Privado (Suscripciones aprobadas)</span>
+                                                <span className="text-[9px] text-slate-400 block">Requiere aprobación del administrador del grupo.</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-2">
                                     <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
                                         <input
-                                            type="radio"
-                                            name="editPrivacy"
-                                            checked={editGroupPrivacy === 'PUBLIC'}
-                                            onChange={() => setEditGroupPrivacy('PUBLIC')}
-                                            className="accent-[#1877f2]"
+                                            type="checkbox"
+                                            checked={editGroupUnified}
+                                            onChange={(e) => setEditGroupUnified(e.target.checked)}
+                                            className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
                                         />
                                         <div>
-                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Globe size={12} />Público</span>
-                                            <span className="text-[9px] text-slate-400 block">Cualquiera puede unirse y ver publicaciones.</span>
+                                            <span className="text-xs font-bold text-white block">Unificar como grupo</span>
+                                            <span className="text-[9px] text-slate-400 block font-normal">Integra las publicaciones de todas sus subcarpetas como contenido de este feed de grupo.</span>
                                         </div>
                                     </label>
+
                                     <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
                                         <input
-                                            type="radio"
-                                            name="editPrivacy"
-                                            checked={editGroupPrivacy === 'PRIVATE'}
-                                            onChange={() => setEditGroupPrivacy('PRIVATE')}
-                                            className="accent-[#1877f2]"
+                                            type="checkbox"
+                                            checked={editGroupAllowUpload}
+                                            onChange={(e) => setEditGroupAllowUpload(e.target.checked)}
+                                            className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
                                         />
                                         <div>
-                                            <span className="text-xs font-bold text-white flex items-center gap-1"><Lock size={12} />Privado (Suscripciones aprobadas)</span>
-                                            <span className="text-[9px] text-slate-400 block">Requiere aprobación del administrador del grupo.</span>
+                                            <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
+                                            <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={editGroupUnified}
-                                        onChange={(e) => setEditGroupUnified(e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
-                                    />
-                                    <div>
-                                        <span className="text-xs font-bold text-white block">Unificar como grupo</span>
-                                        <span className="text-[9px] text-slate-400 block font-normal">Integra las publicaciones de todas sus subcarpetas como contenido de este feed de grupo.</span>
-                                    </div>
-                                </label>
-
-                                <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={editGroupAllowUpload}
-                                        onChange={(e) => setEditGroupAllowUpload(e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
-                                    />
-                                    <div>
-                                        <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
-                                        <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
-                                    </div>
-                                </label>
+                            {/* Fixed Footer */}
+                            <div className="p-4 border-t border-[#3e4042] bg-[#242526] shrink-0">
+                                <button
+                                    type="submit"
+                                    disabled={updatingGroup}
+                                    className="w-full bg-[#1877f2] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-xs font-bold hover:shadow-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                    {updatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    <span>Guardar Cambios</span>
+                                </button>
                             </div>
-
-                            <button
-                                type="submit"
-                                disabled={updatingGroup}
-                                className="w-full bg-[#1877f2] hover:bg-blue-600 disabled:opacity-50 text-white rounded-xl py-2.5 text-xs font-bold mt-2 hover:shadow-lg transition-all flex items-center justify-center gap-1"
-                            >
-                                {updatingGroup ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                <span>Guardar Cambios</span>
-                            </button>
                         </form>
                     </div>
                 </div>

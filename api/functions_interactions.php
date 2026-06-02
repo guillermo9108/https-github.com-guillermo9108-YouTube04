@@ -802,6 +802,16 @@ function group_subscribe($pdo, $input) {
         $stmt = $pdo->prepare("INSERT INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, ?, ?)");
         $stmt->execute([$userId, $folderPath, $approved, time()]);
         if ($approved === 0) {
+            $creatorId = $meta['creatorId'] ?? 'admin';
+            $buyerName = $pdo->query("SELECT username FROM users WHERE id = '$userId'")->fetchColumn() ?: 'Un usuario';
+            send_direct_notification(
+                $pdo, 
+                $creatorId, 
+                'GROUP_REQUEST', 
+                "El usuario {$buyerName} ha solicitado unirse a tu grupo privado '{$folderPath}'.", 
+                "/groups?tab=ADMIN&pending=1", 
+                null
+            );
             respond(true, ['approved' => false], "Solicitud de suscripción enviada. Esperando aprobación del administrador.");
         } else {
             respond(true, ['approved' => true], "Suscripción a grupo exitosa");
@@ -1066,6 +1076,15 @@ function group_approve_sub($pdo, $input) {
     $stmtUp = $pdo->prepare("UPDATE group_subscriptions SET approved = 1 WHERE userId = ? AND folderPath = ?");
     $stmtUp->execute([$subscriberId, $folderPath]);
 
+    send_direct_notification(
+        $pdo, 
+        $subscriberId, 
+        'GROUP_APPROVED', 
+        "¡Tu solicitud para unirte al grupo '{$folderPath}' ha sido aprobada!", 
+        "/groups?folder=" . urlencode($folderPath), 
+        null
+    );
+
     respond(true, null, "Suscripción aprobada");
 }
 
@@ -1082,6 +1101,15 @@ function group_decline_sub($pdo, $input) {
 
     $stmtDel = $pdo->prepare("DELETE FROM group_subscriptions WHERE userId = ? AND folderPath = ?");
     $stmtDel->execute([$subscriberId, $folderPath]);
+
+    send_direct_notification(
+        $pdo, 
+        $subscriberId, 
+        'GROUP_DECLINED', 
+        "Tu solicitud para unirte al grupo '{$folderPath}' ha sido rechazada.", 
+        "/groups", 
+        null
+    );
 
     respond(true, null, "Solicitud rechazada");
 }
