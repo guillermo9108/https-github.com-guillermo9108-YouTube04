@@ -6,18 +6,20 @@ interface FolderEditModalProps {
     initialPrice: number;
     initialSortOrder: string;
     onClose: () => void;
-    onSave: (price: number, sortOrder: string) => Promise<void>;
+    onSave: (price: number, sortOrder: string, isUnified: boolean) => Promise<void>;
 }
 
 const FolderEditModal: React.FC<FolderEditModalProps> = ({ folder, initialPrice, initialSortOrder, onClose, onSave }) => {
     const [price, setPrice] = useState<number>(initialPrice);
     const [sortOrder, setSortOrder] = useState<string>(initialSortOrder);
+    const [isUnified, setIsUnified] = useState<boolean>(!!folder.isUnified);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setPrice(initialPrice);
         setSortOrder(initialSortOrder);
-    }, [folder.relativePath, initialPrice, initialSortOrder]);
+        setIsUnified(!!folder.isUnified);
+    }, [folder.relativePath, initialPrice, initialSortOrder, folder.isUnified]);
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
@@ -54,11 +56,25 @@ const FolderEditModal: React.FC<FolderEditModalProps> = ({ folder, initialPrice,
                             </select>
                         </div>
                     </div>
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2.5 cursor-pointer p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500 transition-all">
+                            <input
+                                type="checkbox"
+                                checked={isUnified}
+                                onChange={(e) => setIsUnified(e.target.checked)}
+                                className="w-4 h-4 rounded text-[#1877f2] bg-slate-900 border-slate-800 cursor-pointer accent-[#1877f2]"
+                            />
+                            <div>
+                                <span className="text-xs font-bold text-white block">Unificar como grupo</span>
+                                <span className="text-[9px] text-slate-400 block">Todas las publicaciones en subcarpetas se integran como contenido unificado de este grupo.</span>
+                            </div>
+                        </label>
+                    </div>
                     <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20">
                          <p className="text-[9px] text-indigo-300 leading-snug font-bold uppercase">Esto aplicará recursivamente a todos los videos y subcarpetas dentro de: <span className="text-white italic">{folder.name}</span></p>
                     </div>
                     <button 
-                        onClick={() => { setLoading(true); onSave(price, sortOrder).finally(() => setLoading(false)); }} 
+                        onClick={() => { setLoading(true); onSave(price, sortOrder, isUnified).finally(() => setLoading(false)); }} 
                         disabled={loading} 
                         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all text-xs uppercase tracking-widest"
                     >

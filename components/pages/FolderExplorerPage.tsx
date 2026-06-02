@@ -104,12 +104,12 @@ export default function FolderExplorerPage() {
         setSelectedIds(new Set());
     };
 
-    const handleBulkEditFolder = async (price: number, sortOrder: string) => {
+    const handleBulkEditFolder = async (price: number, sortOrder: string, isUnified: boolean) => {
         if (!editingFolder || !editingFolder.relativePath) return;
         try {
             await db.request('action=admin_bulk_edit_folder', {
                 method: 'POST',
-                body: JSON.stringify({ folderPath: editingFolder.relativePath, price, sortOrder })
+                body: JSON.stringify({ folderPath: editingFolder.relativePath, price, sortOrder, isUnified })
             });
             toast.success("Configuración aplicada");
             setEditingFolder(null);

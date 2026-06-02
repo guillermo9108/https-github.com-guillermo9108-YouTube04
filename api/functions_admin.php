@@ -73,9 +73,23 @@ function admin_bulk_edit_folder($pdo, $input) {
     $path = $input['folderPath'];
     $price = floatval($input['price']);
     $sortOrder = $input['sortOrder'] ?? 'LATEST';
+    $isUnified = isset($input['isUnified']) ? ($input['isUnified'] ? 1 : 0) : null;
     
     $pdo->beginTransaction();
     try {
+        if ($isUnified !== null) {
+            $stmtC = $pdo->prepare("SELECT COUNT(*) FROM groups_metadata WHERE folderPath = ?");
+            $stmtC->execute([$path]);
+            $exists = $stmtC->fetchColumn() > 0;
+            if ($exists) {
+                $stmtU = $pdo->prepare("UPDATE groups_metadata SET isUnified = ? WHERE folderPath = ?");
+                $stmtU->execute([$isUnified, $path]);
+            } else {
+                $stmtI = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmtI->execute([$path, 'admin', '', '', 0, $isUnified, date('Y-m-d H:i:s')]);
+            }
+        }
+
         // 1. Actualizar videos que COMIENCEN con esa ruta (recursivo)
         $stmt = $pdo->prepare("UPDATE videos SET price = ? WHERE videoUrl LIKE ?");
         $stmt->execute([$price, '%' . $path . '%']);

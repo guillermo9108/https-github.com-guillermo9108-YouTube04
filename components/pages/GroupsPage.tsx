@@ -12,6 +12,7 @@ import { db } from '../../services/db';
 import { useToast } from '../../context/ToastContext';
 import { useUpload } from '../../context/UploadContext';
 import { useDownload } from '../../context/DownloadContext';
+import VideoCard from '../VideoCard';
 
 export default function GroupsPage() {
     const navigate = useNavigate();
@@ -1077,210 +1078,19 @@ export default function GroupsPage() {
                                 )}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-4">
-                                {filteredContent.map((v) => {
-                                    const isVideo = v.videoUrl?.match(/\.(mp4|mov|avi|mkv|flv|webm)$/i) || v.videoUrl?.includes('vid_');
-                                    const isPic = v.videoUrl?.match(/\.(png|jpg|jpeg|gif|webp)$/i) || v.videoUrl?.includes('img_');
-                                    const react = reactionsState[v.id];
-
-                                    return (
-                                        <div key={v.id} className="bg-[#242526] rounded-xl border border-[#3e4042] overflow-hidden shadow-md flex flex-col text-left">
-                                            {/* FB Post Header */}
-                                            <div className="p-3.5 flex items-center justify-between border-b border-[#3e4042]/30">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="w-10 h-10 rounded-full bg-[#3a3b3c] overflow-hidden">
-                                                        {v.creatorAvatarUrl ? (
-                                                            <img src={v.creatorAvatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center font-bold text-[#1877f2] bg-[#3a3b3c]">{v.creatorName?.[0] || 'G'}</div>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="font-extrabold text-sm text-[#e4e6eb] hover:underline cursor-pointer">{v.creatorName || 'Usuario'}</span>
-                                                            <span className="text-[11px] text-[#b0b3b8] font-medium">publicó en</span>
-                                                            <span className="font-extrabold text-sm text-[#1877f2] hover:underline cursor-pointer flex items-center gap-0.5">
-                                                                {activeGroup.name}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-[10px] text-[#b0b3b8] font-bold flex items-center gap-1">
-                                                            <span>{new Date(v.createdAt).toLocaleDateString()}</span>
-                                                            <span>•</span>
-                                                            <Globe size={11} />
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <button className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition">
-                                                    <MoreHorizontal size={18} />
-                                                </button>
-                                            </div>
-
-                                            {/* Post Description caption */}
-                                            {v.description && (
-                                                <div className="px-3.5 pt-2 pb-2.5 text-xs text-[#e4e6eb] whitespace-pre-wrap leading-relaxed">
-                                                    {v.description}
-                                                </div>
-                                            )}
-
-                                            {/* Nested Media player / renderer */}
-                                            <div className="bg-black/40 flex items-center justify-center overflow-hidden border-t border-b border-[#3e4042]/20 cursor-pointer" onClick={() => navigate(`/watch/${v.id}`)}>
-                                                {isVideo ? (
-                                                    <div className="relative w-full aspect-video bg-black flex items-center justify-center border-b border-[#3e4042]">
-                                                        {v.thumbnailUrl ? (
-                                                            <img src={v.thumbnailUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                                        ) : (
-                                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 dark:bg-slate-900">
-                                                                <Video size={36} className="text-[#1877f2]" />
-                                                                <span className="text-xs mt-2 font-bold font-mono">Reproductor de Video</span>
-                                                            </div>
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                                                            <div className="w-12 h-12 bg-black/65 hover:bg-black/85 rounded-full flex items-center justify-center text-[#1877f2] border-2 border-slate-600 shadow-xl select-none transition-all">
-                                                                <Play size={20} className="ml-0.5 fill-current" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : isPic ? (
-                                                    <div className="w-full max-h-[380px] bg-slate-900 flex items-center justify-center">
-                                                        <img src={v.videoUrl} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                                                    </div>
-                                                ) : (
-                                                    <div className="w-full bg-slate-900 border border-[#3e4042] p-5 flex items-center justify-between text-xs my-0.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <FileText size={24} className="text-amber-500" />
-                                                            <div className="text-left">
-                                                                <p className="font-bold text-white truncate max-w-[200px]">{v.title}</p>
-                                                                <p className="text-[10px] text-slate-400">Archivo descargable</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Reactions count review */}
-                                            <div className="px-3.5 py-2 flex items-center justify-between text-[11px] text-slate-400 font-bold border-b border-[#3e4042]/20">
-                                                <div className="flex items-center gap-1.5 cursor-pointer hover:underline">
-                                                    <span className="flex items-center gap-0.5">
-                                                        <ThumbsUp size={12} className="text-blue-500 fill-current" />
-                                                        <Heart size={12} className="text-red-500 fill-current" />
-                                                    </span>
-                                                    <span>{react ? 1 + react.count : 1} reacción • {v.views || 0} reproducciones</span>
-                                                </div>
-                                                <button onClick={() => toggleComments(v.id)} className="hover:underline">
-                                                    Ver comentarios
-                                                </button>
-                                            </div>
-
-                                            {/* FB Post Action Bar */}
-                                            <div className="flex border-b border-[#3e4042]/20 relative">
-                                                {/* Reacciones FB Hover Menu */}
-                                                <div className="flex-1 relative group py-2">
-                                                    <button 
-                                                        onClick={() => handleReact(v.id, '👍')}
-                                                        className="w-full flex items-center justify-center gap-1.5 text-xs font-extrabold text-[#b0b3b8] hover:text-[#1877f2] transition-colors py-1"
-                                                    >
-                                                        {react ? (
-                                                            <span className="flex items-center gap-1 text-[#1877f2]">
-                                                                <span>{react.type}</span>
-                                                                <span className="capitalize">{react.type === '👍' ? 'Me gusta' : react.type === '❤️' ? 'Me encanta' : 'Reaccionado'}</span>
-                                                            </span>
-                                                        ) : (
-                                                            <>
-                                                                <ThumbsUp size={16} />
-                                                                <span>Me gusta</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                    
-                                                    {/* Floating FB reactions drawer */}
-                                                    <div className="absolute bottom-10 left-3 bg-[#242526] border border-[#3e454e] rounded-full px-2.5 py-1.5 hidden group-hover:flex items-center gap-2 shadow-2xl animate-in slide-in-from-bottom-2 duration-300 z-50">
-                                                        {['👍', '❤️', '🥰', '😆', '😮', '😢', '😡'].map(emoji => (
-                                                            <button 
-                                                                key={emoji}
-                                                                onClick={() => handleReact(v.id, emoji)}
-                                                                className="text-lg hover:scale-130 active:scale-90 transition-transform p-0.5"
-                                                            >
-                                                                {emoji}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <button 
-                                                    onClick={() => toggleComments(v.id)}
-                                                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-extrabold text-[#b0b3b8] hover:text-white py-3 transition-colors"
-                                                >
-                                                    <MessageSquare size={16} />
-                                                    <span>Comentar</span>
-                                                </button>
-                                                
-                                                <button 
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(`${window.location.origin}/watch/${v.id}`);
-                                                        toast.success("¡Enlace de publicación copiado al portapapeles!");
-                                                    }}
-                                                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-extrabold text-[#b0b3b8] hover:text-white py-3 transition-colors"
-                                                >
-                                                    <Share2 size={16} />
-                                                    <span>Compartir</span>
-                                                </button>
-                                            </div>
-
-                                            {/* FB COMMENTS BLOCK */}
-                                            {expandedComments[v.id] && (
-                                                <div className="bg-slate-900/60 p-3 space-y-3">
-                                                    {loadingComments[v.id] ? (
-                                                        <div className="flex items-center justify-center py-4">
-                                                            <Loader2 size={18} className="animate-spin text-[#1877f2]" />
-                                                        </div>
-                                                    ) : !commentsMap[v.id] || commentsMap[v.id].length === 0 ? (
-                                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider text-center">Sin comentarios aún. sé el primero!</p>
-                                                    ) : (
-                                                        <div className="space-y-2 max-h-[180px] overflow-y-auto">
-                                                            {commentsMap[v.id].map((com: any, cidx: number) => (
-                                                                <div key={com.id || cidx} className="flex gap-2 items-start text-xs text-left">
-                                                                    <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden shrink-0 mt-0.5">
-                                                                        {com.avatarUrl ? (
-                                                                            <img src={com.avatarUrl} className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <div className="w-full h-full bg-[#1877f2] flex items-center justify-center text-[10px] text-white font-bold uppercase">{com.username?.[0]}</div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="bg-[#3a3b3c] rounded-2xl px-3 py-2 max-w-[85%] text-[#e4e6eb]">
-                                                                        <span className="font-extrabold text-[11px] block text-white">{com.username}</span>
-                                                                        <p className="mt-0.5 leading-relaxed">{com.text}</p>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Comments write text */}
-                                                    {user && (
-                                                        <div className="flex items-center gap-2 border-t border-[#3e4042]/40 pt-2">
-                                                            <input
-                                                                type="text"
-                                                                value={newCommentTexts[v.id] || ''}
-                                                                onChange={(e) => setNewCommentTexts(prev => ({ ...prev, [v.id]: e.target.value }))}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') handleAddCommentSubmit(v.id);
-                                                                }}
-                                                                placeholder="Escribe un comentario..."
-                                                                className="flex-1 bg-[#3a3b3c] border border-[#3e4042] rounded-full px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#1877f2]"
-                                                            />
-                                                            <button 
-                                                                onClick={() => handleAddCommentSubmit(v.id)}
-                                                                className="text-[#1877f2] hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-slate-800"
-                                                            >
-                                                                <Send size={16} />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 bg-[var(--divider)]">
+                                {filteredContent.map((v) => (
+                                    <div key={v.id} className="bg-[var(--bg-secondary)] relative group">
+                                        <VideoCard 
+                                            video={v} 
+                                            isUnlocked={isAdmin || user?.id === v.creatorId || !!(user?.vipExpiry && user.vipExpiry > Date.now() / 1000) || Number(v.price || 0) <= 0} 
+                                            isWatched={false} 
+                                            onCategoryClick={() => {}}
+                                            showDownload={!isAdmin}
+                                            onDownload={() => downloadItem(v)}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         )
                     )}
