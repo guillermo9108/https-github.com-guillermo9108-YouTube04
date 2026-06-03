@@ -1350,7 +1350,12 @@ function video_upload_chunk($pdo, $post, $files) {
     $thumbDir = 'uploads/thumbnails/';
     if (!is_dir($thumbDir)) mkdir($thumbDir, 0777, true);
 
-    if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
+    $extLower = strtolower($ext);
+    $imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
+
+    if ($extLower === 'txt') {
+        $thumbPath = 'api/uploads/thumbnails/text_post.jpg'; 
+    } else if (isset($files['thumbnail']) && $files['thumbnail']['error'] === UPLOAD_ERR_OK) {
         $thumbName = "{$id}.jpg"; 
         $dest = $thumbDir . $thumbName;
         if (move_uploaded_file($files['thumbnail']['tmp_name'], $dest)) {
@@ -1361,9 +1366,16 @@ function video_upload_chunk($pdo, $post, $files) {
         $bins = get_ffmpeg_binaries($pdo);
         $thumbName = "{$id}.jpg";
         $thumbDest = $thumbDir . $thumbName;
-        if (extract_video_thumbnail($finalVideoPath, $thumbDest, $bins['ffmpeg'])) {
-            $thumbPath = 'api/' . $thumbDest;
-            create_thumbnail($thumbDest);
+        if (in_array($extLower, $imageExts)) {
+            if (copy($finalVideoPath, $thumbDest)) {
+                $thumbPath = 'api/' . $thumbDest;
+                create_thumbnail($thumbDest);
+            }
+        } else {
+            if (extract_video_thumbnail($finalVideoPath, $thumbDest, $bins['ffmpeg'])) {
+                $thumbPath = 'api/' . $thumbDest;
+                create_thumbnail($thumbDest);
+            }
         }
     }
 
@@ -1611,7 +1623,11 @@ function smartParseFilename($path, $currentCategory, $categories) {
     // Detectar si es una imagen por extensión
     $imageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
     if (in_array($ext, $imageExts)) {
-        $category = 'IMAGES';
+        // PERO si $currentCategory ya es un grupo o carpeta específica (no genéricos de sistema), conservar la categoría actual!
+        $genCats = ['PENDING', 'GENERAL', 'IMAGES', 'PERSONAL', 'VIDEOS', ''];
+        if (in_array(strtoupper($currentCategory), $genCats)) {
+            $category = 'IMAGES';
+        }
     } else {
         if (count($parts) > 0) {
             $lastPart = array_pop($parts);

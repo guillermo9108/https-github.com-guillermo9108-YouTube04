@@ -17,6 +17,21 @@ const ThumbnailPreview = ({ file }: { file: File }) => {
     return <img src={src} alt="Thumb" className="w-full h-full object-cover" />;
 };
 
+const calculatePriceByFileSize = (fileSizeInBytes: number, settings: any) => {
+    const sizeMB = fileSizeInBytes / (1024 * 1024);
+    const mbs = sizeMB > 0 ? sizeMB : 1.0;
+    
+    const currencyConversion = Number(settings?.currencyConversion ?? 300.00);
+    const etecsaCostGB = Number(settings?.etecsaCostGB ?? 0.3500);
+    const etecsaDiscount = Number(settings?.etecsaDiscount ?? 0.70);
+    
+    let computedPrice = ((mbs / 1024.0) * (etecsaCostGB * currencyConversion)) * etecsaDiscount;
+    if (computedPrice < 1.0) {
+        computedPrice = 1.0;
+    }
+    return Number(computedPrice.toFixed(2));
+};
+
 export default function Upload() {
   const { user } = useAuth();
   const { addToQueue } = useUpload();
@@ -154,7 +169,7 @@ export default function Upload() {
           if (f.type.startsWith('image/')) return VideoCategory.IMAGES;
           return VideoCategory.PERSONAL;
       });
-      const newPrices = newCategories.map(cat => getPriceForCategory(cat));
+      const newPrices = newFiles.map(f => calculatePriceByFileSize(f.size, systemSettings));
 
       setFiles(prev => [...prev, ...newFiles]);
       setTitles(prev => [...prev, ...newTitles]);

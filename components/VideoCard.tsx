@@ -231,6 +231,11 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
   }, [video.videoUrl, video.category, video.isAlbum, (video as any).rawPath]);
 
   const isAudio = Number(video.is_audio) === 1;
+
+  const isTextOnly = useMemo(() => {
+    const path = (video as any).rawPath || video.videoUrl || '';
+    return path.toLowerCase().endsWith('.txt') || !!(video as any).is_text;
+  }, [video.videoUrl, (video as any).rawPath]);
   
   const defaultThumb = isAudio ? settings?.defaultAudioThumb : settings?.defaultVideoThumb;
   const hasDefaultThumb = !video.thumbnailUrl || video.thumbnailUrl.includes('default.jpg') || video.thumbnailUrl.includes('defaultaudio.jpg');
@@ -866,7 +871,7 @@ const VideoCard: React.FC<VideoCardProps> = React.memo(({ video, isUnlocked, isW
           </div>
       )}
 
-      {!video.originalVideo && !video.originalMarketplaceItem && (
+      {!video.originalVideo && !video.originalMarketplaceItem && !isTextOnly && (
           <div className={`relative w-full ${video.isAlbum && video.albumItems && video.albumItems.length > 1 ? 'aspect-[4/3]' : 'aspect-video'} bg-black overflow-hidden`}>
             {video.isAlbum && video.albumItems && video.albumItems.length > 1 ? (
                 <div 

@@ -187,13 +187,6 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {isOffline && (
-        <div className="fixed bottom-0 left-0 right-0 z-[100] bg-red-600 text-white text-[12px] font-bold py-2 px-4 flex items-center justify-center gap-2 shadow-lg">
-          <AlertTriangle size={14} />
-          <span>Modo Offline: Mostrando contenido en caché</span>
-        </div>
-      )}
-
       <UploadIndicator />
       <ServerTaskIndicator />
       <GridProcessor />

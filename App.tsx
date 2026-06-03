@@ -59,29 +59,90 @@ import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { DownloadProvider } from './context/DownloadContext';
 import { db } from './services/db';
-import { Loader2, WifiOff } from 'lucide-react';
+import { Loader2, WifiOff, Wifi } from 'lucide-react';
 
 // New page
 import DownloadQueuePage from './components/pages/DownloadQueuePage';
 
-const OfflineBanner = () => {
-    const [online, setOnline] = useState(navigator.onLine);
-    useEffect(() => {
-        const handleOnline = () => setOnline(true);
-        const handleOffline = () => setOnline(false);
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
+const UnifiedNetworkBanner = () => {
+    const { isOffline } = useAuth();
+    const [visible, setVisible] = useState(false);
+    const [bannerState, setBannerState] = useState<'offline' | 'online' | null>(null);
+    const prevOffline = useRef<boolean | null>(null);
 
-    if (online) return null;
+    useEffect(() => {
+        if (prevOffline.current === null) {
+            // First render / mount state
+            prevOffline.current = isOffline;
+            if (isOffline) {
+                setBannerState('offline');
+                setVisible(true);
+                const timer = setTimeout(() => setVisible(false), 5000);
+                return () => clearTimeout(timer);
+            }
+            return;
+        }
+
+        if (isOffline && !prevOffline.current) {
+            // Transitioned Online -> Offline
+            setBannerState('offline');
+            setVisible(true);
+            const timer = setTimeout(() => setVisible(false), 5000);
+            prevOffline.current = isOffline;
+            return () => clearTimeout(timer);
+        } else if (!isOffline && prevOffline.current) {
+            // Transitioned Offline -> Online (reconnected!)
+            setBannerState('online');
+            setVisible(true);
+            const timer = setTimeout(() => setVisible(false), 4000);
+            prevOffline.current = isOffline;
+            return () => clearTimeout(timer);
+        }
+
+        prevOffline.current = isOffline;
+    }, [isOffline]);
+
+    if (!visible || !bannerState) return null;
+
+    const isOfflineType = bannerState === 'offline';
 
     return (
-        <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-red-600/90 text-white text-center py-2 z-[100] text-xs font-bold flex items-center justify-center gap-2 backdrop-blur-sm">
-            <WifiOff size={14} /> Estás desconectado. Mostrando contenido caché.
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[250] w-full max-w-sm px-4">
+            <motion.div
+                initial={{ opacity: 0, y: -50, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -25, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className={`p-4 rounded-2xl shadow-xl flex items-center gap-3 border backdrop-blur-md ${
+                    isOfflineType 
+                        ? 'bg-[#ef4444]/95 border-[#f87171] text-white shadow-red-950/40' 
+                        : 'bg-[#10b981]/95 border-[#34d399] text-white shadow-[#10b981]/20'
+                }`}
+            >
+                <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${isOfflineType ? 'bg-red-700/50' : 'bg-emerald-700/50'}`}>
+                    {isOfflineType ? (
+                        <WifiOff size={16} className="animate-pulse text-white" />
+                    ) : (
+                        <Wifi size={16} className="text-white" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black uppercase tracking-wider leading-none mb-1 text-white">
+                        {isOfflineType ? 'Sin Conexión' : '¡De Vuelta Online!'}
+                    </p>
+                    <p className="text-[11px] opacity-95 leading-normal text-slate-100 font-medium">
+                        {isOfflineType 
+                            ? 'El servidor o la red no responden. Trabajando con caché.' 
+                            : 'La conexión se ha restablecido exitosamente.'}
+                    </p>
+                </div>
+                <button 
+                    onClick={() => setVisible(false)} 
+                    className="p-1 rounded-lg hover:bg-white/15 transition-colors text-white/80 hover:text-white shrink-0"
+                >
+                    <X size={15} />
+                </button>
+            </motion.div>
         </div>
     );
 };
@@ -290,7 +351,7 @@ export default function App() {
                     <GridProvider>
                         <HashRouter>
                         <AppGuard>
-                        <OfflineBanner />
+                        <UnifiedNetworkBanner />
                         <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Cargando...</div>}>
                             <Routes>
                             <Route path="/setup" element={<Setup />} />

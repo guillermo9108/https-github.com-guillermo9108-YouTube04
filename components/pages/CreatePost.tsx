@@ -1,14 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, X, Upload, Image as ImageIcon, Send, Loader2, Globe, ChevronDown, User, Plus, Play } from 'lucide-react';
 import { useNavigate } from '../Router';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
+const calculatePriceByFileSize = (fileSizeInBytes: number, settings: any) => {
+    const sizeMB = fileSizeInBytes / (1024 * 1024);
+    const mbs = sizeMB > 0 ? sizeMB : 1.0;
+    
+    const currencyConversion = Number(settings?.currencyConversion ?? 300.00);
+    const etecsaCostGB = Number(settings?.etecsaCostGB ?? 0.3500);
+    const etecsaDiscount = Number(settings?.etecsaDiscount ?? 0.70);
+    
+    let computedPrice = ((mbs / 1024.0) * (etecsaCostGB * currencyConversion)) * etecsaDiscount;
+    if (computedPrice < 1.0) {
+        computedPrice = 1.0;
+    }
+    return Number(computedPrice.toFixed(2));
+};
+
 export default function CreatePost() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const toast = useToast();
+    
+    const [systemSettings, setSystemSettings] = useState<any>(null);
+    useEffect(() => {
+        db.getSystemSettings().then(settings => {
+            if (settings) {
+                setSystemSettings(settings);
+            }
+        }).catch(err => console.error("Error loading system settings in CreatePost:", err));
+    }, []);
     
     const [files, setFiles] = useState<File[]>([]);
     const [previews, setPreviews] = useState<string[]>([]);
@@ -115,6 +139,7 @@ export default function CreatePost() {
             
             files.forEach((file, i) => {
                 fd.append(`image_${i}`, file);
+                fd.append(`price_${i}`, String(calculatePriceByFileSize(file.size, systemSettings)));
                 if (durations[i]) fd.append(`duration_${i}`, String(durations[i]));
             });
             fd.append('count', String(files.length));
@@ -203,6 +228,9 @@ export default function CreatePost() {
                     <div className={`grid gap-1 ${previews.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                         {previews.map((src, i) => (
                             <div key={i} className="relative aspect-square rounded-lg overflow-hidden group bg-slate-800">
+                                <div className="absolute top-2 left-2 bg-indigo-600/90 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide backdrop-blur-sm shadow-md z-10 flex items-center gap-1">
+                                    <span>{calculatePriceByFileSize(files[i]?.size || 0, systemSettings)} cr</span>
+                                </div>
                                 {files[i]?.type.startsWith('video/') ? (
                                     <div className="w-full h-full flex items-center justify-center relative">
                                         <video src={src} className="w-full h-full object-cover" />

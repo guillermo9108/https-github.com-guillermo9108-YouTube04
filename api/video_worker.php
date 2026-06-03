@@ -58,6 +58,14 @@ for ($i = 0; $i < $batchSize; $i++) {
     
     $realPath = resolve_video_path($video['videoUrl'], $pdo, $video['id']);
     
+    if ($realPath && strtolower(pathinfo($realPath, PATHINFO_EXTENSION)) === 'txt') {
+         echo "[SUCCESS] TXT text-only post approved instantly.\n";
+         $pdo->prepare("UPDATE videos SET transcode_status = 'NONE', locked_at = 0, processing_attempts = 0 WHERE id = ?")
+             ->execute([$video['id']]);
+         $processed++;
+         continue;
+    }
+    
     $isFtp = (strpos($video['id'], 'ftp_') === 0);
     if (!$realPath || (!$isFtp && !file_exists($realPath))) {
         $reason = '404: File not found';

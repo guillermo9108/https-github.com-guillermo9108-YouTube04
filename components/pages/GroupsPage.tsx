@@ -4,7 +4,7 @@ import {
     CheckCircle, LogOut, ArrowLeft, Image as ImageIcon, Zap, Loader2, 
     Calendar, FileText, MessageSquare, ThumbsUp, Heart, Smile, Sparkles, 
     MoreHorizontal, Send, RefreshCw, Upload, Video, Globe, Lock, Check, Gift, Play, X, Music, Search,
-    Clock, Settings
+    Clock, Settings, Save
 } from 'lucide-react';
 import { useNavigate, useLocation } from '../Router';
 import { useAuth } from '../../context/AuthContext';
@@ -60,6 +60,48 @@ export default function GroupsPage() {
     // Composer posting state
     const [postText, setPostText] = useState('');
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
+
+    // Group invitation / share states
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [shareSearch, setShareSearch] = useState('');
+    const [sentInvits, setSentInvits] = useState<{ [userId: string]: boolean }>({});
+
+    // Load available users when sharing modal opens
+    useEffect(() => {
+        if (showShareModal) {
+            db.getAllUsers().then(res => {
+                if (res) {
+                    setAllUsers(res);
+                }
+            }).catch(err => console.error("Error loading users for group share:", err));
+        }
+    }, [showShareModal]);
+
+    const handleOpenShareModal = () => {
+        setShowShareModal(true);
+    };
+
+    const handleSendInvitation = async (targetUser: any) => {
+        if (!user || !activeGroup) return;
+        try {
+            const groupName = activeGroup.name;
+            const link = `${window.location.origin}/#/groups?folder=${encodeURIComponent(groupName)}`;
+            const messageText = `👋 ¡Hola ${targetUser.username}! Te invito a unirte a nuestro grupo de FB "${groupName}". 🌟 Aquí compartimos el mejor contenido interactivo, fotos y videos. ¡No te lo pierdas! Únete tocando aquí 👉 ${link}`;
+            
+            await db.sendMessage({
+                userId: user.id,
+                receiverId: targetUser.id,
+                text: messageText,
+                mediaType: 'TEXT'
+            });
+            setSentInvits(prev => ({ ...prev, [targetUser.id]: true }));
+            toast.success(`¡Invitación enviada a ${targetUser.username}!`);
+        } catch (error) {
+            console.error(error);
+            toast.error("No se pudo enviar la invitación por el chat");
+        }
+    };
 
     // Load pending subscriptions list
     const loadPendingSubscriptions = async () => {
@@ -643,44 +685,65 @@ export default function GroupsPage() {
 
                 {/* Group Cover Style Banner */}
                 <div className="bg-[#242526] border-b border-[#3e4042]">
-                    <div className="relative h-44 bg-slate-800 flex items-center justify-center overflow-hidden">
+                    <div className="relative h-60 bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-900 flex flex-col justify-end overflow-hidden group/cover">
                         {activeGroup.coverUrl || activeGroup.thumbnailUrl ? (
-                            <img src={activeGroup.coverUrl || activeGroup.thumbnailUrl} className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
+                            <img src={activeGroup.coverUrl || activeGroup.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover/cover:scale-105 transition-transform duration-700" referrerPolicy="no-referrer" />
                         ) : (
-                            <div className="absolute inset-0 bg-gradient-to-r from-[#1e3c72] to-[#2a5298] opacity-70" />
+                            <div className="absolute inset-0 bg-gradient-to-tr from-[#1e3c72]/80 via-slate-900/90 to-[#2a5298]/80" />
                         )}
-                        <div className="absolute inset-0 bg-black/40"></div>
-                        <div className="relative text-center p-4">
-                            <span className={`text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider mb-2 inline-block shadow-md ${activeGroup.isPrivate ? 'bg-amber-600' : 'bg-[#1877f2]'}`}>
-                                {activeGroup.isPrivate ? '🔒 FB Grupo Privado' : '🌎 FB Grupo Público'}
-                            </span>
-                            <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                                {activeGroup.name.includes('/') ? (
-                                    <>
-                                        <span className="text-slate-400 font-bold block text-xs tracking-wider uppercase mb-1">
-                                            {activeGroup.name.substring(0, activeGroup.name.lastIndexOf('/')).replace(/\//g, ' › ')}
-                                        </span>
-                                        {activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1)}
-                                    </>
-                                ) : (
-                                    activeGroup.name
+                        
+                        {/* Elegant Decorative Ambient Light */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#242526] via-transparent to-black/40"></div>
+                        
+                        {/* Overlay contents containing Title, Badges and Actions */}
+                        <div className="relative p-6 flex flex-col md:flex-row md:items-end justify-between gap-4 z-10">
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1 backdrop-blur-md ${activeGroup.isPrivate ? 'bg-amber-600/90 text-white border border-amber-500/30' : 'bg-[#1877f2]/90 text-white border border-blue-500/30'}`}>
+                                        {activeGroup.isPrivate ? <Lock size={12} /> : <Globe size={12} />}
+                                        {activeGroup.isPrivate ? 'Grupo Privado' : 'Grupo Público'}
+                                    </span>
+                                </div>
+                                <h1 className="text-2xl md:text-3.5xl font-extrabold text-white tracking-tight drop-shadow-md">
+                                    {activeGroup.name.includes('/') ? (
+                                        <>
+                                            <span className="text-slate-300 font-bold block text-xs tracking-wider uppercase mb-1 drop-shadow-sm">
+                                                {activeGroup.name.substring(0, activeGroup.name.lastIndexOf('/')).replace(/\//g, ' › ')}
+                                            </span>
+                                            {activeGroup.name.substring(activeGroup.name.lastIndexOf('/') + 1)}
+                                        </>
+                                    ) : (
+                                        activeGroup.name
+                                    )}
+                                </h1>
+                                <p className="text-xs text-slate-200 font-semibold flex items-center gap-3 drop-shadow-sm">
+                                    <span className="flex items-center gap-1"><Users size={12} className="text-[#1877f2]" /> {getGroupMembersCount(activeGroup.name)} Miembros</span>
+                                    <span className="opacity-50">•</span>
+                                    <span className="flex items-center gap-1"><FileText size={12} className="text-emerald-400" /> {activeGroup.count} Publicaciones</span>
+                                </p>
+                            </div>
+                            
+                            {/* Actions Right (Invite Share, Edit Group) */}
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={handleOpenShareModal}
+                                    className="bg-[#1877f2] hover:bg-blue-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 active:scale-95 border border-blue-500/30"
+                                >
+                                    <Share2 size={14} />
+                                    <span>Compartir y Invitar</span>
+                                </button>
+                                
+                                {(isCreator || isAdmin) && (
+                                    <button 
+                                        onClick={handleOpenEditModal}
+                                        className="bg-[#3a3b3c] hover:bg-[#4e4f50] border border-[#4e4f50] text-[#e4e6eb] font-bold text-xs px-3 py-2.5 rounded-xl transition-all shadow-md active:scale-95 animate-in fade-in duration-200"
+                                        title="Administrar Grupo"
+                                    >
+                                        <Settings size={14} />
+                                    </button>
                                 )}
-                            </h1>
-                            <p className="text-xs text-white/90 font-semibold mt-1 flex items-center justify-center gap-2">
-                                <span>{getGroupMembersCount(activeGroup.name)} Miembros</span>
-                                <span className="opacity-50">•</span>
-                                <span>{activeGroup.count} Publicaciones</span>
-                            </p>
+                            </div>
                         </div>
-                        {(isCreator || isAdmin) && (
-                            <button 
-                                onClick={handleOpenEditModal}
-                                className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 rounded-full p-2.5 text-white transition-all shadow-md active:scale-95 z-10"
-                                title="Editar Grupo"
-                            >
-                                <Settings size={16} />
-                            </button>
-                        )}
                     </div>
 
                     {/* Facebook style Group description & actions */}
@@ -807,39 +870,7 @@ export default function GroupsPage() {
                         </div>
                     ) : (
                         <>
-                            {/* Secondary menu tabs (Miembro, Invitar, etc) */}
-                            <div className="flex gap-2 bg-[#242526] p-2 rounded-xl border border-[#3e4042] shadow-sm justify-around text-xs animate-in slide-in-from-top-1">
-                                <button 
-                                    onClick={(e) => handleToggleSubscribe(e, activeGroup.name)} 
-                                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all text-slate-300 font-bold hover:bg-[#3a3b3c] ${joined ? 'text-green-500 bg-[#3a3b3c]/20' : ''}`}
-                                >
-                                    <Check size={16} />
-                                    <span>{joined ? 'Unido' : isGroupPending(activeGroup.name) ? 'Pendiente' : 'Unirse'}</span>
-                                </button>
-                                <button 
-                                    onClick={handleCopyInviteLink} 
-                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                                >
-                                    <Share2 size={16} />
-                                    <span>Invitar</span>
-                                </button>
-                                <button 
-                                    onClick={() => setGroupSubTab('PHOTOS')} 
-                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                                >
-                                    <ImageIcon size={16} />
-                                    <span>Fotos</span>
-                                </button>
-                                <button 
-                                    onClick={() => setGroupSubTab('FILES')} 
-                                    className="flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-slate-300 font-bold hover:bg-[#3a3b3c] transition-all"
-                                >
-                                    <FileText size={16} />
-                                    <span>Archivos</span>
-                                </button>
-                    </div>
-
-                    {/* FB Compositor Box for posting DIRECT to group */}
+                            {/* FB Compositor Box for posting DIRECT to group */}
                     {groupSubTab === 'FEED' && joined && (
                         <div className="bg-[#242526] rounded-xl p-4 border border-[#3e4042] shadow-md space-y-3">
                             <div className="flex items-start gap-3">
@@ -862,7 +893,13 @@ export default function GroupsPage() {
                                         <div className="mt-2 bg-slate-900 rounded-lg p-2 flex items-center justify-between border border-[#3e4042]">
                                             <div className="flex items-center gap-2">
                                                 <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg">
-                                                    {attachedFile.type.startsWith('video/') ? <Video size={18} /> : <ImageIcon size={18} />}
+                                                    {attachedFile.type.startsWith('video/') ? (
+                                                        <Video size={18} />
+                                                    ) : attachedFile.type.startsWith('audio/') ? (
+                                                        <Music size={18} />
+                                                    ) : (
+                                                        <ImageIcon size={18} />
+                                                    )}
                                                 </div>
                                                 <div className="text-left">
                                                     <p className="text-xs font-bold text-white truncate max-w-[200px]">{attachedFile.name}</p>
@@ -884,13 +921,13 @@ export default function GroupsPage() {
                                         className="flex items-center gap-1.5 text-xs text-[#b0b3b8] font-bold hover:bg-[#3a3b3c] px-3 py-1.5 rounded-lg transition-all text-green-500"
                                     >
                                         <ImageIcon size={18} />
-                                        <span>Agregar Foto / Video</span>
+                                        <span>Agregar Foto / Video / Audio</span>
                                     </button>
                                     <input
                                         type="file"
                                         ref={fileInputRef}
                                         onChange={(e) => setAttachedFile(e.target.files?.[0] || null)}
-                                        accept="video/*,image/*"
+                                        accept="video/*,image/*,audio/*"
                                         className="hidden"
                                     />
                                 </div>
@@ -1591,6 +1628,97 @@ export default function GroupsPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* GROUP INVITATION / SHARE MODAL */}
+            {showShareModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div id="share-group-modal" className="bg-[#242526] border border-[#3e4042] rounded-2xl w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden text-left animate-in zoom-in-95 duration-200 shadow-2xl">
+                        {/* Header */}
+                        <div className="p-4 border-b border-[#3e4042] flex items-center justify-between shrink-0">
+                            <h3 className="font-extrabold text-white text-sm flex items-center gap-1.5 font-sans">
+                                <Share2 size={18} className="text-[#1877f2]" />
+                                Invitar Amigos al Grupo
+                            </h3>
+                            <button onClick={() => { setShowShareModal(false); setShareSearch(''); }} className="text-slate-400 hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        {/* Search Input */}
+                        <div className="p-3 bg-[#18191a] border-b border-[#3e4042] shrink-0">
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                                    <Search size={14} />
+                                </span>
+                                <input
+                                    type="text"
+                                    value={shareSearch}
+                                    onChange={(e) => setShareSearch(e.target.value)}
+                                    placeholder="Buscar amigos por nombre..."
+                                    className="w-full bg-[#3a3b3c] border-transparent rounded-xl pl-9 pr-3 py-2 text-xs text-[#e4e6eb] placeholder-slate-400 focus:outline-none focus:bg-[#4e4f50] transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Centered Scrollable Users List */}
+                        <div className="p-2 overflow-y-auto flex-1 divide-y divide-[#3e4042]/40 scrollbar-thin scrollbar-thumb-slate-700 min-h-[250px]">
+                            {allUsers
+                                .filter((u: any) => u.id !== user?.id && u.username?.toLowerCase().includes(shareSearch.toLowerCase()))
+                                .length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 space-y-2">
+                                        <Users size={32} className="opacity-40" />
+                                        <p className="text-xs">No se encontraron amigos para invitar.</p>
+                                    </div>
+                                ) : (
+                                    allUsers
+                                        .filter((u: any) => u.id !== user?.id && u.username?.toLowerCase().includes(shareSearch.toLowerCase()))
+                                        .map((u: any) => {
+                                            const wasSent = !!sentInvits[u.id];
+                                            return (
+                                                <div key={u.id} className="flex items-center justify-between p-2 hover:bg-[#3a3b3c]/20 rounded-xl transition-colors">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="relative shrink-0">
+                                                            <div className="w-9 h-9 rounded-full bg-[#1877f2] font-extrabold flex items-center justify-center text-xs overflow-hidden text-white">
+                                                                {u.avatarUrl ? (
+                                                                    <img src={u.avatarUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                                ) : (
+                                                                    u.username?.[0]?.toUpperCase() || 'U'
+                                                                )}
+                                                            </div>
+                                                            {u.isOnline && (
+                                                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-[#242526] rounded-full"></span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-white leading-none mb-0.5">{u.username}</p>
+                                                            <p className="text-[10px] text-slate-400 capitalize">{u.role?.toLowerCase() || 'Miembro'}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button
+                                                        onClick={() => handleSendInvitation(u)}
+                                                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-lg active:scale-95 transition-all flex items-center gap-1 ${
+                                                            wasSent 
+                                                                ? 'bg-green-600/20 text-green-400 border border-green-500/30' 
+                                                                : 'bg-[#1877f2] hover:bg-blue-600 text-white shadow'
+                                                        }`}
+                                                    >
+                                                        {wasSent ? <CheckCircle size={13} /> : <Send size={13} />}
+                                                        <span>{wasSent ? 'Enviado ✓' : 'Invitar'}</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-3 bg-[#18191a] border-t border-[#3e4042] text-center shrink-0">
+                            <p className="text-[10px] text-slate-400">Las invitaciones se envían instantáneamente mediante chat directo.</p>
+                        </div>
                     </div>
                 </div>
             )}
