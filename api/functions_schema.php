@@ -430,6 +430,7 @@ function getAppSchema() {
                 'isPrivate' => 'TINYINT(1) DEFAULT 0',
                 'isUnified' => 'TINYINT(1) DEFAULT 0',
                 'allowUpload' => 'TINYINT(1) DEFAULT 1',
+                'isSeries' => 'TINYINT(1) DEFAULT 0',
                 'createdAt' => 'BIGINT'
             ]
         ],

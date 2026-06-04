@@ -852,6 +852,40 @@ function get_user_all_subscriptions($pdo) {
     respond(true, $subs);
 }
 
+function save_group_cover_file($folderName, $base64Data, $pdo) {
+    if (empty($base64Data) || strpos($base64Data, 'data:image/') !== 0) {
+        return $base64Data; // Already a URL or empty
+    }
+    
+    // Resolve base path
+    $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
+    $sSet = $stmtSet->fetch();
+    $localPath = $sSet['localLibraryPath'] ?? '';
+    if (empty($localPath)) {
+        $localPath = 'uploads/videos/';
+    }
+    $basePath = rtrim(str_replace('\\', '/', $localPath), '/');
+    $targetDir = $basePath . '/' . $folderName;
+    
+    if (!is_dir($targetDir)) {
+        @mkdir($targetDir, 0777, true);
+    }
+    
+    // Parse base64
+    $parts = explode(',', $base64Data);
+    if (count($parts) < 2) return $base64Data;
+    $data = base64_decode($parts[1]);
+    if (!$data) return $base64Data;
+    
+    // Save as cover.jpg or cover image
+    $filePath = $targetDir . '/cover.jpg';
+    if (file_put_contents($filePath, $data)) {
+        return 'uploads/videos/' . $folderName . '/cover.jpg';
+    }
+    
+    return $base64Data;
+}
+
 function group_create($pdo, $input) {
     $userId = $input['userId'] ?? '';
     $groupName = trim($input['name'] ?? '');
@@ -874,6 +908,9 @@ function group_create($pdo, $input) {
     if (empty($folderNameForDir)) {
         respond(false, null, "Nombre de grupo inválido");
     }
+
+    // Process and save coverUrl if base64 before creating group folder or registering meatadata
+    $coverUrl = save_group_cover_file($folderNameForDir, $coverUrl, $pdo);
 
     // Create physical/virtual directory
     $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
@@ -935,10 +972,12 @@ function group_create($pdo, $input) {
         }
     }
 
+    $isSeries = !empty($input['isSeries']) ? 1 : 0;
+
     // Register metadata
     try {
-        $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, allowUpload, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, $allowUpload, time()]);
+        $stmtMeta = $pdo->prepare("INSERT INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, allowUpload, isSeries, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, $allowUpload, $isSeries, time()]);
     } catch (Exception $e) {
         // En caso de que falle de otra manera, intentamos sin el campo allowUpload o registramos el error
         try {
@@ -946,7 +985,8 @@ function group_create($pdo, $input) {
             $stmtMeta->execute([$folderNameForDir, $userId, $description, $coverUrl, $isPrivate, time()]);
             // Intentar alterar la tabla dinámicamente si falta la columna
             $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
-            $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
+            $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN isSeries TINYINT(1) DEFAULT 0");
+            $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload, isSeries = $isSeries WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
         } catch (Exception $ex) {}
     }
 
@@ -974,7 +1014,12 @@ function group_edit($pdo, $input) {
     $isPrivate = !empty($input['isPrivate']) ? 1 : 0;
     $isUnified = !empty($input['isUnified']) ? 1 : 0;
     $allowUpload = !isset($input['allowUpload']) || !empty($input['allowUpload']) ? 1 : 0;
+    $isSeries = !empty($input['isSeries']) ? 1 : 0;
     $newName = trim($input['name'] ?? '');
+
+    // Process and physically save group cover image in the correct directory
+    $folderNameForCover = (!empty($newName) && $newName !== $folderPath) ? preg_replace('/[\/\\\\\?\*\:\"\'\<\>\|\.]/u', '', $newName) : $folderPath;
+    $coverUrl = save_group_cover_file($folderNameForCover, $coverUrl, $pdo);
 
     if (!empty($newName) && $newName !== $folderPath) {
         $reserved = ["PRINCIPAL", "PRIVADO", "PERSONAL", "GENERAL", "TODOS", "ALL", "uploads", "admin", "config", "shared"];
@@ -997,14 +1042,15 @@ function group_edit($pdo, $input) {
 
         // update db records
         try {
-            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ? WHERE folderPath = ?");
-            $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $folderPath]);
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ?, isSeries = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $isSeries, $folderPath]);
         } catch (Exception $e) {
             $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET folderPath = ?, description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
             $stmtMeta->execute([$folderNameForDir, $description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
             try {
                 $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
-                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
+                $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN isSeries TINYINT(1) DEFAULT 0");
+                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload, isSeries = $isSeries WHERE folderPath = '" . str_replace("'", "''", $folderNameForDir) . "'");
             } catch (Exception $ex) {}
         }
 
@@ -1024,14 +1070,15 @@ function group_edit($pdo, $input) {
         $folderPath = $folderNameForDir;
     } else {
         try {
-            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ? WHERE folderPath = ?");
-            $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $folderPath]);
+            $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ?, allowUpload = ?, isSeries = ? WHERE folderPath = ?");
+            $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $allowUpload, $isSeries, $folderPath]);
         } catch (Exception $e) {
             $stmtMeta = $pdo->prepare("UPDATE groups_metadata SET description = ?, coverUrl = ?, isPrivate = ?, isUnified = ? WHERE folderPath = ?");
             $stmtMeta->execute([$description, $coverUrl, $isPrivate, $isUnified, $folderPath]);
             try {
                 $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN allowUpload TINYINT(1) DEFAULT 1");
-                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload WHERE folderPath = '" . str_replace("'", "''", $folderPath) . "'");
+                $pdo->exec("ALTER TABLE groups_metadata ADD COLUMN isSeries TINYINT(1) DEFAULT 0");
+                $pdo->exec("UPDATE groups_metadata SET allowUpload = $allowUpload, isSeries = $isSeries WHERE folderPath = '" . str_replace("'", "''", $folderPath) . "'");
             } catch (Exception $ex) {}
         }
     }

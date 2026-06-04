@@ -45,6 +45,7 @@ export default function GroupsPage() {
     const [newGroupDescription, setNewGroupDescription] = useState('');
     const [newGroupCover, setNewGroupCover] = useState('');
     const [newGroupAllowUpload, setNewGroupAllowUpload] = useState(true);
+    const [newGroupIsSeries, setNewGroupIsSeries] = useState(false);
     const [creatingGroup, setCreatingGroup] = useState(false);
 
     // Edit Group Modal States
@@ -55,7 +56,9 @@ export default function GroupsPage() {
     const [editGroupCover, setEditGroupCover] = useState('');
     const [editGroupUnified, setEditGroupUnified] = useState(false);
     const [editGroupAllowUpload, setEditGroupAllowUpload] = useState(true);
+    const [editGroupIsSeries, setEditGroupIsSeries] = useState(false);
     const [updatingGroup, setUpdatingGroup] = useState(false);
+    const [groupSort, setGroupSort] = useState<'LATEST' | 'OLDEST'>('LATEST');
 
     // Composer posting state
     const [postText, setPostText] = useState('');
@@ -186,10 +189,10 @@ export default function GroupsPage() {
     };
 
     // Load active group's feed
-    const loadGroupContent = async (groupName: string) => {
+    const loadGroupContent = async (groupName: string, sort: 'LATEST' | 'OLDEST' = groupSort) => {
         try {
             setLoadingContent(true);
-            const result = await db.getVideos(0, 100, groupName, '', 'TODOS', 'ALL', 'LATEST');
+            const result = await db.getVideos(0, 100, groupName, '', 'TODOS', 'ALL', sort);
             setGroupContent(result.videos || []);
         } catch (err) {
             console.error('Error loading group content:', err);
@@ -202,7 +205,9 @@ export default function GroupsPage() {
     const handleGroupClick = (group: any) => {
         setActiveGroup(group);
         setGroupSubTab('FEED');
-        loadGroupContent(group.name);
+        const defaultSort = group.isSeries === 1 ? 'OLDEST' : 'LATEST';
+        setGroupSort(defaultSort);
+        loadGroupContent(group.name, defaultSort);
         
         // Seed default events for this group
         const baseEvents = [
@@ -328,7 +333,8 @@ export default function GroupsPage() {
                 newGroupDescription.trim(),
                 newGroupPrivacy === 'PRIVATE',
                 newGroupCover.trim(),
-                newGroupAllowUpload
+                newGroupAllowUpload,
+                newGroupIsSeries
             );
             toast.success(`Grupo "${newGroupName}" creado con éxito`);
             setShowCreateModal(false);
@@ -336,6 +342,7 @@ export default function GroupsPage() {
             setNewGroupDescription('');
             setNewGroupCover('');
             setNewGroupAllowUpload(true);
+            setNewGroupIsSeries(false);
             await loadGroups();
             
             // Auto open the new group
@@ -347,6 +354,7 @@ export default function GroupsPage() {
                 description: newGroupDescription.trim() || 'Grupo sin descripción.',
                 isPrivate: newGroupPrivacy === 'PRIVATE' ? 1 : 0,
                 allowUpload: newGroupAllowUpload ? 1 : 0,
+                isSeries: newGroupIsSeries ? 1 : 0,
                 membersCount: 1
             };
             handleGroupClick(newGroupObj);
@@ -366,6 +374,7 @@ export default function GroupsPage() {
         setEditGroupCover(activeGroup.coverUrl || '');
         setEditGroupUnified(activeGroup.isUnified === 1);
         setEditGroupAllowUpload(activeGroup.allowUpload !== 0);
+        setEditGroupIsSeries(activeGroup.isSeries === 1);
         setShowEditModal(true);
     };
 
@@ -386,7 +395,8 @@ export default function GroupsPage() {
                 editGroupPrivacy === 'PRIVATE',
                 editGroupCover.trim(),
                 editGroupUnified,
-                editGroupAllowUpload
+                editGroupAllowUpload,
+                editGroupIsSeries
             );
             toast.success("Grupo actualizado con éxito");
             setShowEditModal(false);
@@ -401,6 +411,7 @@ export default function GroupsPage() {
                 isPrivate: editGroupPrivacy === 'PRIVATE' ? 1 : 0,
                 isUnified: editGroupUnified ? 1 : 0,
                 allowUpload: editGroupAllowUpload ? 1 : 0,
+                isSeries: editGroupIsSeries ? 1 : 0,
                 coverUrl: editGroupCover.trim()
             }));
         } catch (err: any) {
@@ -647,17 +658,18 @@ export default function GroupsPage() {
     }, [groupContent, groupSubTab, sortBy]);
 
     // Render Group feed view
-    if (activeGroup) {
-        const joined = isSubscribed(activeGroup.name);
-        const isAdmin = user?.role === 'ADMIN';
-        const isCreator = user?.id && activeGroup.creatorId === user.id;
-        const isAuthorizedToView = !activeGroup.isPrivate || joined || isCreator || isAdmin;
+    const joined = activeGroup ? isSubscribed(activeGroup.name) : false;
+    const isAdmin = user?.role === 'ADMIN';
+    const isCreator = (user?.id && activeGroup && activeGroup.creatorId === user.id) ? true : false;
+    const isAuthorizedToView = activeGroup ? (!activeGroup.isPrivate || joined || isCreator || isAdmin) : false;
 
-        const groupPendingCount = pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase()).length;
-        const groupPendingList = pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase());
+    const groupPendingCount = activeGroup ? pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase()).length : 0;
+    const groupPendingList = activeGroup ? pendingSubscriptions.filter(p => p.folderPath.toLowerCase() === activeGroup.name.toLowerCase()) : [];
 
-        return (
-            <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
+    return (
+        <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
+            {activeGroup ? (
+                <>
                 {/* Header sticky bar */}
                 <div className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-40 bg-[#242526] border-b border-[#3e4042] px-4 h-14 flex items-center justify-between shadow-md">
                     <button onClick={handleBack} className="flex items-center gap-1.5 text-[#1877f2] font-bold text-sm hover:underline">
@@ -703,6 +715,12 @@ export default function GroupsPage() {
                                         {activeGroup.isPrivate ? <Lock size={12} /> : <Globe size={12} />}
                                         {activeGroup.isPrivate ? 'Grupo Privado' : 'Grupo Público'}
                                     </span>
+                                    {activeGroup.isSeries === 1 && (
+                                        <span className="text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white border border-violet-500/30">
+                                            <Sparkles size={11} className="text-amber-300 animate-pulse" />
+                                            <span>Modo Serie</span>
+                                        </span>
+                                    )}
                                 </div>
                                 <h1 className="text-2xl md:text-3.5xl font-extrabold text-white tracking-tight drop-shadow-md">
                                     {activeGroup.name.includes('/') ? (
@@ -960,19 +978,48 @@ export default function GroupsPage() {
                     {groupSubTab === 'FEED' && (
                         <div className="flex items-center justify-between text-xs text-slate-400 font-bold px-1">
                             <span>Publicaciones de la carpeta</span>
-                            <div className="flex items-center gap-2">
-                                <button 
-                                    onClick={() => setSortBy('RECENT')}
-                                    className={`px-2 py-1 rounded transition-all ${sortBy === 'RECENT' ? 'text-white bg-[#3a3b3c]' : 'hover:text-white'}`}
-                                >
-                                    Filtro recientes
-                                </button>
-                                <button 
-                                    onClick={() => setSortBy('FEATURED')}
-                                    className={`px-2 py-1 rounded transition-all ${sortBy === 'FEATURED' ? 'text-white bg-[#3a3b3c]' : 'hover:text-white'}`}
-                                >
-                                    Destacados
-                                </button>
+                            <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg border border-[#3e4042]/50">
+                                {activeGroup.isSeries === 1 ? (
+                                    <>
+                                        <button 
+                                            onClick={async () => {
+                                                setGroupSort('OLDEST');
+                                                await loadGroupContent(activeGroup.name, 'OLDEST');
+                                            }}
+                                            className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${groupSort === 'OLDEST' ? 'text-white bg-[#1877f2] shadow-sm' : 'hover:text-white text-slate-400'}`}
+                                            title="Ver episodios desde el primero (cronológico)"
+                                        >
+                                            <Sparkles size={12} className="text-amber-400" />
+                                            <span>Primer Episodio</span>
+                                        </button>
+                                        <button 
+                                            onClick={async () => {
+                                                setGroupSort('LATEST');
+                                                await loadGroupContent(activeGroup.name, 'LATEST');
+                                            }}
+                                            className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${groupSort === 'LATEST' ? 'text-white bg-[#1877f2] shadow-sm' : 'hover:text-white text-slate-400'}`}
+                                            title="Ver episodios más recientes primero (decaiente)"
+                                        >
+                                            <Clock size={12} />
+                                            <span>Último Episodio</span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button 
+                                            onClick={() => setSortBy('RECENT')}
+                                            className={`px-2 py-1 rounded transition-all ${sortBy === 'RECENT' ? 'text-white bg-[#3a3b3c]' : 'hover:text-white'}`}
+                                        >
+                                            Recientes
+                                        </button>
+                                        <button 
+                                            onClick={() => setSortBy('FEATURED')}
+                                            className={`px-2 py-1 rounded transition-all ${sortBy === 'FEATURED' ? 'text-white bg-[#3a3b3c]' : 'hover:text-white'}`}
+                                        >
+                                            Destacados
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1160,12 +1207,9 @@ export default function GroupsPage() {
                     </>
                 )}
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="min-h-screen bg-[#18191a] text-[#e4e6eb] pb-24">
+            </>
+        ) : (
+            <>
             {/* Header section styled elegantly like FB Groups */}
             <div className="sticky top-[calc(104px+env(safe-area-inset-top,24px))] z-40 bg-[#242526] border-b border-[#3e4042] shadow-md">
                 <div className="px-4 py-3 flex items-center justify-between">
@@ -1329,6 +1373,8 @@ export default function GroupsPage() {
                     </div>
                 )}
             </div>
+        </>
+    )}
 
             {/* CREATE GROUP DIALOG MODAL */}
             {showCreateModal && (
@@ -1455,6 +1501,21 @@ export default function GroupsPage() {
                                         <div>
                                             <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
                                             <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div>
+                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={newGroupIsSeries}
+                                            onChange={(e) => setNewGroupIsSeries(e.target.checked)}
+                                            className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-white block">Organizar contenido como Serie (Modo Serie)</span>
+                                            <span className="text-[9px] text-slate-400 block font-normal">Permite que el creador defina si el grupo organiza y ordena las publicaciones de forma serial.</span>
                                         </div>
                                     </label>
                                 </div>
@@ -1611,6 +1672,19 @@ export default function GroupsPage() {
                                         <div>
                                             <span className="text-xs font-bold text-white block">Permitir subir contenido al grupo</span>
                                             <span className="text-[9px] text-slate-400 block font-normal">Los miembros suscritos podrán publicar contenido directamente en este grupo.</span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-center gap-2.5 cursor-pointer p-2 rounded-lg bg-slate-900 border border-[#3e4042] hover:border-slate-500 transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={editGroupIsSeries}
+                                            onChange={(e) => setEditGroupIsSeries(e.target.checked)}
+                                            className="w-4 h-4 rounded text-[#1877f2] bg-slate-800 border-[#3e4042] cursor-pointer accent-[#1877f2]"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-bold text-white block">Organizar contenido como Serie (Modo Serie)</span>
+                                            <span className="text-[9px] text-slate-400 block font-normal">Permite que el creador defina si el grupo organiza y ordena las publicaciones de forma serial.</span>
                                         </div>
                                     </label>
                                 </div>

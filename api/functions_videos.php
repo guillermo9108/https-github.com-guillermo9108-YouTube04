@@ -320,8 +320,14 @@ function video_get_all($pdo) {
             $isUnified = (bool)$stmtUni->fetchColumn();
         } catch (Exception $e) {}
 
-        $clauses = [];
-        foreach ($roots as $root) {
+        $all_roots = $roots;
+        $all_roots[] = 'uploads/videos';
+        $all_roots = array_unique(array_filter($all_roots));
+
+        $clauses = ["v.category = ?"];
+        $params[] = $folder;
+
+        foreach ($all_roots as $root) {
             if ($isUnified) {
                 $clauses[] = "REPLACE(v.videoUrl, '\\\\', '/') LIKE ?";
                 $params[] = $root . '/' . $folder . '/%';
@@ -438,6 +444,20 @@ function video_get_all($pdo) {
             $orderParams = [$userId, $userId, $userId];
         } else {
             $orderBy = "v.title ASC";
+        }
+    } elseif ($effectiveSort === 'OLDEST') {
+        if (!empty($userId)) {
+            $orderBy = "
+                (CASE 
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.disliked = 1 LIMIT 1) THEN 3
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isWatched = 1 LIMIT 1) THEN 2
+                    WHEN (SELECT 1 FROM interactions i WHERE i.userId = ? AND i.videoId = v.id AND i.isSkipped = 1 LIMIT 1) THEN 1
+                    ELSE 0 
+                END) ASC,
+                v.createdAt ASC";
+            $orderParams = [$userId, $userId, $userId];
+        } else {
+            $orderBy = "v.createdAt ASC";
         }
     } else {
         if (!empty($userId)) {
@@ -1000,12 +1020,22 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
     $allMeta = [];
     $metaMap = [];
     try {
-        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, createdAt FROM groups_metadata");
+        $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, isSeries, createdAt FROM groups_metadata");
         $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
         foreach ($allMeta as $m) {
             $metaMap[strtolower($m['folderPath'])] = $m;
         }
-    } catch (Exception $e) {}
+    } catch (Exception $e) {
+        // Fallback if isSeries does not exist yet physically in DB on some setups
+        try {
+            $stmtM = $pdo->query("SELECT folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowUpload, createdAt FROM groups_metadata");
+            $allMeta = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($allMeta as $m) {
+                $m['isSeries'] = 0;
+                $metaMap[strtolower($m['folderPath'])] = $m;
+            }
+        } catch (Exception $ext) {}
+    }
 
     // Group videos by lowercase relativePath to identify last thumbs and new posts count
     $folderVideosList = [];
@@ -1102,6 +1132,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $f['isPrivate'] = (int)$metaMap[$key]['isPrivate'];
             $f['isUnified'] = (int)($metaMap[$key]['isUnified'] ?? 0);
             $f['allowUpload'] = isset($metaMap[$key]['allowUpload']) ? (int)$metaMap[$key]['allowUpload'] : 1;
+            $f['isSeries'] = (int)($metaMap[$key]['isSeries'] ?? 0);
             $f['createdAt'] = (int)$metaMap[$key]['createdAt'];
         } else {
             $f['creatorId'] = 'admin';
@@ -1110,6 +1141,7 @@ function video_discover_subfolders($pdo, $currentRelPath = '', $search = '', $me
             $f['isPrivate'] = 0;
             $f['isUnified'] = 0;
             $f['allowUpload'] = 1;
+            $f['isSeries'] = 0;
             $f['createdAt'] = time();
         }
 
