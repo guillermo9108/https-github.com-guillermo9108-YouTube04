@@ -425,6 +425,7 @@ async function startServer() {
       isPrivate INTEGER DEFAULT 0,
       isUnified INTEGER DEFAULT 0,
       allowMemberUploads INTEGER DEFAULT 1,
+      isSeries INTEGER DEFAULT 0,
       createdAt INTEGER
     );
 
@@ -505,6 +506,10 @@ async function startServer() {
       .run('admin', 'admin', adminHash, 'ADMIN', 1000);
   }
 
+  // Schema adjustments/migrations
+  try { db.exec("ALTER TABLE groups_metadata ADD COLUMN allowMemberUploads INTEGER DEFAULT 1;"); } catch (e) {}
+  try { db.exec("ALTER TABLE groups_metadata ADD COLUMN isSeries INTEGER DEFAULT 0;"); } catch (e) {}
+
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -525,7 +530,8 @@ async function startServer() {
     { name: 'thumbnail', maxCount: 1 },
     { name: 'proof_image', maxCount: 1 },
     { name: 'proofImage', maxCount: 1 },
-    { name: 'images[]', maxCount: 10 }
+    { name: 'images[]', maxCount: 10 },
+    { name: 'file', maxCount: 1 }
   ]);
 
   app.use("/api", (req: Request, res: Response, next: NextFunction) => {
@@ -617,19 +623,265 @@ async function startServer() {
       }
 
       if (action === 'get_videos') {
-        const videos = db.prepare("SELECT * FROM videos WHERE is_private = 0 ORDER BY createdAt DESC").all() as any[];
-        const processedVideos = videos.map(v => ({
-          ...v,
-          thumbnailUrl: fix_url(v.thumbnailUrl),
-          videoUrl: fix_url(v.videoUrl)
-        }));
-        return res.json({ success: true, data: {
-          videos: processedVideos,
-          folders: [],
-          activeCategories: [],
-          total: processedVideos.length,
-          hasMore: false
-        }, appliedSortOrder: 'LATEST' });
+        const folderParam = (req.query.folder || '').toString().trim();
+        const categoryParam = (req.query.category || '').toString().trim();
+        const searchParam = (req.query.search || req.query.q || '').toString().trim();
+        const sortOrderParam = (req.query.sort_order || req.query.sortOrder || 'LATEST').toString().toUpperCase();
+        const limitParam = parseInt((req.query.limit || '40').toString());
+        const offsetParam = parseInt((req.query.offset || '0').toString());
+        const userIdParam = (req.query.userId || '').toString().trim();
+
+        let filterStr = "is_private = 0";
+        const params: any[] = [];
+
+        // If folder is specified, we filter by category (group name/folderPath)
+        const targetCategory = folderParam || categoryParam;
+        if (targetCategory && targetCategory !== 'ALL' && targetCategory !== 'TODOS' && targetCategory !== 'GENERAL') {
+          filterStr += " AND LOWER(category) = LOWER(?)";
+          params.push(targetCategory);
+        }
+
+        if (searchParam) {
+          filterStr += " AND (title LIKE ? OR description LIKE ?)";
+          params.push(`%${searchParam}%`, `%${searchParam}%`);
+        }
+
+        if (userIdParam) {
+          // If specific creator
+          filterStr += " AND creatorId = ?";
+          params.push(userIdParam);
+        }
+
+        let orderStr = " ORDER BY createdAt DESC";
+        if (sortOrderParam === 'OLDEST') {
+          orderStr = " ORDER BY createdAt ASC";
+        } else if (sortOrderParam === 'POPULAR' || sortOrderParam === 'FEATURED') {
+          orderStr = " ORDER BY views DESC, createdAt DESC";
+        }
+
+        try {
+          const totalRow = db.prepare(`SELECT COUNT(*) as count FROM videos WHERE ${filterStr}`).get(...params) as any;
+          const total = totalRow?.count || 0;
+
+          const query = `SELECT * FROM videos WHERE ${filterStr}${orderStr} LIMIT ? OFFSET ?`;
+          const queryParams = [...params, limitParam, offsetParam];
+          const videos = db.prepare(query).all(...queryParams) as any[];
+
+          const processedVideos = videos.map(v => ({
+            ...v,
+            thumbnailUrl: fix_url(v.thumbnailUrl),
+            videoUrl: fix_url(v.videoUrl)
+          }));
+
+          return res.json({ success: true, data: {
+            videos: processedVideos,
+            folders: [],
+            activeCategories: [],
+            total: total,
+            hasMore: (offsetParam + videos.length) < total
+          }, appliedSortOrder: sortOrderParam });
+        } catch (err: any) {
+          console.error("DB Error in get_videos:", err);
+          return res.json({ success: false, error: err.message });
+        }
+      }
+
+      if (action === 'get_folders') {
+        try {
+          const rows = db.prepare("SELECT * FROM groups_metadata").all() as any[];
+          
+          const folders = rows.map(r => {
+            const videoCountObj = db.prepare("SELECT COUNT(*) as count FROM videos WHERE LOWER(category) = LOWER(?)").get(r.folderPath) as any;
+            const membersCountObj = db.prepare("SELECT COUNT(*) as count FROM group_subscriptions WHERE LOWER(folderPath) = LOWER(?) AND approved = 1").get(r.folderPath) as any;
+            
+            return {
+              name: r.folderPath,
+              relativePath: r.folderPath,
+              count: videoCountObj ? videoCountObj.count : 0,
+              thumbnailUrl: r.coverUrl ? fix_url(r.coverUrl) : '/api/uploads/thumbnails/default.jpg',
+              creatorId: r.creatorId || 'admin',
+              description: r.description || 'Grupo sin descripción.',
+              coverUrl: r.coverUrl ? fix_url(r.coverUrl) : null,
+              isPrivate: r.isPrivate || 0,
+              isUnified: r.isUnified || 0,
+              allowUpload: r.allowMemberUploads !== undefined ? r.allowMemberUploads : 1,
+              isSeries: r.isSeries || 0,
+              createdAt: r.createdAt || Math.floor(Date.now() / 1000),
+              membersCount: membersCountObj ? membersCountObj.count : 1
+            };
+          });
+
+          // Include dynamic categories/groups not in groups_metadata
+          const distinctCats = db.prepare("SELECT category FROM videos GROUP BY category").all() as any[];
+          const reserved = ["PRINCIPAL", "PRIVADO", "PERSONAL", "GENERAL", "TODOS", "ALL", "uploads", "admin", "config", "shared"];
+          
+          distinctCats.forEach(cat => {
+            const catName = cat.category;
+            if (catName && !reserved.includes(catName.toUpperCase())) {
+              const alreadyInMeta = folders.some(f => f.name.toLowerCase() === catName.toLowerCase());
+              if (!alreadyInMeta) {
+                const videoCountObj = db.prepare("SELECT COUNT(*) as count FROM videos WHERE LOWER(category) = LOWER(?)").get(catName) as any;
+                folders.push({
+                  name: catName,
+                  relativePath: catName,
+                  count: videoCountObj ? videoCountObj.count : 0,
+                  thumbnailUrl: '/api/uploads/thumbnails/default.jpg',
+                  creatorId: 'admin',
+                  description: 'Grupo autocreado',
+                  coverUrl: null,
+                  isPrivate: 0,
+                  isUnified: 0,
+                  allowUpload: 1,
+                  isSeries: 0,
+                  createdAt: Math.floor(Date.now() / 1000),
+                  membersCount: 1
+                });
+              }
+            }
+          });
+
+          return res.json({ success: true, data: folders });
+        } catch (err: any) {
+          console.error("DB Error in get_folders:", err);
+          return res.json({ success: false, error: err.message });
+        }
+      }
+
+      if (action === 'upload_chunk') {
+        const uploadId = (req.body.uploadId || '').toString().trim();
+        const chunkIndex = parseInt((req.body.chunkIndex || '0').toString());
+        const totalChunks = parseInt((req.body.totalChunks || '1').toString());
+        const fileName = (req.body.fileName || 'video.mp4').toString().trim();
+
+        if (!uploadId) {
+          return res.json({ success: false, error: "uploadId es requerido para subida por fragmentos" });
+        }
+
+        const fileObj = req.files?.file?.[0];
+        if (!fileObj) {
+          return res.json({ success: false, error: "Archivo fragmentado no recibido o inválido" });
+        }
+
+        const tempDir = path.join(process.cwd(), 'api/uploads/temp_chunks', uploadId);
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const partName = String(chunkIndex).padStart(5, '0') + '.part';
+        const chunkPath = path.join(tempDir, partName);
+
+        try {
+          fs.copyFileSync(fileObj.path, chunkPath);
+          fs.unlinkSync(fileObj.path); // remove multer temporary file
+        } catch (copyErr: any) {
+          console.error("Error copy file:", copyErr);
+          return res.json({ success: false, error: "No se pudo guardar el fragmento en el servidor: " + copyErr.message });
+        }
+
+        const filesInTemp = fs.readdirSync(tempDir).filter(fn => fn.endsWith('.part'));
+        if (filesInTemp.length < totalChunks) {
+          return res.json({ success: true, data: { status: 'chunk_saved', chunkIndex } });
+        }
+
+        // Assemble chunks
+        const id = 'v_' + Math.random().toString(36).substring(2) + Date.now();
+        const ext = path.extname(fileName) || '.mp4';
+        const videoName = `${id}${ext}`;
+        const folderParam = (req.body.folder || '').toString().trim();
+
+        let videoBaseDir = path.join(process.cwd(), 'api/uploads/videos');
+        if (folderParam) {
+          const cleanedFolder = folderParam.replace(/[\/\\?\*:\"'<>|\.]/g, '');
+          if (cleanedFolder) {
+            videoBaseDir = path.join(videoBaseDir, cleanedFolder);
+          }
+        }
+
+        if (!fs.existsSync(videoBaseDir)) {
+          fs.mkdirSync(videoBaseDir, { recursive: true });
+        }
+
+        const finalVideoPath = path.join(videoBaseDir, videoName);
+
+        try {
+          const writeStream = fs.createWriteStream(finalVideoPath);
+          for (let i = 0; i < totalChunks; i++) {
+            const currentChunkPath = path.join(tempDir, String(i).padStart(5, '0') + '.part');
+            if (!fs.existsSync(currentChunkPath)) {
+              writeStream.end();
+              try { fs.unlinkSync(finalVideoPath); } catch (e) {}
+              return res.json({ success: false, error: `Falta el fragmento número ${i}` });
+            }
+            const chunkData = fs.readFileSync(currentChunkPath);
+            writeStream.write(chunkData);
+            try { fs.unlinkSync(currentChunkPath); } catch (e) {}
+          }
+          writeStream.end();
+        } catch (assembleErr: any) {
+          console.error("Assemble error:", assembleErr);
+          return res.json({ success: false, error: "No se pudo ensamblar el video final: " + assembleErr.message });
+        }
+
+        // Clean up temp directory
+        try { fs.rmdirSync(tempDir); } catch (e) {}
+
+        // Handle thumbnail
+        let thumbnailUrl = 'uploads/thumbnails/default.jpg';
+        const thumbnailFile = req.files?.thumbnail?.[0];
+        if (thumbnailFile) {
+          const thumbDir = path.join(process.cwd(), 'api/uploads/thumbnails');
+          if (!fs.existsSync(thumbDir)) {
+            fs.mkdirSync(thumbDir, { recursive: true });
+          }
+          const finalThumbPath = path.join(thumbDir, `${id}.jpg`);
+          try {
+            fs.copyFileSync(thumbnailFile.path, finalThumbPath);
+            fs.unlinkSync(thumbnailFile.path); // remove multer temporary file
+            thumbnailUrl = `uploads/thumbnails/${id}.jpg`;
+          } catch (thumbErr) {
+            console.error("Error copying thumbnail:", thumbErr);
+          }
+        }
+
+        const price = parseFloat(req.body.price || '0');
+        const category = (req.body.category || folderParam || 'GENERAL').toString().trim();
+        const duration = parseInt(req.body.duration || '0');
+        const title = (req.body.title || `Video ${id}`).toString().trim();
+        const description = (req.body.description || '').toString().trim();
+        const creatorId = (req.body.userId || 'admin').toString().trim();
+        const is_private = parseInt(req.body.is_private || req.body.isPrivate || '0');
+
+        const relativeVideoUrl = 'uploads/videos/' + (folderParam ? folderParam + '/' : '') + videoName;
+
+        try {
+          db.prepare("INSERT INTO videos (id, title, description, price, thumbnailUrl, videoUrl, creatorId, views, createdAt, category, duration, isLocal, transcode_status, is_private, likes, dislikes, shares) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, 'NONE', ?, 0, 0, 0)")
+            .run(id, title, description, price, thumbnailUrl, relativeVideoUrl, creatorId, Math.floor(Date.now() / 1000), category, duration, is_private);
+
+          // Auto-create category/group metadata if it doesn't exist under groups_metadata
+          if (category && category !== 'GENERAL' && category !== 'PERSONAL' && category !== 'ALL' && category !== 'TODOS') {
+            const cleanedCategory = category.replace(/[\/\\?\*:\"'<>|\.]/g, '');
+            if (cleanedCategory) {
+              const groupExists = db.prepare("SELECT COUNT(*) as count FROM groups_metadata WHERE LOWER(folderPath) = LOWER(?)").get(cleanedCategory) as any;
+              if (!groupExists || groupExists.count === 0) {
+                db.prepare("INSERT OR IGNORE INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowMemberUploads, isSeries, createdAt) VALUES (?, ?, ?, ?, 0, 0, 1, 0, ?)")
+                  .run(cleanedCategory, creatorId, 'Grupo autocreado al subir contenido.', null, Math.floor(Date.now() / 1000));
+                db.prepare("INSERT OR IGNORE INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, 1, ?)")
+                  .run(creatorId, cleanedCategory, Math.floor(Date.now() / 1000));
+              }
+            }
+          }
+
+          const registeredVideo = db.prepare("SELECT * FROM videos WHERE id = ?").get(id) as any;
+          if (registeredVideo) {
+            registeredVideo.thumbnailUrl = fix_url(registeredVideo.thumbnailUrl);
+            registeredVideo.videoUrl = fix_url(registeredVideo.videoUrl);
+          }
+
+          return res.json({ success: true, data: registeredVideo || { id } });
+        } catch (dbErr: any) {
+          console.error("Database insert video error:", dbErr);
+          return res.json({ success: false, error: dbErr.message });
+        }
       }
 
       if (action === 'rate_video') {
@@ -1171,7 +1423,7 @@ async function startServer() {
       }
 
       if (action === 'group_create') {
-        const { userId, name, description, isPrivate, coverUrl } = req.body;
+        const { userId, name, description, isPrivate, coverUrl, allowMemberUploads, isSeries } = req.body;
         if (!userId || !name) {
           return res.json({ success: false, error: "Faltan datos" });
         }
@@ -1184,10 +1436,20 @@ async function startServer() {
           return res.json({ success: false, error: "Nombre de grupo inválido" });
         }
 
+        // Physically create the folder
+        try {
+          const groupDir = path.join(process.cwd(), 'api/uploads/videos', folderNameForDir);
+          if (!fs.existsSync(groupDir)) {
+            fs.mkdirSync(groupDir, { recursive: true });
+          }
+        } catch (dirErr: any) {
+          console.error("Error creating physical folder during group_create:", dirErr);
+        }
+
         // Register in DB
         try {
-          db.prepare("INSERT OR REPLACE INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowMemberUploads, createdAt) VALUES (?, ?, ?, ?, ?, 0, 1, ?)")
-            .run(folderNameForDir, userId, description || 'Grupo sin descripción.', coverUrl || null, isPrivate ? 1 : 0, Math.floor(Date.now() / 1000));
+          db.prepare("INSERT OR REPLACE INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowMemberUploads, isSeries, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)")
+            .run(folderNameForDir, userId, description || 'Grupo sin descripción.', coverUrl || null, isPrivate ? 1 : 0, allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : 1, isSeries ? (isSeries ? 1 : 0) : 0, Math.floor(Date.now() / 1000));
           
           db.prepare("INSERT OR IGNORE INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, 1, ?)")
             .run(userId, folderNameForDir, Math.floor(Date.now() / 1000));
@@ -1199,7 +1461,7 @@ async function startServer() {
       }
 
       if (action === 'group_edit') {
-        const { userId, folderPath, name, description, isPrivate, coverUrl, isUnified, allowMemberUploads } = req.body;
+        const { userId, folderPath, name, description, isPrivate, coverUrl, isUnified, allowMemberUploads, isSeries } = req.body;
         if (!userId || !folderPath) {
           return res.json({ success: false, error: "Faltan datos" });
         }
@@ -1217,7 +1479,8 @@ async function startServer() {
                 coverUrl = COALESCE(?, coverUrl),
                 isPrivate = COALESCE(?, isPrivate),
                 isUnified = COALESCE(?, isUnified),
-                allowMemberUploads = COALESCE(?, allowMemberUploads)
+                allowMemberUploads = COALESCE(?, allowMemberUploads),
+                isSeries = COALESCE(?, isSeries)
             WHERE folderPath = ?
           `).run(
             description !== undefined ? description : null,
@@ -1225,6 +1488,7 @@ async function startServer() {
             isPrivate !== undefined ? (isPrivate ? 1 : 0) : null,
             isUnified !== undefined ? (isUnified ? 1 : 0) : null,
             allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : null,
+            isSeries !== undefined ? (isSeries ? 1 : 0) : null,
             folderPath
           );
           return res.json({ success: true, message: "Grupo actualizado exitosamente" });
