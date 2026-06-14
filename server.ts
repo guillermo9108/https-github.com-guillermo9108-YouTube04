@@ -471,6 +471,13 @@ async function startServer() {
     INSERT OR IGNORE INTO system_settings (id, categories) VALUES (1, '[{"id":"c1","name":"Gaming","price":0.5},{"id":"c2","name":"Music","price":0.8},{"id":"c3","name":"Tech","price":1.0}]');
   `);
 
+  try {
+    db.exec("ALTER TABLE system_settings ADD COLUMN batteryConfig TEXT");
+  } catch (e) {}
+  try {
+    db.exec("ALTER TABLE system_settings ADD COLUMN batteryHistory TEXT");
+  } catch (e) {}
+
   // Seed data for videos if empty
   const videoCount = (db.prepare("SELECT COUNT(*) as count FROM videos").get() as any).count;
   if (videoCount === 0) {
@@ -1377,6 +1384,237 @@ async function startServer() {
         }});
       }
 
+      if (action === 'get_real_stats') {
+        const fromTs = parseInt(req.query.from as string) || 0;
+        const toTs = parseInt(req.query.to as string) || Math.floor(Date.now() / 1000);
+
+        const totalUsersRow = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+        const userCount = totalUsersRow ? totalUsersRow.count : 0;
+
+        const revRow = db.prepare(`
+          SELECT SUM(amount) as total 
+          FROM transactions 
+          WHERE (type = 'DEPOSIT' OR isExternal = 1) 
+            AND timestamp >= ? AND timestamp <= ?
+        `).get(fromTs, toTs) as any;
+        const totalRevenue = revRow && revRow.total ? parseFloat(revRow.total) : 0;
+
+        const feeRow = db.prepare(`
+          SELECT SUM(COALESCE(adminFee, 0)) as total 
+          FROM transactions 
+          WHERE timestamp >= ? AND timestamp <= ?
+        `).get(fromTs, toTs) as any;
+        const internalRevenue = feeRow && feeRow.total ? parseFloat(feeRow.total) : 0;
+
+        const payingRow = db.prepare(`
+          SELECT COUNT(DISTINCT buyerId) as count 
+          FROM transactions 
+          WHERE buyerId IS NOT NULL AND buyerId != ''
+        `).get() as any;
+        const payingCount = payingRow ? payingRow.count : 0;
+
+        const conversion = userCount > 0 ? parseFloat(((payingCount / userCount) * 100).toFixed(1)) : 0;
+        const arpu = userCount > 0 ? parseFloat((totalRevenue / userCount).toFixed(1)) : 0;
+
+        // Fetch plan mix
+        const mixRows = db.prepare(`
+          SELECT videoTitle as planName, COUNT(*) as count 
+          FROM transactions 
+          WHERE type = 'VIP' AND timestamp >= ? AND timestamp <= ?
+          GROUP BY videoTitle
+        `).all(fromTs, toTs) as any[];
+
+        const planMix: Record<string, number> = {};
+        mixRows.forEach(row => {
+          if (row.planName) {
+            planMix[row.planName] = row.count;
+          }
+        });
+
+        // Daily history points grouping
+        const dailyRows = db.prepare(`
+          SELECT 
+            DATE(timestamp, 'unixepoch') as day,
+            SUM(CASE WHEN (type = 'DEPOSIT' OR isExternal = 1) THEN amount ELSE 0 END) as cash_in,
+            SUM(COALESCE(adminFee, 0)) as internal_rev
+          FROM transactions
+          WHERE timestamp >= ? AND timestamp <= ?
+          GROUP BY day
+          ORDER BY day ASC
+        `).all(fromTs, toTs) as any[];
+
+        const dailyMap = new Map<string, { cash_in: number, internal_rev: number }>();
+        dailyRows.forEach(row => {
+          if (row.day) {
+            dailyMap.set(row.day, {
+              cash_in: parseFloat(row.cash_in || '0'),
+              internal_rev: parseFloat(row.internal_rev || '0')
+            });
+          }
+        });
+
+        const dailyHistory = [];
+        const startDay = new Date(fromTs * 1000);
+        const endDay = new Date(toTs * 1000);
+        for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().split('T')[0];
+          const value = dailyMap.get(dateStr) || { cash_in: 0, internal_rev: 0 };
+          dailyHistory.push({
+            label: dateStr,
+            cash_in: value.cash_in,
+            internal_rev: value.internal_rev
+          });
+        }
+
+        if (dailyHistory.length < 2) {
+          const defaultDayStr = new Date(fromTs * 1000).toISOString().split('T')[0];
+          dailyHistory.push({ label: defaultDayStr, cash_in: 0, internal_rev: 0 });
+          dailyHistory.push({ label: new Date(toTs * 1000).toISOString().split('T')[0], cash_in: 0, internal_rev: 0 });
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            totalRevenue,
+            internalRevenue,
+            userCount,
+            averages: {
+              arpu,
+              conversion
+            },
+            planMix,
+            history: {
+              daily: dailyHistory
+            }
+          }
+        });
+      }
+
+      if (action === 'get_global_transactions') {
+        const history = db.prepare("SELECT * FROM transactions ORDER BY timestamp DESC LIMIT 200").all() as any[];
+        const systemRevenueRow = db.prepare("SELECT SUM(COALESCE(adminFee, 0)) as total FROM transactions").get() as any;
+        const systemRevenue = systemRevenueRow ? parseFloat(systemRevenueRow.total || '0') : 0;
+        return res.json({ success: true, data: { history, systemRevenue } });
+      }
+
+      if (action === 'get_balance_requests') {
+        const balanceRequests = db.prepare(`
+          SELECT br.*, u.username as username
+          FROM balance_requests br
+          JOIN users u ON br.userId = u.id
+          ORDER BY br.createdAt DESC
+        `).all() as any[];
+
+        return res.json({
+          success: true,
+          data: {
+            balance: balanceRequests,
+            vip: [],
+            activeVip: []
+          }
+        });
+      }
+
+      if (action === 'admin_get_server_stats') {
+        const cpu = Math.round(5 + Math.random() * 15);
+
+        const settings = db.prepare("SELECT batteryConfig, batteryHistory FROM system_settings WHERE id = 1").get() as any;
+        let battery = null;
+        let batteryHistory = null;
+        if (settings) {
+          if (settings.batteryConfig) {
+            try { battery = JSON.parse(settings.batteryConfig); } catch (e) {}
+          }
+          if (settings.batteryHistory) {
+            try { batteryHistory = JSON.parse(settings.batteryHistory); } catch (e) {}
+          }
+        }
+
+        if (!battery) {
+          battery = {
+            voltage: 14.8,
+            minWatts: 200,
+            maxWatts: 300,
+            isCharging: false,
+            cellHealth: 89,
+            currentWh: 150,
+            lastUpdate: Date.now(),
+            chargePower: 45,
+            cellsSeries: 4,
+            cellsParallel: 4,
+            cellCapacityMah: 5000,
+            lastChargeTime: Date.now()
+          };
+        }
+
+        if (!batteryHistory || batteryHistory.length === 0) {
+          batteryHistory = [];
+          const now = Date.now();
+          for (let i = 24; i >= 0; i--) {
+            batteryHistory.push({
+              t: now - i * 3600 * 1000,
+              v: 14.2 + Math.sin(i / 3) * 0.5 + Math.random() * 0.1,
+              c: 150 + Math.cos(i / 3) * 20
+            });
+          }
+        }
+
+        const totalUsersRow = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
+        const activeUsersCount = totalUsersRow ? totalUsersRow.count : 1;
+
+        return res.json({
+          success: true,
+          data: {
+            cpu,
+            storage: {
+              total: "512 GB",
+              used: "124 GB",
+              percent: 24
+            },
+            network: {
+              up: Math.round(20 + Math.random() * 80),
+              down: Math.round(50 + Math.random() * 200)
+            },
+            activeUsers: activeUsersCount,
+            uptime: "45d 12h 30m",
+            battery,
+            batteryHistory
+          }
+        });
+      }
+
+      if (action === 'update_system_settings') {
+        const bodyKeys = Object.keys(req.body);
+        if (bodyKeys.length > 0) {
+          db.transaction(() => {
+            for (const key of bodyKeys) {
+              let valueToStore = req.body[key];
+              if (typeof valueToStore === 'object') {
+                valueToStore = JSON.stringify(valueToStore);
+              }
+              // Dynamically update column if it exists or use basic parameters
+              try {
+                db.prepare(`UPDATE system_settings SET ${key} = ? WHERE id = 1`).run(valueToStore);
+              } catch (err: any) {
+                console.error(`Failed to update system_settings column ${key}:`, err.message);
+              }
+            }
+          })();
+        }
+        return res.json({ success: true });
+      }
+
+      if (action === 'admin_add_balance') {
+        const { userId, amount, reason } = req.body;
+        const amt = parseFloat(amount || '0');
+        db.transaction(() => {
+          db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(amt, userId);
+          db.prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'DEPOSIT', ?, ?, 1)")
+            .run('tx_adm_add_' + Date.now(), userId, amt, Math.floor(Date.now() / 1000), reason || 'Ajuste de Saldo por Administrador');
+        })();
+        return res.json({ success: true });
+      }
+
       if (action === 'get_system_settings') {
         const settings = db.prepare("SELECT * FROM system_settings WHERE id = 1").get() as any;
         if (!settings) return res.json({ success: true, data: {} });
@@ -1385,7 +1623,9 @@ async function startServer() {
           categories: JSON.parse(settings.categories || '[]'),
           paymentMethods: JSON.parse(settings.paymentMethods || '{}'),
           vipPlans: JSON.parse(settings.vipPlans || '[]'),
-          isQueuePaused: !!settings.isQueuePaused
+          isQueuePaused: !!settings.isQueuePaused,
+          batteryConfig: settings.batteryConfig ? JSON.parse(settings.batteryConfig) : undefined,
+          batteryHistory: settings.batteryHistory ? JSON.parse(settings.batteryHistory) : undefined
         }});
       }
 
