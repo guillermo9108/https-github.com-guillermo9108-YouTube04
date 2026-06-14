@@ -804,21 +804,20 @@ async function startServer() {
         const finalVideoPath = path.join(videoBaseDir, videoName);
 
         try {
-          const writeStream = fs.createWriteStream(finalVideoPath);
+          fs.writeFileSync(finalVideoPath, "");
           for (let i = 0; i < totalChunks; i++) {
             const currentChunkPath = path.join(tempDir, String(i).padStart(5, '0') + '.part');
             if (!fs.existsSync(currentChunkPath)) {
-              writeStream.end();
               try { fs.unlinkSync(finalVideoPath); } catch (e) {}
               return res.json({ success: false, error: `Falta el fragmento número ${i}` });
             }
             const chunkData = fs.readFileSync(currentChunkPath);
-            writeStream.write(chunkData);
+            fs.appendFileSync(finalVideoPath, chunkData);
             try { fs.unlinkSync(currentChunkPath); } catch (e) {}
           }
-          writeStream.end();
         } catch (assembleErr: any) {
           console.error("Assemble error:", assembleErr);
+          try { fs.unlinkSync(finalVideoPath); } catch (e) {}
           return res.json({ success: false, error: "No se pudo ensamblar el video final: " + assembleErr.message });
         }
 

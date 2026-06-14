@@ -66,89 +66,93 @@ export const UploadProvider = ({ children }: { children?: React.ReactNode }) => 
 
             // Perform chunked upload
             await new Promise<void>(async (resolve, reject) => {
-                const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
-                const file = item.file;
-                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-                const uploadId = "up_" + Math.random().toString(36).substring(2) + Date.now();
+                try {
+                    const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
+                    const file = item.file;
+                    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                    const uploadId = "up_" + Math.random().toString(36).substring(2) + Date.now();
 
-                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                    const start = chunkIndex * CHUNK_SIZE;
-                    const end = Math.min(start + CHUNK_SIZE, file.size);
-                    const chunkBlob = file.slice(start, end);
+                    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                        const start = chunkIndex * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, file.size);
+                        const chunkBlob = file.slice(start, end);
 
-                    await new Promise<void>((resolveChunk, rejectChunk) => {
-                        const xhr = new XMLHttpRequest();
-                        const fd = new FormData();
-                        
-                        fd.append('action', 'upload_chunk');
-                        fd.append('uploadId', uploadId);
-                        fd.append('chunkIndex', String(chunkIndex));
-                        fd.append('totalChunks', String(totalChunks));
-                        fd.append('fileName', file.name);
-                        fd.append('file', chunkBlob);
+                        await new Promise<void>((resolveChunk, rejectChunk) => {
+                            const xhr = new XMLHttpRequest();
+                            const fd = new FormData();
+                            
+                            fd.append('action', 'upload_chunk');
+                            fd.append('uploadId', uploadId);
+                            fd.append('chunkIndex', String(chunkIndex));
+                            fd.append('totalChunks', String(totalChunks));
+                            fd.append('fileName', file.name);
+                            fd.append('file', chunkBlob);
 
-                        fd.append('title', item.title);
-                        fd.append('description', item.description);
-                        fd.append('price', String(item.price));
-                        fd.append('category', item.category);
-                        fd.append('duration', String(item.duration));
-                        fd.append('userId', user.id);
-                        if (item.thumbnail && chunkIndex === totalChunks - 1) {
-                            fd.append('thumbnail', item.thumbnail);
-                        }
-
-                        const targetFolder = folder || (item.category !== 'PERSONAL' ? item.category : '');
-                        if (targetFolder) {
-                            fd.append('folder', targetFolder);
-                        }
-
-                        const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
-                        xhr.open('POST', '/api/index.php');
-                        if (token) {
-                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                        }
-
-                        xhr.upload.onprogress = (e) => {
-                            if (e.lengthComputable) {
-                                const totalUploadedBytes = start + e.loaded;
-                                const percent = Math.min(100, Math.round((totalUploadedBytes / file.size) * 100));
-                                setProgress(percent);
-
-                                const now = Date.now();
-                                const diffTime = now - lastTime.current;
-                                if (diffTime >= 1000) {
-                                    const diffLoaded = totalUploadedBytes - lastLoaded.current;
-                                    const mbps = (diffLoaded / 1024 / 1024) / (diffTime / 1000);
-                                    setUploadSpeed(`${mbps.toFixed(1)} MB/s`);
-                                    
-                                    lastLoaded.current = totalUploadedBytes;
-                                    lastTime.current = now;
-                                }
+                            fd.append('title', item.title);
+                            fd.append('description', item.description);
+                            fd.append('price', String(item.price));
+                            fd.append('category', item.category);
+                            fd.append('duration', String(item.duration));
+                            fd.append('userId', user.id);
+                            if (item.thumbnail && chunkIndex === totalChunks - 1) {
+                                fd.append('thumbnail', item.thumbnail);
                             }
-                        };
 
-                        xhr.onload = () => {
-                            if (xhr.status >= 200 && xhr.status < 300) {
-                                try {
-                                    const res = JSON.parse(xhr.responseText);
-                                    if (res.success) {
-                                        resolveChunk();
-                                    } else {
-                                        rejectChunk(new Error(res.error || 'Subida errónea del fragmento'));
+                            const targetFolder = folder || (item.category !== 'PERSONAL' ? item.category : '');
+                            if (targetFolder) {
+                                fd.append('folder', targetFolder);
+                            }
+
+                            const token = localStorage.getItem('sp_session_token') || sessionStorage.getItem('sp_session_token');
+                            xhr.open('POST', '/api/index.php');
+                            if (token) {
+                                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                            }
+
+                            xhr.upload.onprogress = (e) => {
+                                if (e.lengthComputable) {
+                                    const totalUploadedBytes = start + e.loaded;
+                                    const percent = Math.min(100, Math.round((totalUploadedBytes / file.size) * 100));
+                                    setProgress(percent);
+
+                                    const now = Date.now();
+                                    const diffTime = now - lastTime.current;
+                                    if (diffTime >= 1000) {
+                                        const diffLoaded = totalUploadedBytes - lastLoaded.current;
+                                        const mbps = (diffLoaded / 1024 / 1024) / (diffTime / 1000);
+                                        setUploadSpeed(`${mbps.toFixed(1)} MB/s`);
+                                        
+                                        lastLoaded.current = totalUploadedBytes;
+                                        lastTime.current = now;
                                     }
-                                } catch (e) {
-                                    rejectChunk(new Error("Respuesta inválida del servidor"));
                                 }
-                            } else {
-                                rejectChunk(new Error(`Servicio devolvió código ${xhr.status}`));
-                            }
-                        };
+                            };
 
-                        xhr.onerror = () => rejectChunk(new Error("Error de red durante la subida del fragmento"));
-                        xhr.send(fd);
-                    });
+                            xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    try {
+                                        const res = JSON.parse(xhr.responseText);
+                                        if (res.success) {
+                                            resolveChunk();
+                                        } else {
+                                            rejectChunk(new Error(res.error || 'Subida errónea del fragmento'));
+                                        }
+                                    } catch (e) {
+                                        rejectChunk(new Error("Respuesta inválida del servidor"));
+                                    }
+                                } else {
+                                    rejectChunk(new Error(`Servicio devolvió código ${xhr.status}`));
+                                }
+                            };
+
+                            xhr.onerror = () => rejectChunk(new Error("Error de red durante la subida del fragmento"));
+                            xhr.send(fd);
+                        });
+                    }
+                    resolve();
+                } catch (err) {
+                    reject(err);
                 }
-                resolve();
             });
         }
 
