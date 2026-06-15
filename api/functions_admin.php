@@ -1096,6 +1096,18 @@ function admin_add_video_to_transcode_queue($pdo, $input) {
     if (empty($input['videoId'])) respond(false, null, "ID de video faltante");
     $videoId = $input['videoId'];
     
+    // Verificar que no sea imagen o archivo de texto
+    $vStmt = $pdo->prepare("SELECT videoUrl FROM videos WHERE id = ?");
+    $vStmt->execute([$videoId]);
+    $row = $vStmt->fetch();
+    if ($row) {
+        $ext = strtolower(pathinfo($row['videoUrl'], PATHINFO_EXTENSION));
+        $forbidden = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'txt', 'srt', 'vtt', 'pdf', 'doc', 'docx', 'csv', 'md'];
+        if (in_array($ext, $forbidden)) {
+            respond(false, null, "No se pueden transcodificar imágenes o archivos de texto");
+        }
+    }
+
     // Solo actualizar split_shorts si se pasó explícitamente en el input.
     $sql = "UPDATE videos SET transcode_status = 'WAITING', locked_at = 0, processing_attempts = 0";
     $params = [];
@@ -1836,8 +1848,15 @@ function _admin_perform_transcode_single($pdo, $video, $bins) {
         return false;
     }
 
-    // Determinar perfil según extensión de entrada
+    // Determinar perfil según extensión de entrada y abortar si es imagen o texto
     $ext = strtolower(pathinfo($inputPath, PATHINFO_EXTENSION));
+    $forbidden = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'txt', 'srt', 'vtt', 'pdf', 'doc', 'docx', 'csv', 'md'];
+    if (in_array($ext, $forbidden)) {
+        write_log("Transcode: El archivo es una imagen o texto ($ext), no se puede convertir.", 'ERROR');
+        $pdo->prepare("UPDATE videos SET transcode_status = 'FAILED', reason = 'Cannot transcode image or text files' WHERE id = ?")->execute([$videoId]);
+        return false;
+    }
+
     $audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus', 'm4b'];
     $isAudioInput = in_array($ext, $audioExts);
     

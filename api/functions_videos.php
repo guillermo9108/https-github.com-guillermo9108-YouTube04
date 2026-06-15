@@ -47,12 +47,14 @@ function video_process_rows(&$rows, $depth = 0) {
             $v['is_audio'] = (isset($v['is_audio']) && ($v['is_audio'] == 1 || $v['is_audio'] === true)) || $isAudioExt;
         }
 
-        // Buscar subtítulos externos (.srt, .vtt)
+        // Buscar subtítulos externos (.srt, .vtt) y verificar si hay una imagen con el mismo nombre que el video (miniatura)
         $v['subtitles'] = [];
         if ($isLocal || $isUploaded) {
             $inputPath = resolve_video_path($v['rawPath']);
             if ($inputPath && file_exists($inputPath)) {
                 $basePath = preg_replace('/\.[^.]+$/', '', $inputPath);
+                
+                // 1. Subtítulos
                 foreach (['srt', 'vtt'] as $subExt) {
                     $subFile = $basePath . '.' . $subExt;
                     if (file_exists($subFile)) {
@@ -62,6 +64,15 @@ function video_process_rows(&$rows, $depth = 0) {
                             'label' => strtoupper($subExt),
                             'kind' => 'subtitles'
                         ];
+                    }
+                }
+
+                // 2. Imagen de miniatura con el mismo nombre que el archivo de video
+                foreach (['jpg', 'jpeg', 'png', 'webp', 'gif'] as $imgExt) {
+                    $imgFile = $basePath . '.' . $imgExt;
+                    if (file_exists($imgFile)) {
+                        $v['thumbnailUrl'] = preg_replace('/\.[^.]+$/', '.' . $imgExt, $v['rawPath']);
+                        break;
                     }
                 }
             }
@@ -1267,7 +1278,8 @@ function video_upload($pdo, $post, $files) {
     $isAudio = in_array($extLower, $audioExts) ? 1 : 0;
     if ($extLower === 'mp4') $isAudio = 0;
 
-    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3') {
+    $forbidden = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'txt', 'srt', 'vtt', 'pdf', 'doc', 'docx', 'csv', 'md'];
+    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3' && !in_array($extLower, $forbidden)) {
         $transcodeStatus = 'WAITING';
     }
 
@@ -1275,6 +1287,10 @@ function video_upload($pdo, $post, $files) {
     $collection = $post['collection'] ?? null;
     $isPrivate = !empty($post['is_private']) ? 1 : 0;
     $duration = intval($post['duration'] ?? 0);
+    if ($duration <= 0 && !empty($videoPath) && file_exists($videoPath)) {
+        $bins = get_ffmpeg_binaries($pdo);
+        $duration = floor(get_media_duration($videoPath, $bins['ffprobe']));
+    }
     $title = !empty($post['title']) ? $post['title'] : "Video $id";
     $desc = $post['description'] ?? '';
     // Usar el userId del token preferiblemente si functions_auth define una forma de obtenerlo, 
@@ -1454,7 +1470,8 @@ function video_upload_chunk($pdo, $post, $files) {
     $isAudio = in_array($extLower, $audioExts) ? 1 : 0;
     if ($extLower === 'mp4') $isAudio = 0;
 
-    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3') {
+    $forbidden = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'txt', 'srt', 'vtt', 'pdf', 'doc', 'docx', 'csv', 'md'];
+    if ($autoTranscode === 1 && $extLower !== 'mp4' && $extLower !== 'mp3' && !in_array($extLower, $forbidden)) {
         $transcodeStatus = 'WAITING';
     }
 
@@ -1462,6 +1479,10 @@ function video_upload_chunk($pdo, $post, $files) {
     $collection = $post['collection'] ?? null;
     $isPrivate = !empty($post['is_private']) ? 1 : 0;
     $duration = intval($post['duration'] ?? 0);
+    if ($duration <= 0 && !empty($finalVideoPath) && file_exists($finalVideoPath)) {
+        $bins = get_ffmpeg_binaries($pdo);
+        $duration = floor(get_media_duration($finalVideoPath, $bins['ffprobe']));
+    }
     $title = !empty($post['title']) ? $post['title'] : "Video $id";
     $desc = $post['description'] ?? '';
     $creatorId = $post['userId'] ?? 'anonymous';
@@ -1802,7 +1823,8 @@ function video_scan_local($pdo, $input) {
                         $autoTranscode = (int)($settings['autoTranscode'] ?? 0);
                         
                         if ($autoTranscode === 1) {
-                            if ($ext !== 'mp4' && $ext !== 'mp3') {
+                            $forbidden = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'txt', 'srt', 'vtt', 'pdf', 'doc', 'docx', 'csv', 'md'];
+                            if ($ext !== 'mp4' && $ext !== 'mp3' && !in_array($ext, $forbidden)) {
                                 $transcodeStatus = 'WAITING';
                             }
                         }

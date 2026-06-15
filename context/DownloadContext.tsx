@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Video } from '../types';
 import { db } from '../services/db';
 import { useAuth } from './AuthContext';
+import { isRunningInAPK, triggerNativeDownload } from '../utils/platform';
 
 interface DownloadItem {
     video: Video;
@@ -107,6 +108,14 @@ export function DownloadProvider({ children }: { children: React.ReactNode }) {
             const filename = encodeURIComponent((item.video.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase());
             const ext = item.video.is_audio ? 'mp3' : 'mp4';
             const downloadUrl = `${streamUrl}&download=1&filename=${filename}.${ext}`;
+
+            if (isRunningInAPK()) {
+                const handled = triggerNativeDownload(downloadUrl, `${filename}.${ext}`);
+                if (handled) {
+                    setQueue(prev => prev.map(i => i.video.id === videoId ? { ...i, status: 'COMPLETED', progress: 100 } : i));
+                    return true;
+                }
+            }
 
             const link = document.createElement('a');
             link.href = downloadUrl;

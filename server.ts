@@ -129,13 +129,29 @@ async function startServer() {
             return;
           }
 
+          let senderName = "Usuario";
+          let senderAvatar = "";
+          try {
+            const senderRow = db.prepare("SELECT username, avatarUrl FROM users WHERE id = ?").get(senderId) as any;
+            if (senderRow) {
+              senderName = senderRow.username;
+              senderAvatar = senderRow.avatarUrl ? senderRow.avatarUrl : "";
+            }
+          } catch (dbErr) {
+            console.error("Error fetching sender details for chat push", dbErr);
+          }
+
           // Ensure both casing versions exist for compatibility
           const normalizedPayload = {
             ...payload,
             senderId,
             receiverId,
             sender_id: senderId,
-            receiver_id: receiverId
+            receiver_id: receiverId,
+            senderName,
+            senderAvatar,
+            username: senderName,
+            avatarUrl: senderAvatar
           };
 
           console.log(`Chat message from ${senderId} to ${receiverId}: ${payload.text?.substring(0, 20)}...`);
@@ -590,6 +606,63 @@ async function startServer() {
     return '/api/' + url;
   };
 
+  const prepareVideoNode = (v: any) => {
+    if (!v) return null;
+    const isLocal = v.isLocal === 1 || v.isLocal === true || String(v.isLocal) === '1';
+    const isUploaded = v.videoUrl && v.videoUrl.indexOf('uploads/videos/') !== -1;
+    v.subtitles = [];
+
+    if (isLocal || isUploaded) {
+      const rawPath = v.videoUrl;
+      const videoUrlClean = rawPath.replace(/\\/g, '/');
+      const pathsToTry = [
+        path.join(process.cwd(), 'api', videoUrlClean.startsWith('api/') ? videoUrlClean.substring(4) : videoUrlClean),
+        path.join(process.cwd(), videoUrlClean.startsWith('api/') ? videoUrlClean.substring(4) : videoUrlClean),
+        path.join(process.cwd(), 'api', videoUrlClean),
+        path.join(process.cwd(), videoUrlClean)
+      ];
+      let resolvedPath = null;
+      for (const p of pathsToTry) {
+        if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+          resolvedPath = p;
+          break;
+        }
+      }
+
+      if (resolvedPath) {
+        const basePath = resolvedPath.replace(/\.[^.]+$/, '');
+        // 1. Scan subtitles (.srt, .vtt) next to video
+        for (const ext of ['vtt', 'srt']) {
+          const subFile = basePath + '.' + ext;
+          if (fs.existsSync(subFile)) {
+            v.subtitles.push({
+              url: `api/index.php?action=stream_sub&id=${v.id}&ext=${ext}`,
+              lang: ext.toUpperCase(),
+              label: ext.toUpperCase(),
+              kind: 'subtitles'
+            });
+          }
+        }
+
+        // 2. Scan companion image preview with same name as video
+        for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'gif']) {
+          const imgFile = basePath + '.' + ext;
+          if (fs.existsSync(imgFile)) {
+            v.thumbnailUrl = videoUrlClean.replace(/\.[^.]+$/, '.' + ext);
+            break;
+          }
+        }
+      }
+
+      v.videoUrl = "api/index.php?action=stream&id=" + v.id;
+      v.isLocal = 1;
+    }
+
+    v.thumbnailUrl = fix_url(v.thumbnailUrl);
+    v.videoUrl = fix_url(v.videoUrl);
+    return v;
+  };
+
   const uploadFields = upload.fields([
     { name: 'avatar', maxCount: 1 },
     { name: 'video', maxCount: 1 },
@@ -733,11 +806,7 @@ async function startServer() {
           const queryParams = [...params, limitParam, offsetParam];
           const videos = db.prepare(query).all(...queryParams) as any[];
 
-          const processedVideos = videos.map(v => ({
-            ...v,
-            thumbnailUrl: fix_url(v.thumbnailUrl),
-            videoUrl: fix_url(v.videoUrl)
-          }));
+          const processedVideos = videos.map(v => prepareVideoNode(v));
 
           return res.json({ success: true, data: {
             videos: processedVideos,
@@ -935,7 +1004,37 @@ async function startServer() {
 
         const price = parseFloat(req.body.price || '0');
         const category = (req.body.category || folderParam || 'GENERAL').toString().trim();
-        const duration = parseInt(req.body.duration || '0');
+        let duration = parseInt(req.body.duration || '0');
+
+        if (duration <= 0) {
+          try {
+            const systemSettings = db.prepare("SELECT ffmpegPath FROM system_settings WHERE id = 1").get() as any;
+            const savedFfmpeg = systemSettings?.ffmpegPath || '';
+            const savedFfprobe = savedFfmpeg ? savedFfmpeg.replace('ffmpeg', 'ffprobe') : '';
+            const ffprobeCandidates = [
+              savedFfprobe,
+              '/usr/bin/ffprobe',
+              '/usr/local/bin/ffprobe',
+              'ffprobe'
+            ];
+            let activeFfprobe = 'ffprobe';
+            for (const cand of ffprobeCandidates) {
+              if (cand && (cand === 'ffprobe' || fs.existsSync(cand))) {
+                activeFfprobe = cand;
+                break;
+              }
+            }
+            const cp = require('child_process');
+            const ffprobeCmd = `${activeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${finalVideoPath}"`;
+            const resStr = cp.execSync(ffprobeCmd).toString().trim();
+            if (resStr && !isNaN(parseFloat(resStr))) {
+              duration = Math.round(parseFloat(resStr));
+            }
+          } catch (e: any) {
+            console.warn("ffprobe duration extraction failed at upload_chunk Node layer:", e.message);
+          }
+        }
+
         const title = (req.body.title || `Video ${id}`).toString().trim();
         const description = (req.body.description || '').toString().trim();
         const creatorId = (req.body.userId || 'admin').toString().trim();
@@ -1236,16 +1335,14 @@ async function startServer() {
 
       if (action === 'get_trending_videos') {
         const videos = db.prepare("SELECT * FROM videos WHERE is_private = 0 ORDER BY views DESC LIMIT 20").all() as any[];
-        return res.json({ success: true, data: videos.map(v => ({...v, thumbnailUrl: fix_url(v.thumbnailUrl), videoUrl: fix_url(v.videoUrl)})) });
+        return res.json({ success: true, data: videos.map(v => prepareVideoNode(v)) });
       }
 
       if (action === 'get_video') {
         const id = req.query.id;
         const video = db.prepare("SELECT * FROM videos WHERE id = ?").get(id) as any;
         if (video) {
-          video.thumbnailUrl = fix_url(video.thumbnailUrl);
-          video.videoUrl = fix_url(video.videoUrl);
-          return res.json({ success: true, data: video });
+          return res.json({ success: true, data: prepareVideoNode(video) });
         }
         return res.json({ success: false, error: "Not found" });
       }
@@ -1328,7 +1425,7 @@ async function startServer() {
           ORDER BY i.watchedAt DESC 
           LIMIT 50
         `).all(userId) as any[];
-        return res.json({ success: true, data: history.map(v => ({ ...v, thumbnailUrl: fix_url(v.thumbnailUrl), videoUrl: fix_url(v.videoUrl) })) });
+        return res.json({ success: true, data: history.map(v => prepareVideoNode(v)) });
       }
 
       if (action === 'has_purchased') {
