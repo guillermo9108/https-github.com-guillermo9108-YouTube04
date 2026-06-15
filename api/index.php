@@ -2,6 +2,7 @@
 /**
  * StreamPay - Core Controller V12.0 (Stability & Fallback Fix)
  */
+chdir(__DIR__);
 ob_start(); 
 require_once __DIR__ . '/functions_utils.php';
 write_log("API Request: " . ($_GET['action'] ?? 'none') . " from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
