@@ -1076,7 +1076,9 @@ async function startServer() {
          if (!video || !user) return res.json({ success: false, error: "Datos inválidos" });
          if (user.balance < video.price) return res.json({ success: false, error: "Saldo insuficiente" });
 
-         const fee = video.price * 0.20;
+         const settings = db.prepare("SELECT videoCommission FROM system_settings WHERE id = 1").get() as any;
+         const commissionPercent = settings && settings.videoCommission !== undefined ? Number(settings.videoCommission) : 20;
+         const fee = video.price * (commissionPercent / 100);
          const part = video.price - fee;
          
          db.transaction(() => {
@@ -1394,7 +1396,7 @@ async function startServer() {
         const revRow = db.prepare(`
           SELECT SUM(amount) as total 
           FROM transactions 
-          WHERE (type = 'DEPOSIT' OR isExternal = 1) 
+          WHERE (isExternal = 1) 
             AND timestamp >= ? AND timestamp <= ?
         `).get(fromTs, toTs) as any;
         const totalRevenue = revRow && revRow.total ? parseFloat(revRow.total) : 0;
@@ -1435,7 +1437,7 @@ async function startServer() {
         const dailyRows = db.prepare(`
           SELECT 
             DATE(timestamp, 'unixepoch') as day,
-            SUM(CASE WHEN (type = 'DEPOSIT' OR isExternal = 1) THEN amount ELSE 0 END) as cash_in,
+            SUM(CASE WHEN (isExternal = 1) THEN amount ELSE 0 END) as cash_in,
             SUM(COALESCE(adminFee, 0)) as internal_rev
           FROM transactions
           WHERE timestamp >= ? AND timestamp <= ?
