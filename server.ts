@@ -804,14 +804,39 @@ async function startServer() {
           }
         }
 
-        if (!fs.existsSync(videoBaseDir)) {
-          fs.mkdirSync(videoBaseDir, { recursive: true });
+        try {
+          if (!fs.existsSync(videoBaseDir)) {
+            fs.mkdirSync(videoBaseDir, { recursive: true });
+          }
+        } catch (dirErr) {
+          videoBaseDir = path.join(process.cwd(), 'api/uploads/videos');
+          if (!fs.existsSync(videoBaseDir)) {
+            fs.mkdirSync(videoBaseDir, { recursive: true });
+          }
         }
 
-        const finalVideoPath = path.join(videoBaseDir, videoName);
+        let finalVideoPath = path.join(videoBaseDir, videoName);
 
         try {
           fs.writeFileSync(finalVideoPath, "");
+        } catch (writeErr) {
+          // Fallback to basic uploads/videos
+          videoBaseDir = path.join(process.cwd(), 'api/uploads/videos');
+          try {
+            if (!fs.existsSync(videoBaseDir)) {
+              fs.mkdirSync(videoBaseDir, { recursive: true });
+            }
+            finalVideoPath = path.join(videoBaseDir, videoName);
+            fs.writeFileSync(finalVideoPath, "");
+          } catch (writeErr2) {
+            // Ultimate fallback to uploads root
+            videoBaseDir = path.join(process.cwd(), 'api/uploads');
+            finalVideoPath = path.join(videoBaseDir, videoName);
+            fs.writeFileSync(finalVideoPath, "");
+          }
+        }
+
+        try {
           for (let i = 0; i < totalChunks; i++) {
             const currentChunkPath = path.join(tempDir, String(i).padStart(5, '0') + '.part');
             if (!fs.existsSync(currentChunkPath)) {

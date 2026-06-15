@@ -1350,13 +1350,46 @@ function video_upload_chunk($pdo, $post, $files) {
         }
     }
     if (!is_dir($videoDir)) {
-        mkdir($videoDir, 0777, true);
+        @mkdir($videoDir, 0777, true);
     }
 
     $finalVideoPath = $videoDir . $videoName;
-    $out = fopen($finalVideoPath, 'wb');
+    $out = @fopen($finalVideoPath, 'wb');
+
+    if (!$out && !empty($localPath)) {
+        // Fallback 1: Intentar sin localLibraryPath en uploads/videos/[grupo]/
+        $videoDir = 'uploads/videos/' . trim($folderParam, '/') . '/';
+        if (!is_dir($videoDir)) {
+            @mkdir($videoDir, 0777, true);
+        }
+        $finalVideoPath = $videoDir . $videoName;
+        $out = @fopen($finalVideoPath, 'wb');
+    }
+
     if (!$out) {
-        respond(false, null, "No se pudo crear el archivo final de video");
+        // Fallback 2: Intentar en uploads/videos/ estandar
+        $videoDir = 'uploads/videos/';
+        if (!is_dir($videoDir)) {
+            @mkdir($videoDir, 0777, true);
+        }
+        $finalVideoPath = $videoDir . $videoName;
+        $out = @fopen($finalVideoPath, 'wb');
+    }
+
+    if (!$out) {
+        // Fallback 3: Intentar en uploads/ directamente
+        $videoDir = 'uploads/';
+        if (!is_dir($videoDir)) {
+            @mkdir($videoDir, 0777, true);
+        }
+        $finalVideoPath = $videoDir . $videoName;
+        $out = @fopen($finalVideoPath, 'wb');
+    }
+
+    if (!$out) {
+        $lastError = error_get_last();
+        $errorMsg = isset($lastError['message']) ? $lastError['message'] : 'Error desconocido de fopen/permisos';
+        respond(false, null, "No se pudo crear el archivo final de video. Detalles: " . $errorMsg . " - Path intentado: " . $finalVideoPath . " - Directorio de trabajo: " . getcwd());
     }
 
     for ($i = 0; $i < $totalChunks; $i++) {

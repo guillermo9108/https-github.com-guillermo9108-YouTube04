@@ -481,7 +481,6 @@ export default function GroupsPage() {
                 thumbnail: null
             };
 
-            toast.info("Subiendo publicación directamente al grupo...</br>Por favor espera...");
             await addToQueue([uploadItemObj], user, activeGroup.name);
             
             setPostText('');
