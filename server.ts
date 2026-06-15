@@ -414,7 +414,66 @@ async function startServer() {
       userId TEXT,
       amount REAL,
       status TEXT DEFAULT 'PENDING',
+      rejectionReason TEXT,
       createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS vip_requests (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      planSnapshot TEXT,
+      paymentRef TEXT,
+      proofText TEXT,
+      proofImageUrl TEXT,
+      status TEXT DEFAULT 'PENDING',
+      rejectionReason TEXT,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS marketplace_items (
+      id TEXT PRIMARY KEY,
+      sellerId TEXT,
+      title TEXT,
+      description TEXT,
+      price REAL,
+      category TEXT,
+      images TEXT,
+      stock INTEGER DEFAULT 1,
+      salesCount INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'DISPONIBLE',
+      itemCondition TEXT,
+      createdAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS marketplace_orders (
+      id TEXT PRIMARY KEY,
+      buyerId TEXT,
+      sellerId TEXT,
+      totalAmount REAL,
+      paymentMethod TEXT,
+      status TEXT DEFAULT 'PENDING',
+      shippingDetails TEXT,
+      rejectionReason TEXT,
+      createdAt INTEGER,
+      updatedAt INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS marketplace_order_items (
+      id TEXT PRIMARY KEY,
+      orderId TEXT,
+      itemId TEXT,
+      quantity INTEGER,
+      price REAL,
+      status TEXT DEFAULT 'PENDING'
+    );
+
+    CREATE TABLE IF NOT EXISTS marketplace_reviews (
+      id TEXT PRIMARY KEY,
+      itemId TEXT,
+      userId TEXT,
+      rating INTEGER,
+      comment TEXT,
+      timestamp INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS groups_metadata (
@@ -1388,7 +1447,7 @@ async function startServer() {
         
         db.transaction(() => {
           db.prepare("UPDATE users SET balance = balance - ?, vipExpiry = ? WHERE id = ?").run(plan.price, newExpiry, userId);
-          db.prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle) VALUES (?, ?, ?, 'VIP', ?, ?)")
+          db.prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'VIP', ?, ?, 1)")
             .run('txv_'+Date.now(), userId, plan.price, now, plan.name);
         })();
         return res.json({ success: true });
@@ -1522,24 +1581,6 @@ async function startServer() {
         const systemRevenueRow = db.prepare("SELECT SUM(COALESCE(adminFee, 0)) as total FROM transactions").get() as any;
         const systemRevenue = systemRevenueRow ? parseFloat(systemRevenueRow.total || '0') : 0;
         return res.json({ success: true, data: { history, systemRevenue } });
-      }
-
-      if (action === 'get_balance_requests') {
-        const balanceRequests = db.prepare(`
-          SELECT br.*, u.username as username
-          FROM balance_requests br
-          JOIN users u ON br.userId = u.id
-          ORDER BY br.createdAt DESC
-        `).all() as any[];
-
-        return res.json({
-          success: true,
-          data: {
-            balance: balanceRequests,
-            vip: [],
-            activeVip: []
-          }
-        });
       }
 
       if (action === 'admin_get_server_stats') {
@@ -1890,8 +1931,86 @@ async function startServer() {
         return res.json({ success: true, data: combined });
       }
 
-      // Default response for other actions to prevent 501 errors
-      return res.json({ success: true, data: [], message: `Action '${action}' handled by generic Node fallback.` });
+      // Proxy unhandled action fallback to PHP server on port 8005
+      console.log(`[Proxy] Routing unhandled action '${action}' (path: ${req.path}) to PHP server on port 8005...`);
+      
+      const phpUrl = new URL(`http://127.0.0.1:8005${req.path === '/' || req.path === '' ? '/index.php' : req.path}`);
+      
+      // Copy query parameters
+      for (const [k, v] of Object.entries(req.query)) {
+        if (v !== undefined) {
+          phpUrl.searchParams.set(k, String(v));
+        }
+      }
+
+      // Copy and translate headers
+      const headersStr: Record<string, string> = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (v !== undefined) {
+          const lowerKey = k.toLowerCase();
+          // Filter out problematic headers that node-fetch / native-fetch auto-populate
+          if (['host', 'content-length', 'connection', 'accept-encoding'].includes(lowerKey)) {
+            continue;
+          }
+          headersStr[k] = String(v);
+        }
+      }
+      headersStr['host'] = '127.0.0.1:8005';
+
+      let body: any = null;
+      const contentType = req.headers['content-type'] || '';
+
+      if (req.method === 'POST') {
+        if (contentType.includes('application/json')) {
+          body = JSON.stringify(req.body);
+        } else if (contentType.includes('application/x-www-form-urlencoded')) {
+          const params = new URLSearchParams();
+          for (const [k, v] of Object.entries(req.body)) {
+            params.set(k, String(v));
+          }
+          body = params.toString();
+        } else if (req.files || contentType.includes('multipart/form-data')) {
+          const form = new FormData();
+          
+          if (req.body) {
+            for (const [k, v] of Object.entries(req.body)) {
+              if (v !== undefined) {
+                form.append(k, String(v));
+              }
+            }
+          }
+          
+          if (req.files) {
+            for (const fieldName of Object.keys(req.files)) {
+              const fileList = req.files[fieldName];
+              if (Array.isArray(fileList)) {
+                for (const f of fileList) {
+                  const blob = new Blob([fs.readFileSync(f.path)], { type: f.mimetype });
+                  form.append(fieldName, blob, f.originalname);
+                }
+              }
+            }
+          }
+          
+          body = form;
+          // Native fetch handles multipart content-type boundary decoration if body is a FormData instance
+        } else {
+          body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        }
+      }
+
+      const phpResponse = await fetch(phpUrl.toString(), {
+        method: req.method,
+        headers: headersStr,
+        body: body,
+      });
+
+      const responseText = await phpResponse.text();
+      const respContentType = phpResponse.headers.get('content-type') || '';
+
+      res.status(phpResponse.status);
+      res.setHeader('content-type', respContentType);
+      return res.send(responseText);
 
     } catch (err: any) {
       console.error("Node API Error:", err);
