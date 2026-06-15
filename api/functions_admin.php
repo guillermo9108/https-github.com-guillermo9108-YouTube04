@@ -243,7 +243,7 @@ function admin_handle_vip_request($pdo, $input) {
                 $now = time();
                 $stmtU = $pdo->prepare("SELECT vipExpiry FROM users WHERE id = ?"); $stmtU->execute([$r['userId']]); $curr = intval($stmtU->fetchColumn());
                 $newStart = ($curr > $now) ? $curr : $now;
-                $pdo->prepare("UPDATE users SET vipExpiry = ? WHERE id = ?")->execute([$newStart + $seconds, $r['userId']]);
+                $pdo->prepare("UPDATE users SET vipExpiry = ?, paidVipExpiry = ? WHERE id = ?")->execute([$newStart + $seconds, $newStart + $seconds, $r['userId']]);
                 
                 $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, timestamp, type, videoTitle, isExternal) VALUES (?, ?, ?, ?, 'VIP', ?, 1)")
                     ->execute([uniqid('tx_vip_'), $r['userId'], $plan['price'], time(), $plan['name']]);

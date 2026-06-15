@@ -268,7 +268,8 @@ async function startServer() {
       shippingDetails TEXT,
       watchLater TEXT,
       defaultPrices TEXT,
-      vipExpiry INTEGER DEFAULT 0
+      vipExpiry INTEGER DEFAULT 0,
+      paidVipExpiry INTEGER DEFAULT 0
     );
     
     CREATE TABLE IF NOT EXISTS videos (
@@ -1267,6 +1268,10 @@ async function startServer() {
          db.transaction(() => {
            db.prepare("UPDATE users SET balance = balance - ? WHERE id = ?").run(video.price, userId);
            db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(part, video.creatorId);
+           const admin = db.prepare("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1").get() as any;
+           if (admin) {
+             db.prepare("UPDATE users SET balance = balance + ? WHERE id = ?").run(fee, admin.id);
+           }
            db.prepare("INSERT INTO transactions (id, buyerId, creatorId, videoId, amount, adminFee, timestamp, type, videoTitle) VALUES (?, ?, ?, ?, ?, ?, ?, 'PURCHASE', ?)")
              .run('tx_'+Date.now(), userId, video.creatorId, videoId, video.price, fee, Math.floor(Date.now()/1000), video.title);
          })();
@@ -1543,7 +1548,7 @@ async function startServer() {
         const newExpiry = Math.max(user.vipExpiry || 0, now) + durationSeconds;
         
         db.transaction(() => {
-          db.prepare("UPDATE users SET balance = balance - ?, vipExpiry = ? WHERE id = ?").run(plan.price, newExpiry, userId);
+          db.prepare("UPDATE users SET balance = balance - ?, vipExpiry = ?, paidVipExpiry = ? WHERE id = ?").run(plan.price, newExpiry, newExpiry, userId);
           db.prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'VIP', ?, ?, 1)")
             .run('txv_'+Date.now(), userId, plan.price, now, plan.name);
         })();
