@@ -81,7 +81,7 @@ function market_mark_item_paid($pdo, $input) {
     
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare("SELECT oi.*, o.sellerId, o.buyerId, o.paymentMethod, o.id as orderId FROM marketplace_order_items oi JOIN marketplace_orders o ON oi.orderId = o.id WHERE oi.id = ?");
+        $stmt = $pdo->prepare("SELECT oi.*, o.sellerId, o.buyerId, o.paymentMethod, o.id as orderId, mi.title as itemTitle FROM marketplace_order_items oi JOIN marketplace_orders o ON oi.orderId = o.id JOIN marketplace_items mi ON oi.itemId = mi.id WHERE oi.id = ?");
         $stmt->execute([$orderItemId]);
         $item = $stmt->fetch();
         
@@ -102,10 +102,17 @@ function market_mark_item_paid($pdo, $input) {
             ->execute([$item['quantity'], $item['quantity'], $item['itemId']]);
         $pdo->prepare("UPDATE marketplace_items SET status = 'AGOTADO' WHERE id = ? AND stock <= 0")->execute([$item['itemId']]);
         
-        // Record transaction for stats
+        // Retrieve commission percent from settings
+        $settings = $pdo->query("SELECT marketCommission FROM system_settings WHERE id = 1")->fetch();
+        $commissionPercent = isset($settings['marketCommission']) ? intval($settings['marketCommission']) : 25;
+        
+        $totalPrice = floatval($item['price']) * intval($item['quantity']);
+        $fee = $totalPrice * ($commissionPercent / 100.0);
+        
+        // Record transaction for stats (Manual payment/cash gets approved, represents real transaction so isExternal = 1)
         $txId = 'tx_' . uniqid();
-        $pdo->prepare("INSERT INTO transactions (id, buyerId, creatorId, marketplaceItemId, amount, timestamp, type) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            ->execute([$txId, $item['buyerId'], $sellerId, $item['itemId'], floatval($item['price']) * intval($item['quantity']), time(), 'MARKET_PURCHASE']);
+        $pdo->prepare("INSERT INTO transactions (id, buyerId, creatorId, marketplaceItemId, amount, adminFee, timestamp, type, videoTitle, isExternal) VALUES (?, ?, ?, ?, ?, ?, ?, 'MARKET_PURCHASE', ?, 1)")
+            ->execute([$txId, $item['buyerId'], $sellerId, $item['itemId'], $totalPrice, $fee, time(), "Artículo del Marketplace: " . ($item['itemTitle'] ?? 'Producto')]);
             
         $pdo->commit();
         respond(true);
@@ -368,7 +375,12 @@ function market_checkout($pdo, $input) {
                 
                 if ($paymentMethod === 'PLATFORM') {
                     $sub = floatval($item['price']) * intval($item['quantity']);
-                    $fee = $sub * 0.25; $part = $sub - $fee;
+                    
+                    // Retrieve commission percent from settings
+                    $settings = $pdo->query("SELECT marketCommission FROM system_settings WHERE id = 1")->fetch();
+                    $commissionPercent = isset($settings['marketCommission']) ? intval($settings['marketCommission']) : 25;
+                    
+                    $fee = $sub * ($commissionPercent / 100.0); $part = $sub - $fee;
                     
                     $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$part, $sellerId]);
                     if ($adminId) $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$fee, $adminId]);
@@ -377,8 +389,8 @@ function market_checkout($pdo, $input) {
                     
                     // Record transaction
                     $txId = 'tx_' . uniqid();
-                    $pdo->prepare("INSERT INTO transactions (id, buyerId, creatorId, marketplaceItemId, amount, adminFee, timestamp, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                        ->execute([$txId, $uid, $sellerId, $item['id'], $sub, $fee, time(), 'MARKET_PURCHASE']);
+                    $pdo->prepare("INSERT INTO transactions (id, buyerId, creatorId, marketplaceItemId, amount, adminFee, timestamp, type, videoTitle, isExternal) VALUES (?, ?, ?, ?, ?, ?, ?, 'MARKET_PURCHASE', ?, 0)")
+                        ->execute([$txId, $uid, $sellerId, $item['id'], $sub, $fee, time(), "Artículo del Marketplace: " . $item['title']]);
                 }
             }
             

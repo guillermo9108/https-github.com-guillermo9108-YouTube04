@@ -9,6 +9,7 @@ import { Link, useLocation, Outlet, useNavigate } from './Router';
 import { db } from '../services/db';
 import { Notification as AppNotification } from '../types';
 import GridProcessor from './GridProcessor';
+import StreamPayLogo from './StreamPayLogo';
 
 const UploadIndicator = () => {
   const { isUploading, progress, currentFileIndex, totalFiles, uploadSpeed } = useUpload();
@@ -112,9 +113,7 @@ export default function Layout() {
               }}
               className="flex items-center"
             >
-              <span className="text-[28px] font-bold tracking-tighter text-[#1877f2] lowercase">
-                facebook
-              </span>
+              <StreamPayLogo className="h-7 w-auto" />
             </Link>
             <div className="flex items-center gap-2">
               <button onClick={() => navigate('/upload')} className="w-10 h-10 flex items-center justify-center text-white bg-[#3a3b3c] rounded-full hover:bg-[#4e4f50] transition-colors">

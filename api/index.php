@@ -254,6 +254,7 @@ try {
         case 'get_user_followers': interact_get_user_followers($pdo, $_GET['userId'] ?? ''); break;
         case 'has_purchased': interact_has_purchased($pdo, $_GET['userId'] ?? '', $_GET['videoId'] ?? ''); break;
         case 'purchase_video': interact_purchase($pdo, $input); break;
+        case 'purchase_category': interact_purchase_category($pdo, $input); break;
         case 'purchase_vip_instant': interact_purchase_vip_instant($pdo, $input); break;
         case 'transfer_balance': interact_transfer_balance($pdo, $input); break;
         case 'share_video': interact_share_video($pdo, $input); break;

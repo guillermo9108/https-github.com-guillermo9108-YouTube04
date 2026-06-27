@@ -867,17 +867,109 @@ function admin_clear_logs() {
 }
 
 function get_real_stats($pdo) {
-    $stats = [
-        'totalUsers' => $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(),
-        'totalVideos' => $pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn(),
-        'totalSales' => $pdo->query("SELECT SUM(amount) FROM transactions WHERE type = 'PURCHASE'")->fetchColumn() ?: 0,
-        'totalAdminFees' => $pdo->query("SELECT SUM(adminFee) FROM transactions")->fetchColumn() ?: 0,
-        'totalMarketItems' => $pdo->query("SELECT COUNT(*) FROM marketplace_items WHERE status != 'ELIMINADO'")->fetchColumn(),
-        'pendingVip' => $pdo->query("SELECT COUNT(*) FROM vip_requests WHERE status = 'PENDING'")->fetchColumn(),
-        'pendingBalance' => $pdo->query("SELECT COUNT(*) FROM balance_requests WHERE status = 'PENDING'")->fetchColumn(),
-        'pendingVerification' => $pdo->query("SELECT COUNT(*) FROM seller_verifications WHERE status = 'PENDING'")->fetchColumn()
-    ];
-    respond(true, $stats);
+    $fromTs = isset($_GET['from']) ? intval($_GET['from']) : 0;
+    $toTs = isset($_GET['to']) ? intval($_GET['to']) : time();
+
+    $userCount = intval($pdo->query("SELECT COUNT(*) FROM users")->fetchColumn() ?: 0);
+
+    $stmtRev = $pdo->prepare("
+        SELECT (SUM(CASE WHEN isExternal = 1 THEN amount ELSE 0 END) + SUM(CASE WHEN isExternal = 0 THEN COALESCE(adminFee, 0) ELSE 0 END)) as total 
+        FROM transactions 
+        WHERE timestamp >= ? AND timestamp <= ?
+    ");
+    $stmtRev->execute([$fromTs, $toTs]);
+    $totalRevenue = floatval($stmtRev->fetchColumn() ?: 0);
+
+    $stmtFee = $pdo->prepare("
+        SELECT SUM(COALESCE(adminFee, 0)) as total 
+        FROM transactions 
+        WHERE timestamp >= ? AND timestamp <= ?
+    ");
+    $stmtFee->execute([$fromTs, $toTs]);
+    $internalRevenue = floatval($stmtFee->fetchColumn() ?: 0);
+
+    $payingCount = intval($pdo->query("
+        SELECT COUNT(DISTINCT buyerId) 
+        FROM transactions 
+        WHERE buyerId IS NOT NULL AND buyerId != ''
+    ")->fetchColumn() ?: 0);
+
+    $conversion = $userCount > 0 ? round(($payingCount / $userCount) * 100, 1) : 0;
+    $arpu = $userCount > 0 ? round($totalRevenue / $userCount, 1) : 0;
+
+    // Fetch plan mix
+    $stmtMix = $pdo->prepare("
+        SELECT videoTitle as planName, COUNT(*) as count 
+        FROM transactions 
+        WHERE type = 'VIP' AND timestamp >= ? AND timestamp <= ?
+        GROUP BY videoTitle
+    ");
+    $stmtMix->execute([$fromTs, $toTs]);
+    $planMix = [];
+    foreach ($stmtMix->fetchAll() as $row) {
+        if ($row['planName']) {
+            $planMix[$row['planName']] = intval($row['count']);
+        }
+    }
+
+    // Daily history points grouping
+    $stmtDaily = $pdo->prepare("
+        SELECT 
+            DATE(timestamp, 'unixepoch') as day,
+            (SUM(CASE WHEN isExternal = 1 THEN amount ELSE 0 END) + SUM(CASE WHEN isExternal = 0 THEN COALESCE(adminFee, 0) ELSE 0 END)) as cash_in,
+            SUM(COALESCE(adminFee, 0)) as internal_rev
+        FROM transactions
+        WHERE timestamp >= ? AND timestamp <= ?
+        GROUP BY day
+        ORDER BY day ASC
+    ");
+    $stmtDaily->execute([$fromTs, $toTs]);
+    $dailyMap = [];
+    foreach ($stmtDaily->fetchAll() as $row) {
+        if ($row['day']) {
+            $dailyMap[$row['day']] = [
+                'cash_in' => floatval($row['cash_in'] ?: 0),
+                'internal_rev' => floatval($row['internal_rev'] ?: 0)
+            ];
+        }
+    }
+
+    $dailyHistory = [];
+    $startDay = new DateTime("@$fromTs");
+    $endDay = new DateTime("@$toTs");
+    
+    // Interval day grouping
+    $interval = new DateInterval('P1D');
+    $period = new DatePeriod($startDay, $interval, $endDay->modify('+1 day'));
+    foreach ($period as $date) {
+        $dateStr = $date->format('Y-m-d');
+        $val = isset($dailyMap[$dateStr]) ? $dailyMap[$dateStr] : ['cash_in' => 0, 'internal_rev' => 0];
+        $dailyHistory[] = [
+            'label' => $dateStr,
+            'cash_in' => $val['cash_in'],
+            'internal_rev' => $val['internal_rev']
+        ];
+    }
+
+    if (count($dailyHistory) < 2) {
+        $defaultDayStr = date('Y-m-d', $fromTs);
+        $dailyHistory[] = ['label' => $defaultDayStr, 'cash_in' => 0, 'internal_rev' => 0];
+        $dailyHistory[] = ['label' => date('Y-m-d', $toTs), 'cash_in' => 0, 'internal_rev' => 0];
+    }
+
+    respond(true, [
+        'totalRevenue' => $totalRevenue,
+        'internalRevenue' => $internalRevenue,
+        'userCount' => $userCount,
+        'averages' => [
+            'arpu' => $arpu,
+            'conversion' => $conversion
+        ],
+        'planMix' => $planMix,
+        'history' => [
+            'daily' => $dailyHistory
+        ]
+    ]);
 }
 
 function admin_get_requests($pdo, $status) {

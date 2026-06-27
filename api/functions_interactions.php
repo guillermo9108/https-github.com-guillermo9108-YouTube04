@@ -124,7 +124,13 @@ function interact_purchase($pdo, $input) {
         }
 
         if ($bal < $v['price']) throw new Exception("Saldo insuficiente");
-        $fee = $v['price'] * 0.20; $part = $v['price'] - $fee;
+        
+        // Query configured video commission from settings
+        $settingsStmt = $pdo->query("SELECT videoCommission FROM system_settings WHERE id = 1");
+        $settings = $settingsStmt ? $settingsStmt->fetch() : null;
+        $commissionPercent = isset($settings['videoCommission']) ? intval($settings['videoCommission']) : 20;
+        
+        $fee = $v['price'] * ($commissionPercent / 100.0); $part = $v['price'] - $fee;
         $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$v['price'], $bid]);
         $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$part, $v['creatorId']]);
         $aid = $pdo->query("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1")->fetchColumn();
@@ -148,7 +154,15 @@ function interact_purchase_vip_instant($pdo, $input) {
         $stmtU = $pdo->prepare("SELECT vipExpiry FROM users WHERE id = ?"); $stmtU->execute([$uid]); $curr = $stmtU->fetchColumn();
         $new = max($curr, $now) + ($plan['durationDays'] * 86400);
         $pdo->prepare("UPDATE users SET vipExpiry = ?, paidVipExpiry = ? WHERE id = ?")->execute([$new, $new, $uid]);
-        $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, 'VIP', ?, ?, 0)")->execute([uniqid('txv_'), $uid, $plan['price'], $now, $plan['name']]);
+        
+        // Credit the Admin account with the VIP plan price
+        $aid = $pdo->query("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1")->fetchColumn();
+        if ($aid) {
+            $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$plan['price'], $aid]);
+        }
+        
+        // Recording direct VIP purchases as isExternal = 1 and 100% adminFee
+        $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, type, timestamp, videoTitle, isExternal, adminFee) VALUES (?, ?, ?, 'VIP', ?, ?, 1, ?)")->execute([uniqid('txv_'), $uid, $plan['price'], $now, $plan['name'], $plan['price']]);
         $pdo->commit(); respond(true);
     } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
 }
@@ -1159,4 +1173,35 @@ function group_decline_sub($pdo, $input) {
     );
 
     respond(true, null, "Solicitud rechazada");
+}
+
+function interact_purchase_category($pdo, $input) {
+    $uid = $input['userId']; $catId = $input['categoryId']; $now = time();
+    $pdo->beginTransaction();
+    try {
+        $settingsStmt = $pdo->query("SELECT categories FROM system_settings WHERE id = 1");
+        $settings = $settingsStmt ? $settingsStmt->fetch() : null;
+        $categories = json_decode($settings['categories'] ?? '[]', true);
+        $cat = null;
+        foreach ($categories as $c) {
+            if ($c['id'] === $catId) { $cat = $c; break; }
+        }
+        if (!$cat) throw new Exception("Categoría no encontrada");
+        if ($cat['price'] <= 0) { respond(true); return; }
+
+        $bal = $pdo->query("SELECT balance FROM users WHERE id = '$uid'")->fetchColumn();
+        if ($bal < $cat['price']) throw new Exception("Saldo insuficiente");
+
+        $pdo->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$cat['price'], $uid]);
+        
+        $aid = $pdo->query("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1")->fetchColumn();
+        if ($aid) {
+            $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$cat['price'], $aid]);
+        }
+        
+        $pdo->prepare("INSERT INTO transactions (id, buyerId, amount, adminFee, type, timestamp, videoTitle, isExternal) VALUES (?, ?, ?, ?, 'PURCHASE', ?, ?, 1)")
+            ->execute([uniqid('txc_'), $uid, $cat['price'], $cat['price'], $now, "Compra de categoría: " . $cat['name']]);
+        
+        $pdo->commit(); respond(true);
+    } catch (Exception $e) { $pdo->rollBack(); respond(false, null, $e->getMessage()); }
 }
