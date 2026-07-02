@@ -96,8 +96,7 @@ function groups_list($pdo) {
                         1 // autoDetected
                     ]);
                     
-                    // Create a log entry
-                    groups_add_log($pdo, 'AUTO_DETECT', "Se detectó y registró automáticamente el grupo '" . $df['name'] . "' con " . $df['fileCount'] . " archivos.");
+                    // Auto-detect logged skipped
                     
                     // Reload record
                     $stmtGet = $pdo->prepare("SELECT * FROM groups_metadata WHERE folderPath = ?");
@@ -244,7 +243,6 @@ function groups_save($pdo, $input) {
                     $meta['autoDetected'] ?? 0
                 ]);
 
-                groups_add_log($pdo, 'EDIT_RENAME', "Se renombró el grupo '" . $folderPath . "' a '" . $newName . "'.");
                 $folderPath = $newName; // Continue editing under new name
             } else {
                 // Normal update
@@ -257,7 +255,7 @@ function groups_save($pdo, $input) {
                     $description,
                     $folderPath
                 ]);
-                groups_add_log($pdo, 'EDIT_UPDATE', "Se actualizaron parámetros del grupo '" . $folderPath . "'.");
+                // Parameters updated
             }
             $count++;
         }
@@ -300,7 +298,7 @@ function groups_upload_cover($pdo, $post, $files) {
             $stmt = $pdo->prepare("UPDATE groups_metadata SET coverUrl = ? WHERE folderPath = ?");
             $stmt->execute([$coverUrl, $folderPath]);
 
-            groups_add_log($pdo, 'UPLOAD_COVER', "Se subió una nueva portada para el grupo '" . $folderPath . "'.");
+            // Cover uploaded
             respond(true, ['coverUrl' => fix_url($coverUrl)], "Portada subida con éxito");
         } else {
             respond(false, null, "Fallo al guardar el archivo en el servidor");
@@ -442,7 +440,7 @@ function groups_cleanup_run($pdo) {
             if ($sv['views'] > 0 || $sv['likes'] > 0 || $sv['shares'] > 0 || $commentCount > 0) {
                 // Cancel scheduled deletion!
                 $pdo->prepare("UPDATE videos SET scheduled_deletion_time = NULL WHERE id = ?")->execute([$sv['id']]);
-                groups_add_log($pdo, 'CLEANUP_PROTECT', "Se canceló la eliminación de la publicación '" . $sv['id'] . "' al recibir interacción.");
+                // Cleanup cancellation logged
             }
         }
 
@@ -457,7 +455,7 @@ function groups_cleanup_run($pdo) {
                 $msg = "Tu publicación '" . $vid['title'] . "' en el grupo '" . $vid['category'] . "' será eliminada en 24h si no recibe interacción.";
                 send_direct_notification($pdo, $vid['creatorId'], 'SYSTEM', $msg, '/profile');
                 
-                groups_add_log($pdo, 'CLEANUP_WARN', "Notificación enviada a " . $vid['creatorId'] . ": '" . $vid['title'] . "' programada para eliminación.");
+                // Warn logged
                 $notificationsSent++;
             } else {
                 // If already scheduled and 24h passed
@@ -485,7 +483,7 @@ function groups_cleanup_run($pdo) {
                     $pdo->prepare("DELETE FROM comments WHERE videoId = ?")->execute([$vid['id']]);
                     $pdo->prepare("DELETE FROM likes_dislikes WHERE videoId = ?")->execute([$vid['id']]);
 
-                    groups_add_log($pdo, 'CLEANUP_DELETE_VIDEO', "Se eliminó automáticamente la publicación '" . $vid['title'] . "' del grupo '" . $vid['category'] . "' por falta de interacción.");
+                    // Video deletion logged
                     $videosDeleted++;
                 }
             }
@@ -524,7 +522,7 @@ function groups_cleanup_run($pdo) {
                 // If active or last activity is recent -> cancel!
                 if ($hasActiveVideo || $lastVideoTime >= $seriesLimitTime) {
                     $pdo->prepare("UPDATE groups_metadata SET scheduled_deletion_time = NULL WHERE folderPath = ?")->execute([$folder]);
-                    groups_add_log($pdo, 'CLEANUP_PROTECT_SERIES', "Se canceló la eliminación del grupo serie '" . $folder . "' al registrar actividad.");
+                    // Protect series logged
                 }
             }
         }
@@ -563,7 +561,7 @@ function groups_cleanup_run($pdo) {
                     $msg = "Tu grupo serie '" . $folder . "' será eliminado en 24h por falta de actividad.";
                     send_direct_notification($pdo, $sg['creatorId'], 'SYSTEM', $msg, '/profile');
                     
-                    groups_add_log($pdo, 'CLEANUP_WARN_SERIES', "Notificación enviada al administrador " . $sg['creatorId'] . ": Grupo serie '" . $folder . "' programado para eliminación.");
+                    // Warn series logged
                     $notificationsSent++;
                 } else {
                     if ($now >= intval($sg['scheduled_deletion_time'])) {
@@ -615,7 +613,7 @@ function groups_cleanup_run($pdo) {
                         // 4. Delete group metadata record
                         $pdo->prepare("DELETE FROM groups_metadata WHERE folderPath = ?")->execute([$folder]);
 
-                        groups_add_log($pdo, 'CLEANUP_DELETE_SERIES', "Se eliminó por completo el grupo serie '" . $folder . "' y todo su contenido por inactividad.");
+                        // Delete series logged
                         $seriesDeleted++;
                     }
                 }
@@ -720,7 +718,7 @@ function groups_combine_run($pdo) {
                                 $folderName
                             ]);
 
-                            groups_add_log($pdo, 'COMBINE_PUBLISH', "Publicación combinada automática creada en '" . $folderName . "': '" . $title . "' usando miniatura '" . $imageName . "'.");
+                            // Combine publish logged
                             $combinedCount++;
                         }
                     }
@@ -734,33 +732,7 @@ function groups_combine_run($pdo) {
     }
 }
 
-function groups_get_logs($pdo) {
-    try {
-        $stmt = $pdo->query("SELECT * FROM group_logs ORDER BY timestamp DESC LIMIT 100");
-        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        respond(true, $logs);
-    } catch (Exception $e) {
-        respond(false, null, "Error obteniendo logs de grupos: " . $e->getMessage());
-    }
-}
-
-// Helpers
-function groups_add_log($pdo, $action, $message) {
-    try {
-        $stmt = $pdo->prepare("INSERT INTO group_logs (id, action, message, timestamp) VALUES (?, ?, ?, ?)");
-        $stmt->execute([
-            uniqid('glog_'),
-            $action,
-            $message,
-            time()
-        ]);
-        
-        // Also write to general log
-        write_log("Groups: [$action] $message");
-    } catch (Exception $e) {
-        write_log("Failed to insert group log: " . $e->getMessage(), 'ERROR');
-    }
-}
+// Log helper functions removed as requested
 
 function groups_delete_folder_recursive($dir) {
     if (!is_dir($dir)) return false;

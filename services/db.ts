@@ -26,7 +26,7 @@ class DBService {
     private logCountInWindow = 0;
     private lastLogResetTime = Date.now();
 
-    public async logRemote(message: string, level: 'ERROR' | 'INFO' | 'WARNING' = 'ERROR') {
+    public async logRemote(message: string, level: 'ERROR' | 'INFO' | 'WARNING' = 'ERROR', extra?: { source?: string; file?: string; line?: number; trace?: string }) {
         if (this.isOffline) return;
         if (this.isLogging) return; // Recursion loop guard
 
@@ -48,7 +48,14 @@ class DBService {
             await fetch(`/api/index.php?action=client_log`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, level }),
+                body: JSON.stringify({ 
+                    message, 
+                    level,
+                    source: extra?.source || 'JS_ERROR',
+                    file: extra?.file,
+                    line: extra?.line,
+                    trace: extra?.trace || (extra?.file ? undefined : new Error().stack)
+                }),
                 signal: controller.signal
             }).then(r => r.text()).catch(() => {});
             clearTimeout(id);

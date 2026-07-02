@@ -12,8 +12,13 @@ window.onerror = function(message, source, lineno, colno, error) {
     if (msg.includes('AbortError') || msg.includes('play()') || msg.includes('supported source') || msg.includes('Script error') || msg === 'Script error.') {
         return;
     }
-    const report = `JS ERROR: ${message} at ${source}:${lineno}:${colno}`;
-    db.logRemote(report, 'ERROR');
+    const report = `${message}`;
+    db.logRemote(report, 'ERROR', {
+        source: 'JS_ERROR',
+        file: source ? String(source) : undefined,
+        line: lineno ? Number(lineno) : undefined,
+        trace: error?.stack || `At ${source}:${lineno}:${colno}`
+    });
 };
 
 window.onunhandledrejection = function(event) {
@@ -23,8 +28,11 @@ window.onunhandledrejection = function(event) {
         event.preventDefault();
         return;
     }
-    const report = `UNHANDLED PROMISE: ${event.reason}`;
-    db.logRemote(report, 'ERROR');
+    const report = `Unhandled Rejection: ${reason}`;
+    db.logRemote(report, 'ERROR', {
+        source: 'JS_PROMISE_REJECTION',
+        trace: event.reason?.stack || reason
+    });
 };
 
 // Register Service Worker

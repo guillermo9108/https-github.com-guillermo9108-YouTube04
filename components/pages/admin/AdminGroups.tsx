@@ -38,10 +38,13 @@ interface AdminUser {
   name: string;
 }
 
-interface GroupLog {
+interface AppError {
   id: string;
-  action: string;
+  source: string;
   message: string;
+  file: string | null;
+  line: number | null;
+  trace: string | null;
   timestamp: number;
 }
 
@@ -63,7 +66,7 @@ export default function AdminGroups() {
   };
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [logs, setLogs] = useState<GroupLog[]>([]);
+  const [logs, setLogs] = useState<AppError[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [combining, setCombining] = useState(false);
@@ -85,8 +88,24 @@ export default function AdminGroups() {
   // Modals / Panels
   const [showConfig, setShowConfig] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
   const [showCleanupPreview, setShowCleanupPreview] = useState(false);
   const [cleanupPreview, setCleanupPreview] = useState<CleanupPreviewData | null>(null);
+
+  const handleClearErrors = async () => {
+    if (!confirm('¿Seguro que deseas vaciar todos los errores del sistema?')) return;
+    try {
+      const res = await db.request<{ success: boolean }>('action=admin_clear_errors');
+      if (res.success) {
+        showToast('Historial de errores vaciado', 'success');
+        setLogs([]);
+      } else {
+        showToast('Error al vaciar errores', 'error');
+      }
+    } catch (e: any) {
+      showToast(e.message || 'Error de conexión', 'error');
+    }
+  };
 
   // Cleanup config
   const [normalDays, setNormalDays] = useState(30);
@@ -125,7 +144,7 @@ export default function AdminGroups() {
 
   const loadLogs = async () => {
     try {
-      const res = await db.request<{ success: boolean; data: GroupLog[] }>('action=groups_get_logs');
+      const res = await db.request<{ success: boolean; data: AppError[] }>('action=admin_get_errors');
       if (res.success && res.data) {
         setLogs(res.data);
       }
@@ -454,10 +473,10 @@ export default function AdminGroups() {
 
           <button 
             onClick={() => { setShowLogs(true); loadLogs(); }}
-            className="flex items-center gap-1.5 p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-white/5 cursor-pointer"
-            title="Historial de acciones"
+            className="flex items-center gap-1.5 p-2 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-xl transition-all border border-rose-500/20 cursor-pointer"
+            title="Registro de Errores"
           >
-            <FileText size={16} />
+            <AlertTriangle size={16} />
           </button>
         </div>
       </div>
@@ -903,48 +922,118 @@ export default function AdminGroups() {
         </div>
       )}
 
-      {/* LOGS MODAL PANEL */}
+      {/* LOGS MODAL PANEL (ERROR LOGS SYSTEM) */}
       {showLogs && (
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-white text-sm font-black flex items-center gap-1.5">
-                <FileText className="text-indigo-500" size={18} />
-                HISTORIAL DE ACCIONES DE GRUPOS
-              </h3>
-              <button onClick={() => setShowLogs(false)} className="text-slate-400 hover:text-white cursor-pointer">
-                <X size={18} />
-              </button>
+          <div className="bg-slate-900 border border-white/10 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950/40">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="text-rose-500 animate-pulse" size={20} />
+                <div>
+                  <h3 className="text-white text-sm font-black uppercase tracking-wider">
+                    Registro de Errores de la App (Real-Time)
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Captura de excepciones PHP, JS, SQL y advertencias críticas</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {logs.length > 0 && (
+                  <button 
+                    onClick={handleClearErrors}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-500/20 text-[10px] font-black uppercase rounded-lg transition-all cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    Limpiar Todo
+                  </button>
+                )}
+                <button onClick={() => setShowLogs(false)} className="text-slate-400 hover:text-white cursor-pointer p-1">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
             
-            <div className="p-5 max-h-[400px] overflow-y-auto space-y-2.5">
+            <div className="p-5 overflow-y-auto space-y-3 flex-1 bg-slate-900/50">
               {logs.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 text-xs italic">
-                  No hay acciones registradas en el historial todavía.
+                <div className="p-16 text-center flex flex-col items-center justify-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <Check size={24} />
+                  </div>
+                  <div className="text-slate-300 font-black uppercase tracking-wider text-xs">¡Sistema Estable y Limpio!</div>
+                  <div className="text-slate-500 text-[10px] font-bold max-w-xs leading-relaxed">
+                    No se han registrado errores o advertencias en la base de datos. La aplicación está operando correctamente.
+                  </div>
                 </div>
               ) : (
-                logs.map(l => (
-                  <div key={l.id} className="bg-slate-950 p-3 rounded-lg border border-white/5 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-black text-indigo-400 text-[10px] uppercase">
-                        {l.action}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {new Date(l.timestamp * 1000).toLocaleString()}
-                      </span>
+                logs.map(l => {
+                  const isExpanded = !!expandedErrors[l.id];
+                  const isFatal = l.source.includes('FATAL') || l.source.includes('CRITICAL');
+                  const badgeColor = isFatal 
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+                    : l.source.includes('JS') 
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+
+                  return (
+                    <div key={l.id} className="bg-slate-950 rounded-xl border border-white/5 overflow-hidden transition-all duration-150 hover:border-white/10">
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 border rounded text-[9px] font-mono font-black tracking-wider uppercase ${badgeColor}`}>
+                              {l.source}
+                            </span>
+                            {l.line && (
+                              <span className="text-[10px] text-slate-500 font-mono font-semibold">
+                                Línea {l.line}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono font-semibold">
+                            {new Date(l.timestamp * 1000).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {l.file && (
+                          <div className="text-[10px] text-indigo-400 font-mono font-bold bg-slate-900/80 px-2 py-1 rounded border border-white/5 break-all">
+                            Archivo: {l.file}
+                          </div>
+                        )}
+
+                        <p className="text-slate-100 text-xs font-bold leading-relaxed whitespace-pre-wrap selection:bg-rose-500/30">
+                          {l.message}
+                        </p>
+
+                        {l.trace && (
+                          <div className="mt-2 pt-2 border-t border-white/5">
+                            <button
+                              onClick={() => setExpandedErrors(prev => ({ ...prev, [l.id]: !prev[l.id] }))}
+                              className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer transition-all"
+                            >
+                              {isExpanded ? 'Ocultar Traza Técnica ▴' : 'Mostrar Traza Técnica / Stack Trace ▾'}
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="mt-2 bg-slate-900 p-3 rounded-lg border border-white/5 overflow-x-auto max-w-full font-mono text-[9px] text-slate-400 leading-normal whitespace-pre">
+                                {l.trace}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-slate-300 mt-1 font-bold">{l.message}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
-            <div className="p-5 border-t border-white/10 flex justify-end bg-slate-950/40">
+            <div className="p-5 border-t border-white/10 flex justify-between items-center bg-slate-950/60">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                Total Registrado: {logs.length} error(es)
+              </span>
               <button 
                 onClick={() => setShowLogs(false)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-white/5 text-white font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer shadow-md"
               >
-                Cerrar Historial
+                Cerrar Panel
               </button>
             </div>
           </div>

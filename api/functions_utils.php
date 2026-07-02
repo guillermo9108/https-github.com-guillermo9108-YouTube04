@@ -3,12 +3,50 @@
  * UTILS - CORE FUNCTIONS V19.5 (Synology Path Detection & Streaming)
  */
 
-function write_log($msg, $level = 'INFO') {
+function log_app_error($pdo, $source, $message, $file = null, $line = null, $trace = null) {
+    try {
+        $timestamp = time();
+        $id = uniqid('err_');
+        
+        if (!$pdo) {
+            global $pdo;
+        }
+        
+        if ($pdo) {
+            $stmt = $pdo->prepare("INSERT INTO app_errors (id, source, message, file, line, trace, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $id,
+                $source,
+                $message,
+                $file,
+                $line ? intval($line) : null,
+                $trace,
+                $timestamp
+            ]);
+            return true;
+        }
+    } catch (Throwable $e) {
+        // Fallback below
+    }
+    
+    // File fallback
     try {
         $date = date('Y-m-d H:i:s');
-        $line = "[$date] [$level] $msg" . PHP_EOL;
-        @file_put_contents(__DIR__ . '/transcode_log.txt', $line, FILE_APPEND);
+        $lineStr = "[$date] [FALLBACK_ERROR] [$source] $message" . ($file ? " in $file on line $line" : "") . PHP_EOL;
+        if ($trace) {
+            $lineStr .= "Trace: " . $trace . PHP_EOL;
+        }
+        @file_put_contents(__DIR__ . '/transcode_log.txt', $lineStr, FILE_APPEND);
     } catch (Throwable $e) {}
+    return false;
+}
+
+function write_log($msg, $level = 'INFO') {
+    $level = strtoupper($level);
+    if ($level !== 'ERROR' && $level !== 'FATAL' && $level !== 'WARNING') {
+        return;
+    }
+    log_app_error(null, 'PHP_LOG_' . $level, $msg);
 }
 
 function get_system_settings($pdo) {

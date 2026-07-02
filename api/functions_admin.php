@@ -1448,10 +1448,32 @@ function admin_organize_paquete($pdo, $input) {
 
 function admin_client_log($input) {
     $msg = $input['message'] ?? '';
-    $level = $input['level'] ?? 'ERROR';
-    $log = "[" . date('Y-m-d H:i:s') . "] [$level] $msg\n";
-    file_put_contents('client_errors.log', $log, FILE_APPEND);
+    $source = isset($input['source']) ? $input['source'] : 'JS_ERROR';
+    $file = $input['file'] ?? null;
+    $line = $input['line'] ?? null;
+    $trace = $input['trace'] ?? null;
+    
+    log_app_error(null, $source, $msg, $file, $line, $trace);
     respond(true);
+}
+
+function admin_get_errors($pdo) {
+    try {
+        $stmt = $pdo->query("SELECT * FROM app_errors ORDER BY timestamp DESC LIMIT 200");
+        $errors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        respond(true, $errors);
+    } catch (Exception $e) {
+        respond(false, null, "Error al obtener errores del sistema: " . $e->getMessage());
+    }
+}
+
+function admin_clear_errors($pdo) {
+    try {
+        $pdo->exec("DELETE FROM app_errors");
+        respond(true);
+    } catch (Exception $e) {
+        respond(false, null, "Error al limpiar errores: " . $e->getMessage());
+    }
 }
 
 function admin_get_seller_verification_requests($pdo) {

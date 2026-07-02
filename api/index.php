@@ -5,7 +5,6 @@
 chdir(__DIR__);
 ob_start(); 
 require_once __DIR__ . '/functions_utils.php';
-write_log("API Request: " . ($_GET['action'] ?? 'none') . " from " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
 ini_set('display_errors', 0); 
 error_reporting(E_ALL);
 date_default_timezone_set('UTC');
@@ -28,14 +27,16 @@ require_once __DIR__ . '/functions_app.php';
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     if (!(error_reporting() & $errno)) return false;
-    write_log("$errstr in $errfile on line $errline", 'ERROR');
+    global $pdo;
+    log_app_error($pdo, 'PHP_ERROR', $errstr, $errfile, $errline);
     return true; // No permitir que el error pase al controlador estándar de PHP
 });
 
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        write_log("FATAL: " . $error['message'], 'FATAL');
+        global $pdo;
+        log_app_error($pdo, 'PHP_FATAL', $error['message'], $error['file'], $error['line']);
         if (ob_get_level()) ob_clean();
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => false, 'error' => 'Critical PHP Error: ' . $error['message']]);
@@ -354,7 +355,8 @@ try {
         case 'groups_cleanup_preview': groups_cleanup_preview($pdo); break;
         case 'groups_cleanup_run': groups_cleanup_run($pdo); break;
         case 'groups_combine_run': groups_combine_run($pdo); break;
-        case 'groups_get_logs': groups_get_logs($pdo); break;
+        case 'admin_get_errors': admin_get_errors($pdo); break;
+        case 'admin_clear_errors': admin_clear_errors($pdo); break;
         case 'get_requests': admin_get_requests($pdo, $_GET['status'] ?? 'ALL'); break;
         case 'delete_request': admin_delete_request($pdo, $input); break;
         case 'update_request_status': admin_update_request_status($pdo, $input); break;

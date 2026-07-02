@@ -439,11 +439,14 @@ function getAppSchema() {
                 'scheduled_deletion_time' => 'BIGINT DEFAULT NULL'
             ]
         ],
-        'group_logs' => [
+        'app_errors' => [
             'cols' => [
                 'id' => 'VARCHAR(50) PRIMARY KEY',
-                'action' => 'VARCHAR(50)',
+                'source' => 'VARCHAR(50)',
                 'message' => 'TEXT',
+                'file' => 'VARCHAR(255) DEFAULT NULL',
+                'line' => 'INT DEFAULT NULL',
+                'trace' => 'TEXT DEFAULT NULL',
                 'timestamp' => 'BIGINT'
             ]
         ],
