@@ -113,7 +113,7 @@ function groups_list($pdo) {
 
         // 3. Prepare final combined list
         $resultList = [];
-        $usersList = $pdo->query("SELECT id, username, name FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $usersList = $pdo->query("SELECT id, username, username AS name FROM users ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch count of registered videos for each category/folder
         $stmtVidCount = $pdo->query("SELECT category, COUNT(*) as qty FROM videos GROUP BY category");
