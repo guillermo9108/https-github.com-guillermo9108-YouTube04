@@ -51,7 +51,8 @@ function admin_update_settings($pdo, $input) {
         'transferFee', 'vipPlans', 'paymentMethods', 'enableDebugLog', 'vapidPublicKey', 'vapidPrivateKey',
         'defaultVideoThumb', 'defaultAudioThumb', 'defaultAvatar', 'latestApkVersion', 'batteryConfig', 'batteryHistory',
         'shortsPath', 'collaboration_enabled', 'fragmentation_time', 'likes_goal', 'max_monthly_extra_days',
-        'weekly_challenge_enabled', 'weekly_challenge_goal', 'weekly_challenge_reward', 'expire_rewards_monthly'
+        'weekly_challenge_enabled', 'weekly_challenge_goal', 'weekly_challenge_reward', 'expire_rewards_monthly',
+        'cleanNormalGroupsDays', 'cleanSeriesGroupsDays'
     ];
     
     $fields = []; $params = [];

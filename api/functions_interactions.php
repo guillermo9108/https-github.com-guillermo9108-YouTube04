@@ -1021,7 +1021,15 @@ function group_edit($pdo, $input) {
     $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
     $stmt->execute([$folderPath]);
     $creatorId = $stmt->fetchColumn();
-    if ($creatorId !== $userId) respond(false, null, "No tienes permisos de administrador para este grupo");
+
+    $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $userStmt->execute([$userId]);
+    $userRole = $userStmt->fetchColumn();
+    $isAdmin = (strtoupper($userRole ?? '') === 'ADMIN');
+
+    if ($creatorId !== $userId && !$isAdmin) {
+        respond(false, null, "No tienes permisos de administrador para este grupo");
+    }
 
     $description = $input['description'] ?? null;
     $coverUrl = $input['coverUrl'] ?? null;
@@ -1104,15 +1112,30 @@ function group_get_pending_subs($pdo, $input) {
     $userId = $input['userId'] ?? '';
     if (!$userId) respond(false, null, "Faltan datos");
 
-    // Fetch all pending subscriptions for groups created by $userId
-    $stmt = $pdo->prepare("
-        SELECT gs.userId, gs.folderPath, gs.createdAt, u.username, u.avatarUrl 
-        FROM group_subscriptions gs
-        JOIN users u ON gs.userId = u.id
-        JOIN groups_metadata gm ON gs.folderPath = gm.folderPath
-        WHERE gs.approved = 0 AND gm.creatorId = ?
-    ");
-    $stmt->execute([$userId]);
+    $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $userStmt->execute([$userId]);
+    $userRole = $userStmt->fetchColumn();
+    $isAdmin = (strtoupper($userRole ?? '') === 'ADMIN');
+
+    if ($isAdmin) {
+        $stmt = $pdo->prepare("
+            SELECT gs.userId, gs.folderPath, gs.createdAt, u.username, u.avatarUrl 
+            FROM group_subscriptions gs
+            JOIN users u ON gs.userId = u.id
+            JOIN groups_metadata gm ON gs.folderPath = gm.folderPath
+            WHERE gs.approved = 0
+        ");
+        $stmt->execute([]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT gs.userId, gs.folderPath, gs.createdAt, u.username, u.avatarUrl 
+            FROM group_subscriptions gs
+            JOIN users u ON gs.userId = u.id
+            JOIN groups_metadata gm ON gs.folderPath = gm.folderPath
+            WHERE gs.approved = 0 AND gm.creatorId = ?
+        ");
+        $stmt->execute([$userId]);
+    }
     $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($pending as &$p) {
@@ -1128,11 +1151,19 @@ function group_approve_sub($pdo, $input) {
     $folderPath = $input['folderPath'] ?? '';
     if (!$adminId || !$subscriberId || !$folderPath) respond(false, null, "Faltan datos");
 
-    // Confirm that adminId is indeed the creator
+    // Confirm that adminId is indeed the creator or a system administrator
     $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
     $stmt->execute([$folderPath]);
     $creatorId = $stmt->fetchColumn();
-    if ($creatorId !== $adminId) respond(false, null, "No tienes permisos");
+
+    $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $userStmt->execute([$adminId]);
+    $userRole = $userStmt->fetchColumn();
+    $isAdmin = (strtoupper($userRole ?? '') === 'ADMIN');
+
+    if ($creatorId !== $adminId && !$isAdmin) {
+        respond(false, null, "No tienes permisos");
+    }
 
     $stmtUp = $pdo->prepare("UPDATE group_subscriptions SET approved = 1 WHERE userId = ? AND folderPath = ?");
     $stmtUp->execute([$subscriberId, $folderPath]);
@@ -1158,7 +1189,15 @@ function group_decline_sub($pdo, $input) {
     $stmt = $pdo->prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?");
     $stmt->execute([$folderPath]);
     $creatorId = $stmt->fetchColumn();
-    if ($creatorId !== $adminId) respond(false, null, "No tienes permisos");
+
+    $userStmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $userStmt->execute([$adminId]);
+    $userRole = $userStmt->fetchColumn();
+    $isAdmin = (strtoupper($userRole ?? '') === 'ADMIN');
+
+    if ($creatorId !== $adminId && !$isAdmin) {
+        respond(false, null, "No tienes permisos");
+    }
 
     $stmtDel = $pdo->prepare("DELETE FROM group_subscriptions WHERE userId = ? AND folderPath = ?");
     $stmtDel->execute([$subscriberId, $folderPath]);

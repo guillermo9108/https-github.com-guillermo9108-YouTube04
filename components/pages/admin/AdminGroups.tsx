@@ -121,19 +121,17 @@ export default function AdminGroups() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await db.request<{ success: boolean; data: { groups: GroupItem[]; users: AdminUser[] }; message?: string }>('action=groups_list');
-      if (res.success && res.data) {
-        setGroups(res.data.groups);
-        setUsers(res.data.users);
-      } else {
-        showToast(res.message || 'Error cargando grupos', 'error');
+      const data = await db.request<{ groups: GroupItem[]; users: AdminUser[] }>('action=groups_list');
+      if (data && data.groups) {
+        setGroups(data.groups);
+        setUsers(data.users || []);
       }
       
       // Load configurations as well
-      const configRes = await db.request<{ success: boolean; data: any }>('action=get_system_settings');
-      if (configRes.success && configRes.data) {
-        setNormalDays(configRes.data.cleanNormalGroupsDays ?? 30);
-        setSeriesDays(configRes.data.cleanSeriesGroupsDays ?? 90);
+      const config = await db.request<any>('action=get_system_settings');
+      if (config) {
+        setNormalDays(config.cleanNormalGroupsDays ?? 30);
+        setSeriesDays(config.cleanSeriesGroupsDays ?? 90);
       }
     } catch (e: any) {
       showToast(e.message || 'Error de conexión', 'error');
@@ -144,9 +142,9 @@ export default function AdminGroups() {
 
   const loadLogs = async () => {
     try {
-      const res = await db.request<{ success: boolean; data: AppError[] }>('action=admin_get_errors');
-      if (res.success && res.data) {
-        setLogs(res.data);
+      const data = await db.request<AppError[]>('action=admin_get_errors');
+      if (data) {
+        setLogs(data);
       }
     } catch (e) {}
   };
@@ -162,13 +160,11 @@ export default function AdminGroups() {
     showToast('Escaneando carpetas en disco...', 'info');
     try {
       // Re-trigger scanning via list itself (which auto-registers new groups)
-      const res = await db.request<{ success: boolean; data: { groups: GroupItem[]; users: AdminUser[] }; message?: string }>('action=groups_list');
-      if (res.success && res.data) {
-        setGroups(res.data.groups);
+      const data = await db.request<{ groups: GroupItem[]; users: AdminUser[] }>('action=groups_list');
+      if (data && data.groups) {
+        setGroups(data.groups);
         showToast('Escaneo completado. Se sincronizaron los grupos.', 'success');
         loadLogs();
-      } else {
-        showToast(res.message || 'Error en el escaneo', 'error');
       }
     } catch (e: any) {
       showToast(e.message || 'Fallo de red al escanear', 'error');
@@ -182,16 +178,14 @@ export default function AdminGroups() {
     setCombining(true);
     showToast('Buscando carpetas de publicación combinada...', 'info');
     try {
-      const res = await db.request<{ success: boolean; data: { combinedCount: number }; message?: string }>('action=groups_combine_run');
-      if (res.success && res.data) {
-        showToast(`Se crearon ${res.data.combinedCount} publicaciones combinadas automáticas`, 'success');
+      const data = await db.request<{ combinedCount: number }>('action=groups_combine_run');
+      if (data) {
+        showToast(`Se crearon ${data.combinedCount} publicaciones combinadas automáticas`, 'success');
         loadData();
         loadLogs();
-      } else {
-        showToast(res.message || 'Fallo en publicaciones combinadas', 'error');
       }
     } catch (e: any) {
-      showToast(e.message || 'Error de red', 'error');
+      showToast(e.message || 'Fallo en publicaciones combinadas', 'error');
     } finally {
       setCombining(false);
     }
@@ -201,15 +195,13 @@ export default function AdminGroups() {
   const handleCleanupPreview = async () => {
     setCleaning(true);
     try {
-      const res = await db.request<{ success: boolean; data: CleanupPreviewData; message?: string }>('action=groups_cleanup_preview');
-      if (res.success && res.data) {
-        setCleanupPreview(res.data);
+      const data = await db.request<CleanupPreviewData>('action=groups_cleanup_preview');
+      if (data) {
+        setCleanupPreview(data);
         setShowCleanupPreview(true);
-      } else {
-        showToast(res.message || 'Error obteniendo preview de limpieza', 'error');
       }
     } catch (e: any) {
-      showToast(e.message || 'Error de red', 'error');
+      showToast(e.message || 'Error obteniendo preview de limpieza', 'error');
     } finally {
       setCleaning(false);
     }
@@ -221,16 +213,12 @@ export default function AdminGroups() {
     setShowCleanupPreview(false);
     showToast('Ejecutando limpieza inteligente de grupos...', 'info');
     try {
-      const res = await db.request<{ success: boolean; message?: string }>('action=groups_cleanup_run');
-      if (res.success) {
-        showToast(res.message || 'Limpieza inteligente ejecutada correctamente', 'success');
-        loadData();
-        loadLogs();
-      } else {
-        showToast(res.message || 'Error al ejecutar limpieza', 'error');
-      }
+      await db.request<void>('action=groups_cleanup_run');
+      showToast('Limpieza inteligente ejecutada correctamente', 'success');
+      loadData();
+      loadLogs();
     } catch (e: any) {
-      showToast(e.message || 'Error de red', 'error');
+      showToast(e.message || 'Error al ejecutar limpieza', 'error');
     } finally {
       setCleaning(false);
     }
@@ -239,21 +227,17 @@ export default function AdminGroups() {
   // Action: Save cleanup configurations
   const handleSaveCleanupConfig = async () => {
     try {
-      const res = await db.request<{ success: boolean; message?: string }>('action=update_system_settings', {
+      await db.request<void>('action=update_system_settings', {
         method: 'POST',
         body: JSON.stringify({
           cleanNormalGroupsDays: normalDays,
           cleanSeriesGroupsDays: seriesDays
         })
       });
-      if (res.success) {
-        showToast('Configuraciones de limpieza guardadas correctamente', 'success');
-        setShowConfig(false);
-      } else {
-        showToast(res.message || 'Fallo al guardar configuraciones', 'error');
-      }
+      showToast('Configuraciones de limpieza guardadas correctamente', 'success');
+      setShowConfig(false);
     } catch (e: any) {
-      showToast(e.message || 'Error de red', 'error');
+      showToast(e.message || 'Fallo al guardar configuraciones', 'error');
     }
   };
 
@@ -274,19 +258,15 @@ export default function AdminGroups() {
     };
 
     try {
-      const res = await db.request<{ success: boolean; message?: string }>('action=groups_save', {
+      await db.request<void>('action=groups_save', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      if (res.success) {
-        showToast('Grupo actualizado con éxito', 'success');
-        loadData();
-        loadLogs();
-      } else {
-        showToast(res.message || 'Error al actualizar grupo', 'error');
-      }
+      showToast('Grupo actualizado con éxito', 'success');
+      loadData();
+      loadLogs();
     } catch (e: any) {
-      showToast(e.message || 'Error de conexión', 'error');
+      showToast(e.message || 'Error al actualizar grupo', 'error');
     }
   };
 
@@ -307,25 +287,21 @@ export default function AdminGroups() {
     };
 
     try {
-      const res = await db.request<{ success: boolean; message?: string }>('action=groups_save', {
+      await db.request<void>('action=groups_save', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      if (res.success) {
-        showToast(`Se actualizaron ${selectedFolders.length} grupos correctamente`, 'success');
-        setSelectedFolders([]);
-        // Reset bulk selection controls
-        setBulkCreatorId('');
-        setBulkIsSeries(null);
-        setBulkAllowUpload(null);
-        setBulkIsPrivate(null);
-        loadData();
-        loadLogs();
-      } else {
-        showToast(res.message || 'Error al guardar cambios masivos', 'error');
-      }
+      showToast(`Se actualizaron ${selectedFolders.length} grupos correctamente`, 'success');
+      setSelectedFolders([]);
+      // Reset bulk selection controls
+      setBulkCreatorId('');
+      setBulkIsSeries(null);
+      setBulkAllowUpload(null);
+      setBulkIsPrivate(null);
+      loadData();
+      loadLogs();
     } catch (e: any) {
-      showToast(e.message || 'Error de conexión', 'error');
+      showToast(e.message || 'Error al guardar cambios masivos', 'error');
     }
   };
 
@@ -337,19 +313,17 @@ export default function AdminGroups() {
 
     showToast('Subiendo portada...', 'info');
     try {
-      const res = await db.request<{ success: boolean; data?: { coverUrl: string }; message?: string }>('action=groups_upload_cover', {
+      const data = await db.request<{ coverUrl: string }>('action=groups_upload_cover', {
         method: 'POST',
         body: formData
       });
-      if (res.success && res.data) {
+      if (data) {
         showToast('Portada actualizada', 'success');
         loadData();
         loadLogs();
-      } else {
-        showToast(res.message || 'Fallo al subir portada', 'error');
       }
     } catch (e: any) {
-      showToast(e.message || 'Error de conexión', 'error');
+      showToast(e.message || 'Fallo al subir portada', 'error');
     }
   };
 
