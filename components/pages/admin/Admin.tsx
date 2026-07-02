@@ -1,7 +1,7 @@
 
 import React from 'react';
 // Added ShieldCheck to imports to fix error on line 71
-import { User as UserIcon, Wallet, Store, Settings, Database, Wrench, TrendingUp, Network, DownloadCloud, HardDrive, Cpu, Package, Home as HomeIcon, XCircle, ShieldCheck, Activity } from 'lucide-react';
+import { User as UserIcon, Wallet, Store, Settings, Database, Wrench, TrendingUp, Network, DownloadCloud, HardDrive, Cpu, Package, Home as HomeIcon, XCircle, ShieldCheck, Activity, Folder } from 'lucide-react';
 import { useLocation, Link } from '../../Router';
 
 import AdminUsers from './AdminUsers';
@@ -16,10 +16,11 @@ import AdminRequests from './AdminRequests';
 import AdminLocalFiles from './AdminLocalFiles';
 import AdminTranscoder from './AdminTranscoder';
 import AdminPortability from './AdminPortability';
+import AdminGroups from './AdminGroups';
 
 import AdminServerStats from './AdminServerStats';
 
-type TabID = 'USERS' | 'FINANCE' | 'MARKET' | 'CONFIG' | 'LIBRARY' | 'FILES' | 'FTP' | 'MAINTENANCE' | 'ANALYTICS' | 'REQUESTS' | 'TRANSCODER' | 'PORTABILITY' | 'SERVER';
+type TabID = 'USERS' | 'FINANCE' | 'MARKET' | 'CONFIG' | 'LIBRARY' | 'FILES' | 'FTP' | 'MAINTENANCE' | 'ANALYTICS' | 'REQUESTS' | 'TRANSCODER' | 'PORTABILITY' | 'SERVER' | 'GROUPS';
 
 export default function Admin() {
   const location = useLocation();
@@ -39,6 +40,7 @@ export default function Admin() {
     '/admin/config': 'CONFIG',
     '/admin/maintenance': 'MAINTENANCE',
     '/admin/server': 'SERVER',
+    '/admin/groups': 'GROUPS',
     '/admin': 'USERS' // Default
   };
 
@@ -49,6 +51,7 @@ export default function Admin() {
        { id: 'FINANCE', icon: Wallet, label: 'Finance', path: '/admin/finance' },
        { id: 'MARKET', icon: Store, label: 'Market', path: '/admin/market' },
        { id: 'REQUESTS', icon: DownloadCloud, label: 'Requests', path: '/admin/requests' },
+       { id: 'GROUPS', icon: Folder, label: 'Grupos', path: '/admin/groups' },
        { id: 'LIBRARY', icon: Database, label: 'Library', path: '/admin/library' },
        { id: 'TRANSCODER', icon: Cpu, label: 'Conversión', path: '/admin/transcoder' },
        { id: 'PORTABILITY', icon: Package, label: 'Portabilidad', path: '/admin/portability' },
@@ -92,6 +95,7 @@ export default function Admin() {
           {activeTab === 'FINANCE' && <AdminFinance />}
           {activeTab === 'MARKET' && <AdminMarket />}
           {activeTab === 'REQUESTS' && <AdminRequests />}
+          {activeTab === 'GROUPS' && <AdminGroups />}
           {activeTab === 'CONFIG' && <AdminConfig />}
           {activeTab === 'LIBRARY' && <AdminLibrary />}
           {activeTab === 'TRANSCODER' && <AdminTranscoder />}

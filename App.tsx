@@ -408,6 +408,7 @@ export default function App() {
                                 <Route path="/admin/finance" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/market" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/requests" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
+                                 <Route path="/admin/groups" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/library" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/transcoder" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />
                                 <Route path="/admin/portability" element={<SetupGuard><AdminRoute><Admin /></AdminRoute></SetupGuard>} />

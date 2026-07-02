@@ -109,6 +109,7 @@ require_once __DIR__ . '/functions_market.php';
 require_once __DIR__ . '/functions_admin.php';
 require_once __DIR__ . '/functions_portability.php';
 require_once __DIR__ . '/functions_analytics.php';
+require_once __DIR__ . '/functions_groups.php';
 // Verificar sincronización de esquema (periódico - optimizado a 24 horas y guardando en directorio local ejecutable para evitar fallos de lectura/escritura)
 $syncCache = __DIR__ . '/sp_schema_synced_' . md5($configFile) . '.txt';
 if (!file_exists($syncCache) || (time() - filemtime($syncCache) > 86400)) {
@@ -347,6 +348,13 @@ try {
         case 'admin_get_logs': admin_get_logs(); break;
         case 'admin_clear_logs': admin_clear_logs(); break;
         case 'get_real_stats': get_real_stats($pdo); break;
+        case 'groups_list': groups_list($pdo); break;
+        case 'groups_save': groups_save($pdo, $input); break;
+        case 'groups_upload_cover': groups_upload_cover($pdo, $_POST, $_FILES); break;
+        case 'groups_cleanup_preview': groups_cleanup_preview($pdo); break;
+        case 'groups_cleanup_run': groups_cleanup_run($pdo); break;
+        case 'groups_combine_run': groups_combine_run($pdo); break;
+        case 'groups_get_logs': groups_get_logs($pdo); break;
         case 'get_requests': admin_get_requests($pdo, $_GET['status'] ?? 'ALL'); break;
         case 'delete_request': admin_delete_request($pdo, $input); break;
         case 'update_request_status': admin_update_request_status($pdo, $input); break;

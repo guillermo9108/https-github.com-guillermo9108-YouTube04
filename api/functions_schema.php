@@ -68,7 +68,8 @@ function getAppSchema() {
                 'split_series' => 'TINYINT(1) DEFAULT 0',
                 'is_series_fragment' => 'TINYINT(1) DEFAULT 0',
                 'custom_fragmentation_time' => 'INT DEFAULT NULL',
-                'target_extension' => 'VARCHAR(10) DEFAULT NULL'
+                'target_extension' => 'VARCHAR(10) DEFAULT NULL',
+                'scheduled_deletion_time' => 'BIGINT DEFAULT NULL'
             ],
             'indices' => [
                 'idx_category' => 'category',
@@ -272,7 +273,9 @@ function getAppSchema() {
                 'weekly_challenge_enabled' => 'TINYINT(1) DEFAULT 0',
                 'weekly_challenge_goal' => 'INT DEFAULT 1',
                 'weekly_challenge_reward' => 'INT DEFAULT 1',
-                'expire_rewards_monthly' => 'TINYINT(1) DEFAULT 0'
+                'expire_rewards_monthly' => 'TINYINT(1) DEFAULT 0',
+                'cleanNormalGroupsDays' => 'INT DEFAULT 30',
+                'cleanSeriesGroupsDays' => 'INT DEFAULT 90'
             ]
         ],
         'transactions' => [
@@ -431,7 +434,17 @@ function getAppSchema() {
                 'isUnified' => 'TINYINT(1) DEFAULT 0',
                 'allowUpload' => 'TINYINT(1) DEFAULT 1',
                 'isSeries' => 'TINYINT(1) DEFAULT 0',
-                'createdAt' => 'BIGINT'
+                'createdAt' => 'BIGINT',
+                'autoDetected' => 'TINYINT(1) DEFAULT 0',
+                'scheduled_deletion_time' => 'BIGINT DEFAULT NULL'
+            ]
+        ],
+        'group_logs' => [
+            'cols' => [
+                'id' => 'VARCHAR(50) PRIMARY KEY',
+                'action' => 'VARCHAR(50)',
+                'message' => 'TEXT',
+                'timestamp' => 'BIGINT'
             ]
         ],
         'active_transcodes' => [
