@@ -1041,51 +1041,51 @@ export default function Home() {
                         </div>
 
                         {/* Real Stories */}
-                        {groupedStories.map(story => (
-                            <div 
-                                key={story.id} 
-                                onClick={() => navigate(`/stories?userId=${story.userId}`)}
-                                className="relative w-[105px] h-44 bg-[var(--bg-tertiary)] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
-                            >
-                                {(() => {
-                                    const teaserThumbnail = story.originalVideo?.thumbnailUrl || 
-                                                          (story.originalMarketplaceItem?.images?.[0]) || 
-                                                          story.contentUrl;
-                                    return (teaserThumbnail || story.type === 'IMAGE' || story.type === 'VIDEO') ? (
+                        {groupedStories.map(story => {
+                            const teaserThumbnail = story.originalVideo?.thumbnailUrl || 
+                                                  (story.originalMarketplaceItem?.images?.[0]) || 
+                                                  story.contentUrl;
+                            return (
+                                <div 
+                                    key={story.id} 
+                                    onClick={() => navigate(`/stories?userId=${story.userId}`)}
+                                    className="relative w-[105px] h-44 bg-[var(--bg-tertiary)] rounded-xl overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-transform"
+                                >
+                                    {(teaserThumbnail || story.type === 'IMAGE' || story.type === 'VIDEO') ? (
                                         <img src={getThumbnailUrl(teaserThumbnail) || ''} className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
                                     ) : (
                                         <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Play size={24} className="text-white opacity-20"/></div>
-                                    );
-                                })()}
-                                <div className={`absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] ${(story as any).isCompleted ? 'border-slate-500' : 'border-[#1877f2]'} p-0.5 overflow-hidden bg-indigo-600`}>
-                                    {story.avatarUrl ? (
-                                        <img src={getThumbnailUrl(story.avatarUrl) || ''} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">
-                                            {story.username?.[0]?.toUpperCase()}
+                                    )}
+                                    <div className={`absolute top-2 left-2 w-9 h-9 rounded-full border-[3px] ${(story as any).isCompleted ? 'border-slate-500' : 'border-[#1877f2]'} p-0.5 overflow-hidden bg-indigo-600`}>
+                                        {story.avatarUrl ? (
+                                            <img src={getThumbnailUrl(story.avatarUrl) || ''} className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white">
+                                                {story.username?.[0]?.toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="absolute bottom-2 left-2 right-2">
+                                        <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">{story.username}</span>
+                                    </div>
+                                    
+                                    {/* Overlay Text Preview (only for text-only stories, to avoid blocking images/video previews) */}
+                                    {story.overlayText && !teaserThumbnail && story.type !== 'IMAGE' && story.type !== 'VIDEO' && (
+                                        <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
+                                            <p 
+                                                className="text-[10px] font-bold text-center line-clamp-3 px-1 rounded"
+                                                style={{ 
+                                                    color: story.overlayColor || '#ffffff',
+                                                    backgroundColor: story.overlayBg || 'transparent'
+                                                }}
+                                            >
+                                                {story.overlayText}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
-                                <div className="absolute bottom-2 left-2 right-2">
-                                    <span className="text-[11px] font-bold text-white drop-shadow-md line-clamp-2">{story.username}</span>
-                                </div>
-                                
-                                {/* Overlay Text Preview */}
-                                {story.overlayText && (
-                                    <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
-                                        <p 
-                                            className="text-[10px] font-bold text-center line-clamp-3 px-1 rounded"
-                                            style={{ 
-                                                color: story.overlayColor || '#ffffff',
-                                                backgroundColor: story.overlayBg || 'transparent'
-                                            }}
-                                        >
-                                            {story.overlayText}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         {loadingMoreStories && (
                             <div className="flex items-center justify-center w-[105px] h-44 bg-[var(--bg-tertiary)]/50 rounded-xl shrink-0">

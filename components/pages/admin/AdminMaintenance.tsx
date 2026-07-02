@@ -245,87 +245,28 @@ export default function AdminMaintenance() {
                 <div className="lg:col-span-1 space-y-4">
                     <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center"><Brush size={20}/></div>
-                            <h3 className="font-bold text-white uppercase text-xs tracking-widest">Janitor Engine V7</h3>
+                            <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center"><Wrench size={20}/></div>
+                            <h3 className="font-bold text-white uppercase text-xs tracking-widest">Mantenimiento Seguro</h3>
                         </div>
 
-                        <div className="space-y-5">
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-2">Categoría a Analizar</label>
-                                <select value={config.category} onChange={e => setConfig({...config, category: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white text-sm rounded-xl p-3 outline-none">
-                                    <option value="ALL">Toda la Librería</option>
-                                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                    {(Object.values(VideoCategory) as string[]).map(c => (
-                                        !categories.find(cat => cat.name === c) && <option key={c} value={c}>{c.replace('_', ' ')}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Vistas Máximas</label>
-                                        <span className="text-[10px] font-bold text-indigo-400">{config.maxViews}</span>
-                                    </div>
-                                    <input type="range" min="0" max="100" value={config.maxViews} onChange={e => setConfig({...config, maxViews: parseInt(e.target.value)})} className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-full appearance-none" />
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Antigüedad</label>
-                                        <span className="text-[10px] font-bold text-indigo-400">{config.minDays} días</span>
-                                    </div>
-                                    <input type="range" min="1" max="365" value={config.minDays} onChange={e => setConfig({...config, minDays: parseInt(e.target.value)})} className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-full appearance-none" />
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Límite Purga GB</label>
-                                        <span className="text-[10px] font-bold text-red-400">{config.maxGbLimit} GB</span>
-                                    </div>
-                                    <input type="range" min="1" max="500" step="5" value={config.maxGbLimit} onChange={e => setConfig({...config, maxGbLimit: parseInt(e.target.value)})} className="w-full accent-red-500 h-1 bg-slate-800 rounded-full appearance-none" />
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Máximo de Videos</label>
-                                        <span className="text-[10px] font-bold text-amber-400">{config.maxDeleteLimit}</span>
-                                    </div>
-                                    <input type="range" min="10" max="1000" step="10" value={config.maxDeleteLimit} onChange={e => setConfig({...config, maxDeleteLimit: parseInt(e.target.value)})} className="w-full accent-amber-500 h-1 bg-slate-800 rounded-full appearance-none" />
-                                </div>
-                            </div>
-
-                            <button onClick={handlePreviewCleaner} disabled={cleaning} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all">
-                                {cleaning ? <Loader2 className="animate-spin" size={20}/> : <Zap size={20}/>} Escanear Desperdicios
+                        <div className="grid grid-cols-1 gap-3">
+                            <button onClick={handleRepairDb} className="flex items-center gap-3 p-4 bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-xl transition-all">
+                                 <Database size={18} className="text-indigo-500" />
+                                 <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar MariaDB</span><span className="block text-[9px] text-slate-500">SINCRONIZACIÓN</span></div>
+                            </button>
+                            <button onClick={handleRepairGroups} className="flex items-center gap-3 p-4 bg-slate-950 border border-slate-800 hover:border-violet-500/50 rounded-xl transition-all">
+                                 <Wrench size={18} className="text-violet-500" />
+                                 <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Grupos</span><span className="block text-[9px] text-slate-500">SUSCRIPCIONES Y VERIFICACIÓN</span></div>
+                            </button>
+                            <button onClick={handleRepairPrices} className="flex items-center gap-3 p-4 bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-xl transition-all">
+                                 <Percent size={18} className="text-emerald-500" />
+                                 <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Precios</span><span className="block text-[9px] text-slate-500">CÁLCULO AUTOMÁTICO ETECSA</span></div>
+                            </button>
+                            <button onClick={handleRepairBrokenVideos} className="flex items-center gap-3 p-4 bg-slate-950 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
+                                 <ShieldAlert size={18} className="text-amber-500" />
+                                 <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Videos Rotos</span><span className="block text-[9px] text-slate-500">MINIATURAS Y ERRORES</span></div>
                             </button>
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                        <button onClick={handleCleanupOrphans} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-red-500/50 rounded-xl transition-all">
-                             <Trash2 size={18} className="text-red-500" />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Borrar Huérfanos</span><span className="block text-[9px] text-slate-500">LIMPIEZA DE DISCO</span></div>
-                        </button>
-                        <button onClick={handleRepairDb} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl transition-all">
-                             <Database size={18} className="text-indigo-500" />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar MariaDB</span><span className="block text-[9px] text-slate-500">SINCRONIZACIÓN</span></div>
-                        </button>
-                        <button onClick={handleRepairGroups} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-violet-500/50 rounded-xl transition-all">
-                             <Wrench size={18} className="text-violet-500" />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Grupos</span><span className="block text-[9px] text-slate-500">SUSCRIPCIONES Y VERIFICACIÓN</span></div>
-                        </button>
-                        <button onClick={handleRepairPrices} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl transition-all">
-                             <Percent size={18} className="text-emerald-500" />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Precios</span><span className="block text-[9px] text-slate-500">CÁLCULO AUTOMÁTICO ETECSA</span></div>
-                        </button>
-                        <button onClick={handleRepairBrokenVideos} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
-                             <ShieldAlert size={18} className="text-amber-500" />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Reparar Videos Rotos</span><span className="block text-[9px] text-slate-500">MINIATURAS Y ERRORES</span></div>
-                        </button>
-                        <button onClick={handleDeepCleanup} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl transition-all">
-                             <RefreshCw size={18} className={`text-amber-500 ${cleaning ? 'animate-spin' : ''}`} />
-                             <div className="text-left"><span className="block text-xs font-bold text-white uppercase">Limpieza Profunda</span><span className="block text-[9px] text-slate-500">MANTENIMIENTO TOTAL</span></div>
-                        </button>
                     </div>
                 </div>
 

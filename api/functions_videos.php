@@ -2339,6 +2339,14 @@ function get_stories($pdo) {
         $followedGroups = $stmtGs->fetchAll(PDO::FETCH_COLUMN);
     }
 
+    // 2.5 Obtener portadas/iconos de grupos
+    $stmtGMeta = $pdo->query("SELECT folderPath, coverUrl FROM groups_metadata WHERE coverUrl IS NOT NULL AND coverUrl != ''");
+    $groupsMeta = $stmtGMeta->fetchAll(PDO::FETCH_ASSOC);
+    $groupCoversMap = [];
+    foreach ($groupsMeta as $gm) {
+        $groupCoversMap[strtolower($gm['folderPath'])] = $gm['coverUrl'];
+    }
+
     // 3. Obtener raíces del sistema de archivos para determinar relPath de los videos
     $stmtRoots = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
     $sRoots = $stmtRoots->fetch();
@@ -2436,6 +2444,10 @@ function get_stories($pdo) {
             // Nombre del grupo (subcarpeta)
             $grpName = basename($relPath);
 
+            // Obtener portada/icono del grupo para usar de avatar
+            $grpCover = $groupCoversMap[strtolower($relPath)] ?? '';
+            $grpAvatar = !empty($grpCover) ? $grpCover : $storyThumb;
+
             // Simular un creador basado en el grupo
             $simulatedCreatedAt = $now - (2 * 3600) - ($index * 3600); // Strictly within 24 hours
 
@@ -2448,7 +2460,7 @@ function get_stories($pdo) {
                 'id' => 'st_group_' . $relPath . '_' . $mv['id'],
                 'userId' => 'group_' . $relPath, // El identificador de usuario es el grupo
                 'username' => 'Grupo · ' . $grpName, 
-                'avatarUrl' => fix_url($storyThumb),
+                'avatarUrl' => fix_url($grpAvatar),
                 'contentUrl' => fix_url($mv['videoUrl']),
                 'type' => $isImg ? 'IMAGE' : 'VIDEO',
                 'overlayText' => $mv['title'],

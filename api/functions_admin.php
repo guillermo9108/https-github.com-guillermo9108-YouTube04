@@ -477,8 +477,9 @@ function admin_cleanup_files($pdo) {
     $stories = $pdo->query("SELECT contentUrl FROM stories")->fetchAll(PDO::FETCH_COLUMN);
     $storyAudio = $pdo->query("SELECT audioUrl FROM stories")->fetchAll(PDO::FETCH_COLUMN);
     $proofs = $pdo->query("SELECT proofImageUrl FROM vip_requests")->fetchAll(PDO::FETCH_COLUMN);
+    $groupCovers = $pdo->query("SELECT coverUrl FROM groups_metadata WHERE coverUrl IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
     
-    $usedFiles = array_merge($videos, $thumbs, $avatars, $stories, $storyAudio, $proofs);
+    $usedFiles = array_merge($videos, $thumbs, $avatars, $stories, $storyAudio, $proofs, $groupCovers);
     foreach ($market as $imgs) {
         $decoded = json_decode($imgs ?: '[]', true);
         if (is_array($decoded)) $usedFiles = array_merge($usedFiles, $decoded);
@@ -517,7 +518,7 @@ function admin_cleanup_files($pdo) {
             if (is_file($f)) {
                 // Normalizar la ruta del archivo encontrado por glob
                 $normF = ltrim($f, './');
-                if (!in_array($normF, $localUsed)) {
+                if (!in_array($normF, $localUsed) && strpos($normF, 'group_cover_') === false) {
                     @unlink($f);
                     $deleted++;
                 }

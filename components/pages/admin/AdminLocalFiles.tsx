@@ -215,7 +215,6 @@ export default function AdminLocalFiles() {
 
             <div className="flex bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl sticky top-[74px] z-30">
                 <TabBtn id="HEALTH" label="Estado" icon={Activity} />
-                <TabBtn id="EXPLORER" label="Limpieza" icon={Brush} />
                 <TabBtn id="LIBRARIAN" label="Janitor" icon={Zap} />
             </div>
 

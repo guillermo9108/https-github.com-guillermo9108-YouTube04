@@ -2018,13 +2018,14 @@ async function startServer() {
           selectedVideos.forEach((v, index) => {
             const storyThumb = v.thumbnailUrl || 'api/uploads/thumbnails/default.jpg';
             const grpName = folder;
+            const grpAvatar = meta?.coverUrl || storyThumb;
             const simulatedCreatedAt = nowSec - (2 * 3600) - (index * 3600);
 
             groupStories.push({
               id: `st_group_${folder}_${v.id}`,
               userId: `group_${folder}`,
               username: `Grupo · ${grpName}`,
-              avatarUrl: storyThumb,
+              avatarUrl: grpAvatar,
               contentUrl: v.videoUrl,
               type: 'VIDEO',
               overlayText: v.title,

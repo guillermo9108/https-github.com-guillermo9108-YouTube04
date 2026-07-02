@@ -25,6 +25,7 @@ function groups_list($pdo) {
                         // Count video, audio, image files
                         $videoCount = 0; $audioCount = 0; $imageCount = 0; $fileCount = 0;
                         $hasCover = false;
+                        $filesToImport = [];
                         
                         try {
                             $subDi = new RecursiveDirectoryIterator($dirPath, RecursiveDirectoryIterator::SKIP_DOTS);
@@ -33,10 +34,23 @@ function groups_list($pdo) {
                                 if ($f->isFile()) {
                                     $fileCount++;
                                     $ext = strtolower($f->getExtension());
+                                    $filePath = str_replace('\\', '/', $f->getRealPath());
                                     if (in_array($ext, ['mp4', 'mkv', 'webm', 'avi', 'mov'])) {
                                         $videoCount++;
+                                        $filesToImport[] = [
+                                            'path' => $filePath,
+                                            'ext' => $ext,
+                                            'isAudio' => 0,
+                                            'mtime' => $f->getMTime()
+                                        ];
                                     } elseif (in_array($ext, ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'opus'])) {
                                         $audioCount++;
+                                        $filesToImport[] = [
+                                            'path' => $filePath,
+                                            'ext' => $ext,
+                                            'isAudio' => 1,
+                                            'mtime' => $f->getMTime()
+                                        ];
                                     } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
                                         $imageCount++;
                                     }
@@ -61,7 +75,8 @@ function groups_list($pdo) {
                             'imageCount' => $imageCount,
                             'fileCount' => $fileCount,
                             'hasCover' => $hasCover,
-                            'createdAt' => $fileinfo->getMTime()
+                            'createdAt' => $fileinfo->getMTime(),
+                            'files' => $filesToImport
                         ];
                     }
                 }
@@ -109,6 +124,113 @@ function groups_list($pdo) {
                     write_log("Error auto-registering group " . $df['name'] . ": " . $ex->getMessage());
                 }
             }
+        }
+
+        // Auto-publish unregistered videos and auto-create group covers
+        try {
+            // Load all registered video URLs to prevent duplicates
+            $stmtVUrls = $pdo->query("SELECT LOWER(videoUrl) as url FROM videos");
+            $existingUrls = $stmtVUrls->fetchAll(PDO::FETCH_COLUMN);
+            $existingUrlsMap = array_flip($existingUrls);
+
+            // Fetch system settings for pricing and transcode
+            $stmtS2 = $pdo->query("SELECT categories, autoTranscode FROM system_settings WHERE id = 1");
+            $settingsData = $stmtS2->fetch(PDO::FETCH_ASSOC);
+
+            $stmtInsertVideo = $pdo->prepare("INSERT INTO videos (id, title, videoUrl, creatorId, createdAt, category, isLocal, is_audio, price, transcode_status) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)");
+
+            foreach ($metaMap as $key => $meta) {
+                $df = $diskFolders[$key] ?? null;
+                $creatorId = $meta['creatorId'] ?: $defaultAdmin;
+
+                // 1. Auto-publish videos/audios in the folder
+                if ($df && !empty($df['files'])) {
+                    foreach ($df['files'] as $fileData) {
+                        $filePath = $fileData['path'];
+                        if (!isset($existingUrlsMap[strtolower($filePath)])) {
+                            $videoId = 'loc_' . md5($filePath);
+                            $title = pathinfo($filePath, PATHINFO_FILENAME);
+                            $isAudio = $fileData['isAudio'];
+
+                            // Determine price
+                            require_once 'functions_videos.php';
+                            $price = getPriceForCategory($meta['folderPath'], $settingsData);
+
+                            // Check autoTranscode status
+                            $transcodeStatus = 'NONE';
+                            $autoTranscode = isset($settingsData['autoTranscode']) ? intval($settingsData['autoTranscode']) : 0;
+                            if ($autoTranscode === 1 && !$isAudio && $fileData['ext'] !== 'mp4') {
+                                        $transcodeStatus = 'WAITING';
+                            }
+
+                            try {
+                                $stmtInsertVideo->execute([
+                                    $videoId,
+                                    $title,
+                                    $filePath,
+                                    $creatorId,
+                                    $fileData['mtime'] ?: time(),
+                                    $meta['folderPath'], // Assigned to this folder/group category!
+                                    $isAudio,
+                                    $price,
+                                    $transcodeStatus
+                                ]);
+                                // Update existing list
+                                $existingUrlsMap[strtolower($filePath)] = true;
+                            } catch (Exception $ex) {
+                                write_log("Error auto-publishing video in group list: " . $ex->getMessage());
+                            }
+                        }
+                    }
+                }
+
+                // 2. Auto-create cover if not set or default placeholder
+                $currentCover = $meta['coverUrl'] ?? '';
+                $isDefaultCover = (empty($currentCover) || strpos($currentCover, 'default.jpg') !== false);
+                if ($isDefaultCover) {
+                    $coverUrl = null;
+
+                    // A. Check for physical cover candidate in the folder
+                    if ($df) {
+                        $dirPath = $df['physicalPath'];
+                        $coverCandidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'poster.jpg', 'poster.png', 'portada.jpg', 'portada.png'];
+                        foreach ($coverCandidates as $candidate) {
+                            $candPath = "$dirPath/$candidate";
+                            if (file_exists($candPath)) {
+                                $ext = strtolower(pathinfo($candPath, PATHINFO_EXTENSION));
+                                $uniqueName = 'group_cover_auto_' . md5($meta['folderPath']) . '.' . $ext;
+                                $destPath = __DIR__ . "/uploads/thumbnails/$uniqueName";
+                                if (!is_dir(dirname($destPath))) {
+                                    @mkdir(dirname($destPath), 0777, true);
+                                }
+                                if (@copy($candPath, $destPath)) {
+                                    $coverUrl = "api/uploads/thumbnails/$uniqueName";
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // B. If no physical file, check if any video has an extracted non-default thumbnail
+                    if (!$coverUrl) {
+                        $stmtVidThumb = $pdo->prepare("SELECT thumbnailUrl FROM videos WHERE category = ? AND thumbnailUrl IS NOT NULL AND thumbnailUrl != '' AND thumbnailUrl NOT LIKE '%default.jpg' LIMIT 1");
+                        $stmtVidThumb->execute([$meta['folderPath']]);
+                        $vidThumb = $stmtVidThumb->fetchColumn();
+                        if ($vidThumb) {
+                            $coverUrl = $vidThumb;
+                        }
+                    }
+
+                    // C. Update DB & local map if a cover was found or extracted
+                    if ($coverUrl) {
+                        $stmtUpdateCover = $pdo->prepare("UPDATE groups_metadata SET coverUrl = ? WHERE folderPath = ?");
+                        $stmtUpdateCover->execute([$coverUrl, $meta['folderPath']]);
+                        $metaMap[$key]['coverUrl'] = $coverUrl;
+                    }
+                }
+            }
+        } catch (Exception $ex) {
+            write_log("Error in group list video auto-publish and cover creation sync: " . $ex->getMessage());
         }
 
         // 3. Prepare final combined list
