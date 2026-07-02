@@ -743,14 +743,3 @@ function groups_delete_folder_recursive($dir) {
     }
     return @rmdir($dir);
 }
-
-function resolve_video_path($url) {
-    if (empty($url)) return null;
-    $url = str_replace('api/', '', $url);
-    $url = ltrim($url, '/');
-    
-    // Check if it's absolute
-    if (file_exists($url)) return $url;
-    if (file_exists(__DIR__ . '/' . $url)) return __DIR__ . '/' . $url;
-    return null;
-}
