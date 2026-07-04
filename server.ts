@@ -1870,10 +1870,29 @@ async function startServer() {
           console.error("Error creating physical folder during group_create:", dirErr);
         }
 
+        // Process base64 coverUrl if present
+        let finalCoverUrl = coverUrl;
+        if (coverUrl && coverUrl.startsWith('data:image/')) {
+          try {
+            const groupDir = path.join(process.cwd(), 'api/uploads/videos', folderNameForDir);
+            const parts = coverUrl.split(',');
+            if (parts.length >= 2) {
+              const buffer = Buffer.from(parts[1], 'base64');
+              const randomStr = Math.random().toString(36).substring(2, 10);
+              const fileName = `cover_grupo_${randomStr}.jpg`;
+              const filePath = path.join(groupDir, fileName);
+              fs.writeFileSync(filePath, buffer);
+              finalCoverUrl = `uploads/videos/${folderNameForDir}/${fileName}`;
+            }
+          } catch (coverErr: any) {
+            console.error("Error saving base64 cover inside group_create in server.ts:", coverErr);
+          }
+        }
+
         // Register in DB
         try {
           db.prepare("INSERT OR REPLACE INTO groups_metadata (folderPath, creatorId, description, coverUrl, isPrivate, isUnified, allowMemberUploads, isSeries, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)")
-            .run(folderNameForDir, userId, description || 'Grupo sin descripción.', coverUrl || null, isPrivate ? 1 : 0, allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : 1, isSeries ? (isSeries ? 1 : 0) : 0, Math.floor(Date.now() / 1000));
+            .run(folderNameForDir, userId, description || 'Grupo sin descripción.', finalCoverUrl || null, isPrivate ? 1 : 0, allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : 1, isSeries ? (isSeries ? 1 : 0) : 0, Math.floor(Date.now() / 1000));
           
           db.prepare("INSERT OR IGNORE INTO group_subscriptions (userId, folderPath, approved, createdAt) VALUES (?, ?, 1, ?)")
             .run(userId, folderNameForDir, Math.floor(Date.now() / 1000));
@@ -1890,10 +1909,41 @@ async function startServer() {
           return res.json({ success: false, error: "Faltan datos" });
         }
 
-        // Verify creator
+        // Verify creator or Admin
+        const userRow = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as any;
+        const isAdmin = userRow && userRow.role === 'ADMIN';
+
         const meta = db.prepare("SELECT creatorId FROM groups_metadata WHERE folderPath = ?").get(folderPath) as any;
-        if (!meta || meta.creatorId !== userId) {
-          return res.json({ success: false, error: "No tienes permisos para editar este grupo" });
+        if (!meta || (meta.creatorId !== userId && !isAdmin)) {
+          return res.json({ success: false, error: "No tienes permisos de administrador para este grupo" });
+        }
+
+        let finalCoverUrl = coverUrl;
+        if (coverUrl && coverUrl.startsWith('data:image/')) {
+          try {
+            const groupDir = path.join(process.cwd(), 'api/uploads/videos', folderPath);
+            if (!fs.existsSync(groupDir)) {
+              fs.mkdirSync(groupDir, { recursive: true });
+            }
+            // Clean old covers
+            const files = fs.readdirSync(groupDir);
+            for (const file of files) {
+              if (file.startsWith('cover_grupo_') && file.endsWith('.jpg')) {
+                try { fs.unlinkSync(path.join(groupDir, file)); } catch (_) {}
+              }
+            }
+            const parts = coverUrl.split(',');
+            if (parts.length >= 2) {
+              const buffer = Buffer.from(parts[1], 'base64');
+              const randomStr = Math.random().toString(36).substring(2, 10);
+              const fileName = `cover_grupo_${randomStr}.jpg`;
+              const filePath = path.join(groupDir, fileName);
+              fs.writeFileSync(filePath, buffer);
+              finalCoverUrl = `uploads/videos/${folderPath}/${fileName}`;
+            }
+          } catch (coverErr: any) {
+            console.error("Error saving base64 cover inside group_edit in server.ts:", coverErr);
+          }
         }
 
         try {
@@ -1908,7 +1958,7 @@ async function startServer() {
             WHERE folderPath = ?
           `).run(
             description !== undefined ? description : null,
-            coverUrl !== undefined ? coverUrl : null,
+            finalCoverUrl !== undefined ? finalCoverUrl : null,
             isPrivate !== undefined ? (isPrivate ? 1 : 0) : null,
             isUnified !== undefined ? (isUnified ? 1 : 0) : null,
             allowMemberUploads !== undefined ? (allowMemberUploads ? 1 : 0) : null,

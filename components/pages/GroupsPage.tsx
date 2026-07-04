@@ -300,14 +300,45 @@ export default function GroupsPage() {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64Str = reader.result as string;
-                if (isEdit) {
-                    setEditGroupCover(base64Str);
-                } else {
-                    setNewGroupCover(base64Str);
-                }
-                toast.success("Foto de portada cargada con éxito");
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 600;
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round(height * (maxDim / width));
+                            width = maxDim;
+                        } else {
+                            width = Math.round(width * (maxDim / height));
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                        if (isEdit) {
+                            setEditGroupCover(compressedBase64);
+                        } else {
+                            setNewGroupCover(compressedBase64);
+                        }
+                        toast.success("Foto de portada optimizada y cargada con éxito");
+                    } else {
+                        const rawBase64 = event.target?.result as string;
+                        if (isEdit) {
+                            setEditGroupCover(rawBase64);
+                        } else {
+                            setNewGroupCover(rawBase64);
+                        }
+                        toast.success("Foto de portada cargada con éxito");
+                    }
+                };
+                img.src = event.target?.result as string;
             };
             reader.readAsDataURL(file);
         }

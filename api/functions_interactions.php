@@ -866,6 +866,36 @@ function get_user_all_subscriptions($pdo) {
     respond(true, $subs);
 }
 
+function save_group_cover_file_compressed($data, $destPath) {
+    if (function_exists('imagecreatefromstring')) {
+        $img = @imagecreatefromstring($data);
+        if ($img !== false) {
+            $w = imagesx($img);
+            $h = imagesy($img);
+            $maxDim = 600;
+            if ($w > $maxDim || $h > $maxDim) {
+                if ($w > $h) {
+                    $newW = $maxDim;
+                    $newH = intval($h * ($maxDim / $w));
+                } else {
+                    $newH = $maxDim;
+                    $newW = intval($w * ($maxDim / $h));
+                }
+                $resized = imagecreatetruecolor($newW, $newH);
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+                imagedestroy($img);
+                $img = $resized;
+            }
+            if (imagejpeg($img, $destPath, 65)) {
+                imagedestroy($img);
+                return true;
+            }
+            imagedestroy($img);
+        }
+    }
+    return file_put_contents($destPath, $data) !== false;
+}
+
 function save_group_cover_file($folderName, $base64Data, $pdo) {
     if (empty($base64Data) || strpos($base64Data, 'data:image/') !== 0) {
         return $base64Data; // Already a URL or empty
@@ -891,10 +921,27 @@ function save_group_cover_file($folderName, $base64Data, $pdo) {
     $data = base64_decode($parts[1]);
     if (!$data) return $base64Data;
     
-    // Save as cover.jpg or cover image
-    $filePath = $targetDir . '/cover.jpg';
+    // Clean up any old cover_grupo_*.jpg to avoid filling up disk with stale covers
+    $oldCovers = glob($targetDir . '/cover_grupo_*.jpg');
+    if ($oldCovers) {
+        foreach ($oldCovers as $old) {
+            @unlink($old);
+        }
+    }
+    
+    // Generate random name
+    $randomStr = substr(md5(uniqid(microtime(), true)), 0, 8);
+    $fileName = 'cover_grupo_' . $randomStr . '.jpg';
+    $filePath = $targetDir . '/' . $fileName;
+    
+    // Save compressed/optimized image (few KBs)
+    if (save_group_cover_file_compressed($data, $filePath)) {
+        return 'uploads/videos/' . $folderName . '/' . $fileName;
+    }
+    
+    // Fallback: save raw data
     if (file_put_contents($filePath, $data)) {
-        return 'uploads/videos/' . $folderName . '/cover.jpg';
+        return 'uploads/videos/' . $folderName . '/' . $fileName;
     }
     
     return $base64Data;
@@ -923,9 +970,6 @@ function group_create($pdo, $input) {
         respond(false, null, "Nombre de grupo inválido");
     }
 
-    // Process and save coverUrl if base64 before creating group folder or registering meatadata
-    $coverUrl = save_group_cover_file($folderNameForDir, $coverUrl, $pdo);
-
     // Create physical/virtual directory
     $stmtSet = $pdo->query("SELECT localLibraryPath FROM system_settings WHERE id = 1");
     $sSet = $stmtSet->fetch();
@@ -940,6 +984,9 @@ function group_create($pdo, $input) {
     if (is_dir($targetDir) || file_exists($targetDir)) {
         respond(false, null, "El grupo (carpeta) ya existe física o virtualmente");
     }
+
+    // Process and save coverUrl if base64 after validating and before registering metadata
+    $coverUrl = save_group_cover_file($folderNameForDir, $coverUrl, $pdo);
 
     // Try detecting alternative disks/volumes in Synology NAS to prevent filling up the system volume
     $synologyOtherVolumes = ['/volume2', '/volume3', '/volume4', '/volumeUSB1', '/volumeUSB2'];

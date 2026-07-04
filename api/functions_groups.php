@@ -193,19 +193,63 @@ function groups_list($pdo) {
                     // A. Check for physical cover candidate in the folder
                     if ($df) {
                         $dirPath = $df['physicalPath'];
-                        $coverCandidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'poster.jpg', 'poster.png', 'portada.jpg', 'portada.png'];
-                        foreach ($coverCandidates as $candidate) {
-                            $candPath = "$dirPath/$candidate";
-                            if (file_exists($candPath)) {
-                                $ext = strtolower(pathinfo($candPath, PATHINFO_EXTENSION));
-                                $uniqueName = 'group_cover_auto_' . md5($meta['folderPath']) . '.' . $ext;
-                                $destPath = __DIR__ . "/uploads/thumbnails/$uniqueName";
-                                if (!is_dir(dirname($destPath))) {
-                                    @mkdir(dirname($destPath), 0777, true);
+                        
+                        // First, check if there's ALREADY a cover_grupo_*.jpg in the folder
+                        $existingCoverGrupo = glob("$dirPath/cover_grupo_*.jpg");
+                        if ($existingCoverGrupo && count($existingCoverGrupo) > 0) {
+                            $coverUrl = "uploads/videos/" . $meta['folderPath'] . "/" . basename($existingCoverGrupo[0]);
+                        } else {
+                            // Let's find any images in the folder
+                            $imagesInFolder = [];
+                            try {
+                                $di = new DirectoryIterator($dirPath);
+                                foreach ($di as $fileinfo) {
+                                    if ($fileinfo->isFile()) {
+                                        $ext = strtolower($fileinfo->getExtension());
+                                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp']) && strpos($fileinfo->getFilename(), 'cover_grupo_') !== 0) {
+                                            $imagesInFolder[] = $fileinfo->getRealPath();
+                                        }
+                                    }
                                 }
-                                if (@copy($candPath, $destPath)) {
-                                    $coverUrl = "api/uploads/thumbnails/$uniqueName";
-                                    break;
+                            } catch (Exception $e) {}
+
+                            if (count($imagesInFolder) > 0) {
+                                // Select one randomly!
+                                $randSrc = $imagesInFolder[array_rand($imagesInFolder)];
+                                $randomStr = substr(md5(uniqid(microtime(), true)), 0, 8);
+                                $fileName = 'cover_grupo_' . $randomStr . '.jpg';
+                                $destPath = "$dirPath/$fileName";
+
+                                // Clean up any stale ones just in case
+                                $staleCovers = glob("$dirPath/cover_grupo_*.jpg");
+                                if ($staleCovers) {
+                                    foreach ($staleCovers as $stale) {
+                                        @unlink($stale);
+                                    }
+                                }
+
+                                // Load, compress and save
+                                $imgData = @file_get_contents($randSrc);
+                                if ($imgData && compress_and_save_image($imgData, $destPath)) {
+                                    $coverUrl = "uploads/videos/" . $meta['folderPath'] . "/" . $fileName;
+                                }
+                            }
+                        }
+
+                        // If no cover_grupo created but has standard coverCandidates, try copying it as cover_grupo
+                        if (!$coverUrl) {
+                            $coverCandidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'poster.jpg', 'poster.png', 'portada.jpg', 'portada.png'];
+                            foreach ($coverCandidates as $candidate) {
+                                $candPath = "$dirPath/$candidate";
+                                if (file_exists($candPath)) {
+                                    $randomStr = substr(md5(uniqid(microtime(), true)), 0, 8);
+                                    $fileName = 'cover_grupo_' . $randomStr . '.jpg';
+                                    $destPath = "$dirPath/$fileName";
+                                    $imgData = @file_get_contents($candPath);
+                                    if ($imgData && compress_and_save_image($imgData, $destPath)) {
+                                        $coverUrl = "uploads/videos/" . $meta['folderPath'] . "/" . $fileName;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -864,4 +908,34 @@ function groups_delete_folder_recursive($dir) {
         (is_dir($path)) ? groups_delete_folder_recursive($path) : @unlink($path);
     }
     return @rmdir($dir);
+}
+
+function compress_and_save_image($data, $destPath) {
+    if (function_exists('imagecreatefromstring')) {
+        $img = @imagecreatefromstring($data);
+        if ($img !== false) {
+            $w = imagesx($img);
+            $h = imagesy($img);
+            $maxDim = 600;
+            if ($w > $maxDim || $h > $maxDim) {
+                if ($w > $h) {
+                    $newW = $maxDim;
+                    $newH = intval($h * ($maxDim / $w));
+                } else {
+                    $newH = $maxDim;
+                    $newW = intval($w * ($maxDim / $h));
+                }
+                $resized = imagecreatetruecolor($newW, $newH);
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+                imagedestroy($img);
+                $img = $resized;
+            }
+            if (imagejpeg($img, $destPath, 65)) {
+                imagedestroy($img);
+                return true;
+            }
+            imagedestroy($img);
+        }
+    }
+    return file_put_contents($destPath, $data) !== false;
 }

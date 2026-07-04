@@ -518,7 +518,7 @@ function admin_cleanup_files($pdo) {
             if (is_file($f)) {
                 // Normalizar la ruta del archivo encontrado por glob
                 $normF = ltrim($f, './');
-                if (!in_array($normF, $localUsed) && strpos($normF, 'group_cover_') === false) {
+                if (!in_array($normF, $localUsed) && strpos($normF, 'group_cover_') === false && strpos($normF, 'cover_grupo_') === false) {
                     @unlink($f);
                     $deleted++;
                 }
