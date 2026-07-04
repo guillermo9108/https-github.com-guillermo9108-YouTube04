@@ -3,7 +3,7 @@
  * GROUPS - ADVANCED ADMINISTRATIVE SYSTEM (MariaDB 10 / SQLite compatible)
  */
 
-function groups_list($pdo) {
+function groups_sync_folders($pdo) {
     try {
         $stmtS = $pdo->query("SELECT localLibraryPath, libraryPaths FROM system_settings WHERE id = 1");
         $s = $stmtS->fetch(PDO::FETCH_ASSOC);
@@ -110,8 +110,6 @@ function groups_list($pdo) {
                         time(),
                         1 // autoDetected
                     ]);
-                    
-                    // Auto-detect logged skipped
                     
                     // Reload record
                     $stmtGet = $pdo->prepare("SELECT * FROM groups_metadata WHERE folderPath = ?");
@@ -276,6 +274,17 @@ function groups_list($pdo) {
         } catch (Exception $ex) {
             write_log("Error in group list video auto-publish and cover creation sync: " . $ex->getMessage());
         }
+
+        return [$diskFolders, $metaMap];
+    } catch (Exception $e) {
+        write_log("Error in groups_sync_folders: " . $e->getMessage());
+        return [[], []];
+    }
+}
+
+function groups_list($pdo) {
+    try {
+        list($diskFolders, $metaMap) = groups_sync_folders($pdo);
 
         // 3. Prepare final combined list
         $resultList = [];

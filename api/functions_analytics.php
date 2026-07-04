@@ -35,7 +35,9 @@ function analytics_get_detailed_stats($pdo) {
 function analytics_get_revenue_chart($pdo) {
     // Agrupar ventas por día en los últimos 30 días
     $thirtyDaysAgo = time() - (30 * 86400);
-    $stmt = $pdo->prepare("SELECT DATE(FROM_UNIXTIME(timestamp)) as date, SUM(amount) as total FROM transactions WHERE timestamp > ? GROUP BY DATE(FROM_UNIXTIME(timestamp)) ORDER BY date ASC");
+    $driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $dateExpr = ($driverName === 'sqlite') ? "DATE(timestamp, 'unixepoch')" : "DATE(FROM_UNIXTIME(timestamp))";
+    $stmt = $pdo->prepare("SELECT $dateExpr as date, SUM(amount) as total FROM transactions WHERE timestamp > ? GROUP BY date ORDER BY date ASC");
     $stmt->execute([$thirtyDaysAgo]);
     respond(true, $stmt->fetchAll());
 }

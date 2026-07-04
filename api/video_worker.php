@@ -11,6 +11,7 @@ setlocale(LC_ALL, 'en_US.UTF-8');
 
 require_once 'functions_utils.php';
 require_once 'functions_videos.php';
+require_once 'functions_groups.php';
 
 $configFile = 'db_config.json';
 if (!file_exists($configFile)) {
@@ -41,14 +42,56 @@ if ($count >= 3) {
 
 echo "--- VIDEO WORKER V1.6 ---\n";
 
+echo "[INFO] Sincronizando grupos y carpetas en disco...\n";
+try {
+    groups_sync_folders($pdo);
+} catch (Exception $e) {
+    echo "[ERROR] Sincronización de grupos falló: " . $e->getMessage() . "\n";
+}
+
+// Obtener carpetas de grupos con suscriptores para priorizarlas
+$subbedFolders = [];
+try {
+    $stmtSubs = $pdo->query("SELECT DISTINCT folderPath FROM group_subscriptions");
+    $subbedFolders = $stmtSubs->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($subbedFolders)) {
+        echo "[INFO] Priorizando videos de los grupos suscritos: " . implode(', ', $subbedFolders) . "\n";
+    }
+} catch (Exception $e) {
+    echo "[WARN] Error al obtener grupos suscritos: " . $e->getMessage() . "\n";
+}
+
 $batchSize = 20;
 $processed = 0;
 $failed = 0;
 
 for ($i = 0; $i < $batchSize; $i++) {
     $now = time();
-    $stmt = $pdo->prepare("SELECT * FROM videos WHERE (category = 'PENDING' OR (thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg')) AND transcode_status = 'NONE' AND processing_attempts < 3 AND locked_at < ? ORDER BY processing_attempts ASC, createdAt ASC LIMIT 1");
-    $stmt->execute([$now - 60]);
+    
+    // Armar consulta priorizada por suscripciones si existen
+    if (!empty($subbedFolders)) {
+        $placeholders = implode(',', array_fill(0, count($subbedFolders), '?'));
+        $sql = "SELECT * FROM videos 
+                WHERE (category = 'PENDING' OR (thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg')) 
+                  AND transcode_status = 'NONE' 
+                  AND processing_attempts < 3 
+                  AND locked_at < ? 
+                ORDER BY CASE WHEN category IN ($placeholders) THEN 0 ELSE 1 END, processing_attempts ASC, createdAt ASC 
+                LIMIT 1";
+        $params = array_merge([$now - 60], $subbedFolders);
+    } else {
+        $sql = "SELECT * FROM videos 
+                WHERE (category = 'PENDING' OR (thumbnailUrl IS NULL OR thumbnailUrl = '' OR thumbnailUrl LIKE '%default.jpg')) 
+                  AND transcode_status = 'NONE' 
+                  AND processing_attempts < 3 
+                  AND locked_at < ? 
+                ORDER BY processing_attempts ASC, createdAt ASC 
+                LIMIT 1";
+        $params = [$now - 60];
+    }
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $video = $stmt->fetch();
 
     if (!$video) break;

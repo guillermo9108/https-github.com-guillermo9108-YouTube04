@@ -915,9 +915,11 @@ function get_real_stats($pdo) {
     }
 
     // Daily history points grouping
+    $driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $dateExpr = ($driverName === 'sqlite') ? "DATE(timestamp, 'unixepoch')" : "DATE(FROM_UNIXTIME(timestamp))";
     $stmtDaily = $pdo->prepare("
         SELECT 
-            DATE(timestamp, 'unixepoch') as day,
+            $dateExpr as day,
             (SUM(CASE WHEN isExternal = 1 THEN amount ELSE 0 END) + SUM(CASE WHEN isExternal = 0 THEN COALESCE(adminFee, 0) ELSE 0 END)) as cash_in,
             SUM(COALESCE(adminFee, 0)) as internal_rev
         FROM transactions

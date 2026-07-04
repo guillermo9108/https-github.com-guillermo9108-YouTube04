@@ -2463,7 +2463,7 @@ function get_stories($pdo) {
                 'avatarUrl' => fix_url($grpAvatar),
                 'contentUrl' => fix_url($mv['videoUrl']),
                 'type' => $isImg ? 'IMAGE' : 'VIDEO',
-                'overlayText' => $mv['title'],
+                'overlayText' => NULL,
                 'overlayColor' => '#ffffff',
                 'overlayBg' => 'bg-black/50',
                 'audioUrl' => NULL,

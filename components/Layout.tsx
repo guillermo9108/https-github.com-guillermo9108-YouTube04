@@ -47,6 +47,22 @@ export default function Layout() {
   const { settings } = useSettings();
   const [unreadCount, setUnreadCount] = useState(0);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [wasOffline, setWasOffline] = useState(false);
+  const [showOnlineBanner, setShowOnlineBanner] = useState(false);
+
+  useEffect(() => {
+    if (isOffline) {
+      setWasOffline(true);
+      setShowOnlineBanner(false);
+    } else if (wasOffline) {
+      setShowOnlineBanner(true);
+      const timer = setTimeout(() => {
+        setShowOnlineBanner(false);
+        setWasOffline(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOffline, wasOffline]);
 
   useEffect(() => {
     if (!user) return;
@@ -95,6 +111,19 @@ export default function Layout() {
 
   return (
     <div className={`min-h-screen flex flex-col bg-[var(--bg-primary)] pb-[env(safe-area-inset-bottom,0px)] ${isMenuMode ? '' : 'pt-[calc(104px+env(safe-area-inset-top,24px))]'}`}>
+      {/* Connection Status Banners */}
+      {isOffline && (
+        <div className={`fixed ${isMenuMode ? 'top-0' : 'top-14'} left-0 right-0 z-[999] bg-amber-600 text-white text-[11px] font-bold text-center py-1.5 px-4 flex items-center justify-center gap-1.5 shadow-md transition-all duration-300 animate-in slide-in-from-top`}>
+          <AlertTriangle size={13} />
+          <span>Sin conexión a Internet — Trabajando en modo local/offline</span>
+        </div>
+      )}
+      {showOnlineBanner && (
+        <div className={`fixed ${isMenuMode ? 'top-0' : 'top-14'} left-0 right-0 z-[999] bg-emerald-600 text-white text-[11px] font-bold text-center py-1.5 px-4 flex items-center justify-center gap-1.5 shadow-md transition-all duration-300 animate-in slide-in-from-top`}>
+          <CheckCircle2 size={13} />
+          <span>Conexión restablecida — De nuevo en línea</span>
+        </div>
+      )}
       {/* Facebook Lite Style Header */}
       {!isMenuMode && (
         <header 

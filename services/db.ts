@@ -21,6 +21,55 @@ class DBService {
     public isHomeDirty() { return this.homeDirty; }
     public resetHomeDirty() { this.homeDirty = false; }
     private isOffline = false;
+    private offlineCheckTimeout: any = null;
+
+    private setOfflineState(newOffline: boolean) {
+        if (newOffline) {
+            if (this.isOffline) return;
+            if (this.offlineCheckTimeout) return;
+
+            this.offlineCheckTimeout = setTimeout(async () => {
+                this.offlineCheckTimeout = null;
+                // Confirm if browser is strictly offline according to navigator
+                if (navigator.onLine === false) {
+                    this.isOffline = true;
+                    window.dispatchEvent(new CustomEvent('sp_offline'));
+                    window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: true } }));
+                    return;
+                }
+
+                // If navigator says we are online, do a quick verification ping to make sure
+                try {
+                    const controller = new AbortController();
+                    const pid = setTimeout(() => controller.abort(), 3000);
+                    await fetch('/api/index.php?action=client_log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: 'ping_check_connectivity', level: 'INFO', source: 'PING' }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(pid);
+                    // Connection is active, false alarm!
+                } catch (e) {
+                    // Verification failed! Truly offline
+                    this.isOffline = true;
+                    window.dispatchEvent(new CustomEvent('sp_offline'));
+                    window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: true } }));
+                }
+            }, 3000);
+        } else {
+            if (this.offlineCheckTimeout) {
+                clearTimeout(this.offlineCheckTimeout);
+                this.offlineCheckTimeout = null;
+            }
+            if (this.isOffline) {
+                this.isOffline = false;
+                window.dispatchEvent(new CustomEvent('sp_online'));
+                window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: false } }));
+            }
+        }
+    }
+
     private lastErrorTime = 0;
     private isLogging = false;
     private logCountInWindow = 0;
@@ -102,11 +151,7 @@ class DBService {
         return fetch(url, options).then(async (response) => {
             clearTimeout(timeoutId);
             
-            if (this.isOffline) {
-                this.isOffline = false;
-                window.dispatchEvent(new CustomEvent('sp_online'));
-                window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: false } }));
-            }
+            this.setOfflineState(false);
 
             const rawText = await response.text();
             
@@ -148,10 +193,8 @@ class DBService {
             // Detectar error de conexión o timeout
             const isNetworkError = err.name === 'TypeError' || err.name === 'AbortError' || err.message.includes('Failed to fetch');
             
-            if (isNetworkError && !this.isOffline) {
-                this.isOffline = true;
-                window.dispatchEvent(new CustomEvent('sp_offline'));
-                window.dispatchEvent(new CustomEvent('sp_network_status_change', { detail: { isOffline: true } }));
+            if (isNetworkError) {
+                this.setOfflineState(true);
             }
 
             if (isReadRequest) {

@@ -429,23 +429,6 @@ export default function AdminGroups() {
           </button>
 
           <button 
-            onClick={handleCleanupPreview}
-            disabled={cleaning || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-md"
-          >
-            <Trash2 size={14} className={cleaning ? 'animate-spin' : ''} />
-            Limpieza Inteligente
-          </button>
-
-          <button 
-            onClick={() => setShowConfig(true)}
-            className="flex items-center gap-1.5 p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-white/5 cursor-pointer"
-            title="Configurar limpieza"
-          >
-            <Settings size={16} />
-          </button>
-
-          <button 
             onClick={() => { setShowLogs(true); loadLogs(); }}
             className="flex items-center gap-1.5 p-2 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-xl transition-all border border-rose-500/20 cursor-pointer"
             title="Registro de Errores"

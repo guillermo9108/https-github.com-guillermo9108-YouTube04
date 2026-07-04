@@ -413,8 +413,8 @@ export default function StoryViewer() {
                     <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600" />
                 )}
 
-                {/* Shared Content Overlay (Facebook style) */}
-                {(currentStory.originalVideo || currentStory.originalMarketplaceItem) && (
+                {/* Shared Content Overlay (Facebook style) - Hidden for automatic group stories to prevent blocking video visibility */}
+                {(currentStory.originalVideo || currentStory.originalMarketplaceItem) && !currentStory.userId?.startsWith('group_') && (
                     <div className="absolute inset-x-0 bottom-36 flex justify-center p-4 z-50 pointer-events-none">
                         <div 
                             className="bg-black/80 backdrop-blur-md border border-white/20 rounded-2xl w-full max-w-[300px] overflow-hidden pointer-events-auto shadow-2xl active:scale-95 transition-transform"
